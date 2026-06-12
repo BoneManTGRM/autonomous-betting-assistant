@@ -3,6 +3,7 @@ import os
 import streamlit as st
 
 from autonomous_betting_agent.live_odds import list_sports, scan_market
+from autonomous_betting_agent.scorelines import estimate_scorelines, expected_goals_from_probability
 
 st.title("Live market scanner")
 
@@ -35,6 +36,23 @@ else:
             st.subheader(f"{item.away_team} at {item.home_team}")
             st.write(f"Most likely: {item.favorite} ({item.favorite_probability:.1%})")
             rows = []
+            home_probability = None
             for outcome in item.outcomes:
                 rows.append({"Outcome": outcome.name, "Price": round(outcome.average_price, 3), "Probability": f"{outcome.normalized_probability:.1%}"})
+                if outcome.name == item.home_team:
+                    home_probability = outcome.normalized_probability
             st.dataframe(rows, use_container_width=True, hide_index=True)
+            if home_probability is not None:
+                home_xg, away_xg = expected_goals_from_probability(home_probability, neutral_site=False)
+                score_rows = []
+                for pick in estimate_scorelines(home_xg, away_xg):
+                    if pick.margin > 0:
+                        margin = f"{item.home_team} by {pick.margin}"
+                    elif pick.margin < 0:
+                        margin = f"{item.away_team} by {abs(pick.margin)}"
+                    else:
+                        margin = "Draw"
+                    score_rows.append({"Score": pick.label, "Spread": margin, "Probability": f"{pick.probability:.1%}"})
+                st.write("Most likely scorelines / spread")
+                st.dataframe(score_rows, use_container_width=True, hide_index=True)
+            st.caption("Market-based scan only. Add injuries, lineups, weather and team ratings before trusting a pick.")
