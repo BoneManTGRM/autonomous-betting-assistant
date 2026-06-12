@@ -48,10 +48,10 @@ pip install -r requirements.txt
 python run_agent.py examples/sample_event.json
 ```
 
-Write outputs to files:
+Write JSON output to a file:
 
 ```bash
-python run_agent.py examples/sample_event.json --json-output result.json --markdown-output report.md
+python run_agent.py examples/sample_event.json --json-output result.json
 ```
 
 ## Run the Streamlit app
