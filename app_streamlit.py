@@ -8,7 +8,7 @@ from autonomous_betting_agent.scorelines import estimate_scorelines, expected_go
 
 st.set_page_config(page_title="Autonomous Betting Agent", layout="wide")
 st.title("Autonomous Betting Agent")
-st.caption("Enter teams. The agent searches live market data, ranks likely outcomes, and estimates scorelines.")
+st.caption("Enter the teams. The agent searches live market data, ranks likely outcomes, and estimates scorelines.")
 
 
 def read_key(name: str) -> str:
@@ -32,13 +32,13 @@ def match_score(query: str, candidate: str) -> float:
     return SequenceMatcher(None, query, candidate).ratio()
 
 
-def event_matches(item, team_a: str, team_b: str) -> bool:
-    if not team_a and not team_b:
+def event_matches(item, team_one: str, team_two: str) -> bool:
+    if not team_one and not team_two:
         return True
     names = [item.home_team, item.away_team] + [outcome.name for outcome in item.outcomes]
-    a_ok = not team_a or max(match_score(team_a, name) for name in names) >= 0.55
-    b_ok = not team_b or max(match_score(team_b, name) for name in names) >= 0.55
-    return a_ok and b_ok
+    one_ok = not team_one or max(match_score(team_one, name) for name in names) >= 0.55
+    two_ok = not team_two or max(match_score(team_two, name) for name in names) >= 0.55
+    return one_ok and two_ok
 
 
 def show_event(item) -> None:
@@ -78,7 +78,7 @@ def show_event(item) -> None:
     with st.expander("ARA cycle notes"):
         for note in item.cycle_notes:
             st.write(f"- {note}")
-    st.caption("Research estimate only. It uses market data until team-stat, injury, lineup, and weather providers are added.")
+    st.caption("Research estimate only. This uses market data until team-stat, injury, lineup, and weather providers are added.")
 
 
 api_key = read_key("THE_ODDS_API_KEY")
@@ -87,14 +87,18 @@ if not api_key:
     st.code('THE_ODDS_API_KEY = "paste-your-key-here"', language="toml")
     st.stop()
 
-sport_search = st.text_input("Sport or competition", "soccer")
-team_a = st.text_input("Team 1", "")
-team_b = st.text_input("Team 2", "")
-max_events = st.slider("Max games to scan", 1, 50, 20)
+team_one = st.text_input("Team 1", "")
+team_two = st.text_input("Team 2", "")
+competition = st.text_input("Sport / competition", "soccer")
+
+with st.expander("Advanced settings"):
+    region_text = st.text_input("Regions", "us,eu,uk")
+    max_events = st.number_input("Max games to scan", min_value=1, max_value=50, value=20, step=1)
+    choose_feed = st.checkbox("Choose exact feed", value=False)
 
 with st.spinner("Loading sport feeds"):
     sports = list_sports(api_key, include_all=False)
-terms = [term.lower() for term in sport_search.split() if term.strip()]
+terms = [term.lower() for term in competition.split() if term.strip()]
 choices = []
 for sport_item in sports:
     haystack = f"{sport_item.key} {sport_item.group} {sport_item.title} {sport_item.description}".lower()
@@ -103,14 +107,23 @@ for sport_item in sports:
 if not choices:
     choices = sports
 labels = [f"{sport_item.title} | {sport_item.key}" for sport_item in choices]
-selected = st.selectbox("Feed", labels)
-sport_key = choices[labels.index(selected)].key
+if choose_feed:
+    selected = st.selectbox("Feed", labels)
+    selected_sports = [choices[labels.index(selected)]]
+else:
+    selected_sports = choices[:3]
+    st.caption("Agent will scan the best matching feeds automatically. Use Advanced settings to pick one exact feed.")
 
-if st.button("Run autonomous search"):
+if st.button("Run autonomous agent"):
+    all_results = []
     with st.spinner("Searching games and building report"):
-        results = scan_market(api_key, sport_key=sport_key, regions="us,eu,uk", max_events=max_events)
-    filtered = [item for item in results if event_matches(item, team_a, team_b)]
+        for sport_item in selected_sports:
+            try:
+                all_results.extend(scan_market(api_key, sport_key=sport_item.key, regions=region_text, max_events=int(max_events)))
+            except Exception as exc:
+                st.warning(f"Skipped {sport_item.title}: {exc}")
+    filtered = [item for item in all_results if event_matches(item, team_one, team_two)]
     if not filtered:
-        st.info("No matching games found in this feed. Try fewer team-name words or a different feed.")
+        st.info("No matching games found. Try fewer team-name words or a broader competition search like soccer, fifa, nba, nfl, mlb, or tennis.")
     for item in filtered:
         show_event(item)
