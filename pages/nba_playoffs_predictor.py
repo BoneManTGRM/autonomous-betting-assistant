@@ -8,67 +8,55 @@ from autonomous_betting_agent.live_odds import list_sports, scan_market
 
 st.set_page_config(page_title="NBA Playoffs Predictor", layout="wide")
 
-language = st.selectbox("Language / Idioma", ["English", "Español"], index=0)
+_translate_choice = st.selectbox("Translate page", ["English", "Español"], index=0)
+language = _translate_choice
 IS_ES = language == "Español"
 
 TEXT = {
     "title": {"English": "NBA Playoffs Predictor", "Español": "Predictor de Playoffs NBA"},
     "caption": {
         "English": "NBA-only scanner with moneyline, point spread, and totals when the provider returns them. It will not mix in college football, tennis, soccer, or other sports.",
-        "Español": "Escáner solo para NBA con moneyline, spread y totales cuando el proveedor los devuelve. No mezcla futbol americano universitario, tenis, futbol u otros deportes.",
+        "Español": "Escáner exclusivo de NBA con ganador/moneyline, spread y total cuando el proveedor los devuelve. No mezcla futbol americano universitario, tenis, futbol u otros deportes.",
     },
     "token": {"English": "Provider key", "Español": "Clave del proveedor"},
     "team": {"English": "Optional team filter", "Español": "Filtro opcional de equipo"},
-    "regions": {"English": "Bookmaker regions", "Español": "Regiones de casas"},
-    "events": {"English": "Max NBA events", "Español": "Máximo eventos NBA"},
+    "regions": {"English": "Bookmaker regions", "Español": "Regiones de casas de apuesta"},
+    "events": {"English": "Max NBA events", "Español": "Máximo de eventos NBA"},
     "scan": {"English": "Scan NBA markets", "Español": "Escanear mercados NBA"},
     "none": {"English": "No NBA odds markets were returned. The NBA may not be offered by the provider at this moment, or your key/plan may not include it.", "Español": "No se devolvieron mercados NBA. Puede que el proveedor no ofrezca NBA ahora mismo, o que tu clave/plan no lo incluya."},
-    "no_team": {"English": "No NBA market matched that team. Showing all NBA markets found instead.", "Español": "Ningún mercado NBA coincidió con ese equipo. Mostrando todos los mercados NBA encontrados."},
+    "no_team": {"English": "No NBA market matched that team. Showing all NBA markets found instead.", "Español": "Ningún mercado NBA coincidió con ese equipo. Se mostrarán todos los mercados NBA encontrados."},
     "dashboard": {"English": "NBA dashboard", "Español": "Panel NBA"},
-    "matches": {"English": "Team matches", "Español": "Coincidencias"},
+    "matches": {"English": "Team matches", "Español": "Coincidencias del equipo"},
     "all": {"English": "All NBA markets", "Español": "Todos los mercados NBA"},
     "diag": {"English": "Diagnostics", "Español": "Diagnóstico"},
-    "raw": {"English": "Moneyline table", "Español": "Tabla moneyline"},
-    "spread": {"English": "Point spread", "Español": "Spread"},
+    "raw": {"English": "Moneyline table", "Español": "Tabla de ganador/moneyline"},
+    "spread": {"English": "Point spread", "Español": "Spread / hándicap"},
     "totals": {"English": "Game total", "Español": "Total del juego"},
-    "pick": {"English": "Market lean", "Español": "Lectura de mercado"},
+    "pick": {"English": "Market lean", "Español": "Lectura del mercado"},
     "prob": {"English": "Probability", "Español": "Probabilidad"},
-    "price": {"English": "Best price", "Español": "Mejor precio"},
+    "price": {"English": "Best price", "Español": "Mejor momio"},
     "quality": {"English": "Data quality", "Español": "Calidad de datos"},
     "start": {"English": "Start", "Español": "Inicio"},
+    "not_returned": {"English": "not returned", "Español": "no disponible"},
+    "feeds_found": {"English": "NBA feeds found", "Español": "Feeds NBA encontrados"},
+    "skipped": {"English": "Skipped", "Español": "Omitidos"},
+    "markets_requested": {"English": "Markets requested: h2h, spreads, totals", "Español": "Mercados solicitados: ganador, spread y total"},
+    "nba_only_note": {"English": "This page only scans NBA feeds. It does not use upcoming all-sports fallback, so college football cannot appear here.", "Español": "Esta página solo escanea feeds de NBA. No usa el fallback de todos los deportes, así que no puede aparecer futbol americano universitario aquí."},
 }
 
 ALL_REGIONS = ["us", "us2", "uk", "eu", "au"]
 NBA_ALIASES = {
-    "hawks": ["atlanta hawks", "hawks"],
-    "celtics": ["boston celtics", "celtics"],
-    "nets": ["brooklyn nets", "nets"],
-    "hornets": ["charlotte hornets", "hornets"],
-    "bulls": ["chicago bulls", "bulls"],
-    "cavaliers": ["cleveland cavaliers", "cavaliers", "cavs"],
-    "mavericks": ["dallas mavericks", "mavericks", "mavs"],
-    "nuggets": ["denver nuggets", "nuggets"],
-    "pistons": ["detroit pistons", "pistons"],
-    "warriors": ["golden state warriors", "warriors", "gsw"],
-    "rockets": ["houston rockets", "rockets"],
-    "pacers": ["indiana pacers", "pacers"],
-    "clippers": ["la clippers", "los angeles clippers", "clippers", "lac"],
-    "lakers": ["los angeles lakers", "la lakers", "lakers", "lal"],
-    "grizzlies": ["memphis grizzlies", "grizzlies"],
-    "heat": ["miami heat", "heat"],
-    "bucks": ["milwaukee bucks", "bucks"],
-    "timberwolves": ["minnesota timberwolves", "timberwolves", "wolves"],
-    "pelicans": ["new orleans pelicans", "pelicans"],
-    "knicks": ["new york knicks", "knicks", "ny knicks"],
-    "thunder": ["oklahoma city thunder", "okc thunder", "thunder"],
-    "magic": ["orlando magic", "magic"],
-    "76ers": ["philadelphia 76ers", "76ers", "sixers"],
-    "suns": ["phoenix suns", "suns"],
-    "trail blazers": ["portland trail blazers", "trail blazers", "blazers"],
-    "kings": ["sacramento kings", "kings"],
-    "spurs": ["san antonio spurs", "spurs"],
-    "raptors": ["toronto raptors", "raptors"],
-    "jazz": ["utah jazz", "jazz"],
+    "hawks": ["atlanta hawks", "hawks"], "celtics": ["boston celtics", "celtics"], "nets": ["brooklyn nets", "nets"],
+    "hornets": ["charlotte hornets", "hornets"], "bulls": ["chicago bulls", "bulls"], "cavaliers": ["cleveland cavaliers", "cavaliers", "cavs"],
+    "mavericks": ["dallas mavericks", "mavericks", "mavs"], "nuggets": ["denver nuggets", "nuggets"], "pistons": ["detroit pistons", "pistons"],
+    "warriors": ["golden state warriors", "warriors", "gsw"], "rockets": ["houston rockets", "rockets"], "pacers": ["indiana pacers", "pacers"],
+    "clippers": ["la clippers", "los angeles clippers", "clippers", "lac"], "lakers": ["los angeles lakers", "la lakers", "lakers", "lal"],
+    "grizzlies": ["memphis grizzlies", "grizzlies"], "heat": ["miami heat", "heat"], "bucks": ["milwaukee bucks", "bucks"],
+    "timberwolves": ["minnesota timberwolves", "timberwolves", "wolves"], "pelicans": ["new orleans pelicans", "pelicans"],
+    "knicks": ["new york knicks", "knicks", "ny knicks"], "thunder": ["oklahoma city thunder", "okc thunder", "thunder"],
+    "magic": ["orlando magic", "magic"], "76ers": ["philadelphia 76ers", "76ers", "sixers"], "suns": ["phoenix suns", "suns"],
+    "trail blazers": ["portland trail blazers", "trail blazers", "blazers"], "kings": ["sacramento kings", "kings"],
+    "spurs": ["san antonio spurs", "spurs"], "raptors": ["toronto raptors", "raptors"], "jazz": ["utah jazz", "jazz"],
     "wizards": ["washington wizards", "wizards"],
 }
 
@@ -78,7 +66,7 @@ def t(key):
 
 
 def clean(value: str) -> str:
-    value = unicodedata.normalize("NFKD", value or "")
+    value = unicodedata.normalize("NFKD", str(value or ""))
     value = "".join(ch for ch in value if not unicodedata.combining(ch))
     return " ".join(value.lower().replace("-", " ").replace(".", " ").replace("'", "").split())
 
@@ -119,12 +107,12 @@ def match_score(filter_text, event):
 def safe_error(exc):
     status = getattr(getattr(exc, "response", None), "status_code", None)
     if status in (401, 403):
-        return "key rejected"
+        return "clave rechazada" if IS_ES else "key rejected"
     if status == 422:
-        return "region/feed unavailable"
+        return "feed o región no disponible" if IS_ES else "region/feed unavailable"
     if status == 429:
-        return "quota/rate limit"
-    return "request failed"
+        return "límite de cuota o velocidad" if IS_ES else "quota/rate limit"
+    return "falló la solicitud" if IS_ES else "request failed"
 
 
 def find_nba_sports(sports):
@@ -162,50 +150,21 @@ def snapshot(event, score, matched):
     gap = top.normalized_probability - (second.normalized_probability if second else 0)
     max_range = max((o.price_range or 0.0) for o in event.outcomes)
     quality = max(0, min(100, round(45 + min(event.bookmaker_count, 12) * 3.5 + min(gap, 0.30) * 80 - min(max_range, 1.5) * 6)))
-    return {
-        "Event": f"{event.away_team} at {event.home_team}",
-        "Sport": event.sport_title,
-        "Start": event.commence_time,
-        "Pick": top.name,
-        "Probability": f"{top.normalized_probability:.1%}",
-        "Best price": round((top.best_price or top.average_price), 3),
-        "Best book": top.best_bookmaker or "",
-        "Books": event.bookmaker_count,
-        "Data quality": quality,
-        "Match": f"{score:.0%}",
-        "Matched": matched,
-        "_score": score,
-        "_prob": top.normalized_probability,
-        "_event": event,
-    }
+    return {"Event": f"{event.away_team} at {event.home_team}", "Sport": event.sport_title, "Start": event.commence_time, "Pick": top.name, "Probability": f"{top.normalized_probability:.1%}", "Best price": round((top.best_price or top.average_price), 3), "Best book": top.best_bookmaker or "", "Books": event.bookmaker_count, "Data quality": quality, "Match": f"{score:.0%}", "Matched": matched, "_score": score, "_prob": top.normalized_probability, "_event": event}
 
 
 def market_table(event):
-    return [{
-        "Outcome": o.name,
-        "Average price": round(o.average_price, 3),
-        "Best price": round((o.best_price or o.average_price), 3),
-        "Best book": o.best_bookmaker or "",
-        "Probability": f"{o.normalized_probability:.1%}",
-        "Books": o.source_count,
-    } for o in event.outcomes]
+    return [{"Outcome": o.name, "Average price": round(o.average_price, 3), "Best price": round((o.best_price or o.average_price), 3), "Best book": o.best_bookmaker or "", "Probability": f"{o.normalized_probability:.1%}", "Books": o.source_count} for o in event.outcomes]
 
 
 def line_table(lines):
-    return [{
-        "Name": line.name,
-        "Point": "" if line.point is None else line.point,
-        "Average price": round(line.average_price, 3),
-        "Best price": round((line.best_price or line.average_price), 3),
-        "Best book": line.best_bookmaker or "",
-        "Books": line.source_count,
-    } for line in (lines or [])]
+    return [{"Name": line.name, "Point": "" if line.point is None else line.point, "Average price": round(line.average_price, 3), "Best price": round((line.best_price or line.average_price), 3), "Best book": line.best_bookmaker or "", "Books": line.source_count} for line in (lines or [])]
 
 
 def headline_line(lines, market_name):
     rows = line_table(lines)
     if not rows:
-        return f"{market_name}: not returned"
+        return f"{market_name}: {t('not_returned')}"
     first = rows[0]
     return f"{market_name}: {first['Name']} {first['Point']} @ {first['Best price']}"
 
@@ -221,19 +180,19 @@ def show_event(row, expanded=False):
         c4.metric(t("quality"), f"{row['Data quality']}/100")
         st.write(f"{t('start')}: {row['Start']}")
         if row["Matched"]:
-            st.write(f"Matched: {row['Matched']}")
+            st.write(f"{t('matches')}: {row['Matched']}")
         with st.expander(t("spread"), expanded=True):
             spreads = line_table(event.spreads)
             if spreads:
                 st.dataframe(spreads, use_container_width=True, hide_index=True)
             else:
-                st.caption("Point spread was not returned for this event." if not IS_ES else "El spread no fue devuelto para este evento.")
+                st.caption("Point spread was not returned for this event." if not IS_ES else "El spread no está disponible para este evento.")
         with st.expander(t("totals"), expanded=False):
             totals = line_table(event.totals)
             if totals:
                 st.dataframe(totals, use_container_width=True, hide_index=True)
             else:
-                st.caption("Game total was not returned for this event." if not IS_ES else "El total no fue devuelto para este evento.")
+                st.caption("Game total was not returned for this event." if not IS_ES else "El total del juego no está disponible para este evento.")
         with st.expander(t("raw")):
             st.dataframe(market_table(event), use_container_width=True, hide_index=True)
 
@@ -262,7 +221,7 @@ except Exception as exc:
     st.stop()
 
 nba_sports = find_nba_sports(sports)
-st.caption("NBA feeds found: " + (", ".join([s.title for s in nba_sports]) if nba_sports else "none"))
+st.caption(f"{t('feeds_found')}: " + (", ".join([s.title for s in nba_sports]) if nba_sports else "none"))
 
 if st.button(t("scan"), type="primary"):
     if not nba_sports:
@@ -297,16 +256,16 @@ if st.button(t("scan"), type="primary"):
     if not display_rows:
         st.error(t("none"))
         if skipped:
-            with st.expander("Skipped feeds", expanded=True):
+            with st.expander(t("skipped"), expanded=True):
                 for title, reason in skipped:
                     st.write(f"- {title}: {reason}")
         st.stop()
 
     st.subheader(t("dashboard"))
     c1, c2, c3 = st.columns(3)
-    c1.metric("NBA feeds", len(nba_sports))
-    c2.metric("NBA markets", len(rows))
-    c3.metric("Skipped", len(skipped))
+    c1.metric(t("feeds_found"), len(nba_sports))
+    c2.metric(t("all"), len(rows))
+    c3.metric(t("skipped"), len(skipped))
 
     tabs = st.tabs([t("matches"), t("all"), t("diag")])
     with tabs[0]:
@@ -315,8 +274,8 @@ if st.button(t("scan"), type="primary"):
     with tabs[1]:
         st.dataframe([{k: v for k, v in row.items() if not k.startswith("_")} for row in rows], use_container_width=True, hide_index=True)
     with tabs[2]:
-        st.write("This page only scans NBA feeds. It does not use upcoming all-sports fallback, so college football cannot appear here.")
-        st.write("Markets requested: h2h, spreads, totals")
+        st.write(t("nba_only_note"))
+        st.write(t("markets_requested"))
         st.write("NBA sport keys: " + ", ".join([s.key for s in nba_sports]))
         if skipped:
             for title, reason in skipped:
