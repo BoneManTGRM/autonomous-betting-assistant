@@ -13,73 +13,62 @@ language = st.selectbox("Language / Idioma", ["English", "Español"], index=0)
 IS_ES = language == "Español"
 
 TEXT = {
-    "title": {"English": "Live Market Command Center", "Español": "Centro de Comando de Mercado en Vivo"},
+    "title": {"English": "Live Market Scanner", "Español": "Escáner de Mercado en Vivo"},
     "caption": {
-        "English": "Scan across sports and find the teams with the highest market-implied chance to win. Leave the team filter blank for all sports, or enter one team/player to hunt for only that name.",
-        "Español": "Escanea varios deportes y encuentra los equipos con mayor probabilidad de ganar según el mercado. Deja el filtro vacío para todos los deportes o escribe un equipo/jugador para buscar solo ese nombre.",
+        "English": "Search live games across sports. Leave the team/player filter blank to scan everything, or enter a team/player to find matching games.",
+        "Español": "Busca partidos en vivo en varios deportes. Deja el filtro de equipo/jugador vacío para escanear todo, o escribe un equipo/jugador para encontrar partidos relacionados.",
     },
     "token": {"English": "Provider access token", "Español": "Clave de acceso del proveedor"},
     "token_help": {"English": "Paste your own provider access token. It is used only for this browser session unless the app owner configures one separately.", "Español": "Pega tu propia clave. Se usa solo en esta sesión del navegador salvo que el dueño configure una aparte."},
     "mode": {"English": "Scan mode", "Español": "Modo de escaneo"},
-    "smart": {"English": "Smart dashboard", "Español": "Panel inteligente"},
+    "smart": {"English": "Smart multi-feed scan", "Español": "Escaneo inteligente multi-fuente"},
     "single": {"English": "Single feed", "Español": "Una fuente"},
-    "objective": {"English": "Scanner objective", "Español": "Objetivo del escáner"},
-    "highest_win": {"English": "Find highest team win chance", "Español": "Encontrar mayor probabilidad de victoria"},
-    "market_command": {"English": "Full market command center", "Español": "Centro completo de mercado"},
     "regions": {"English": "Bookmaker market regions", "Español": "Regiones de mercado de casas de apuestas"},
-    "regions_help": {"English": "The Odds API regions: us, us2, uk, eu, au. These are bookmaker markets, not event host countries.", "Español": "Regiones de The Odds API: us, us2, uk, eu, au. Son mercados de casas de apuestas, no países sede del evento."},
+    "regions_help": {"English": "Regions are bookmaker markets, not host countries. If one region fails, the scanner tries the others automatically.", "Español": "Las regiones son mercados de casas de apuestas, no países sede. Si una región falla, el escáner prueba las otras automáticamente."},
     "sport_search": {"English": "Sport / league search", "Español": "Buscar deporte / liga"},
     "team_filter": {"English": "Team/player filter", "Español": "Filtro de equipo/jugador"},
-    "team_filter_help": {"English": "Optional. Leave blank for all sports. Example: Mexico, Lakers, Djokovic, Yankees", "Español": "Opcional. Déjalo vacío para todos los deportes. Ejemplo: México, Lakers, Djokovic, Yankees"},
+    "team_filter_help": {"English": "Optional. Example: Mexico, Lakers, Djokovic, Yankees. Leave blank to show all games.", "Español": "Opcional. Ejemplo: México, Lakers, Djokovic, Yankees. Déjalo vacío para mostrar todos los juegos."},
     "max_feeds": {"English": "Max feeds to scan", "Español": "Máximo de fuentes a revisar"},
     "max_events": {"English": "Max events per feed", "Español": "Máximo de eventos por fuente"},
     "min_books": {"English": "Minimum books", "Español": "Mínimo de casas"},
-    "min_fav": {"English": "Minimum team win probability", "Español": "Probabilidad mínima de victoria"},
-    "choose_region": {"English": "Choose at least one market region.", "Español": "Elige al menos una región de mercado."},
-    "sport_feed": {"English": "Sport feed", "Español": "Fuente deportiva"},
     "scan": {"English": "Scan live markets", "Español": "Escanear mercados en vivo"},
+    "sport_feed": {"English": "Sport feed", "Español": "Fuente deportiva"},
+    "choose_region": {"English": "Choose at least one market region.", "Español": "Elige al menos una región de mercado."},
     "no_games": {"English": "No games with usable market data were returned.", "Español": "No se devolvieron partidos con datos de mercado utilizables."},
-    "no_exact": {"English": "No exact matches were found for that filter. Showing the highest-probability games found instead, plus closest name matches when available.", "Español": "No se encontraron coincidencias exactas para ese filtro. Mostrando los juegos con mayor probabilidad encontrados y las coincidencias más cercanas cuando existan."},
+    "no_exact": {"English": "No exact matches were found for that filter. Showing the closest games and the full scan instead.", "Español": "No se encontraron coincidencias exactas para ese filtro. Mostrando los partidos más cercanos y el escaneo completo."},
+    "dashboard": {"English": "Scanner dashboard", "Español": "Panel del escáner"},
+    "feeds": {"English": "Feeds scanned", "Español": "Fuentes revisadas"},
+    "events": {"English": "Events found", "Español": "Eventos encontrados"},
+    "matches": {"English": "Matches", "Español": "Coincidencias"},
+    "skipped": {"English": "Skipped feeds", "Español": "Fuentes omitidas"},
+    "best_matches": {"English": "Best matches", "Español": "Mejores coincidencias"},
+    "closest_matches": {"English": "Closest matches", "Español": "Coincidencias cercanas"},
+    "all_games": {"English": "All games", "Español": "Todos los juegos"},
+    "by_sport": {"English": "Best by sport", "Español": "Mejor por deporte"},
+    "raw": {"English": "Raw market table", "Español": "Tabla cruda de mercado"},
+    "download": {"English": "Download CSV", "Español": "Descargar CSV"},
     "start": {"English": "Start", "Español": "Inicio"},
-    "most_likely": {"English": "Most likely", "Español": "Más probable"},
-    "team_pick": {"English": "Team win pick", "Español": "Equipo con mayor opción"},
-    "win_probability": {"English": "Win probability", "Español": "Probabilidad de victoria"},
-    "outcome": {"English": "Outcome", "Español": "Resultado"},
-    "avg_price": {"English": "Avg price", "Español": "Precio promedio"},
+    "pick": {"English": "Market lean", "Español": "Lectura del mercado"},
+    "probability": {"English": "Probability", "Español": "Probabilidad"},
     "best_price": {"English": "Best price", "Español": "Mejor precio"},
     "best_book": {"English": "Best book", "Español": "Mejor casa"},
-    "range": {"English": "Book spread", "Español": "Diferencia entre casas"},
-    "probability": {"English": "Probability", "Español": "Probabilidad"},
     "books": {"English": "Books", "Español": "Casas"},
+    "quality": {"English": "Quality", "Español": "Calidad"},
+    "outcome": {"English": "Outcome", "Español": "Resultado"},
+    "avg_price": {"English": "Avg price", "Español": "Precio promedio"},
+    "range": {"English": "Book spread", "Español": "Diferencia entre casas"},
     "scorelines": {"English": "Likely scorelines / margins", "Español": "Marcadores / márgenes probables"},
     "score": {"English": "Score / margin", "Español": "Marcador / margen"},
     "read": {"English": "Read", "Español": "Lectura"},
     "estimated": {"English": "Estimated probability", "Español": "Probabilidad estimada"},
     "draw": {"English": "Draw", "Español": "Empate"},
     "by": {"English": "by", "Español": "por"},
-    "dashboard": {"English": "Scanner dashboard", "Español": "Panel del escáner"},
-    "events": {"English": "Events found", "Español": "Eventos encontrados"},
-    "feeds": {"English": "Feeds scanned", "Español": "Fuentes revisadas"},
-    "skipped": {"English": "Skipped feeds", "Español": "Fuentes omitidas"},
     "diagnostics": {"English": "Diagnostics", "Español": "Diagnóstico"},
-    "highest_team": {"English": "Highest team win chance", "Español": "Mayor probabilidad de victoria"},
-    "by_sport": {"English": "Best by sport", "Español": "Mejor por deporte"},
-    "closest_filter": {"English": "Closest filter matches", "Español": "Coincidencias más cercanas"},
-    "strongest": {"English": "Strongest favorites", "Español": "Favoritos más fuertes"},
-    "balanced": {"English": "Closest markets", "Español": "Mercados más cerrados"},
-    "draw_heavy": {"English": "Highest draw risk", "Español": "Mayor riesgo de empate"},
-    "disagreement": {"English": "Bookmaker disagreement", "Español": "Desacuerdo entre casas"},
-    "all_games": {"English": "All ranked games", "Español": "Todos los juegos ordenados"},
-    "raw": {"English": "Raw market table", "Español": "Tabla cruda de mercado"},
-    "ara_read": {"English": "ARA read", "Español": "Lectura ARA"},
-    "quality": {"English": "Market quality", "Español": "Calidad del mercado"},
-    "overround": {"English": "Overround", "Español": "Margen del mercado"},
-    "download": {"English": "Download ranked scan CSV", "Español": "Descargar CSV del escaneo"},
-    "note": {"English": "Market-only scan. This finds the team with the highest market-implied win chance, not a guaranteed winner.", "Español": "Escaneo solo de mercado. Encuentra el equipo con mayor probabilidad implícita de ganar, no un ganador garantizado."},
+    "note": {"English": "Market-only scan. This is not a guaranteed pick.", "Español": "Escaneo solo de mercado. No es una selección garantizada."},
 }
 
 COUNTRY_ALIASES = {
-    "mexico": ["mexico", "méxico", "mex", "el tri", "mexico national", "méxico national"],
+    "mexico": ["mexico", "méxico", "mex", "el tri"],
     "canada": ["canada", "canadá", "can"],
     "usa": ["usa", "united states", "united states of america", "usmnt", "estados unidos"],
     "brazil": ["brazil", "brasil"],
@@ -92,6 +81,9 @@ COUNTRY_ALIASES = {
     "south korea": ["south korea", "korea republic", "republic of korea", "corea del sur", "korea"],
 }
 
+ALL_REGIONS = ["us", "us2", "uk", "eu", "au"]
+POPULAR_TERMS = ["soccer", "fifa", "world cup", "international", "nba", "nfl", "mlb", "nhl", "tennis", "ufc", "mma", "boxing", "cricket", "rugby", "golf"]
+
 
 def t(key: str) -> str:
     entry = TEXT.get(key)
@@ -100,25 +92,10 @@ def t(key: str) -> str:
     return entry.get(language) or entry.get("English") or key.replace("_", " ").title()
 
 
-st.title(t("title"))
-st.caption(t("caption"))
-
-ALL_REGIONS = ["us", "us2", "uk", "eu", "au"]
-POPULAR_TERMS = [
-    "nba", "nfl", "mlb", "nhl", "soccer", "fifa", "world cup", "international", "friendlies", "concacaf",
-    "tennis", "ufc", "mma", "boxing", "cricket", "rugby", "golf", "formula", "nascar", "darts", "snooker",
-    "esports", "volleyball", "handball", "lacrosse",
-]
-
-
 def clean(value: str) -> str:
     value = unicodedata.normalize("NFKD", value or "")
     value = "".join(char for char in value if not unicodedata.combining(char))
     return " ".join(value.lower().replace("-", " ").replace(".", " ").split())
-
-
-def pct(value) -> str:
-    return "" if value is None else f"{value:.1%}"
 
 
 def filter_aliases(value: str) -> list[str]:
@@ -141,12 +118,12 @@ def safe_error(exc: Exception) -> str:
     response = getattr(exc, "response", None)
     status = getattr(response, "status_code", None)
     if status in (401, 403):
-        return "Provider key was rejected. Check the key and plan access." if not IS_ES else "La clave del proveedor fue rechazada. Revisa la clave y el acceso del plan."
+        return "Provider key rejected" if not IS_ES else "Clave rechazada"
     if status == 422:
-        return "This feed is not available for the selected market regions. Try fewer regions or another feed." if not IS_ES else "Esta fuente no está disponible para las regiones seleccionadas. Prueba menos regiones u otra fuente."
+        return "region/feed unavailable" if not IS_ES else "región/fuente no disponible"
     if status == 429:
-        return "Provider quota or rate limit reached. Wait or use another key." if not IS_ES else "Se alcanzó la cuota o límite del proveedor. Espera o usa otra clave."
-    return "Provider request failed. Try another feed or region." if not IS_ES else "Falló la solicitud al proveedor. Prueba otra fuente o región."
+        return "quota or rate limit reached" if not IS_ES else "cuota o límite alcanzado"
+    return "provider request failed" if not IS_ES else "falló la solicitud"
 
 
 def is_outright_feed(sport) -> bool:
@@ -157,26 +134,18 @@ def is_outright_feed(sport) -> bool:
 def sport_relevance(sport, query: str, team_filter: str = "") -> float:
     text = clean(f"{sport.key} {sport.group} {sport.title} {sport.description}")
     terms = [clean(term) for term in query.split() if clean(term) and clean(term) != "auto"]
-    score = -25.0 if is_outright_feed(sport) else 0.0
-
-    if not terms:
+    score = -20.0 if is_outright_feed(sport) else 0.0
+    if terms:
+        for term in terms:
+            score += 14.0 if term in text else SequenceMatcher(None, term, text).ratio()
+    else:
         for index, term in enumerate(POPULAR_TERMS):
             if clean(term) in text:
                 score += max(1.0, 10.0 - index * 0.25)
-    else:
-        for term in terms:
-            if term in text:
-                score += 12.0
-            else:
-                score += SequenceMatcher(None, term, text).ratio()
-
     if team_filter.strip() and is_country_filter(team_filter):
         for term in ["soccer", "fifa", "world", "cup", "international", "friendlies", "concacaf", "uefa", "copa", "qualifiers"]:
             if term in text:
-                score += 14.0
-        for term in ["nba", "nfl", "mlb", "nhl", "basketball", "baseball", "hockey", "americanfootball"]:
-            if term in text:
-                score -= 2.0
+                score += 16.0
     return score
 
 
@@ -206,27 +175,26 @@ def market_snapshot(item) -> dict:
     draw_prob = next((outcome.normalized_probability for outcome in item.outcomes if clean(outcome.name) in ["draw", "empate"]), None)
     gap = top.normalized_probability - (second.normalized_probability if second else 0.0)
     max_range = max((getattr(o, "price_range", 0.0) or 0.0) for o in item.outcomes)
-    best = getattr(team_pick, "best_price", None) or team_pick.average_price
+    best_price = getattr(team_pick, "best_price", None) or team_pick.average_price
     overround = getattr(item, "market_overround", 0.0)
-    quality = min(100, round(50 + min(item.bookmaker_count, 12) * 3 + min(gap, 0.30) * 80 - max(overround, 0.0) * 100))
+    quality = max(0, min(100, round(50 + min(item.bookmaker_count, 12) * 3 + min(gap, 0.30) * 80 - max(overround, 0.0) * 100)))
     return {
         "event": f"{item.away_team} at {item.home_team}",
         "sport": item.sport_title,
         "start": item.commence_time,
+        "pick": team_pick.name,
+        "prob": team_pick.normalized_probability,
         "favorite": top.name,
         "favorite_prob": top.normalized_probability,
-        "team_pick": team_pick.name,
-        "team_win_prob": team_pick.normalized_probability,
-        "best_price": best,
+        "best_price": best_price,
         "best_book": getattr(team_pick, "best_bookmaker", None) or "",
         "gap": gap,
         "draw_prob": draw_prob,
         "books": item.bookmaker_count,
         "max_range": max_range,
-        "overround": overround,
-        "quality": max(0, quality),
-        "match_score": 1.0,
+        "quality": quality,
         "item": item,
+        "match_score": 1.0,
     }
 
 
@@ -249,17 +217,11 @@ def event_table(item):
 
 
 def margin_rows(item):
-    fav = item.favorite
-    dog = next((outcome.name for outcome in item.outcomes if clean(outcome.name) not in [clean(fav), "draw"]), "Opponent")
-    fav_prob = item.outcomes[0].normalized_probability
-    dog_prob = next((outcome.normalized_probability for outcome in item.outcomes if clean(outcome.name) not in [clean(fav), "draw"]), max(0.0, 1.0 - fav_prob))
-    bands = [("close", 0.45), ("solid", 0.35), ("big", 0.20)]
+    pick = top_non_draw(item)
     rows = []
-    for label, weight in bands:
-        rows.append({t("score"): f"{fav} {label}", t("read"): f"{fav} {label}", t("estimated"): f"{fav_prob * weight:.1%}"})
-    for label, weight in bands:
-        rows.append({t("score"): f"{dog} {label}", t("read"): f"{dog} {label}", t("estimated"): f"{dog_prob * weight:.1%}"})
-    return sorted(rows, key=lambda row: float(row[t("estimated")].strip("%")), reverse=True)[:6]
+    for label, weight in [("close", 0.45), ("solid", 0.35), ("big", 0.20)]:
+        rows.append({t("score"): f"{pick.name} {label}", t("read"): f"{pick.name} {label}", t("estimated"): f"{pick.normalized_probability * weight:.1%}"})
+    return rows
 
 
 def scoreline_rows(item, home_probability):
@@ -278,30 +240,16 @@ def scoreline_rows(item, home_probability):
     return rows
 
 
-def ara_report(item, snap) -> str:
-    draw_line = ""
-    if snap["draw_prob"] is not None and snap["draw_prob"] >= 0.25:
-        draw_line = " Draw risk is meaningful; the highest team win chance may still be below 50%." if not IS_ES else " El riesgo de empate es importante; la mayor probabilidad de victoria aún puede estar debajo de 50%."
-    price_line = f" Best available price: {snap['best_price']:.3f}"
-    if snap["best_book"]:
-        price_line += f" at {snap['best_book']}"
-    if IS_ES:
-        return f"Lectura: {snap['team_pick']} tiene la mayor probabilidad de ganar ({snap['team_win_prob']:.1%}). Calidad del mercado: {snap['quality']}/100. {price_line}. {draw_line}"
-    return f"Read: {snap['team_pick']} has the highest team win chance ({snap['team_win_prob']:.1%}). Market quality: {snap['quality']}/100. {price_line}.{draw_line}"
-
-
-def display_event(item, expanded=False):
+def display_event(row, expanded=False):
+    item = row["item"]
     rows, home_probability = event_table(item)
-    snap = market_snapshot(item)
-    with st.expander(f"{snap['event']} | {snap['team_pick']} win {snap['team_win_prob']:.1%} | Q{snap['quality']}", expanded=expanded):
-        st.info(ara_report(item, snap))
+    with st.expander(f"{row['event']} | {row['pick']} {row['prob']:.1%} | Match {row['match_score']:.0%}", expanded=expanded):
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric(t("team_pick"), snap["team_pick"])
-        c2.metric(t("win_probability"), f"{snap['team_win_prob']:.1%}")
-        c3.metric(t("best_price"), f"{snap['best_price']:.3f}")
-        c4.metric(t("quality"), f"{snap['quality']}/100")
-        st.write(f"{t('start')}: {snap['start']}")
-        st.write(f"{t('overround')}: {pct(snap['overround'])}")
+        c1.metric(t("pick"), row["pick"])
+        c2.metric(t("probability"), f"{row['prob']:.1%}")
+        c3.metric(t("best_price"), f"{row['best_price']:.3f}")
+        c4.metric(t("quality"), f"{row['quality']}/100")
+        st.write(f"{t('start')}: {row['start']}")
         st.write(t("scorelines"))
         st.dataframe(scoreline_rows(item, home_probability), use_container_width=True, hide_index=True)
         with st.expander(t("raw")):
@@ -314,19 +262,14 @@ def table_from_snapshots(rows):
         "Event": row["event"],
         "Sport": row["sport"],
         "Start": row["start"],
-        "Team pick": row["team_pick"],
-        "Team win %": f"{row['team_win_prob']:.1%}",
-        "Match %": f"{row.get('match_score', 1.0):.0%}",
-        "Top outcome": row["favorite"],
-        "Top outcome %": f"{row['favorite_prob']:.1%}",
+        "Pick": row["pick"],
+        "Probability": f"{row['prob']:.1%}",
+        "Match": f"{row.get('match_score', 1.0):.0%}",
         "Best price": round(row["best_price"], 3),
         "Best book": row["best_book"],
-        "Gap": f"{row['gap']:.1%}",
         "Draw %": "" if row["draw_prob"] is None else f"{row['draw_prob']:.1%}",
-        "Book spread": round(row["max_range"], 3),
-        "Overround": f"{row['overround']:.1%}",
-        "Quality": row["quality"],
         "Books": row["books"],
+        "Quality": row["quality"],
     } for row in rows]
 
 
@@ -334,10 +277,33 @@ def best_one_per_sport(rows):
     best = {}
     for row in rows:
         current = best.get(row["sport"])
-        if current is None or row["team_win_prob"] > current["team_win_prob"]:
+        if current is None or row["prob"] > current["prob"]:
             best[row["sport"]] = row
-    return sorted(best.values(), key=lambda row: row["team_win_prob"], reverse=True)
+    return sorted(best.values(), key=lambda row: row["prob"], reverse=True)
 
+
+def scan_sport_resilient(key, sport_key, selected_regions, max_events):
+    attempts = [",".join(selected_regions)] + selected_regions
+    seen = set()
+    results = []
+    errors = []
+    for region_text in attempts:
+        try:
+            events = scan_market(key, sport_key, regions=region_text, max_events=max_events)
+            for item in events:
+                item_key = item.event_id or f"{item.sport_key}-{item.home_team}-{item.away_team}-{item.commence_time}"
+                if item_key not in seen:
+                    seen.add(item_key)
+                    results.append(item)
+            if results:
+                break
+        except Exception as exc:
+            errors.append(f"{region_text}: {safe_error(exc)}")
+    return results, errors
+
+
+st.title(t("title"))
+st.caption(t("caption"))
 
 try:
     saved_token = str(st.secrets.get("THE_ODDS_API_KEY", ""))
@@ -346,20 +312,17 @@ except Exception:
 
 entry_token = st.text_input(t("token"), value="", type="password")
 key = entry_token.strip() or saved_token
-
 if not key:
     st.info(t("token_help"))
     st.stop()
 
 scan_mode = st.radio(t("mode"), [t("smart"), t("single")], horizontal=True)
-objective = st.selectbox(t("objective"), [t("highest_win"), t("market_command")], index=0)
-selected_regions = st.multiselect(t("regions"), ALL_REGIONS, default=ALL_REGIONS, help=t("regions_help"))
+selected_regions = st.multiselect(t("regions"), ALL_REGIONS, default=["us", "eu", "uk"], help=t("regions_help"))
 st.caption(t("regions_help"))
 search_text = st.text_input(t("sport_search"), "auto")
 team_filter = st.text_input(t("team_filter"), "", help=t("team_filter_help"))
-
 if team_filter.strip():
-    st.caption(("Filtering for: " if not IS_ES else "Filtrando por: ") + ", ".join(filter_aliases(team_filter)))
+    st.caption(("Searching aliases: " if not IS_ES else "Buscando alias: ") + ", ".join(filter_aliases(team_filter)))
 
 if not selected_regions:
     st.error(t("choose_region"))
@@ -376,21 +339,16 @@ ranked_sports = [sport for sport in ranked_sports if not is_outright_feed(sport)
 
 with st.expander("Pro filters" if not IS_ES else "Filtros pro"):
     min_books = st.number_input(t("min_books"), min_value=1, max_value=25, value=1, step=1)
-    min_favorite = st.slider(t("min_fav"), min_value=0.0, max_value=1.0, value=0.0, step=0.01)
 
 if scan_mode == t("smart"):
-    default_feeds = 70 if team_filter.strip() else (35 if objective == t("highest_win") else 20)
-    default_events = 50 if team_filter.strip() else (15 if objective == t("highest_win") else 12)
-    max_feeds = st.number_input(t("max_feeds"), min_value=1, max_value=120, value=default_feeds, step=1)
-    max_events = st.number_input(t("max_events"), min_value=1, max_value=50, value=default_events, step=1)
+    max_feeds = st.number_input(t("max_feeds"), min_value=1, max_value=120, value=45 if team_filter.strip() else 25, step=1)
+    max_events = st.number_input(t("max_events"), min_value=1, max_value=50, value=50 if team_filter.strip() else 25, step=1)
     selected_sports = ranked_sports[: int(max_feeds)]
 else:
-    max_events = st.number_input(t("max_events"), min_value=1, max_value=50, value=50 if team_filter.strip() else 20, step=1)
+    max_events = st.number_input(t("max_events"), min_value=1, max_value=50, value=50 if team_filter.strip() else 25, step=1)
     labels = [f"{item.title} | {item.key}" for item in ranked_sports]
     selected = st.selectbox(t("sport_feed"), labels)
     selected_sports = [ranked_sports[labels.index(selected)]]
-
-region_text = ",".join(selected_regions)
 
 if st.button(t("scan"), type="primary"):
     all_items = []
@@ -400,11 +358,10 @@ if st.button(t("scan"), type="primary"):
 
     for index, sport in enumerate(selected_sports):
         status.write(f"Scanning {sport.title}...")
-        try:
-            events = scan_market(key, sport.key, regions=region_text, max_events=int(max_events))
-            all_items.extend(events)
-        except Exception as exc:
-            skipped.append((sport.title, safe_error(exc)))
+        events, errors = scan_sport_resilient(key, sport.key, selected_regions, int(max_events))
+        all_items.extend(events)
+        if errors and not events:
+            skipped.append((sport.title, "; ".join(errors[:3])))
         progress.progress((index + 1) / max(1, len(selected_sports)))
 
     status.empty()
@@ -414,93 +371,76 @@ if st.button(t("scan"), type="primary"):
     for row in all_snapshots:
         row["match_score"] = name_match_score(team_filter, row["item"])
 
+    all_snapshots = [row for row in all_snapshots if row["books"] >= int(min_books)]
+
+    exact_matches = []
+    closest_matches = []
     if team_filter.strip():
-        exact_snapshots = [row for row in all_snapshots if row["match_score"] >= 0.72]
-        closest_matches = sorted([row for row in all_snapshots if row["match_score"] >= 0.35], key=lambda row: row["match_score"], reverse=True)
-        if exact_snapshots:
-            snapshots = exact_snapshots
-        else:
+        exact_matches = [row for row in all_snapshots if row["match_score"] >= 0.72]
+        closest_matches = sorted([row for row in all_snapshots if row["match_score"] >= 0.30], key=lambda row: row["match_score"], reverse=True)
+        display_rows = exact_matches if exact_matches else all_snapshots
+        if not exact_matches and all_snapshots:
             st.warning(t("no_exact"))
-            snapshots = all_snapshots
     else:
-        closest_matches = []
-        snapshots = all_snapshots
+        display_rows = all_snapshots
 
-    snapshots = [row for row in snapshots if row["books"] >= int(min_books) and row["team_win_prob"] >= float(min_favorite)]
-
-    if not snapshots:
+    if not display_rows:
         st.info(t("no_games"))
         if skipped:
-            with st.expander(t("skipped")):
-                for title, reason in skipped[:30]:
+            with st.expander(t("skipped"), expanded=True):
+                for title, reason in skipped[:40]:
                     st.write(f"- {title}: {reason}")
         st.stop()
 
-    highest_team = sorted(snapshots, key=lambda row: row["team_win_prob"], reverse=True)
-    by_sport = best_one_per_sport(snapshots)
-    balanced = sorted(snapshots, key=lambda row: row["gap"])
-    disagreement = sorted(snapshots, key=lambda row: row["max_range"], reverse=True)
-    quality = sorted(snapshots, key=lambda row: row["quality"], reverse=True)
-    draw_heavy = [row for row in sorted(snapshots, key=lambda row: row["draw_prob"] or 0.0, reverse=True) if row["draw_prob"] is not None]
+    ranked = sorted(display_rows, key=lambda row: (row["match_score"], row["prob"]), reverse=True)
+    by_sport = best_one_per_sport(display_rows)
 
     st.subheader(t("dashboard"))
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(t("feeds"), len(selected_sports))
-    c2.metric(t("events"), len(snapshots))
-    c3.metric(t("skipped"), len(skipped))
-    c4.metric(t("highest_team"), f"{highest_team[0]['team_pick']} {highest_team[0]['team_win_prob']:.1%}")
+    c2.metric(t("events"), len(display_rows))
+    c3.metric(t("matches"), len(exact_matches) if team_filter.strip() else len(display_rows))
+    c4.metric(t("skipped"), len(skipped))
 
-    csv_rows = table_from_snapshots(highest_team)
+    csv_rows = table_from_snapshots(ranked)
     st.download_button(t("download"), data="\n".join(
         [",".join(csv_rows[0].keys())] + [",".join(str(value).replace(',', ' ') for value in row.values()) for row in csv_rows]
-    ), file_name="highest_team_win_scan.csv", mime="text/csv")
+    ), file_name="live_market_scan.csv", mime="text/csv")
 
-    tab_labels = [t("highest_team"), t("by_sport"), t("balanced"), t("disagreement"), t("draw_heavy"), t("all_games"), t("ara_read")]
+    tab_labels = [t("best_matches"), t("by_sport"), t("all_games")]
     if team_filter.strip():
-        tab_labels.insert(2, t("closest_filter"))
+        tab_labels.insert(1, t("closest_matches"))
     tabs = st.tabs(tab_labels)
 
     with tabs[0]:
-        for row in highest_team[:15]:
-            display_event(row["item"], expanded=row == highest_team[0])
-    with tabs[1]:
+        for row in ranked[:15]:
+            display_event(row, expanded=row == ranked[0])
+
+    offset = 0
+    if team_filter.strip():
+        offset = 1
+        with tabs[1]:
+            if closest_matches:
+                st.dataframe(table_from_snapshots(closest_matches[:25]), use_container_width=True, hide_index=True)
+            else:
+                st.info(t("no_games"))
+
+    with tabs[1 + offset]:
         st.dataframe(table_from_snapshots(by_sport), use_container_width=True, hide_index=True)
         for row in by_sport[:10]:
-            display_event(row["item"], expanded=False)
+            display_event(row, expanded=False)
 
-    tab_offset = 0
-    if team_filter.strip():
-        tab_offset = 1
-        with tabs[2]:
-            if not closest_matches:
-                st.info(t("no_games"))
-            else:
-                st.dataframe(table_from_snapshots(closest_matches[:25]), use_container_width=True, hide_index=True)
-
-    with tabs[2 + tab_offset]:
-        for row in balanced[:10]:
-            display_event(row["item"], expanded=False)
-    with tabs[3 + tab_offset]:
-        for row in disagreement[:10]:
-            display_event(row["item"], expanded=False)
-    with tabs[4 + tab_offset]:
-        if not draw_heavy:
-            st.info("No three-outcome draw markets found." if not IS_ES else "No se encontraron mercados de empate.")
-        for row in draw_heavy[:10]:
-            display_event(row["item"], expanded=False)
-    with tabs[5 + tab_offset]:
-        st.dataframe(table_from_snapshots(highest_team), use_container_width=True, hide_index=True)
-    with tabs[6 + tab_offset]:
-        for row in quality[:10]:
-            st.write(f"- {ara_report(row['item'], row)}")
+    with tabs[2 + offset]:
+        st.dataframe(table_from_snapshots(ranked), use_container_width=True, hide_index=True)
 
     with st.expander(t("diagnostics")):
         st.write(f"{t('feeds')}: {len(selected_sports)}")
-        st.write(f"{t('events')}: {len(snapshots)}")
-        st.write(f"All market events before filter: {len(all_snapshots)}")
+        st.write(f"All market events before filter: {len(all_items)}")
+        st.write(f"Rows displayed: {len(display_rows)}")
         if team_filter.strip():
-            st.write(f"Exact matches for filter: {len([row for row in all_snapshots if row['match_score'] >= 0.72])}")
+            st.write(f"Exact matches: {len(exact_matches)}")
+            st.write(f"Closest matches: {len(closest_matches)}")
         if skipped:
             st.write(f"{t('skipped')}: {len(skipped)}")
-            for title, reason in skipped[:30]:
+            for title, reason in skipped[:40]:
                 st.write(f"- {title}: {reason}")
