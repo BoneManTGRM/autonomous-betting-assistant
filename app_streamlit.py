@@ -1,4 +1,5 @@
 import os
+import unicodedata
 from difflib import SequenceMatcher
 
 import streamlit as st
@@ -8,7 +9,21 @@ from autonomous_betting_agent.scorelines import estimate_scorelines, expected_go
 
 st.set_page_config(page_title="Autonomous Betting Agent", layout="wide")
 st.title("Autonomous Betting Agent")
-st.caption("Enter the teams. The agent searches live market data, ranks likely outcomes, and estimates scorelines.")
+st.caption("Paste a provider token, enter two teams, and let the agent search feeds, rank likely outcomes, and estimate scorelines.")
+
+COUNTRY_ALIASES = {
+    "mexico": ["mexico", "méxico", "mexican", "el tri"],
+    "south korea": ["south korea", "korea republic", "republic of korea", "korea"],
+    "usa": ["usa", "united states", "usmnt", "united states of america"],
+    "united states": ["usa", "united states", "usmnt", "united states of america"],
+    "england": ["england", "english"],
+    "brazil": ["brazil", "brasil"],
+    "germany": ["germany", "deutschland"],
+    "spain": ["spain", "españa"],
+    "argentina": ["argentina"],
+    "france": ["france"],
+    "japan": ["japan"],
+}
 
 
 def read_provider_token() -> str:
@@ -19,30 +34,79 @@ def read_provider_token() -> str:
 
 
 def clean(value: str) -> str:
-    return " ".join(value.lower().replace("-", " ").split())
+    value = unicodedata.normalize("NFKD", value or "")
+    value = "".join(char for char in value if not unicodedata.combining(char))
+    return " ".join(value.lower().replace("-", " ").replace(".", " ").split())
+
+
+def aliases(value: str) -> list[str]:
+    base = clean(value)
+    values = {base}
+    for key, alias_list in COUNTRY_ALIASES.items():
+        if base == clean(key) or base in [clean(alias) for alias in alias_list]:
+            values.update(clean(alias) for alias in alias_list)
+    return [item for item in values if item]
 
 
 def match_score(query: str, candidate: str) -> float:
     query = clean(query)
     candidate = clean(candidate)
-    if not query:
+    if not query or not candidate:
         return 0.0
     if query in candidate or candidate in query:
         return 1.0
     return SequenceMatcher(None, query, candidate).ratio()
 
 
-def event_matches(item, team_one: str, team_two: str) -> bool:
-    if not team_one and not team_two:
-        return True
+def best_name_score(query: str, names: list[str]) -> float:
+    if not query:
+        return 1.0
+    return max(match_score(alias, name) for alias in aliases(query) for name in names)
+
+
+def event_score(item, team_one: str, team_two: str) -> float:
     names = [item.home_team, item.away_team] + [outcome.name for outcome in item.outcomes]
-    one_ok = not team_one or max(match_score(team_one, name) for name in names) >= 0.55
-    two_ok = not team_two or max(match_score(team_two, name) for name in names) >= 0.55
-    return one_ok and two_ok
+    one_score = best_name_score(team_one, names)
+    two_score = best_name_score(team_two, names)
+    if team_one and team_two:
+        return (one_score + two_score) / 2.0
+    return max(one_score, two_score)
 
 
-def show_event(item) -> None:
+def sport_score(sport_item, competition: str, team_one: str, team_two: str) -> float:
+    haystack = clean(f"{sport_item.key} {sport_item.group} {sport_item.title} {sport_item.description}")
+    words = [clean(word) for word in competition.split() if clean(word)]
+    score = 0.0
+    for word in words:
+        if word in haystack:
+            score += 4.0
+    country_matchup = bool(team_one and team_two and (aliases(team_one) or aliases(team_two)))
+    if country_matchup:
+        for word in ["international", "world", "fifa", "cup", "friendlies", "concacaf", "uefa"]:
+            if word in haystack:
+                score += 6.0
+        for domestic_word in ["serie", "division", "league", "liga", "campeonato", "superleague"]:
+            if domestic_word in haystack and "international" not in haystack and "world" not in haystack:
+                score -= 3.0
+    return score
+
+
+def explain_error(exc: Exception) -> str:
+    response = getattr(exc, "response", None)
+    status = getattr(response, "status_code", None)
+    if status in (401, 403):
+        return "provider token was rejected"
+    if status == 422:
+        return "feed is not available for the selected market regions"
+    if status == 429:
+        return "provider quota or rate limit reached"
+    return "provider request failed"
+
+
+def show_event(item, score: float | None = None) -> None:
     st.subheader(f"{item.away_team} at {item.home_team}")
+    if score is not None:
+        st.write(f"Team-match confidence: {score:.0%}")
     st.write(f"Start: {item.commence_time}")
     st.write(f"Most likely outcome: {item.favorite} ({item.favorite_probability:.1%})")
 
@@ -50,7 +114,7 @@ def show_event(item) -> None:
     home_probability = None
     for outcome in item.outcomes:
         rows.append({"Outcome": outcome.name, "Avg market price": round(outcome.average_price, 3), "No-vig probability": f"{outcome.normalized_probability:.1%}", "Sources": outcome.source_count})
-        if outcome.name == item.home_team:
+        if clean(outcome.name) == clean(item.home_team):
             home_probability = outcome.normalized_probability
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
@@ -83,41 +147,64 @@ if not provider_token:
 
 team_one = st.text_input("Team 1", "")
 team_two = st.text_input("Team 2", "")
-competition = st.text_input("Sport / competition", "soccer")
+competition = st.text_input("Sport / competition", "international soccer")
 
 with st.expander("Advanced settings"):
-    region_text = st.text_input("Regions", "us,eu,uk")
-    max_events = st.number_input("Max games to scan", min_value=1, max_value=50, value=20, step=1)
-    choose_feed = st.checkbox("Choose exact feed", value=False)
+    selected_regions = st.multiselect("Market regions", ["us", "uk", "eu", "au"], default=["us", "eu", "uk"])
+    max_feeds = st.number_input("Max feeds to scan", min_value=1, max_value=30, value=12, step=1)
+    max_events = st.number_input("Max games per feed", min_value=1, max_value=50, value=30, step=1)
+    show_nearest = st.checkbox("Show closest games if no exact match", value=True)
 
-with st.spinner("Loading sport feeds"):
-    sports = list_sports(provider_token, include_all=False)
-terms = [term.lower() for term in competition.split() if term.strip()]
-choices = []
-for sport_item in sports:
-    haystack = f"{sport_item.key} {sport_item.group} {sport_item.title} {sport_item.description}".lower()
-    if not terms or any(term in haystack for term in terms):
-        choices.append(sport_item)
-if not choices:
-    choices = sports
-labels = [f"{sport_item.title} | {sport_item.key}" for sport_item in choices]
-if choose_feed:
-    selected = st.selectbox("Feed", labels)
-    selected_sports = [choices[labels.index(selected)]]
-else:
-    selected_sports = choices[:3]
-    st.caption("Agent will scan the best matching feeds automatically. Use Advanced settings to pick one exact feed.")
+if st.button("Run autonomous agent", type="primary"):
+    if not selected_regions:
+        st.error("Choose at least one market region.")
+        st.stop()
 
-if st.button("Run autonomous agent"):
+    with st.spinner("Loading and ranking sport feeds"):
+        try:
+            sports = list_sports(provider_token, include_all=False)
+        except Exception as exc:
+            st.error(f"Could not load sport feeds: {explain_error(exc)}")
+            st.stop()
+
+    ranked_sports = sorted(
+        sports,
+        key=lambda item: sport_score(item, competition, team_one, team_two),
+        reverse=True,
+    )
+    candidate_sports = ranked_sports[: int(max_feeds)]
+    region_text = ",".join(selected_regions)
     all_results = []
+    skipped = []
+
     with st.spinner("Searching games and building report"):
-        for sport_item in selected_sports:
+        for sport_item in candidate_sports:
             try:
                 all_results.extend(scan_market(provider_token, sport_key=sport_item.key, regions=region_text, max_events=int(max_events)))
             except Exception as exc:
-                st.warning(f"Skipped {sport_item.title}: {exc}")
-    filtered = [item for item in all_results if event_matches(item, team_one, team_two)]
-    if not filtered:
-        st.info("No matching games found. Try fewer team-name words or a broader competition search like soccer, fifa, nba, nfl, mlb, or tennis.")
-    for item in filtered:
-        show_event(item)
+                skipped.append((sport_item.title, explain_error(exc)))
+
+    scored = sorted(
+        [(event_score(item, team_one, team_two), item) for item in all_results],
+        key=lambda pair: pair[0],
+        reverse=True,
+    )
+    matches = [(score, item) for score, item in scored if score >= 0.55]
+
+    st.write(f"Scanned {len(candidate_sports)} feeds and found {len(all_results)} games with market data.")
+    if skipped:
+        with st.expander(f"Skipped {len(skipped)} feeds"):
+            for title, reason in skipped[:20]:
+                st.write(f"- {title}: {reason}")
+
+    if matches:
+        for score, item in matches[:10]:
+            show_event(item, score)
+    else:
+        st.info("No exact team match found. The provider may not have this game yet, or the team names may be listed differently.")
+        if show_nearest and scored:
+            st.write("Closest games found")
+            for score, item in scored[:5]:
+                show_event(item, score)
+        else:
+            st.write("Try competition terms like international soccer, fifa, world cup, concacaf, nba, nfl, mlb, tennis, or choose more market regions.")
