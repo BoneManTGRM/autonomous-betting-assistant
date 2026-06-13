@@ -1,6 +1,7 @@
 import os
 import unicodedata
 from difflib import SequenceMatcher
+from types import SimpleNamespace
 
 import streamlit as st
 
@@ -15,21 +16,21 @@ IS_ES = language == "Español"
 TEXT = {
     "title": {"English": "Mexico Soccer Scanner", "Español": "Escáner de Futbol Mexicano"},
     "caption": {
-        "English": "Dedicated scanner for Mexico national team, Liga MX, and major local Mexican clubs. Search by common names like America, Chivas, Pumas, Tigres, Rayados, Cruz Azul, Toluca, Pachuca, Atlas, Leon, Santos, Xolos, Puebla, Necaxa, Queretaro, Juarez, Mazatlan, or San Luis.",
-        "Español": "Escáner dedicado para Selección Mexicana, Liga MX y clubes mexicanos principales. Busca nombres comunes como América, Chivas, Pumas, Tigres, Rayados, Cruz Azul, Toluca, Pachuca, Atlas, León, Santos, Xolos, Puebla, Necaxa, Querétaro, Juárez, Mazatlán o San Luis.",
+        "English": "Dedicated scanner for Mexico national team, Liga MX, and major local Mexican clubs. If a selected team has no current market, the scanner still shows closest Mexico/soccer markets instead of going blank.",
+        "Español": "Escáner dedicado para Selección Mexicana, Liga MX y clubes mexicanos principales. Si un equipo seleccionado no tiene mercado actual, el escáner muestra mercados cercanos de México/futbol en vez de quedar vacío.",
     },
     "token": {"English": "The Odds API key", "Español": "Clave de The Odds API"},
     "token_help": {"English": "Paste your provider key. Do not share it publicly.", "Español": "Pega tu clave del proveedor. No la compartas públicamente."},
     "team": {"English": "Team", "Español": "Equipo"},
     "custom": {"English": "Custom team search", "Español": "Búsqueda manual de equipo"},
-    "custom_help": {"English": "Optional. Overrides the dropdown. Example: Chivas, America, Toluca, Mexico", "Español": "Opcional. Reemplaza el selector. Ejemplo: Chivas, América, Toluca, México"},
+    "custom_help": {"English": "Optional. Overrides the dropdown. Example: Guadalajara, Chivas, America, Toluca, Mexico", "Español": "Opcional. Reemplaza el selector. Ejemplo: Guadalajara, Chivas, América, Toluca, México"},
     "league": {"English": "League/feed search", "Español": "Buscar liga/fuente"},
     "regions": {"English": "Bookmaker regions", "Español": "Regiones de casas"},
     "max_feeds": {"English": "Max feeds", "Español": "Máximo de fuentes"},
     "max_events": {"English": "Max events per feed", "Español": "Máximo de eventos por fuente"},
     "scan": {"English": "Scan Mexico soccer markets", "Español": "Escanear mercados de futbol mexicano"},
-    "no_games": {"English": "No Mexico soccer markets were found. Try another team, select all teams, or reduce regions to us/eu/uk.", "Español": "No se encontraron mercados de futbol mexicano. Prueba otro equipo, selecciona todos los equipos o reduce regiones a us/eu/uk."},
-    "no_exact": {"English": "No exact team match. Showing closest soccer markets found.", "Español": "No hubo coincidencia exacta. Mostrando mercados de futbol más cercanos."},
+    "no_games": {"English": "No Mexico soccer markets were found. Try All local Mexico teams, reduce regions to us/eu/uk, or try Upcoming all sports in the general scanner.", "Español": "No se encontraron mercados de futbol mexicano. Prueba Todos los equipos locales, reduce regiones a us/eu/uk o usa próximos eventos en el escáner general."},
+    "no_exact": {"English": "No exact team match. This usually means the provider does not currently list that team. Showing closest soccer markets found.", "Español": "No hubo coincidencia exacta. Normalmente significa que el proveedor no tiene ese equipo actualmente. Mostrando mercados de futbol más cercanos."},
     "dashboard": {"English": "Mexico soccer dashboard", "Español": "Panel de futbol mexicano"},
     "feeds": {"English": "Feeds scanned", "Español": "Fuentes revisadas"},
     "events": {"English": "Events found", "Español": "Eventos encontrados"},
@@ -43,7 +44,7 @@ TEXT = {
     "probability": {"English": "Probability", "Español": "Probabilidad"},
     "best_price": {"English": "Best price", "Español": "Mejor precio"},
     "books": {"English": "Books", "Español": "Casas"},
-    "quality": {"English": "Market quality", "Español": "Calidad del mercado"},
+    "quality": {"English": "Market data quality", "Español": "Calidad de datos"},
     "outcome": {"English": "Outcome", "Español": "Resultado"},
     "avg_price": {"English": "Avg price", "Español": "Precio promedio"},
     "best_book": {"English": "Best book", "Español": "Mejor casa"},
@@ -62,7 +63,7 @@ TEAM_ALIASES = {
     "All local Mexico teams": [],
     "Mexico national team": ["mexico", "méxico", "mex", "el tri", "seleccion mexicana", "selección mexicana"],
     "Club America": ["america", "américa", "club america", "club américa", "las aguilas", "águilas", "aguilas"],
-    "Chivas / Guadalajara": ["chivas", "guadalajara", "cd guadalajara", "club deportivo guadalajara", "rebaño", "rebano"],
+    "Chivas / Guadalajara": ["chivas", "guadalajara", "cd guadalajara", "club deportivo guadalajara", "deportivo guadalajara", "guadalajara chivas", "chivas guadalajara", "chivas de guadalajara", "cd chivas", "rebaño", "rebano"],
     "Cruz Azul": ["cruz azul", "la maquina", "máquina", "maquina"],
     "Pumas UNAM": ["pumas", "unam", "pumas unam", "universidad nacional"],
     "Tigres UANL": ["tigres", "uanl", "tigres uanl", "club tigres"],
@@ -93,7 +94,7 @@ TEAM_ALIASES = {
 }
 
 ALL_REGIONS = ["us", "us2", "uk", "eu", "au"]
-SOCCER_TERMS = ["soccer", "fifa", "world", "cup", "liga mx", "mexico", "mexican", "primera", "expansion", "expansión", "concacaf", "friendlies"]
+SOCCER_TERMS = ["soccer", "fifa", "world", "cup", "liga mx", "mexico", "mexican", "primera", "expansion", "expansión", "concacaf", "friendlies", "club friendlies", "copa mx"]
 
 
 def t(key: str) -> str:
@@ -284,7 +285,7 @@ team_label = st.selectbox(t("team"), list(TEAM_ALIASES.keys()), index=0)
 custom_team = st.text_input(t("custom"), "", help=t("custom_help"))
 league_query = st.text_input(t("league"), "soccer mexico liga mx")
 regions = st.multiselect(t("regions"), ALL_REGIONS, default=["us", "eu", "uk"])
-max_feeds = st.number_input(t("max_feeds"), min_value=1, max_value=80, value=30, step=1)
+max_feeds = st.number_input(t("max_feeds"), min_value=1, max_value=100, value=45, step=1)
 max_events = st.number_input(t("max_events"), min_value=1, max_value=50, value=50, step=1)
 
 try:
@@ -294,9 +295,10 @@ except Exception as exc:
     st.stop()
 
 ranked_sports = sorted(sports, key=lambda sport: sport_score(sport, league_query), reverse=True)[: int(max_feeds)]
+ranked_sports = [SimpleNamespace(key="upcoming", title="Upcoming all sports", group="All", description="Upcoming games")] + ranked_sports
 selected_aliases = aliases_for(team_label, custom_team)
 if selected_aliases:
-    st.caption(("Searching aliases: " if not IS_ES else "Buscando alias: ") + ", ".join(selected_aliases[:18]))
+    st.caption(("Searching aliases: " if not IS_ES else "Buscando alias: ") + ", ".join(selected_aliases[:22]))
 
 if st.button(t("scan"), type="primary"):
     all_events = []
@@ -318,8 +320,8 @@ if st.button(t("scan"), type="primary"):
         score = match_score(event, selected_aliases)
         rows.append(event_snapshot(event, score))
 
-    exact = [row for row in rows if row["_score"] >= 0.72]
-    close = [row for row in rows if row["_score"] >= 0.35]
+    exact = [row for row in rows if row["_score"] >= 0.60]
+    close = [row for row in rows if row["_score"] >= 0.30]
     if selected_aliases and exact:
         display_rows = exact
     elif selected_aliases and close:
@@ -334,7 +336,7 @@ if st.button(t("scan"), type="primary"):
         st.info(t("no_games"))
         if skipped:
             with st.expander(t("skipped"), expanded=True):
-                for title, reason in skipped[:30]:
+                for title, reason in skipped[:40]:
                     st.write(f"- {title}: {reason}")
         st.stop()
 
@@ -360,5 +362,5 @@ if st.button(t("scan"), type="primary"):
         st.write(f"{t('matches')}: {len(exact)}")
         if skipped:
             st.write(f"{t('skipped')}: {len(skipped)}")
-            for title, reason in skipped[:30]:
+            for title, reason in skipped[:40]:
                 st.write(f"- {title}: {reason}")
