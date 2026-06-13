@@ -8,7 +8,7 @@ from autonomous_betting_agent.live_odds import list_sports, scan_market
 
 st.set_page_config(page_title="NBA Playoffs Predictor", layout="wide")
 
-_translate_choice = st.selectbox("Translate page", ["English", "Español"], index=0)
+_translate_choice = st.sidebar.selectbox("Translate page", ["English", "Español"], index=0)
 language = _translate_choice
 IS_ES = language == "Español"
 
