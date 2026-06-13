@@ -12,7 +12,7 @@ from autonomous_betting_agent.live_odds import list_sports, scan_market
 
 st.set_page_config(page_title="Pro Predictor", layout="wide")
 
-language = st.selectbox("Language / Idioma", ["English", "Español"], index=0)
+language = st.selectbox("Language", ["English", "Español"], index=0)
 IS_ES = language == "Español"
 
 TEXT = {
@@ -60,7 +60,7 @@ TEXT = {
     "event": {"English": "Event", "Español": "Evento"},
     "sport": {"English": "Sport", "Español": "Deporte"},
     "classification": {"English": "Classification", "Español": "Clasificación"},
-    "risk_penalty": {"English": "Risk penalty", "Español": "Castigo por riesgo"},
+    "risk_penalty": {"English": "Risk penalty", "Español": "Risk penalty"},
     "books": {"English": "Books", "Español": "Casas"},
     "draw_probability": {"English": "Draw probability", "Español": "Probabilidad de empate"},
     "match_score": {"English": "Match score", "Español": "Coincidencia"},
