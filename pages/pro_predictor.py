@@ -79,7 +79,7 @@ def t(key):
 
 
 def clean(value):
-    value = unicodedata.normalize("NFKD", value or "")
+    value = unicodedata.normalize("NFKD", str(value or ""))
     value = "".join(char for char in value if not unicodedata.combining(char))
     return " ".join(value.lower().replace("-", " ").replace(".", " ").replace("'", "").split())
 
@@ -269,6 +269,33 @@ def headline_line(lines, label):
     return f"{label}: {first['Name']} {first['Point']} @ {first['Best price']}"
 
 
+def safe_dataframe(rows, empty_message="Not returned"):
+    if rows:
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+    else:
+        st.caption(empty_message)
+
+
+def visible_row(row):
+    return {
+        "Event": row["event"],
+        "Sport": row["sport"],
+        "Start": row["start"],
+        "Prediction": row["prediction"],
+        "Market probability": f"{row['market_probability']:.1%}",
+        "Predictor score": row["predictor_score"],
+        "Classification": row["classification"],
+        "Data quality": row["data_quality"],
+        "Risk penalty": row["risk_penalty"],
+        "Best price": round(row["best_price"], 3),
+        "Best book": row["best_book"],
+        "Books": row["books"],
+        "Draw probability": "" if row["draw_probability"] is None else f"{row['draw_probability']:.1%}",
+        "Match score": f"{row['match_score']:.0%}",
+        "Matched": row["matched"],
+    }
+
+
 def display(row, expanded=False):
     event = row["event_object"]
     with st.expander(f"{row['event']} | {row['prediction']} {row['market_probability']:.1%} | Score {row['predictor_score']}/100 | {row['classification']}", expanded=expanded):
@@ -285,34 +312,15 @@ def display(row, expanded=False):
         if row["matched"]:
             st.write(f"Matched: {row['matched']} | Match score: {row['match_score']:.0%}")
         with st.expander(t("spread"), expanded=True):
-            rows = line_table(event.spreads)
-            st.dataframe(rows, use_container_width=True, hide_index=True) if rows else st.caption("Not returned")
+            safe_dataframe(line_table(event.spreads))
         with st.expander(t("total")):
-            rows = line_table(event.totals)
-            st.dataframe(rows, use_container_width=True, hide_index=True) if rows else st.caption("Not returned")
+            safe_dataframe(line_table(event.totals))
         with st.expander(t("moneyline")):
-            st.dataframe(moneyline_table(event), use_container_width=True, hide_index=True)
+            safe_dataframe(moneyline_table(event))
 
 
 def csv_text(rows):
-    visible = []
-    for row in rows:
-        visible.append({
-            "Event": row["event"],
-            "Sport": row["sport"],
-            "Start": row["start"],
-            "Prediction": row["prediction"],
-            "Market probability": f"{row['market_probability']:.1%}",
-            "Predictor score": row["predictor_score"],
-            "Classification": row["classification"],
-            "Data quality": row["data_quality"],
-            "Risk penalty": row["risk_penalty"],
-            "Best price": round(row["best_price"], 3),
-            "Best book": row["best_book"],
-            "Books": row["books"],
-            "Draw probability": "" if row["draw_probability"] is None else f"{row['draw_probability']:.1%}",
-            "Match score": f"{row['match_score']:.0%}",
-        })
+    visible = [visible_row(row) for row in rows]
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=list(visible[0].keys()))
     writer.writeheader()
@@ -440,7 +448,7 @@ if st.button(t("scan"), type="primary"):
         for row in movers[:25]:
             display(row)
     with tabs[5]:
-        st.dataframe([{k: v for k, v in row.items() if k not in ["event_object", "key"]} for row in ranked], use_container_width=True, hide_index=True)
+        safe_dataframe([visible_row(row) for row in ranked])
     with tabs[6]:
         st.write(f"Feeds scanned: {len(selected_sports)}")
         st.write(f"Events returned before filters: {len(all_events)}")
