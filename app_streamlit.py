@@ -21,7 +21,7 @@ TEXT = {
     "token": {"English": "The Odds API key", "Español": "Clave de The Odds API"},
     "token_help": {"English": "Each user can paste their own key. It is used only for this browser session unless the app owner configures one separately.", "Español": "Cada usuario puede pegar su propia clave. Se usa solo en esta sesión del navegador salvo que el dueño configure una aparte."},
     "game": {"English": "Game", "Español": "Partido"},
-    "game_help": {"English": "Examples: Mexico vs South Korea, Lakers vs Celtics, Chiefs vs Bills, Yankees vs Dodgers", "Español": "Ejemplos: México vs Corea del Sur, Lakers vs Celtics, Chiefs vs Bills, Yankees vs Dodgers"},
+    "game_help": {"English": "Examples: Mexico vs South Korea, Lakers vs Celtics, Chiefs vs Bills, Yankees vs Dodgers, Djokovic vs Alcaraz, India vs Australia", "Español": "Ejemplos: México vs Corea del Sur, Lakers vs Celtics, Chiefs vs Bills, Yankees vs Dodgers, Djokovic vs Alcaraz, India vs Australia"},
     "competition": {"English": "Sport / competition", "Español": "Deporte / competición"},
     "advanced": {"English": "Advanced settings", "Español": "Configuración avanzada"},
     "market_regions": {"English": "Bookmaker market regions", "Español": "Regiones de mercado de casas de apuestas"},
@@ -88,31 +88,46 @@ COUNTRY_ALIASES = {
     "argentina": ["argentina"],
     "france": ["france", "francia"],
     "japan": ["japan", "japon", "japón"],
+    "india": ["india"],
+    "australia": ["australia"],
+    "new zealand": ["new zealand", "nueva zelanda"],
+    "south africa": ["south africa", "sudafrica", "sudáfrica"],
 }
 
 TEAM_SPORT_HINTS = {
-    "lakers": "nba", "celtics": "nba", "warriors": "nba", "knicks": "nba", "bulls": "nba", "heat": "nba", "mavericks": "nba", "nuggets": "nba", "suns": "nba", "bucks": "nba",
-    "chiefs": "nfl", "bills": "nfl", "cowboys": "nfl", "eagles": "nfl", "ravens": "nfl", "packers": "nfl", "patriots": "nfl", "steelers": "nfl", "49ers": "nfl", "niners": "nfl",
-    "yankees": "mlb", "dodgers": "mlb", "red sox": "mlb", "mets": "mlb", "cubs": "mlb", "braves": "mlb", "astros": "mlb", "padres": "mlb",
-    "maple leafs": "nhl", "bruins": "nhl", "rangers": "nhl", "canadiens": "nhl", "oilers": "nhl", "panthers": "nhl", "avalanche": "nhl",
+    "lakers": "nba", "celtics": "nba", "warriors": "nba", "knicks": "nba", "bulls": "nba", "heat": "nba", "mavericks": "nba", "nuggets": "nba", "suns": "nba", "bucks": "nba", "spurs": "nba", "clippers": "nba", "76ers": "nba", "sixers": "nba", "timberwolves": "nba", "thunder": "nba",
+    "chiefs": "nfl", "bills": "nfl", "cowboys": "nfl", "eagles": "nfl", "ravens": "nfl", "packers": "nfl", "patriots": "nfl", "steelers": "nfl", "49ers": "nfl", "niners": "nfl", "bengals": "nfl", "lions": "nfl", "dolphins": "nfl", "jets": "nfl", "raiders": "nfl", "broncos": "nfl", "chargers": "nfl", "rams": "nfl", "seahawks": "nfl", "vikings": "nfl",
+    "yankees": "mlb", "dodgers": "mlb", "red sox": "mlb", "mets": "mlb", "cubs": "mlb", "braves": "mlb", "astros": "mlb", "padres": "mlb", "phillies": "mlb", "giants": "mlb", "cardinals": "mlb", "blue jays": "mlb", "orioles": "mlb", "mariners": "mlb",
+    "maple leafs": "nhl", "bruins": "nhl", "rangers": "nhl", "canadiens": "nhl", "oilers": "nhl", "panthers": "nhl", "avalanche": "nhl", "golden knights": "nhl", "lightning": "nhl", "penguins": "nhl", "capitals": "nhl", "kings": "nhl", "stars": "nhl",
+    "arsenal": "soccer", "chelsea": "soccer", "liverpool": "soccer", "manchester united": "soccer", "man city": "soccer", "real madrid": "soccer", "barcelona": "soccer", "psg": "soccer", "bayern": "soccer", "inter miami": "soccer", "club america": "soccer", "chivas": "soccer", "cruz azul": "soccer", "tigres": "soccer",
+    "djokovic": "tennis", "alcaraz": "tennis", "sinner": "tennis", "nadal": "tennis", "federer": "tennis", "swiatek": "tennis", "sabalenka": "tennis", "gauff": "tennis",
+    "india": "cricket", "australia": "cricket", "england": "cricket", "pakistan": "cricket", "new zealand": "cricket", "south africa": "cricket",
 }
 
 SPORT_SYNONYMS = {
     "auto": [],
-    "soccer": ["soccer", "fifa", "football", "world cup", "international", "concacaf", "epl", "premier", "la liga", "mls"],
-    "nba": ["nba", "basketball"],
-    "nfl": ["nfl", "americanfootball", "american football", "football"],
-    "mlb": ["mlb", "baseball"],
-    "nhl": ["nhl", "hockey", "icehockey", "ice hockey"],
-    "tennis": ["tennis", "atp", "wta"],
-    "mma": ["mma", "ufc", "mixed martial"],
+    "soccer": ["soccer", "fifa", "football", "world cup", "international", "concacaf", "uefa", "epl", "premier", "la liga", "serie a", "bundesliga", "liga mx", "mls", "champions league", "europa"],
+    "nba": ["nba", "basketball", "ncaab", "college basketball", "wnba", "euroleague"],
+    "nfl": ["nfl", "americanfootball", "american football", "ncaaf", "college football", "cfl"],
+    "mlb": ["mlb", "baseball", "npb", "kbo"],
+    "nhl": ["nhl", "hockey", "icehockey", "ice hockey", "shl"],
+    "tennis": ["tennis", "atp", "wta", "grand slam", "wimbledon", "us open", "australian open", "french open"],
+    "mma": ["mma", "ufc", "bellator", "mixed martial"],
     "boxing": ["boxing", "boxeo"],
-    "cricket": ["cricket"],
-    "rugby": ["rugby"],
-    "golf": ["golf"],
+    "cricket": ["cricket", "ipl", "bbl", "psl", "test cricket", "odi", "t20"],
+    "rugby": ["rugby", "rugby union", "rugby league", "nrl", "super rugby"],
+    "aussierules": ["aussie rules", "aussierules", "afl", "australian rules"],
+    "golf": ["golf", "pga", "liv golf", "masters", "ryder cup"],
+    "motorsport": ["motorsport", "formula 1", "formula1", "f1", "nascar", "indycar", "motogp"],
+    "darts": ["darts", "pdc"],
+    "snooker": ["snooker"],
+    "lacrosse": ["lacrosse", "pll", "nll"],
+    "volleyball": ["volleyball", "voleibol"],
+    "handball": ["handball", "balonmano"],
+    "esports": ["esports", "cs2", "csgo", "counter strike", "league of legends", "lol", "dota", "valorant", "call of duty", "cod", "overwatch", "starcraft"],
 }
 
-POPULAR_HINTS = ["nba", "nfl", "mlb", "nhl", "soccer", "epl", "mls", "tennis", "mma", "ufc", "baseball", "basketball", "football", "hockey"]
+POPULAR_HINTS = ["nba", "nfl", "mlb", "nhl", "soccer", "epl", "mls", "tennis", "mma", "ufc", "baseball", "basketball", "football", "hockey", "cricket", "rugby", "golf", "motorsport", "esports", "boxing"]
 
 
 def read_provider_token() -> str:
@@ -198,18 +213,26 @@ def sport_kind(item) -> str:
     text = clean(f"{getattr(item, 'sport_key', '')} {getattr(item, 'sport_title', '')}")
     if any(x in text for x in ["soccer", "fifa", "epl", "mls"]):
         return "soccer"
-    if any(x in text for x in ["basketball", "nba", "ncaab"]):
+    if any(x in text for x in ["basketball", "nba", "ncaab", "wnba"]):
         return "basketball"
-    if any(x in text for x in ["americanfootball", "nfl", "ncaaf"]):
+    if any(x in text for x in ["americanfootball", "nfl", "ncaaf", "cfl"]):
         return "football"
-    if any(x in text for x in ["baseball", "mlb"]):
+    if any(x in text for x in ["baseball", "mlb", "npb", "kbo"]):
         return "baseball"
     if any(x in text for x in ["icehockey", "hockey", "nhl"]):
         return "hockey"
     if "tennis" in text:
         return "tennis"
-    if any(x in text for x in ["mma", "ufc"]):
-        return "mma"
+    if any(x in text for x in ["mma", "ufc", "boxing"]):
+        return "fight"
+    if "cricket" in text:
+        return "cricket"
+    if "rugby" in text:
+        return "rugby"
+    if any(x in text for x in ["aussierules", "afl"]):
+        return "aussierules"
+    if any(x in text for x in ["golf", "motorsport", "formula", "nascar", "darts", "snooker", "esports"]):
+        return "field"
     return "general"
 
 
@@ -321,6 +344,18 @@ def win_margin_rows(item, fav_prob: float, dog_prob: float) -> list[dict]:
     elif kind == "football":
         fav_bands = [("by 1-3", 0.33), ("by 4-7", 0.34), ("by 8+", 0.33)]
         dog_bands = [("by 1-3", 0.42), ("by 4-7", 0.33), ("by 8+", 0.25)]
+    elif kind in ["rugby", "aussierules"]:
+        fav_bands = [("by 1-7", 0.34), ("by 8-14", 0.31), ("by 15+", 0.35)]
+        dog_bands = [("by 1-7", 0.45), ("by 8-14", 0.30), ("by 15+", 0.25)]
+    elif kind == "cricket":
+        fav_bands = [("narrow win", 0.40), ("solid win", 0.38), ("dominant win", 0.22)]
+        dog_bands = [("narrow win", 0.48), ("solid win", 0.34), ("dominant win", 0.18)]
+    elif kind == "fight":
+        fav_bands = [("decision", 0.38), ("finish", 0.42), ("late result", 0.20)]
+        dog_bands = [("decision", 0.42), ("finish", 0.38), ("late result", 0.20)]
+    elif kind == "field":
+        fav_bands = [("wins event", 0.55), ("top contender", 0.30), ("upset field risk", 0.15)]
+        dog_bands = [("field/upset path", 0.55), ("close contender", 0.30), ("longshot path", 0.15)]
     else:
         fav_bands = [("close win", 0.45), ("medium win", 0.35), ("comfortable win", 0.20)]
         dog_bands = [("close win", 0.50), ("medium win", 0.32), ("comfortable win", 0.18)]
@@ -429,8 +464,8 @@ with st.expander(t("advanced")):
     st.caption(t("host_note"))
     team_one = st.text_input(t("team1"), default_one)
     team_two = st.text_input(t("team2"), default_two)
-    selected_regions = st.multiselect(t("market_regions"), ["us", "uk", "eu", "au"], default=["us", "eu", "uk"])
-    max_feeds = st.number_input(t("max_feeds"), min_value=1, max_value=40, value=18, step=1)
+    selected_regions = st.multiselect(t("market_regions"), ["us", "us2", "uk", "eu", "au"], default=["us", "us2", "uk", "eu", "au"])
+    max_feeds = st.number_input(t("max_feeds"), min_value=1, max_value=120, value=40, step=1)
     max_events = st.number_input(t("max_events"), min_value=1, max_value=50, value=30, step=1)
     show_nearest = st.checkbox(t("nearest"), value=True)
 
@@ -442,7 +477,7 @@ if st.button(t("run"), type="primary"):
         st.error(t("choose_region"))
         st.stop()
     if not team_one and not team_two:
-        st.error("Enter a game like Mexico vs South Korea or Lakers vs Celtics." if not IS_ES else "Escribe un partido como México vs Corea del Sur o Lakers vs Celtics.")
+        st.error("Enter a game like Mexico vs South Korea, Lakers vs Celtics, or India vs Australia." if not IS_ES else "Escribe un partido como México vs Corea del Sur, Lakers vs Celtics o India vs Australia.")
         st.stop()
 
     with st.spinner(t("loading")):
