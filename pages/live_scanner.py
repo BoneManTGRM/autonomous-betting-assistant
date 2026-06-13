@@ -8,16 +8,19 @@ from autonomous_betting_agent.scorelines import estimate_scorelines, expected_go
 st.title("Live market scanner")
 
 try:
-    key = str(st.secrets.get("THE_ODDS_API_KEY", ""))
+    saved_token = str(st.secrets.get("THE_ODDS_API_KEY", ""))
 except Exception:
-    key = os.getenv("THE_ODDS_API_KEY", "")
+    saved_token = os.getenv("THE_ODDS_API_KEY", "")
+
+entry_token = st.text_input("Provider access token", value="", type="password")
+key = entry_token.strip() or saved_token
 
 if not key:
-    st.info("Add THE_ODDS_API_KEY in Streamlit secrets.")
+    st.info("Paste your own provider access token above. It is used only for this browser session unless the app owner configures one separately.")
 else:
     region_text = st.text_input("Regions", "us,eu,uk")
     search_text = st.text_input("Sport search", "soccer")
-    max_events = st.slider("Max events", 1, 50, 15)
+    max_events = st.number_input("Max events", min_value=1, max_value=50, value=15, step=1)
     sports = list_sports(key, include_all=False)
     terms = [x.lower() for x in search_text.split() if x.strip()]
     choices = []
@@ -31,7 +34,7 @@ else:
     selected = st.selectbox("Sport feed", labels)
     sport_key = choices[labels.index(selected)].key
     if st.button("Scan"):
-        results = scan_market(key, sport_key, regions=region_text, max_events=max_events)
+        results = scan_market(key, sport_key, regions=region_text, max_events=int(max_events))
         for item in results:
             st.subheader(f"{item.away_team} at {item.home_team}")
             st.write(f"Most likely: {item.favorite} ({item.favorite_probability:.1%})")
