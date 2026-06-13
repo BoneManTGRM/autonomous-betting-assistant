@@ -55,6 +55,7 @@ TEXT = {
     "events": {"English": "Events found", "Español": "Eventos encontrados"},
     "feeds": {"English": "Feeds scanned", "Español": "Fuentes revisadas"},
     "skipped": {"English": "Skipped feeds", "Español": "Fuentes omitidas"},
+    "diagnostics": {"English": "Diagnostics", "Español": "Diagnóstico"},
     "strongest": {"English": "Strongest favorites", "Español": "Favoritos más fuertes"},
     "balanced": {"English": "Closest markets", "Español": "Mercados más cerrados"},
     "draw_heavy": {"English": "Highest draw risk", "Español": "Mayor riesgo de empate"},
@@ -70,7 +71,10 @@ TEXT = {
 
 
 def t(key: str) -> str:
-    return TEXT[key][language]
+    entry = TEXT.get(key)
+    if not entry:
+        return key.replace("_", " ").title()
+    return entry.get(language) or entry.get("English") or key.replace("_", " ").title()
 
 
 st.title(t("title"))
