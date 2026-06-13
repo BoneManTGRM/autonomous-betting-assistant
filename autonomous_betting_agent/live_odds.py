@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from statistics import mean
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
 
@@ -27,6 +27,10 @@ class OutcomePrice:
     raw_probability: float
     normalized_probability: float
     source_count: int
+    best_price: Optional[float] = None
+    worst_price: Optional[float] = None
+    price_range: Optional[float] = None
+    best_bookmaker: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -42,6 +46,7 @@ class LiveEventSummary:
     outcomes: List[OutcomePrice]
     bookmaker_count: int
     cycle_notes: List[str]
+    market_overround: float = 0.0
 
 
 def get_api_key(explicit_key: Optional[str] = None) -> str:
@@ -91,9 +96,10 @@ def fetch_odds(
     return list(_get_json(f"/v4/sports/{sport_key}/odds/", params))
 
 
-def _average_prices_by_outcome(bookmakers: Iterable[Dict[str, Any]]) -> Dict[str, List[float]]:
-    prices: Dict[str, List[float]] = {}
+def _prices_by_outcome(bookmakers: Iterable[Dict[str, Any]]) -> Dict[str, List[Tuple[float, str]]]:
+    prices: Dict[str, List[Tuple[float, str]]] = {}
     for bookmaker in bookmakers:
+        book_name = str(bookmaker.get("title") or bookmaker.get("key") or "Unknown")
         for market in bookmaker.get("markets", []):
             if market.get("key") != "h2h":
                 continue
@@ -108,34 +114,47 @@ def _average_prices_by_outcome(bookmakers: Iterable[Dict[str, Any]]) -> Dict[str
                     continue
                 if price_float <= 1.0:
                     continue
-                prices.setdefault(name, []).append(price_float)
+                prices.setdefault(name, []).append((price_float, book_name))
     return prices
 
 
 def summarize_event(event: Dict[str, Any]) -> Optional[LiveEventSummary]:
-    price_map = _average_prices_by_outcome(event.get("bookmakers", []))
+    price_map = _prices_by_outcome(event.get("bookmakers", []))
     if len(price_map) < 2:
         return None
-    raw_probs = {name: 1.0 / mean(values) for name, values in price_map.items() if values}
+
+    average_prices = {name: mean([price for price, _ in entries]) for name, entries in price_map.items() if entries}
+    raw_probs = {name: 1.0 / avg_price for name, avg_price in average_prices.items() if avg_price > 1.0}
     total = sum(raw_probs.values())
     if total <= 0:
         return None
-    outcomes = [
-        OutcomePrice(
-            name=name,
-            average_price=mean(price_map[name]),
-            raw_probability=raw_probs[name],
-            normalized_probability=raw_probs[name] / total,
-            source_count=len(price_map[name]),
+
+    outcomes: List[OutcomePrice] = []
+    for name in raw_probs:
+        entries = price_map[name]
+        best_price, best_bookmaker = max(entries, key=lambda pair: pair[0])
+        worst_price = min(price for price, _ in entries)
+        outcomes.append(
+            OutcomePrice(
+                name=name,
+                average_price=average_prices[name],
+                raw_probability=raw_probs[name],
+                normalized_probability=raw_probs[name] / total,
+                source_count=len(entries),
+                best_price=best_price,
+                worst_price=worst_price,
+                price_range=best_price - worst_price,
+                best_bookmaker=best_bookmaker,
+            )
         )
-        for name in raw_probs
-    ]
+
     outcomes.sort(key=lambda item: item.normalized_probability, reverse=True)
     favorite = outcomes[0]
+    market_overround = total - 1.0
     cycle_notes = [
         "TEST: pulled live market prices for the event.",
         "DETECT: checked whether at least two outcomes had usable prices.",
-        "REPAIR: averaged prices across books and normalized implied probabilities.",
+        "REPAIR: averaged prices across books, found best available prices, and normalized implied probabilities.",
         "VERIFY: ranked outcomes by no-vig probability and marked draw risk when present.",
     ]
     return LiveEventSummary(
@@ -150,6 +169,7 @@ def summarize_event(event: Dict[str, Any]) -> Optional[LiveEventSummary]:
         outcomes=outcomes,
         bookmaker_count=len(event.get("bookmakers", [])),
         cycle_notes=cycle_notes,
+        market_overround=market_overround,
     )
 
 
