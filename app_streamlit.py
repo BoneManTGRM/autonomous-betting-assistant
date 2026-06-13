@@ -48,6 +48,14 @@ def aliases(value: str) -> list[str]:
     return [item for item in values if item]
 
 
+def is_known_country(value: str) -> bool:
+    base = clean(value)
+    for key, alias_list in COUNTRY_ALIASES.items():
+        if base == clean(key) or base in [clean(alias) for alias in alias_list]:
+            return True
+    return False
+
+
 def match_score(query: str, candidate: str) -> float:
     query = clean(query)
     candidate = clean(candidate)
@@ -80,8 +88,8 @@ def sport_score(sport_item, competition: str, team_one: str, team_two: str) -> f
     for word in words:
         if word in haystack:
             score += 4.0
-    country_matchup = bool(team_one and team_two and (aliases(team_one) or aliases(team_two)))
-    if country_matchup:
+    national_matchup = is_known_country(team_one) and is_known_country(team_two)
+    if national_matchup:
         for word in ["international", "world", "fifa", "cup", "friendlies", "concacaf", "uefa"]:
             if word in haystack:
                 score += 6.0
