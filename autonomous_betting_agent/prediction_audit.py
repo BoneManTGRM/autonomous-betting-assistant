@@ -150,6 +150,23 @@ def _bucket_performance(df: pd.DataFrame) -> dict[str, dict[str, Any]]:
     return out
 
 
+def _empty_report(summary: dict[str, Any], checked: pd.DataFrame) -> dict[str, Any]:
+    return {
+        "raw": summary,
+        "deduped": summary,
+        "status_counts": {},
+        "grade_counts": {},
+        "risk_flag_counts": {},
+        "duplicate_rows": 0,
+        "qualified_rows": 0,
+        "rejected_rows": 0,
+        "price_stats": _price_stats(checked),
+        "price_bucket_counts": {},
+        "price_bucket_performance_raw": {},
+        "price_bucket_performance_deduped": {},
+    }
+
+
 def audit_predictions(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     """Apply final safety layers, mark duplicates, and summarize betting-system quality.
 
@@ -160,15 +177,7 @@ def audit_predictions(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dic
         for column in AUDIT_COLUMNS:
             checked[column] = pd.Series(dtype="object")
         empty_summary = asdict(_performance_summary(checked))
-        return checked, checked.copy(), {
-            "raw": empty_summary,
-            "deduped": empty_summary,
-            "status_counts": {},
-            "risk_flag_counts": {},
-            "price_stats": _price_stats(checked),
-            "price_bucket_performance_raw": {},
-            "price_bucket_performance_deduped": {},
-        }
+        return checked, checked.copy(), _empty_report(empty_summary, checked)
 
     keys = checked.apply(lambda row: record_key(row.to_dict()), axis=1)
     duplicate_counts = keys.map(keys.value_counts())
