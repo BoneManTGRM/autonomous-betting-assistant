@@ -11,6 +11,7 @@ import streamlit as st
 from autonomous_betting_agent.weather_context import (
     fetch_weather,
     infer_weather_location,
+    infer_weather_location_with_confidence,
     is_weather_relevant,
     summary_to_dict,
 )
@@ -24,8 +25,8 @@ IS_ES = language == "Español"
 TEXT = {
     "title": {"English": "Weather Intelligence", "Español": "Inteligencia de Clima"},
     "caption": {
-        "English": "WeatherAPI.com-powered betting-weather module. It can check one matchup or scan a Pro Predictor CSV, infer venue cities, cache calls, score weather risk, and export a weather-enhanced CSV.",
-        "Español": "Módulo de clima para apuestas con WeatherAPI.com. Puede revisar un partido o escanear un CSV del Predictor, inferir ciudades, guardar consultas en caché, medir riesgo climático y exportar un CSV mejorado.",
+        "English": "WeatherAPI.com-powered betting-weather module. It can check one matchup or scan a Pro Predictor CSV, infer venue cities, cache calls, score weather risk, label location confidence, and export a weather-enhanced CSV.",
+        "Español": "Módulo de clima para apuestas con WeatherAPI.com. Puede revisar un partido o escanear un CSV del Predictor, inferir ciudades, guardar consultas en caché, medir riesgo climático, etiquetar confianza de ubicación y exportar un CSV mejorado.",
     },
     "key": {"English": "WeatherAPI key", "Español": "Clave de WeatherAPI"},
     "location": {"English": "Location / stadium city", "Español": "Ubicación / ciudad del estadio"},
@@ -132,17 +133,17 @@ def market_impact(sport: str, summary) -> str:
         if rain >= 50 or "rain" in condition:
             return "Football wet-field risk: higher variance"
         return "Normal football weather context"
-    if any(term in sport_text for term in ["soccer", "fifa", "world cup"]):
+    if any(term in sport_text for term in ["soccer", "fifa", "world cup", "veikkausliiga", "dfb", "pokal", "primera"]):
         if risk >= 20:
             return "Soccer weather risk: higher randomness, draw/under variance can rise"
         if wind >= 15 or rain >= 50:
             return "Soccer conditions watch: wind/rain can reduce clean finishing"
         return "Normal soccer weather context"
-    if "tennis" in sport_text:
+    if any(term in sport_text for term in ["tennis", "wta", "atp"]):
         if risk >= 20:
             return "Outdoor tennis risk: wind/rain can affect serve, timing, and delays"
         return "Normal tennis weather context"
-    if any(term in sport_text for term in ["golf", "cricket", "rugby", "afl", "aussie"]):
+    if any(term in sport_text for term in ["golf", "cricket", "odi", "one day", "rugby", "nrl", "afl", "aussie"]):
         if risk >= 20:
             return "Outdoor-weather sport risk: conditions can materially affect scoring/pace"
         return "Normal outdoor weather context"
@@ -179,6 +180,9 @@ def weather_row_from_prediction(row, event_col, sport_col, start_col, weather_ke
     if outdoor_only and not relevant:
         base.update({
             "weather_location_query": "",
+            "weather_location_confidence": "skipped",
+            "weather_location_matched_term": "",
+            "weather_location_source": "",
             "weather_location": "",
             "weather_condition": "skipped indoor/low relevance",
             "weather_temp_f": "",
@@ -198,10 +202,13 @@ def weather_row_from_prediction(row, event_col, sport_col, start_col, weather_ke
         })
         return base
 
-    location = infer_weather_location(home, away, sport)
-    base["weather_location_query"] = location
+    guess = infer_weather_location_with_confidence(home, away, sport)
+    base["weather_location_query"] = guess.location
+    base["weather_location_confidence"] = guess.confidence
+    base["weather_location_matched_term"] = guess.matched_term
+    base["weather_location_source"] = guess.source
     try:
-        summary = get_cached_weather(weather_key, location, start or None)
+        summary = get_cached_weather(weather_key, guess.location, start or None)
         data = summary_to_dict(summary)
         base.update({
             "weather_location": data.get("location", ""),
@@ -223,7 +230,7 @@ def weather_row_from_prediction(row, event_col, sport_col, start_col, weather_ke
         })
     except Exception as exc:
         base.update({
-            "weather_location": location,
+            "weather_location": guess.location,
             "weather_condition": "",
             "weather_temp_f": "",
             "weather_feelslike_f": "",
@@ -267,8 +274,9 @@ with tab_single:
     home = c1.text_input(t("home"), "New York Yankees")
     away = c2.text_input(t("away"), "")
     sport = st.text_input(t("sport"), "MLB")
-    inferred_location = infer_weather_location(home, away, sport)
-    location = st.text_input(t("location"), inferred_location)
+    guess = infer_weather_location_with_confidence(home, away, sport)
+    st.caption(f"Inferred location: {guess.location} | confidence: {guess.confidence} | matched: {guess.matched_term or 'none'}")
+    location = st.text_input(t("location"), guess.location)
     kickoff = st.text_input(t("kickoff"), "")
 
     if st.button(t("run"), type="primary"):
@@ -341,16 +349,19 @@ with tab_batch:
             if isinstance(enhanced, pd.DataFrame) and not enhanced.empty:
                 high = enhanced[enhanced["weather_tier"].astype(str).eq("High")]
                 med = enhanced[enhanced["weather_tier"].astype(str).eq("Medium")]
-                c1, c2, c3, c4 = st.columns(4)
+                weak = enhanced[enhanced.get("weather_location_confidence", pd.Series(dtype=str)).astype(str).str.contains("weak", na=False)]
+                c1, c2, c3, c4, c5 = st.columns(5)
                 c1.metric("Weather rows" if not IS_ES else "Filas con clima", len(enhanced))
                 c2.metric("High risk" if not IS_ES else "Riesgo alto", len(high))
                 c3.metric("Medium risk" if not IS_ES else "Riesgo medio", len(med))
-                c4.metric(t("cache"), len(st.session_state.get("ara_weather_cache", {})))
+                c4.metric("Weak locations" if not IS_ES else "Ubicaciones débiles", len(weak))
+                c5.metric(t("cache"), len(st.session_state.get("ara_weather_cache", {})))
 
                 display_cols = [col for col in [
-                    event_col, sport_col, start_col, "weather_location", "weather_condition", "weather_temp_f",
-                    "weather_wind_mph", "weather_gust_mph", "weather_rain_chance", "weather_risk",
-                    "weather_tier", "weather_notes", "weather_market_impact", "weather_error",
+                    event_col, sport_col, start_col, "weather_location_query", "weather_location_confidence",
+                    "weather_location", "weather_condition", "weather_temp_f", "weather_wind_mph",
+                    "weather_gust_mph", "weather_rain_chance", "weather_risk", "weather_tier",
+                    "weather_notes", "weather_market_impact", "weather_error",
                 ] if col and col in enhanced.columns]
                 st.dataframe(enhanced[display_cols], use_container_width=True, hide_index=True)
                 st.download_button(t("download"), data=csv_text(enhanced), file_name="weather_enhanced_predictions.csv", mime="text/csv")
@@ -371,3 +382,4 @@ with tab_guide:
         "Deportes bajo techo y combate normalmente reciben poco peso climático."
     )
     st.write("Risk scale: 0–11 low, 12–24 medium, 25+ high." if not IS_ES else "Escala: 0–11 bajo, 12–24 medio, 25+ alto.")
+    st.write("Location confidence: exact_home_team_or_venue is best; sport_or_tournament_hint is useful; inferred_from_event_text is acceptable; weak_guess_needs_review should be manually checked.")
