@@ -18,6 +18,8 @@ This is **research-only software**. It does not place bets, does not guarantee w
 - logs a TGRM-style TEST, DETECT, REPAIR, VERIFY cycle
 - supports backtesting metrics such as Brier score, accuracy and closing-line delta
 - learns probability calibration from graded results and applies it to future predictions
+- tracks predicted winner, model probability, calibrated probability, sportsbook odds, implied probability, edge, result, profit/loss, closing-line value, confidence buckets and sport-level performance
+- adds a stricter selection policy that marks candidates as STRONG, WATCH or AVOID so weak/low-edge picks can be filtered out instead of counted as real recommendations
 - includes a CLI, sample event file, Streamlit UI and tests
 
 ## ARA/TGRM lineage
@@ -89,6 +91,62 @@ The learned state stores calibration parameters, events trained, Brier score bef
 
 This is probability calibration, not proof of edge. It learns whether the raw market/model probabilities have been too confident, too cautious, or biased based on past graded predictions. Retrain it whenever more finished games are added.
 
+## Track picks, edge, profit/loss and CLV
+
+Use the tracker after predictions have been graded:
+
+```bash
+python track_predictions.py pro_predictor_updated_win_loss.csv --ledger-output prediction_ledger_enriched.csv --report-output prediction_report.json
+```
+
+The tracker accepts flexible CSV columns and enriches each row with:
+
+- `predicted_winner`
+- `model_probability`
+- `calibrated_probability`
+- `sportsbook_odds`
+- `implied_probability`
+- `edge`
+- `expected_value`
+- `actual_winner`
+- `result`
+- `profit_loss`
+- `closing_odds`
+- `closing_implied_probability`
+- `closing_line_value`
+- `confidence_bucket`
+- `decision`
+- `decision_reason`
+- `sport`
+- `bookmaker_count`
+
+The report summarizes:
+
+- resolved picks
+- wins/losses/pushes
+- hit rate
+- average model probability
+- average calibrated probability
+- Brier score
+- log loss
+- total unit profit/loss
+- ROI
+- average edge
+- average closing-line value
+- performance by STRONG/WATCH/AVOID decision
+- performance by confidence bucket
+- performance by sport
+
+## Selection policy for higher-quality picks
+
+The selection policy is intentionally stricter than simply taking every favorite. It marks a candidate:
+
+- `STRONG` when calibrated probability is at least 60%, edge is at least 5%, and expected value is positive
+- `WATCH` when calibrated probability is at least 54%, edge is at least 2.5%, and expected value is positive
+- `AVOID` when probability, edge, odds, or market quality are not good enough
+
+This can raise the hit rate of reported recommendations by filtering out weaker candidates, but it will usually reduce the number of picks. A higher hit rate is not the same thing as guaranteed profit, so ROI and closing-line value still need to be tracked.
+
 ## Run the Streamlit app
 
 ```bash
@@ -120,6 +178,11 @@ The baseline supports:
 - scoreline and spread table generation
 - ARA/TGRM cycle notes
 - Brier score, accuracy and closing-line delta backtesting helpers
+- prediction ledger enrichment
+- expected-value and edge calculation
+- confidence-bucket performance analysis
+- sport-specific performance analysis
+- STRONG/WATCH/AVOID filtering to avoid weak picks
 
 All inputs are normalized so results remain interpretable. Future sport-specific modules should replace generic signals with validated features for each sport.
 
