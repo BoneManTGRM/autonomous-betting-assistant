@@ -52,24 +52,85 @@ python tools/fetch_sportsdataio.py SomeEndpoint --sport nfl --subfeed scores --o
 
 Nested objects are flattened into columns such as `Score_Home`. Nested lists are preserved as JSON strings so CSV export stays safe.
 
+## Save canonical model-ready CSV
+
+Flattened SportsDataIO fields can vary by endpoint. The canonical normalizer converts common game, player and team payloads into stable columns for the model/tracker.
+
+```bash
+python tools/fetch_sportsdataio.py ScoresByDate/2026-JAN-15 --sport nfl --subfeed scores --output data/raw_scores.json --csv-output data/flat_scores.csv --canonical-output data/canonical_games.csv --dataset-type games
+```
+
+Use `--dataset-type auto` when you want the tool to infer `games`, `players` or `teams` from the payload keys:
+
+```bash
+python tools/fetch_sportsdataio.py Players --sport nfl --subfeed scores --output data/raw_players.json --canonical-output data/canonical_players.csv --dataset-type auto
+```
+
+Canonical game columns include:
+
+```text
+sdio_game_id
+sport
+season
+week
+start_time
+status
+is_final
+home_team
+away_team
+home_score
+away_score
+winner
+source_quality_flags
+```
+
+Canonical player columns include:
+
+```text
+sdio_player_id
+sport
+display_name
+team
+position
+status
+injury_status
+source_quality_flags
+```
+
+Canonical team columns include:
+
+```text
+sdio_team_id
+sport
+team_key
+city
+name
+full_name
+conference
+division
+source_quality_flags
+```
+
+`source_quality_flags` marks missing critical fields so bad rows do not silently enter the model.
+
 ## Common examples
 
 Teams:
 
 ```bash
-python tools/fetch_sportsdataio.py Teams --sport nfl --subfeed scores --output data/sportsdataio_nfl_teams.json --csv-output data/sportsdataio_nfl_teams.csv
+python tools/fetch_sportsdataio.py Teams --sport nfl --subfeed scores --output data/sportsdataio_nfl_teams.json --csv-output data/sportsdataio_nfl_teams.csv --canonical-output data/canonical_teams.csv --dataset-type teams
 ```
 
 Players:
 
 ```bash
-python tools/fetch_sportsdataio.py Players --sport nfl --subfeed scores --output data/sportsdataio_nfl_players.json --csv-output data/sportsdataio_nfl_players.csv
+python tools/fetch_sportsdataio.py Players --sport nfl --subfeed scores --output data/sportsdataio_nfl_players.json --csv-output data/sportsdataio_nfl_players.csv --canonical-output data/canonical_players.csv --dataset-type players
 ```
 
 Games by season:
 
 ```bash
-python tools/fetch_sportsdataio.py Games/2026 --sport nfl --subfeed scores --output data/sportsdataio_nfl_games.json --csv-output data/sportsdataio_nfl_games.csv
+python tools/fetch_sportsdataio.py Games/2026 --sport nfl --subfeed scores --output data/sportsdataio_nfl_games.json --csv-output data/sportsdataio_nfl_games.csv --canonical-output data/canonical_games.csv --dataset-type games
 ```
 
 Stats feed endpoint:
