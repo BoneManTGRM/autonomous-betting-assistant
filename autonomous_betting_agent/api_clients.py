@@ -44,6 +44,10 @@ class OddsAPIClient:
         except ValueError as exc:
             raise ExternalAPIError("Odds API response was not valid JSON.") from exc
 
+    def sports(self, *, all_sports: bool = False) -> Any:
+        params = {"all": "true"} if all_sports else None
+        return self.get("sports", params=params)
+
     def odds(
         self,
         *,
