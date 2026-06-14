@@ -21,12 +21,13 @@ Supported examples include:
 The layer does not throw away the market. It uses the market as a baseline, then compares it against an independent player probability.
 
 ```text
-market probability + player model probability -> blended probability -> edge -> status
+market probability + player model probability + data confidence -> blended probability -> edge -> status
 ```
 
 Market probability can come from:
 
 - decimal price such as `best_price`
+- American odds such as `+150` or `-120`
 - direct `market_probability`
 - binary no-vig prices such as `over_price` and `under_price`
 
@@ -37,6 +38,35 @@ Player probability can come from:
 - season player rate
 - opponent allowed rate
 - usage rate
+
+## Recommended CSV inputs
+
+Minimum useful columns:
+
+```text
+player_name
+prop_type
+best_price or market_probability
+model_probability or player rates
+books
+data_quality
+sample_size
+injury_status
+```
+
+Better inputs:
+
+```text
+recent_rate
+season_rate
+opponent_allowed_rate
+usage_rate
+recent_games
+season_games
+book_count
+over_price
+under_price
+```
 
 ## Command
 
@@ -61,11 +91,15 @@ python tools/run_player_props.py player_props.csv --include-watch
 
 - `prop_player_name`
 - `prop_type_normalized`
+- `prop_market_source`
 - `prop_market_probability`
+- `prop_no_vig_probability`
 - `prop_model_probability`
 - `prop_blended_probability`
 - `prop_implied_edge`
 - `prop_fair_decimal_price`
+- `prop_data_quality`
+- `prop_confidence_score`
 - `prop_status`
 - `prop_stake_units`
 - `prop_reasons`
@@ -88,6 +122,23 @@ WATCH
 TRACK_ONLY_NEEDS_PLAYER_MODEL_DATA
 REJECT
 ```
+
+## Status controls
+
+Rows can be blocked or watched for:
+
+- missing player name
+- missing prop type
+- missing market probability or price
+- missing player model probability or player rates
+- low book coverage
+- missing book coverage
+- low data quality
+- missing data quality
+- missing sample size
+- small sample size
+- bad player status such as out, doubtful, inactive or IR
+- watch player status such as questionable, probable or limited
 
 ## Required caution
 
