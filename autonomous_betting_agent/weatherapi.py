@@ -39,8 +39,14 @@ class WeatherSnapshot:
     chance_of_snow: int | None
     is_day: int | None
 
+    @property
+    def weather_location(self) -> str:
+        return ", ".join(part for part in (self.location_name, self.region, self.country) if part)
+
     def to_row(self) -> dict[str, Any]:
         row = asdict(self)
+        row["weather_location"] = self.weather_location
+        row["weather_location_query"] = self.location_query
         row["weather_condition"] = self.condition
         row["weather_temp_c"] = self.temperature_c
         row["weather_wind_kph"] = self.wind_kph
