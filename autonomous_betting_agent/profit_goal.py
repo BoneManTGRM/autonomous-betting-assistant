@@ -13,8 +13,10 @@ PUSH_LABELS = {"push", "void", "draw", "tie", "refund", "cancelled", "canceled"}
 EVENT_COLUMNS = ("event", "event_name", "game", "match", "fixture")
 START_COLUMNS = ("start", "start_time", "event_start", "date", "commence_time")
 PICK_COLUMNS = ("prediction", "pick", "predicted_side", "selection", "team", "player_name")
+MARKET_COLUMNS = ("market", "market_key", "prop_type", "bet_type")
+GAME_ID_COLUMNS = ("sdio_game_id", "sportsdataio_game_id", "game_id", "event_id", "sdio_result_game_id")
 RESULT_COLUMNS = ("result", "outcome", "win_loss", "graded_result", "status")
-PRICE_COLUMNS = ("best_price", "price", "odds", "decimal_odds", "sportsbook_odds", "entry_price")
+PRICE_COLUMNS = ("best_price", "price", "odds", "decimal_odds", "sportsbook_odds", "entry_price", "entry_odds")
 CLOSING_PRICE_COLUMNS = ("closing_price", "closing_odds", "close_price", "close_odds")
 CLV_COLUMNS = ("closing_line_value", "clv", "closing_line_delta")
 
@@ -69,6 +71,13 @@ def _first(row: Mapping[str, Any], keys: Iterable[str]) -> Any:
     return None
 
 
+def _clean_id(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return text
+
+
 def parse_float(value: Any) -> float | None:
     if value is None:
         return None
@@ -106,11 +115,15 @@ def parse_price(value: Any) -> float | None:
     return None
 
 
-def _record_key(row: Mapping[str, Any]) -> tuple[str, str, str]:
+def _record_key(row: Mapping[str, Any]) -> tuple[str, str, str, str]:
+    game_id = _clean_id(_first(row, GAME_ID_COLUMNS))
+    market = str(_first(row, MARKET_COLUMNS) or "").strip().lower()
+    pick = str(_first(row, PICK_COLUMNS) or "").strip().lower()
+    if game_id:
+        return "game_id", game_id, market, pick
     event = str(_first(row, EVENT_COLUMNS) or "").strip().lower()
     start = str(_first(row, START_COLUMNS) or "").strip().lower()
-    pick = str(_first(row, PICK_COLUMNS) or "").strip().lower()
-    return event, start, pick
+    return "event_start", f"{event}|{start}", market, pick
 
 
 def unit_profit_loss(result: str, price: float | None) -> float:
@@ -138,7 +151,7 @@ def closing_line_value(row: Mapping[str, Any], entry_price: float | None) -> flo
 
 
 def review_profit_goal_rows(rows: list[Mapping[str, Any]], policy: ProfitGoalPolicy = ProfitGoalPolicy()) -> ProfitGoalReport:
-    seen: set[tuple[str, str, str]] = set()
+    seen: set[tuple[str, str, str, str]] = set()
     duplicate_rows = 0
     finished: list[tuple[Mapping[str, Any], str, float | None, float | None]] = []
 
@@ -190,7 +203,7 @@ def review_profit_goal_rows(rows: list[Mapping[str, Any]], policy: ProfitGoalPol
     if policy.require_positive_clv and checks["positive_average_clv"] is not True:
         required_actions.append("Add or improve closing-odds data until average CLV is positive.")
     if policy.require_no_duplicates and duplicate_rows > 0:
-        required_actions.append("Remove duplicate event/start/pick rows before reporting performance.")
+        required_actions.append("Remove duplicate game/market/pick rows before reporting performance.")
 
     hard_checks = [
         checks["enough_finished_picks"],
@@ -211,6 +224,7 @@ def review_profit_goal_rows(rows: list[Mapping[str, Any]], policy: ProfitGoalPol
 
     notes = [
         "Profit goal uses deduped finished rows only.",
+        "Duplicate protection prefers game_id + market + pick when game IDs are available, then falls back to event/start + market + pick.",
         "Win rate alone is not enough; odds, ROI, CLV and duplicates are checked separately.",
         "Positive CLV requires a closing odds column or a direct CLV column.",
     ]
