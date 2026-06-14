@@ -118,6 +118,29 @@ class AraFilterTests(unittest.TestCase):
         self.assertTrue(weather_location_mismatch(row))
         self.assertIn("weather_location_mismatch", risk_flags_for(row))
 
+    def test_country_short_alias_does_not_match_inside_other_country_name(self) -> None:
+        row = {
+            "Sport": "soccer",
+            "weather_location_query": "Auburn, USA",
+            "weather_location": "Auburn, Queensland, Australia",
+        }
+        self.assertTrue(weather_location_mismatch(row))
+        self.assertIn("weather_location_mismatch", risk_flags_for(row))
+
+    def test_uk_alias_matches_united_kingdom(self) -> None:
+        good_row = {
+            "Sport": "soccer",
+            "weather_location_query": "Manchester, UK",
+            "weather_location": "Manchester, England, United Kingdom",
+        }
+        bad_row = {
+            "Sport": "soccer",
+            "weather_location_query": "Manchester, UK",
+            "weather_location": "Manchester, Ohio, United States of America",
+        }
+        self.assertFalse(weather_location_mismatch(good_row))
+        self.assertTrue(weather_location_mismatch(bad_row))
+
     def test_empty_frame_is_safe(self) -> None:
         enriched = apply_ara_decision_layer(pd.DataFrame())
         self.assertIn("ara_live_decision", enriched.columns)
