@@ -8,6 +8,7 @@ from autonomous_betting_agent.ara_filters import (
     apply_ara_decision_layer,
     dedupe_ara_records,
     market_probability,
+    parse_float,
     parse_percent,
     proxy_filter_decision,
     risk_flags_for,
@@ -22,6 +23,14 @@ class AraFilterTests(unittest.TestCase):
         self.assertEqual(parse_percent("55%"), 0.55)
         self.assertEqual(parse_percent("0.55"), 0.55)
         self.assertIsNone(parse_percent("not a number"))
+
+    def test_parse_percent_rejects_string_nan_and_infinity(self) -> None:
+        self.assertIsNone(parse_percent("nan"))
+        self.assertIsNone(parse_percent("NaN"))
+        self.assertIsNone(parse_percent("inf"))
+        self.assertIsNone(parse_percent("Infinity"))
+        self.assertIsNone(parse_float("nan"))
+        self.assertIsNone(parse_float("inf"))
 
     def test_sport_group_handles_american_football(self) -> None:
         self.assertEqual(sport_group("american football nfl"), "American football")
