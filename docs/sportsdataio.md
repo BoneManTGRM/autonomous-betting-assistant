@@ -68,6 +68,17 @@ quality_gate.metrics
 
 The quality gate checks prediction result match rate, ambiguous result matches, player-feature readiness, player-prop feature match rate, profit-goal status, ROI/odds/duplicate failures and pipeline warnings. A `PASS` means the data pipeline looks usable for review. It does not mean the betting model is guaranteed profitable.
 
+Use strict mode when automation should stop on weak data:
+
+```bash
+python tools/run_sportsdataio_pipeline.py \
+  --existing-canonical-games-csv data/sportsdataio_games_canonical.csv \
+  --predictions-csv predictions.csv \
+  --minimum-quality-status WATCH
+```
+
+`--minimum-quality-status WATCH` exits non-zero only when the quality gate is `FAIL`. `--minimum-quality-status PASS` exits non-zero for both `WATCH` and `FAIL`. The default is `FAIL`, which never blocks completed PASS/WATCH/FAIL reports.
+
 Profit-goal review is enabled by default when predictions are graded. Useful options:
 
 ```bash
