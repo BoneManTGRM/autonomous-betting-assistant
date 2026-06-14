@@ -1,5 +1,7 @@
 # Autonomous Betting Agent
 
+[![tests](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/tests.yml)
+
 Autonomous Betting Agent is a standalone sports research agent built from the ARA/TGRM idea: run repeatable research cycles, detect weak evidence, repair the analysis, verify uncertainty, and produce transparent probability reports.
 
 This is **research-only software**. It does not place bets, does not guarantee winners, and should not be treated as proof of profitability without rigorous backtesting and prospective testing.
@@ -10,7 +12,7 @@ This is **research-only software**. It does not place bets, does not guarantee w
 - lets each app user paste their own provider access token
 - scans live market feeds when a provider token is supplied
 - ranks the most likely outcome for upcoming games
-- estimates likely scorelines such as 1-1, 2-1 and 2-3
+- estimates likely scorelines such as 1-1 and 2-1
 - explains which factors moved the manual ARA model
 - tracks confidence, evidence strength and uncertainty
 - compares model probabilities with no-vig market probabilities
