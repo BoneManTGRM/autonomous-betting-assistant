@@ -18,6 +18,9 @@ NEGATIVE_FLAGS = {
     "classification_avoid": 40,
     "soccer_draw_risk_extreme_30_plus": 35,
     "soccer_draw_risk_block_ml_25_plus": 28,
+    "weather_location_mismatch": 30,
+    "weather_api_error": 30,
+    "weather_missing_for_relevant_event": 25,
     "data_quality_under_80": 25,
     "low_book_coverage_under_5": 20,
     "heavy_favorite_price_under_1_30": 18,
@@ -27,6 +30,7 @@ NEGATIVE_FLAGS = {
     "price_range_disagreement": 12,
     "soccer_draw_risk_elevated_18_plus": 10,
     "limited_book_coverage_under_8": 8,
+    "weather_forecast_not_exact": 8,
     "watch_track_only": 6,
     "independent_ara_probability_missing": 15,
 }
@@ -39,12 +43,14 @@ WEATHER_PENALTIES = {
     "weather_precip_watch": 8,
 }
 
+BLANK_TEXT = {"", "nan", "none", "null", "nat"}
+
 
 def _split_flags(value: Any) -> list[str]:
     text = str(value or "").strip()
-    if not text:
+    if text.lower() in BLANK_TEXT:
         return []
-    return [item.strip() for item in text.split(";") if item.strip()]
+    return [item.strip() for item in text.split(";") if item.strip() and item.strip().lower() not in BLANK_TEXT]
 
 
 def _num(value: Any) -> float | None:
