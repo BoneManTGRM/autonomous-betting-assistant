@@ -75,7 +75,9 @@ def _first(row: Mapping[str, Any], names: tuple[str, ...]) -> Any:
 
 
 def _text(value: Any) -> str:
-    return str(value or "").strip()
+    if value is None:
+        return ""
+    return str(value).strip()
 
 
 def _number(value: Any) -> float | None:
