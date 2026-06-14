@@ -26,7 +26,7 @@ You can use query-string auth with `--auth-mode query` if needed.
 
 ## One-command pipeline
 
-Use the full pipeline when you want SportsDataIO ingestion, result grading, player features, prop enrichment and prop ranking in one run:
+Use the full pipeline when you want SportsDataIO ingestion, result grading, profit-goal review, player features, prop enrichment and prop ranking in one run:
 
 ```bash
 python tools/run_sportsdataio_pipeline.py \
@@ -46,6 +46,7 @@ sportsdataio_games_raw.json
 sportsdataio_games_flat.csv
 sportsdataio_games_canonical.csv
 predictions_with_sportsdataio_results.csv
+profit_goal_report.json
 sportsdataio_player_stats_raw.json
 sportsdataio_player_stats_flat.csv
 sportsdataio_player_features.csv
@@ -53,6 +54,25 @@ player_props_enriched_with_features.csv
 player_props_checked.csv
 player_props_ranked.csv
 sportsdataio_pipeline_report.json
+```
+
+Profit-goal review is enabled by default when predictions are graded. Useful options:
+
+```bash
+python tools/run_sportsdataio_pipeline.py \
+  --existing-canonical-games-csv data/sportsdataio_games_canonical.csv \
+  --predictions-csv predictions.csv \
+  --profit-min-finished 200 \
+  --allow-missing-clv
+```
+
+Skip profit-goal review when you only want raw grading:
+
+```bash
+python tools/run_sportsdataio_pipeline.py \
+  --existing-canonical-games-csv data/sportsdataio_games_canonical.csv \
+  --predictions-csv predictions.csv \
+  --skip-profit-goal-review
 ```
 
 You can also run it without API calls by supplying existing files:
