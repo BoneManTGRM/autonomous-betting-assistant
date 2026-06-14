@@ -36,30 +36,46 @@ The CLI builds a URL like:
 https://api.sportsdata.io/v3/nfl/scores/json/ScoresByDate/2026-JAN-15
 ```
 
+## Save flattened CSV too
+
+Raw JSON is useful for debugging, but the betting pipeline usually needs CSV. Add `--csv-output`:
+
+```bash
+python tools/fetch_sportsdataio.py ScoresByDate/2026-JAN-15 --sport nfl --subfeed scores --output data/sportsdataio_nfl_scores.json --csv-output data/sportsdataio_nfl_scores.csv
+```
+
+If the JSON payload is an object with multiple lists, choose the list to flatten with `--record-key`:
+
+```bash
+python tools/fetch_sportsdataio.py SomeEndpoint --sport nfl --subfeed scores --output data/raw.json --csv-output data/flat.csv --record-key Games
+```
+
+Nested objects are flattened into columns such as `Score_Home`. Nested lists are preserved as JSON strings so CSV export stays safe.
+
 ## Common examples
 
 Teams:
 
 ```bash
-python tools/fetch_sportsdataio.py Teams --sport nfl --subfeed scores --output data/sportsdataio_nfl_teams.json
+python tools/fetch_sportsdataio.py Teams --sport nfl --subfeed scores --output data/sportsdataio_nfl_teams.json --csv-output data/sportsdataio_nfl_teams.csv
 ```
 
 Players:
 
 ```bash
-python tools/fetch_sportsdataio.py Players --sport nfl --subfeed scores --output data/sportsdataio_nfl_players.json
+python tools/fetch_sportsdataio.py Players --sport nfl --subfeed scores --output data/sportsdataio_nfl_players.json --csv-output data/sportsdataio_nfl_players.csv
 ```
 
 Games by season:
 
 ```bash
-python tools/fetch_sportsdataio.py Games/2026 --sport nfl --subfeed scores --output data/sportsdataio_nfl_games.json
+python tools/fetch_sportsdataio.py Games/2026 --sport nfl --subfeed scores --output data/sportsdataio_nfl_games.json --csv-output data/sportsdataio_nfl_games.csv
 ```
 
 Stats feed endpoint:
 
 ```bash
-python tools/fetch_sportsdataio.py PlayerSeasonStats/2026 --sport nfl --subfeed stats --output data/sportsdataio_player_season_stats.json
+python tools/fetch_sportsdataio.py PlayerSeasonStats/2026 --sport nfl --subfeed stats --output data/sportsdataio_player_season_stats.json --csv-output data/sportsdataio_player_season_stats.csv
 ```
 
 Exact endpoint names depend on your SportsDataIO product, sport, and feed access. If SportsDataIO says an endpoint requires production access, the client will raise a clear HTTP error.
