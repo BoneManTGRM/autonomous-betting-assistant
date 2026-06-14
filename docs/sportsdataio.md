@@ -113,6 +113,40 @@ source_quality_flags
 
 `source_quality_flags` marks missing critical fields so bad rows do not silently enter the model.
 
+## Apply SportsDataIO results to predictions
+
+After you fetch and canonicalize final games, you can automatically grade a prediction CSV:
+
+```bash
+python tools/apply_sportsdataio_results.py predictions.csv data/canonical_games.csv --output data/predictions_with_sportsdataio_results.csv
+```
+
+The enrichment layer matches by:
+
+```text
+sdio_game_id, when present
+home_team + away_team, when present
+event text containing both teams, such as "NYG at DAL"
+```
+
+It adds columns such as:
+
+```text
+sdio_result_match_status
+sdio_result_game_id
+sdio_result_home_team
+sdio_result_away_team
+sdio_result_home_score
+sdio_result_away_score
+sdio_result_winner
+sdio_result_status
+sdio_result_note
+result
+actual_winner
+```
+
+Rows that are unmatched, ambiguous or not final are not graded as wins/losses. This protects the tracker from dirty result data.
+
 ## Common examples
 
 Teams:
