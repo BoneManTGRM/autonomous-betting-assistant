@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -35,9 +34,14 @@ MOVEMENT_COLUMNS = [
     "opening_probability",
     "current_probability",
     "probability_move",
+    "probability_move_abs",
     "opening_best_price",
     "current_best_price",
     "best_price_move",
+    "best_price_move_abs",
+    "movement_signal",
+    "movement_strength",
+    "market_confidence_score",
     "opening_snapshot_time_utc",
     "latest_snapshot_time_utc",
 ]
@@ -91,8 +95,54 @@ def append_snapshot_csv(rows: pd.DataFrame, path: str | Path) -> pd.DataFrame:
         combined = pd.concat([existing, rows], ignore_index=True)
     else:
         combined = rows.copy()
+    combined = combined.drop_duplicates(subset=["snapshot_time_utc", "event_id", "outcome"], keep="last")
     combined.to_csv(output_path, index=False)
     return combined
+
+
+def _movement_signal(probability_move: float | None) -> tuple[str, str]:
+    if probability_move is None or pd.isna(probability_move):
+        return "NO_DATA", "none"
+    move = float(probability_move)
+    abs_move = abs(move)
+    if abs_move >= 0.05:
+        strength = "strong"
+    elif abs_move >= 0.02:
+        strength = "moderate"
+    elif abs_move >= 0.01:
+        strength = "small"
+    else:
+        return "STABLE", "none"
+    return ("STEAM" if move > 0 else "DRIFT", strength)
+
+
+def _confidence_score(row: pd.Series) -> int:
+    score = 50
+    books = row.get("bookmaker_count")
+    overround = row.get("market_overround")
+    price_range = row.get("price_range")
+    movement = row.get("probability_move_abs")
+    try:
+        if pd.notna(books):
+            score += min(20, max(0, int(books) * 2))
+    except (TypeError, ValueError):
+        pass
+    try:
+        if pd.notna(overround):
+            score -= int(max(0.0, float(overround)) * 100)
+    except (TypeError, ValueError):
+        pass
+    try:
+        if pd.notna(price_range):
+            score -= min(20, int(abs(float(price_range)) * 50))
+    except (TypeError, ValueError):
+        pass
+    try:
+        if pd.notna(movement) and float(movement) >= 0.02:
+            score += min(15, int(float(movement) * 200))
+    except (TypeError, ValueError):
+        pass
+    return max(0, min(100, score))
 
 
 def add_line_movement(snapshot_frame: pd.DataFrame) -> pd.DataFrame:
@@ -103,8 +153,9 @@ def add_line_movement(snapshot_frame: pd.DataFrame) -> pd.DataFrame:
         return out
 
     work = snapshot_frame.copy()
-    work["snapshot_time_utc"] = work["snapshot_time_utc"].astype(str)
-    sort_cols = ["event_id", "outcome", "snapshot_time_utc"]
+    work["_snapshot_dt"] = pd.to_datetime(work["snapshot_time_utc"], errors="coerce", utc=True)
+    work["_snapshot_sort"] = work["_snapshot_dt"].fillna(pd.Timestamp.min.tz_localize("UTC"))
+    sort_cols = ["event_id", "outcome", "_snapshot_sort"]
     work = work.sort_values(sort_cols).reset_index(drop=True)
     group_cols = ["event_id", "outcome"]
     first = work.groupby(group_cols, dropna=False).first().reset_index()
@@ -117,18 +168,33 @@ def add_line_movement(snapshot_frame: pd.DataFrame) -> pd.DataFrame:
     movement["opening_probability"] = movement["normalized_probability_opening"]
     movement["current_probability"] = movement["normalized_probability_current"]
     movement["probability_move"] = movement["current_probability"] - movement["opening_probability"]
+    movement["probability_move_abs"] = movement["probability_move"].abs()
     movement["opening_best_price"] = movement["best_price_opening"]
     movement["current_best_price"] = movement["best_price_current"]
     movement["best_price_move"] = movement["current_best_price"] - movement["opening_best_price"]
+    movement["best_price_move_abs"] = movement["best_price_move"].abs()
+    movement["movement_signal"] = movement["probability_move"].apply(lambda value: _movement_signal(value)[0])
+    movement["movement_strength"] = movement["probability_move"].apply(lambda value: _movement_signal(value)[1])
     movement["opening_snapshot_time_utc"] = movement["snapshot_time_utc_opening"]
     movement["latest_snapshot_time_utc"] = movement["snapshot_time_utc_current"]
-    keep = group_cols + MOVEMENT_COLUMNS
-    return work.merge(movement[keep], on=group_cols, how="left")
+    keep = group_cols + [column for column in MOVEMENT_COLUMNS if column != "market_confidence_score"]
+    enriched = work.merge(movement[keep], on=group_cols, how="left").drop(columns=["_snapshot_dt", "_snapshot_sort"])
+    enriched["market_confidence_score"] = enriched.apply(_confidence_score, axis=1)
+    return enriched
 
 
 def latest_snapshot_with_movement(snapshot_frame: pd.DataFrame) -> pd.DataFrame:
     moved = add_line_movement(snapshot_frame)
     if moved.empty:
         return moved
-    moved = moved.sort_values(["event_id", "outcome", "snapshot_time_utc"])
-    return moved.groupby(["event_id", "outcome"], dropna=False).tail(1).reset_index(drop=True)
+    moved["_snapshot_dt"] = pd.to_datetime(moved["snapshot_time_utc"], errors="coerce", utc=True)
+    moved = moved.sort_values(["event_id", "outcome", "_snapshot_dt"])
+    latest = moved.groupby(["event_id", "outcome"], dropna=False).tail(1).reset_index(drop=True)
+    return latest.drop(columns=["_snapshot_dt"])
+
+
+def top_market_movers(snapshot_frame: pd.DataFrame, limit: int = 25) -> pd.DataFrame:
+    latest = latest_snapshot_with_movement(snapshot_frame)
+    if latest.empty or "probability_move_abs" not in latest.columns:
+        return latest
+    return latest.sort_values(["probability_move_abs", "market_confidence_score"], ascending=[False, False]).head(limit).reset_index(drop=True)
