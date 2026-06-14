@@ -15,6 +15,7 @@ def main() -> int:
     parser.add_argument("--player-stats-endpoint", default=None, help="SportsDataIO stats endpoint, for example PlayerSeasonStats/2026")
     parser.add_argument("--predictions-csv", type=Path, default=None)
     parser.add_argument("--player-props-csv", type=Path, default=None)
+    parser.add_argument("--odds-csv", type=Path, default=None)
     parser.add_argument("--existing-canonical-games-csv", type=Path, default=None)
     parser.add_argument("--existing-player-features-csv", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=Path("data/sportsdataio_pipeline"))
@@ -47,6 +48,7 @@ def main() -> int:
         player_stats_endpoint=args.player_stats_endpoint,
         predictions_csv=args.predictions_csv,
         player_props_csv=args.player_props_csv,
+        odds_csv=args.odds_csv,
         existing_canonical_games_csv=args.existing_canonical_games_csv,
         existing_player_features_csv=args.existing_player_features_csv,
         output_dir=args.output_dir,
