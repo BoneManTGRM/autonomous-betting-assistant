@@ -13,6 +13,7 @@ This is **research-only software**. It does not place bets, does not guarantee w
 - scans live market feeds when a provider token is supplied
 - ranks the most likely outcome for upcoming games
 - estimates likely scorelines such as 1-1 and 2-1
+- scores individual player props such as touchdown, home run, goal, shot on goal, assist, hit, strikeout, reception, rushing yards, receiving yards and passing yards
 - explains which factors moved the manual ARA model
 - tracks confidence, evidence strength and uncertainty
 - compares model probabilities with no-vig market probabilities
@@ -200,6 +201,33 @@ Use review mode when you also want `WATCH` and track-only rows in the shortlist 
 python generate_best_bets.py "weather_enhanced_predictions.csv" --include-watch
 ```
 
+## Player props layer
+
+The player props layer lives in `autonomous_betting_agent/player_props.py`. It uses market odds as a baseline, then compares the market probability against an independent player probability.
+
+Supported examples include touchdown, home run, goal, shot on goal, assist, hit, strikeout, reception, rushing yards, receiving yards and passing yards.
+
+Score and rank player props from a CSV:
+
+```bash
+python tools/run_player_props.py player_props.csv
+```
+
+Default outputs:
+
+```text
+data/player_props_checked.csv
+data/player_props_ranked.csv
+```
+
+Use review mode when you also want watch/reject rows:
+
+```bash
+python tools/run_player_props.py player_props.csv --include-watch
+```
+
+The full workflow is documented in `docs/player_props.md`.
+
 ## Prediction review workflow
 
 Use the review CLI when you want checked rows, deduped checked rows and a JSON report from one CSV:
@@ -275,6 +303,7 @@ The baseline supports:
 - expected-value and edge calculation
 - confidence-bucket performance analysis
 - sport-specific performance analysis
+- individual player prop scoring
 - STRONG/WATCH/AVOID filtering to avoid weak picks
 - ARA/deep/best-bet shortlist filtering for stricter final review
 
@@ -285,12 +314,13 @@ All inputs are normalized so results remain interpretable. Future sport-specific
 1. Pick the first sport.
 2. Add official schedule and statistics providers.
 3. Add injury, lineup and weather providers.
-4. Add market-provider interfaces with timestamped snapshots.
-5. Build historical event storage.
-6. Add strict time-aware backtesting that prevents future-data leakage.
-7. Tune weights only on training data.
-8. Evaluate on untouched historical data.
-9. Run prospective tests before making any performance claims.
+4. Add player-level statistics and depth-chart providers.
+5. Add market-provider interfaces with timestamped snapshots.
+6. Build historical event storage.
+7. Add strict time-aware backtesting that prevents future-data leakage.
+8. Tune weights only on training data.
+9. Evaluate on untouched historical data.
+10. Run prospective tests before making any performance claims.
 
 ## Validation standard
 
