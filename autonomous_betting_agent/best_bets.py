@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 import pandas as pd
 
-from .ara_filters import dedupe_ara_records, parse_float, parse_percent, weather_location_mismatch
+from .ara_filters import (
+    _country_mismatch,
+    _field,
+    _location_primary_missing,
+    dedupe_ara_records,
+    parse_float,
+    parse_percent,
+    weather_location_mismatch,
+)
 from .deep_analysis import apply_deep_analysis, merge_latest_movement
 
 BEST_BET_COLUMNS = [
@@ -90,6 +98,30 @@ def _grade(score: float) -> str:
     return "F"
 
 
+def _combined_weather_location(row: Mapping[str, Any]) -> str | None:
+    direct = _field(row, ("weather_location", "returned_weather_location"))
+    if direct:
+        return str(direct)
+    parts = [
+        _field(row, ("location_name", "weather_location_name")),
+        _field(row, ("region", "weather_region")),
+        _field(row, ("country", "weather_country")),
+    ]
+    text = ", ".join(str(part) for part in parts if part)
+    return text or None
+
+
+def _best_bet_location_mismatch(row: Mapping[str, Any]) -> bool:
+    if weather_location_mismatch(row):
+        return True
+    query = _field(row, ("weather_location_query", "location_query", "weather_query"))
+    returned = _combined_weather_location(row)
+    tier = str(_field(row, ("weather_tier", "weather status", "weather_status")) or "").strip().lower()
+    if not query or not returned or tier in {"skipped", "error"}:
+        return False
+    return _location_primary_missing(query, returned) or _country_mismatch(query, returned)
+
+
 def _movement_score(row: pd.Series) -> tuple[float, list[str]]:
     score = 0.0
     reasons: list[str] = []
@@ -127,7 +159,7 @@ def _movement_score(row: pd.Series) -> tuple[float, list[str]]:
 def _best_bet_row(row: pd.Series, policy: BestBetPolicy) -> dict[str, Any]:
     risk_flags = set(_split_flags(row.get("ara_risk_flags")))
     weather_flags = set(_split_flags(row.get("ara_weather_flags")))
-    if weather_location_mismatch(row.to_dict()):
+    if _best_bet_location_mismatch(row.to_dict()):
         weather_flags.add("weather_location_mismatch")
     all_flags = risk_flags | weather_flags
     live_decision = str(row.get("ara_live_decision", "")).upper()
