@@ -11,6 +11,7 @@ This is **research-only software**. It does not place bets, does not guarantee w
 - estimates win probabilities for two-outcome sports events
 - lets each app user paste their own provider access token
 - scans live market feeds when a provider token is supplied
+- fetches SportsDataIO league data when a SportsDataIO key is supplied
 - ranks the most likely outcome for upcoming games
 - estimates likely scorelines such as 1-1 and 2-1
 - scores individual player props such as touchdown, home run, goal, shot on goal, assist, hit, strikeout, reception, rushing yards, receiving yards and passing yards
@@ -21,6 +22,8 @@ This is **research-only software**. It does not place bets, does not guarantee w
 - logs a TGRM-style TEST, DETECT, REPAIR, VERIFY cycle
 - supports backtesting metrics such as Brier score, accuracy and closing-line delta
 - learns probability calibration from graded results and applies it to future predictions
+- reviews calibration by classification, probability bucket and sport so overconfident groups can be downweighted
+- checks the profitable 70 percent goal using win rate, average odds, ROI, CLV and duplicates
 - tracks predicted winner, model probability, calibrated probability, sportsbook odds, implied probability, edge, result, profit/loss, closing-line value, confidence buckets and sport-level performance
 - adds strict ARA, deep-analysis and best-bet layers so weak, low-edge, bad-weather, bad-location or favorite-heavy picks can be filtered instead of counted as real recommendations
 - includes a CLI, sample event file, Streamlit UI, unit tests and GitHub Actions test workflow
@@ -94,6 +97,20 @@ The learned state stores calibration parameters, events trained, Brier score bef
 
 This is probability calibration, not proof of edge. It learns whether the raw market/model probabilities have been too confident, too cautious, or biased based on past graded predictions. Retrain it whenever more finished games are added.
 
+Review calibration quality by classification, probability bucket and sport:
+
+```bash
+python tools/run_calibration_review.py pro_predictor_updated_win_loss.csv
+```
+
+Default output:
+
+```text
+data/calibration_review_report.json
+```
+
+Use this report to find groups that should be downweighted, watched, or left unchanged before they are allowed into a final shortlist.
+
 ## Track picks, edge, profit/loss and CLV
 
 Use the tracker after predictions have been graded:
@@ -124,6 +141,49 @@ The tracker accepts flexible CSV columns and enriches each row with:
 - `bookmaker_count`
 
 The report summarizes resolved picks, wins/losses/pushes, hit rate, average probabilities, Brier score, log loss, unit profit/loss, ROI, average edge, average closing-line value and performance by decision, confidence bucket and sport.
+
+## Profitable 70 percent goal review
+
+Check whether a tracked CSV meets the stricter Marco-style target:
+
+```bash
+python tools/run_profit_goal_review.py pro_predictor_updated_win_loss.csv
+```
+
+Default output:
+
+```text
+data/profit_goal_report.json
+```
+
+The goal review checks:
+
+- 70 percent win rate target with tolerance
+- average odds at or above 1.43
+- positive ROI
+- positive closing-line value when closing odds are supplied
+- no duplicate event/start/pick padding
+- minimum finished-pick sample size
+
+The full workflow is documented in `docs/profit_goal.md`.
+
+## SportsDataIO integration
+
+Set your SportsDataIO API key:
+
+```bash
+export SPORTSDATAIO_API_KEY="your_key_here"
+```
+
+Fetch any SportsDataIO endpoint your account can access:
+
+```bash
+python tools/fetch_sportsdataio.py ScoresByDate/2026-JAN-15 --sport nfl --subfeed scores --output data/sportsdataio_nfl_scores.json
+```
+
+The SportsDataIO client defaults to header authentication using `Ocp-Apim-Subscription-Key` and also supports query-string auth with `--auth-mode query`.
+
+The full workflow is documented in `docs/sportsdataio.md`.
 
 ## ARA decision layer
 
@@ -291,9 +351,12 @@ GitHub Actions is configured to run the unit test suite on pushes and pull reque
 The baseline supports:
 
 - live market feed scanning
+- SportsDataIO raw endpoint fetching
 - fuzzy team-name matching
 - market-implied no-vig probabilities
 - learned probability calibration from graded historical predictions
+- calibration review by classification, probability bucket and sport
+- profitable 70 percent goal tracking
 - likely outcome ranking
 - expected-goals scoreline estimation
 - scoreline and spread table generation

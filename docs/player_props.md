@@ -38,6 +38,7 @@ Player probability can come from:
 - season player rate
 - opponent allowed rate
 - usage rate
+- SportsDataIO player feature enrichment
 
 ## Recommended CSV inputs
 
@@ -67,6 +68,48 @@ book_count
 over_price
 under_price
 ```
+
+## SportsDataIO feature enrichment
+
+After building SportsDataIO player features, enrich player props before scoring them:
+
+```bash
+python tools/enrich_player_props_with_features.py player_props.csv data/sportsdataio_player_features.csv --output data/player_props_enriched_with_features.csv
+python tools/run_player_props.py data/player_props_enriched_with_features.csv
+```
+
+The enrichment layer joins by:
+
+```text
+player id, when present
+unique normalized player name
+```
+
+It adds:
+
+```text
+feature_match_status
+feature_match_key
+feature_expected_value
+feature_season_rate
+feature_usage_rate
+feature_sample_size
+feature_data_quality
+feature_reason
+```
+
+Then it fills the existing player-prop model inputs when they are missing:
+
+```text
+season_rate
+usage_rate
+sample_size
+data_quality
+```
+
+For line props such as passing yards, rushing yards, receiving yards, receptions, strikeouts and shots on goal, it compares the SportsDataIO per-game feature to the prop line. For binary props such as touchdown, home run, goal, assist and hit, it uses a conservative Poisson-style estimate from the per-game event rate.
+
+Rows with no unique feature match are not force-enriched. Ambiguous player-name matches are left alone so the scorer does not use the wrong player.
 
 ## Command
 

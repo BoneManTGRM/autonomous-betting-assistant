@@ -66,6 +66,12 @@ PROP_ALIASES = {
     "passing_yards": "passing_yards",
 }
 
+CRITICAL_WATCH_REASONS = {
+    "extreme_market_probability",
+    "extreme_model_probability",
+    "model_market_disagreement_extreme",
+}
+
 
 @dataclass(frozen=True)
 class PlayerPropPolicy:
@@ -244,12 +250,18 @@ def _fair_price(probability: float | None) -> float | None:
     return round(1.0 / probability, 4)
 
 
+def _has_critical_watch(watch_reasons: list[str]) -> bool:
+    return any(reason in CRITICAL_WATCH_REASONS for reason in watch_reasons)
+
+
 def _grade_status(edge: float | None, required: list[str], hard_reasons: list[str], watch_reasons: list[str], confidence: float, policy: PlayerPropPolicy) -> tuple[str, float]:
     if hard_reasons:
         return "REJECT", 0.0
     if required:
         return "TRACK_ONLY_NEEDS_PLAYER_MODEL_DATA", 0.0
     if edge is None or edge < policy.min_model_edge:
+        return "WATCH", 0.0
+    if _has_critical_watch(watch_reasons):
         return "WATCH", 0.0
     if watch_reasons and edge < policy.strong_model_edge:
         return "WATCH", 0.0
