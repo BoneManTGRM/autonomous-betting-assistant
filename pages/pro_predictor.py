@@ -11,6 +11,13 @@ import streamlit as st
 
 from autonomous_betting_agent.live_odds import list_sports, scan_market
 from autonomous_betting_agent.multi_source_fusion import fuse_row
+from autonomous_betting_agent.target_mode import (
+    TargetModePolicy,
+    estimated_ev,
+    evaluate_target_mode,
+    implied_probability,
+    price_probability_gap,
+)
 
 st.set_page_config(page_title="Pro Predictor", layout="wide")
 
@@ -127,86 +134,6 @@ def top_non_draw(event: Any) -> Any | None:
 
 def pct(value: float | None) -> str:
     return "" if value is None else f"{value * 100:.1f}%"
-
-
-def implied_probability(decimal_price: Any) -> float | None:
-    try:
-        price = float(decimal_price)
-    except Exception:
-        return None
-    if price <= 1.0:
-        return None
-    return 1.0 / price
-
-
-def price_probability_gap(decimal_price: Any, market_probability: float) -> float | None:
-    implied = implied_probability(decimal_price)
-    if implied is None:
-        return None
-    return abs(implied - market_probability)
-
-
-def estimated_ev(final_probability: float, decimal_price: Any) -> float | None:
-    try:
-        price = float(decimal_price)
-    except Exception:
-        return None
-    if price <= 1.0:
-        return None
-    return final_probability * price - 1.0
-
-
-def target_70_quality_score(row: dict[str, Any], target_probability: float, tolerance: float) -> int:
-    distance = abs(float(row["final_probability_value"]) - target_probability)
-    score = 100.0
-    score -= min(35.0, (distance / max(tolerance, 0.001)) * 12.0)
-    score += min(8.0, max(0.0, float(row.get("estimated_ev_value") or 0.0)) * 100.0)
-    score += min(6.0, max(0.0, int(row["books"]) - 4) * 1.5)
-    score += min(8.0, max(0.0, float(row["reliability_score"]) - 95.0) * 0.8)
-    gap = row.get("price_probability_gap_value")
-    if gap is not None:
-        score -= min(15.0, float(gap) * 100.0)
-    if row.get("duplicate_event_pick"):
-        score -= 50.0
-    if row.get("confidence") not in {"high", "HIGH", "High"}:
-        score -= 20.0
-    return int(max(0, min(100, round(score))))
-
-
-def target_70_rejection_reason(
-    row: dict[str, Any],
-    target_probability: float,
-    tolerance: float,
-    min_books: int,
-    min_reliability: float,
-    min_market_probability: float,
-    min_ev: float,
-    max_mismatch: float,
-    h2h_only: bool,
-) -> str:
-    reasons: list[str] = []
-    low = target_probability - tolerance
-    high = target_probability + tolerance
-    final_probability = float(row["final_probability_value"])
-    if final_probability < low or final_probability > high:
-        reasons.append(f"outside {low:.0%}-{high:.0%} band")
-    if float(row["market_probability_value"]) < float(min_market_probability):
-        reasons.append("market probability below floor")
-    if int(row["books"]) < int(min_books):
-        reasons.append("not enough books")
-    if float(row["reliability_score"]) < float(min_reliability):
-        reasons.append("reliability below target")
-    if row.get("price_probability_gap_value") is None or float(row["price_probability_gap_value"]) > float(max_mismatch):
-        reasons.append("price/probability mismatch")
-    if row.get("estimated_ev_value") is None or float(row["estimated_ev_value"]) < float(min_ev):
-        reasons.append("EV below target")
-    if row.get("duplicate_event_pick"):
-        reasons.append("duplicate event/pick")
-    if h2h_only and row.get("market_type") != "h2h":
-        reasons.append("not h2h")
-    if row.get("confidence") not in {"high", "HIGH", "High"}:
-        reasons.append("not high confidence")
-    return "; ".join(reasons)
 
 
 @dataclass(frozen=True)
@@ -335,6 +262,17 @@ config = UIConfig(
     target_h2h_only=bool(target_h2h_only),
 )
 
+target_policy = TargetModePolicy(
+    target_probability=float(target_probability),
+    tolerance=float(target_tolerance),
+    min_books=int(target_min_books),
+    min_reliability=float(target_min_reliability),
+    min_market_probability=float(target_min_market_probability),
+    min_ev=float(target_min_ev),
+    max_price_probability_gap=float(target_max_mismatch),
+    h2h_only=bool(target_h2h_only),
+)
+
 if st.button(t("run"), type="primary", use_container_width=True):
     if not odds_key:
         st.warning("Odds API key is required for live market scan." if LANG == "en" else "La clave de Odds API es necesaria para escanear mercados en vivo.")
@@ -443,19 +381,12 @@ if st.button(t("run"), type="primary", use_container_width=True):
         duplicate = row["dedupe_key"] in seen_keys
         row["duplicate_event_pick"] = duplicate
         seen_keys.add(row["dedupe_key"])
-        row["target_70_quality_score"] = target_70_quality_score(row, float(target_probability), float(target_tolerance))
-        row["target_70_rejection_reason"] = target_70_rejection_reason(
-            row,
-            float(target_probability),
-            float(target_tolerance),
-            int(target_min_books),
-            float(target_min_reliability),
-            float(target_min_market_probability),
-            float(target_min_ev),
-            float(target_max_mismatch),
-            bool(target_h2h_only),
-        )
-        row["target_70_mode"] = not bool(row["target_70_rejection_reason"])
+        target_result = evaluate_target_mode(row, target_policy)
+        row["target_70_quality_score"] = target_result.quality_score
+        row["target_70_rejection_reason"] = target_result.rejection_reason
+        row["target_70_mode"] = target_result.passed
+        row["target_probability_band_low"] = pct(target_result.probability_band_low)
+        row["target_probability_band_high"] = pct(target_result.probability_band_high)
 
     ranked = sorted(prelim_ranked, key=lambda row: (row["target_70_mode"], row["target_70_quality_score"], row["reliability_score"], row["final_probability_value"]), reverse=True)
     target_rows = [row for row in ranked if row["target_70_mode"]]
