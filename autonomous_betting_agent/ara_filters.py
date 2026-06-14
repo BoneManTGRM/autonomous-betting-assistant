@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 import math
+import re
+import unicodedata
 
 import pandas as pd
 
@@ -45,6 +47,30 @@ OUTPUT_COLUMNS = [
     "ara_proxy_filter_reason", "ara_requires_independent_probability", "ara_notes",
 ]
 
+BLANK_TEXT = {"", "nan", "none", "null", "nat"}
+LOCATION_STOPWORDS = {"new", "north", "south", "east", "west", "city", "town", "state", "county", "the"}
+COUNTRY_ALIASES = {
+    "germany": {"germany"},
+    "england": {"england", "united kingdom", "uk", "great britain"},
+    "scotland": {"scotland", "united kingdom", "uk", "great britain"},
+    "wales": {"wales", "united kingdom", "uk", "great britain"},
+    "northern ireland": {"northern ireland", "united kingdom", "uk", "great britain"},
+    "spain": {"spain"},
+    "finland": {"finland"},
+    "aland islands": {"aland", "finland"},
+    "united states": {"united states", "united states of america", "usa", "us"},
+    "usa": {"united states", "united states of america", "usa", "us"},
+    "australia": {"australia"},
+    "france": {"france"},
+    "italy": {"italy"},
+    "norway": {"norway"},
+    "sweden": {"sweden"},
+    "denmark": {"denmark"},
+    "netherlands": {"netherlands"},
+    "canada": {"canada"},
+    "mexico": {"mexico"},
+}
+
 
 def parse_percent(value: Any) -> float | None:
     if value is None:
@@ -52,7 +78,7 @@ def parse_percent(value: Any) -> float | None:
     try:
         if pd.isna(value):
             return None
-    except TypeError:
+    except (TypeError, ValueError):
         pass
     text = str(value).strip()
     if not text:
@@ -73,10 +99,10 @@ def parse_float(value: Any) -> float | None:
     try:
         if pd.isna(value):
             return None
-    except TypeError:
+    except (TypeError, ValueError):
         pass
     text = str(value).strip().replace(",", "")
-    if not text:
+    if not text or text.lower() in BLANK_TEXT:
         return None
     try:
         return float(text)
@@ -106,10 +132,68 @@ def _field(row: Mapping[str, Any], names: tuple[str, ...]) -> Any:
             try:
                 if pd.isna(value):
                     return None
-            except TypeError:
+            except (TypeError, ValueError):
                 pass
+            if isinstance(value, str) and value.strip().lower() in BLANK_TEXT:
+                return None
             return value
     return None
+
+
+def _norm_text(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _location_parts(value: Any) -> list[str]:
+    return [_norm_text(part) for part in str(value or "").split(",") if _norm_text(part)]
+
+
+def _location_primary_missing(query: Any, returned_location: Any) -> bool:
+    query_parts = _location_parts(query)
+    location_norm = _norm_text(returned_location)
+    if not query_parts or not location_norm:
+        return False
+    primary = query_parts[0]
+    if primary and primary in location_norm:
+        return False
+    tokens = [token for token in primary.split() if len(token) > 2 and token not in LOCATION_STOPWORDS]
+    if tokens and any(token in location_norm.split() or token in location_norm for token in tokens):
+        return False
+    return True
+
+
+def _expected_country_aliases(query: Any) -> set[str]:
+    query_parts = _location_parts(query)
+    if not query_parts:
+        return set()
+    tail_text = " ".join(query_parts[1:] or query_parts)
+    for expected, aliases in COUNTRY_ALIASES.items():
+        if expected in tail_text:
+            return aliases
+    return set()
+
+
+def _country_mismatch(query: Any, returned_location: Any) -> bool:
+    aliases = _expected_country_aliases(query)
+    if not aliases:
+        return False
+    location_parts = _location_parts(returned_location)
+    if not location_parts:
+        return False
+    returned_country = location_parts[-1]
+    return not any(alias in returned_country for alias in aliases)
+
+
+def weather_location_mismatch(row: Mapping[str, Any]) -> bool:
+    query = _field(row, ("weather_location_query", "location_query", "weather_query"))
+    returned = _field(row, ("weather_location", "location_name", "returned_weather_location"))
+    weather_tier = str(_field(row, ("weather_tier", "weather status", "weather_status")) or "").strip().lower()
+    if not query or not returned or weather_tier in {"", "skipped", "error"}:
+        return False
+    return _location_primary_missing(query, returned) or _country_mismatch(query, returned)
 
 
 def sport_group(value: Any) -> str:
@@ -175,7 +259,7 @@ def _truthy(value: Any) -> bool:
 
 
 def weather_error_flags_for(row: Mapping[str, Any]) -> tuple[str, ...]:
-    """Flag failed or stale weather enrichment so bad weather calls cannot pass silently."""
+    """Flag failed, stale, missing, or mismatched weather enrichment."""
     flags: list[str] = []
     weather_tier = str(_field(row, ("weather_tier", "weather status", "weather_status")) or "").strip().lower()
     weather_error = str(_field(row, ("weather_error", "weather error")) or "").strip()
@@ -185,6 +269,8 @@ def weather_error_flags_for(row: Mapping[str, Any]) -> tuple[str, ...]:
         flags.append("weather_api_error")
     if weather_relevant in {"true", "yes", "1"} and weather_tier in {"", "missing", "none", "nan"}:
         flags.append("weather_missing_for_relevant_event")
+    if weather_location_mismatch(row):
+        flags.append("weather_location_mismatch")
     if forecast_exact is not None and str(forecast_exact).strip().lower() in {"false", "0", "no"}:
         flags.append("weather_forecast_not_exact")
     return tuple(flags)
@@ -294,8 +380,8 @@ def proxy_filter_decision(row: Mapping[str, Any], policy: AraFilterPolicy = AraF
     weather = weather_flags_for(row, policy)
     if "classification_avoid" in flags:
         return "PROXY_AVOID", "Avoid classification."
-    if "weather_api_error" in flags or "weather_missing_for_relevant_event" in flags:
-        return "PROXY_WATCH", "Weather enrichment failed or is missing for a weather-relevant event."
+    if "weather_api_error" in flags or "weather_missing_for_relevant_event" in flags or "weather_location_mismatch" in flags:
+        return "PROXY_WATCH", "Weather enrichment failed, is missing, or resolved to the wrong location."
     if "soccer_draw_risk_extreme_30_plus" in flags or "soccer_draw_risk_block_ml_25_plus" in flags:
         return "PROXY_WATCH_NO_ML", "Soccer draw risk blocks moneyline."
     if "baseball_watch_low_edge_50_56" in flags:
@@ -315,7 +401,7 @@ def live_decision(row: Mapping[str, Any], policy: AraFilterPolicy = AraFilterPol
     implied = implied_probability(row)
     model = model_probability(row)
     edge = model - implied if model is not None and implied is not None else None
-    hard = {"classification_avoid", "soccer_draw_risk_extreme_30_plus", "soccer_draw_risk_block_ml_25_plus", "missing_best_price", "missing_data_quality", "data_quality_under_80", "low_book_coverage_under_5", "heavy_favorite_price_under_1_30", "longshot_price_over_3_00", "baseball_watch_low_edge_50_56", "weather_api_error", "weather_missing_for_relevant_event"}
+    hard = {"classification_avoid", "soccer_draw_risk_extreme_30_plus", "soccer_draw_risk_block_ml_25_plus", "missing_best_price", "missing_data_quality", "data_quality_under_80", "low_book_coverage_under_5", "heavy_favorite_price_under_1_30", "longshot_price_over_3_00", "baseball_watch_low_edge_50_56", "weather_api_error", "weather_missing_for_relevant_event", "weather_location_mismatch"}
     noisy = {"market_overround_high", "price_range_disagreement", "weather_forecast_not_exact"}
     weather_hard = {"weather_wind_block", "weather_precip_block", "weather_condition_severe"}
     if "classification_avoid" in flags:
