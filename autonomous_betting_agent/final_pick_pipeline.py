@@ -11,6 +11,8 @@ from .bankroll_exposure import BankrollPolicy, apply_bankroll_exposure, summariz
 from .ensemble_agreement import apply_ensemble_scoring, summarize_ensemble
 from .line_movement_model import enrich_line_movement_rows, summarize_line_movement
 from .market_accuracy_profiles import enrich_with_market_profiles, summarize_profiles
+from .prediction_validator import ValidationPolicy, validate_prediction_rows, write_report as write_validation_report
+from .reporting import build_daily_markdown_report
 
 
 @dataclass(frozen=True)
@@ -19,7 +21,9 @@ class FinalPickOutputs:
     final_bets_csv: str
     watchlist_csv: str
     rejected_picks_csv: str
+    validation_report_json: str | None
     daily_report_json: str
+    daily_summary_md: str
 
 
 @dataclass(frozen=True)
@@ -29,6 +33,7 @@ class FinalPickReport:
     watchlist: int
     rejected: int
     total_stake_units: float
+    validation_status: str | None
     steps_run: list[str]
     outputs: FinalPickOutputs
     warnings: list[str]
@@ -66,14 +71,32 @@ def run_final_pick_pipeline(
     line_movement_history_csv: str | Path | None = None,
     market_profile_history_csv: str | Path | None = None,
     bankroll_policy: BankrollPolicy = BankrollPolicy(),
+    validation_policy: ValidationPolicy | None = ValidationPolicy(),
+    strict_validation: bool = False,
 ) -> FinalPickReport:
     base = Path(output_dir)
     base.mkdir(parents=True, exist_ok=True)
     steps: list[str] = []
     warnings: list[str] = []
+    validation_status: str | None = None
+    validation_report_json: Path | None = None
 
     rows: list[Mapping[str, Any]] = read_csv_rows(predictions_csv)
     raw_count = len(rows)
+
+    if validation_policy is not None:
+        validated, validation_report = validate_prediction_rows(list(rows), policy=validation_policy)
+        rows = validated
+        validation_status = validation_report.status
+        validation_report_json = base / "prediction_validation_report.json"
+        write_validation_report(validation_report, validation_report_json)
+        steps.append("prediction_validation")
+        if validation_report.status == "FAIL":
+            warnings.append(f"prediction validation failed with {validation_report.error_count} error(s)")
+            if strict_validation:
+                rows = [row for row in rows if row.get("validation_status") == "VALID"]
+        elif validation_report.status == "WATCH":
+            warnings.append(f"prediction validation passed with {validation_report.warning_count} warning(s)")
 
     if calibration_history_csv:
         history = read_csv_rows(calibration_history_csv)
@@ -121,10 +144,18 @@ def run_final_pick_pipeline(
     watchlist_csv = base / "watchlist.csv"
     rejected_csv = base / "rejected_picks.csv"
     report_json = base / "daily_report.json"
+    summary_md = base / "daily_summary.md"
     write_csv_rows(rows, all_scored)
     write_csv_rows(final_bets, final_bets_csv)
     write_csv_rows(watchlist, watchlist_csv)
     write_csv_rows(rejected, rejected_csv)
+    build_daily_markdown_report(
+        final_bets_csv=final_bets_csv,
+        watchlist_csv=watchlist_csv,
+        rejected_picks_csv=rejected_csv,
+        output_md=summary_md,
+        warnings=warnings,
+    )
 
     report = FinalPickReport(
         raw_rows=raw_count,
@@ -132,17 +163,20 @@ def run_final_pick_pipeline(
         watchlist=len(watchlist),
         rejected=len(rejected),
         total_stake_units=bankroll_report.total_stake_units,
+        validation_status=validation_status,
         steps_run=steps,
         outputs=FinalPickOutputs(
             all_scored_csv=str(all_scored),
             final_bets_csv=str(final_bets_csv),
             watchlist_csv=str(watchlist_csv),
             rejected_picks_csv=str(rejected_csv),
+            validation_report_json=str(validation_report_json) if validation_report_json else None,
             daily_report_json=str(report_json),
+            daily_summary_md=str(summary_md),
         ),
         warnings=warnings,
         notes=[
-            "Final bets are rows that survived calibration/profile/ensemble scoring and bankroll exposure checks.",
+            "Final bets are rows that survived validation, calibration/profile/ensemble scoring and bankroll exposure checks.",
             "Watchlist rows are not automatic bets; they need better odds, more data or lower exposure risk.",
             "Rejected rows should not be used for performance claims unless separately tracked as rejected candidates.",
         ],
