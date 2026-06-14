@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from statistics import mean
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
+
+from .learning import ProbabilityCalibrator
 
 API_HOST = "https://api.the-odds-api.com"
 
@@ -245,11 +248,74 @@ def summarize_event(event: Dict[str, Any]) -> Optional[LiveEventSummary]:
     )
 
 
-def scan_market(api_key: str, sport_key: str, regions: str = "us,eu,uk", max_events: int = 25, markets: str = "h2h,spreads,totals") -> List[LiveEventSummary]:
+def _load_calibrator(path: str | Path | None) -> ProbabilityCalibrator | None:
+    if path is None:
+        return None
+    try:
+        candidate = Path(path)
+        if not candidate.exists():
+            return None
+        return ProbabilityCalibrator.load(candidate)
+    except (OSError, ValueError, json.JSONDecodeError, TypeError):
+        return None
+
+
+def _apply_calibration(summary: LiveEventSummary, calibrator: ProbabilityCalibrator) -> LiveEventSummary:
+    adjusted = [calibrator.apply(outcome.normalized_probability) for outcome in summary.outcomes]
+    total = sum(adjusted)
+    if total <= 0.0:
+        return summary
+
+    calibrated_outcomes: List[OutcomePrice] = []
+    for outcome, adjusted_probability in zip(summary.outcomes, adjusted):
+        calibrated_outcomes.append(
+            OutcomePrice(
+                name=outcome.name,
+                average_price=outcome.average_price,
+                raw_probability=outcome.raw_probability,
+                normalized_probability=adjusted_probability / total,
+                source_count=outcome.source_count,
+                best_price=outcome.best_price,
+                worst_price=outcome.worst_price,
+                price_range=outcome.price_range,
+                best_bookmaker=outcome.best_bookmaker,
+            )
+        )
+    calibrated_outcomes.sort(key=lambda item: item.normalized_probability, reverse=True)
+    favorite = calibrated_outcomes[0]
+    return LiveEventSummary(
+        event_id=summary.event_id,
+        sport_key=summary.sport_key,
+        sport_title=summary.sport_title,
+        commence_time=summary.commence_time,
+        home_team=summary.home_team,
+        away_team=summary.away_team,
+        favorite=favorite.name,
+        favorite_probability=favorite.normalized_probability,
+        outcomes=calibrated_outcomes,
+        bookmaker_count=summary.bookmaker_count,
+        cycle_notes=summary.cycle_notes + [f"VERIFY: applied learned probability calibration from {calibrator.events_trained} graded events."],
+        market_overround=summary.market_overround,
+        spreads=summary.spreads,
+        totals=summary.totals,
+    )
+
+
+def scan_market(
+    api_key: str,
+    sport_key: str,
+    regions: str = "us,eu,uk",
+    max_events: int = 25,
+    markets: str = "h2h,spreads,totals",
+    learned_state_path: str | Path | None = "learned_state.json",
+) -> List[LiveEventSummary]:
     events = fetch_odds(api_key, sport_key=sport_key, regions=regions, markets=markets)
+    calibrator = _load_calibrator(learned_state_path)
     summaries = []
     for event in events[:max_events]:
         summary = summarize_event(event)
         if summary is not None:
+            if calibrator is not None and calibrator.events_trained > 0:
+                summary = _apply_calibration(summary, calibrator)
             summaries.append(summary)
     return summaries
