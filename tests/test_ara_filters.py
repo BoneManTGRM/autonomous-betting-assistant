@@ -74,6 +74,11 @@ class AraFilterTests(unittest.TestCase):
         self.assertEqual(enriched.iloc[0]["ara_live_decision"], "WATCH")
         self.assertIn("weather_api_error", enriched.iloc[0]["ara_decision_reason"])
 
+    def test_nan_weather_error_does_not_create_false_error_flag(self) -> None:
+        row = {"Sport": "nba", "weather_tier": "Skipped", "weather_error": float("nan")}
+        self.assertNotIn("weather_api_error", risk_flags_for(row))
+        self.assertNotIn("weather_api_error", weather_flags_for(row))
+
     def test_empty_frame_is_safe(self) -> None:
         enriched = apply_ara_decision_layer(pd.DataFrame())
         self.assertIn("ara_live_decision", enriched.columns)
