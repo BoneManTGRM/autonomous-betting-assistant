@@ -5,6 +5,7 @@ from pathlib import Path
 
 from autonomous_betting_agent.sportsdataio import SportsDataIOClient, SportsDataIOConfig
 from autonomous_betting_agent.sportsdataio_pipeline import run_sportsdataio_pipeline
+from autonomous_betting_agent.sportsdataio_quality import quality_gate_allows
 
 
 def main() -> int:
@@ -23,6 +24,12 @@ def main() -> int:
     parser.add_argument("--skip-profit-goal-review", action="store_true")
     parser.add_argument("--profit-min-finished", type=int, default=200)
     parser.add_argument("--allow-missing-clv", action="store_true")
+    parser.add_argument(
+        "--minimum-quality-status",
+        choices=["PASS", "WATCH", "FAIL"],
+        default="FAIL",
+        help="Exit non-zero if the quality gate is below this status. Use WATCH to block FAIL, or PASS to block WATCH/FAIL.",
+    )
     args = parser.parse_args()
 
     client = None
@@ -50,6 +57,10 @@ def main() -> int:
     )
     print("SportsDataIO pipeline complete")
     print(report)
+    if not quality_gate_allows(report.quality_gate, minimum_status=args.minimum_quality_status):
+        status = "missing" if report.quality_gate is None else report.quality_gate.status
+        print(f"Quality gate blocked continuation: status={status}, required={args.minimum_quality_status}")
+        return 2
     return 0
 
 
