@@ -4,7 +4,19 @@ import argparse
 import json
 from pathlib import Path
 
-from autonomous_betting_agent.learning import fit_probability_calibrator, parse_graded_csv
+from autonomous_betting_agent.learning import GradedPrediction, fit_probability_calibrator, parse_graded_csv
+
+
+def dedupe_rows(rows: list[GradedPrediction]) -> list[GradedPrediction]:
+    seen: set[tuple[str, str, str, int]] = set()
+    unique: list[GradedPrediction] = []
+    for row in rows:
+        key = (row.event_name.strip().lower(), row.predicted_side.strip().lower(), row.actual_side.strip().lower(), row.outcome)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(row)
+    return unique
 
 
 def main() -> int:
@@ -15,9 +27,11 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=0.05)
     parser.add_argument("--l2", type=float, default=0.01)
     parser.add_argument("--min-events", type=int, default=5)
+    parser.add_argument("--keep-duplicates", action="store_true", help="Keep duplicate graded rows instead of training on unique events")
     args = parser.parse_args()
 
-    rows = parse_graded_csv(args.results_csv)
+    parsed_rows = parse_graded_csv(args.results_csv)
+    rows = parsed_rows if args.keep_duplicates else dedupe_rows(parsed_rows)
     if len(rows) < args.min_events:
         parser.error(f"Found {len(rows)} usable graded rows; need at least {args.min_events}.")
         return 2
@@ -30,6 +44,7 @@ def main() -> int:
         min_events=args.min_events,
         source=str(args.results_csv),
     )
+    calibrator.notes.append(f"Parsed {len(parsed_rows)} usable graded rows; trained on {len(rows)} rows.")
     calibrator.save(args.output)
 
     print(json.dumps(calibrator.to_dict(), indent=2, sort_keys=True))
