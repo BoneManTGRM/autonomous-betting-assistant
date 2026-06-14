@@ -113,9 +113,13 @@ def raw_probability(row: Mapping[str, Any]) -> float | None:
 
 
 def _bucket_key(probability: float, bucket_size: float) -> str:
-    floor = math.floor(probability / bucket_size) * bucket_size
-    floor = max(0.0, min(1.0 - bucket_size, floor))
-    ceiling = min(1.0, floor + bucket_size)
+    # Add a tiny epsilon so exact-looking values such as 0.70 do not fall into
+    # the lower bucket because of binary floating point representation.
+    bucket_count = max(1, int(round(1.0 / bucket_size)))
+    index = int(math.floor((probability + 1e-12) / bucket_size))
+    index = max(0, min(bucket_count - 1, index))
+    floor = round(index * bucket_size, 10)
+    ceiling = round(min(1.0, floor + bucket_size), 10)
     return f"{floor:.2f}-{ceiling:.2f}"
 
 
