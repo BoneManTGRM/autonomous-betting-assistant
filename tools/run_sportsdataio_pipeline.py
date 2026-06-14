@@ -20,6 +20,9 @@ def main() -> int:
     parser.add_argument("--api-key", default=None)
     parser.add_argument("--auth-mode", choices=["header", "query"], default="header")
     parser.add_argument("--include-watch", action="store_true")
+    parser.add_argument("--skip-profit-goal-review", action="store_true")
+    parser.add_argument("--profit-min-finished", type=int, default=200)
+    parser.add_argument("--allow-missing-clv", action="store_true")
     args = parser.parse_args()
 
     client = None
@@ -41,6 +44,9 @@ def main() -> int:
         existing_player_features_csv=args.existing_player_features_csv,
         output_dir=args.output_dir,
         include_watch=args.include_watch,
+        run_profit_goal_review=not args.skip_profit_goal_review,
+        profit_goal_min_finished=args.profit_min_finished,
+        allow_missing_clv=args.allow_missing_clv,
     )
     print("SportsDataIO pipeline complete")
     print(report)
