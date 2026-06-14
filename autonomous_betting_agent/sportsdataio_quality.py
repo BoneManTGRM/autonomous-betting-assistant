@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+QUALITY_STATUS_RANK = {"FAIL": 0, "WATCH": 1, "PASS": 2}
+
 
 @dataclass(frozen=True)
 class PipelineQualityGate:
@@ -36,6 +38,24 @@ def _add_issue(status_score: dict[str, float], reasons: list[str], actions: list
         status_score["score"] -= 10.0
     else:
         status_score["score"] -= 4.0
+
+
+def quality_gate_allows(gate: PipelineQualityGate | None, *, minimum_status: str = "WATCH") -> bool:
+    """Return whether a quality gate is good enough for automated continuation.
+
+    `minimum_status="WATCH"` allows PASS and WATCH but blocks FAIL.
+    `minimum_status="PASS"` allows only PASS.
+    `minimum_status="FAIL"` allows every completed quality status.
+    """
+    if gate is None:
+        return False
+    required = QUALITY_STATUS_RANK.get(minimum_status.upper())
+    actual = QUALITY_STATUS_RANK.get(gate.status.upper())
+    if required is None:
+        raise ValueError(f"Unknown minimum quality status: {minimum_status}")
+    if actual is None:
+        return False
+    return actual >= required
 
 
 def evaluate_pipeline_quality(
