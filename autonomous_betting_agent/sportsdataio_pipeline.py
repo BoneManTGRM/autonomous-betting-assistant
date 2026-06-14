@@ -7,6 +7,7 @@ from typing import Any
 
 import pandas as pd
 
+from .accuracy_calibration import apply_calibration, read_csv_rows as read_calibration_csv_rows, write_csv_rows as write_calibration_csv_rows, write_report as write_calibration_report
 from .odds_clv import enrich_predictions_with_odds, read_csv_rows as read_odds_csv_rows, summarize_odds_enrichment, write_report as write_odds_report
 from .player_prop_features import enrich_props_with_player_features, read_csv_rows as read_feature_csv_rows, write_csv_rows
 from .player_props import apply_player_prop_layer, rank_player_props
@@ -23,6 +24,8 @@ class PipelineOutputs:
     raw_games_json: str | None = None
     flat_games_csv: str | None = None
     canonical_games_csv: str | None = None
+    predictions_calibrated_csv: str | None = None
+    accuracy_calibration_report_json: str | None = None
     predictions_with_results_csv: str | None = None
     odds_clv_report_json: str | None = None
     profit_goal_report_json: str | None = None
@@ -80,6 +83,7 @@ def run_sportsdataio_pipeline(
     predictions_csv: str | Path | None = None,
     player_props_csv: str | Path | None = None,
     odds_csv: str | Path | None = None,
+    calibration_history_csv: str | Path | None = None,
     existing_canonical_games_csv: str | Path | None = None,
     existing_player_features_csv: str | Path | None = None,
     output_dir: str | Path = "data/sportsdataio_pipeline",
@@ -104,6 +108,8 @@ def run_sportsdataio_pipeline(
     raw_games_json: Path | None = None
     flat_games_csv: Path | None = None
     canonical_games_csv: Path | None = Path(existing_canonical_games_csv) if existing_canonical_games_csv else None
+    predictions_calibrated_csv: Path | None = None
+    accuracy_calibration_report_json: Path | None = None
     predictions_with_results_csv: Path | None = None
     odds_clv_report_json: Path | None = None
     profit_goal_report_json: Path | None = None
@@ -136,10 +142,23 @@ def run_sportsdataio_pipeline(
             warnings.append("predictions_csv supplied but no games endpoint or canonical games CSV was provided")
         else:
             predictions = read_result_csv_rows(predictions_csv)
+            counts["prediction_rows"] = len(predictions)
+            if calibration_history_csv:
+                history_rows = read_calibration_csv_rows(calibration_history_csv)
+                predictions, calibration_report = apply_calibration(predictions, history_rows)
+                predictions_calibrated_csv = _path(base_dir, "predictions_calibrated.csv")
+                accuracy_calibration_report_json = _path(base_dir, "accuracy_calibration_report.json")
+                write_calibration_csv_rows(predictions, predictions_calibrated_csv)
+                write_calibration_report(calibration_report, accuracy_calibration_report_json)
+                steps.append("apply_accuracy_calibration")
+                counts["calibration_history_rows"] = len(history_rows)
+                counts["calibrated_prediction_rows"] = calibration_report.calibrated_rows
+                if calibration_report.calibrated_rows < len(predictions):
+                    warnings.append("calibration: some prediction rows were missing model probability")
+
             games = read_result_csv_rows(canonical_games_csv)
             enriched_predictions = enrich_predictions_with_results(predictions, games)
             steps.append("apply_game_results")
-            counts["prediction_rows"] = len(predictions)
             for row in enriched_predictions:
                 key = f"prediction_match_{row.get('sdio_result_match_status', 'unknown')}"
                 counts[key] = counts.get(key, 0) + 1
@@ -230,6 +249,8 @@ def run_sportsdataio_pipeline(
             raw_games_json=str(raw_games_json) if raw_games_json else None,
             flat_games_csv=str(flat_games_csv) if flat_games_csv else None,
             canonical_games_csv=str(canonical_games_csv) if canonical_games_csv else None,
+            predictions_calibrated_csv=str(predictions_calibrated_csv) if predictions_calibrated_csv else None,
+            accuracy_calibration_report_json=str(accuracy_calibration_report_json) if accuracy_calibration_report_json else None,
             predictions_with_results_csv=str(predictions_with_results_csv) if predictions_with_results_csv else None,
             odds_clv_report_json=str(odds_clv_report_json) if odds_clv_report_json else None,
             profit_goal_report_json=str(profit_goal_report_json) if profit_goal_report_json else None,
