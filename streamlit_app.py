@@ -6,155 +6,157 @@ from dataclasses import asdict, dataclass
 import streamlit as st
 
 from autonomous_betting_agent.multi_source_fusion import fuse_row
+from autonomous_betting_agent.ui_text import LANGUAGES, tr
 
 
 @dataclass(frozen=True)
-class PredictorProConfig:
+class ProConfig:
+    language: str
+    page: str
     game: str
-    scan_target: str
     sport_search: str
-    venue_city: str
+    weather_location: str
     book_regions: list[str]
     markets: list[str]
-    max_sport_feeds: int
-    max_events_per_feed: int
-    odds_api_enabled: bool
-    sportsdataio_enabled: bool
-    weatherapi_enabled: bool
-    use_ara_memory: bool
-
-
-def _status(value: bool) -> str:
-    return "Enabled" if value else "Missing"
+    odds_enabled: bool
+    sports_enabled: bool
+    weather_enabled: bool
+    ara_memory_enabled: bool
 
 
 def _pct(value: float | None) -> str:
-    if value is None:
-        return ""
-    return f"{value * 100:.1f}%"
+    return "" if value is None else f"{value * 100:.1f}%"
 
 
-st.set_page_config(page_title="Pro Predictor", page_icon="📊", layout="wide")
+def _status(value: bool, lang: str) -> str:
+    return tr("enabled", lang) if value else tr("missing", lang)
 
-st.title("Pro Predictor")
-st.caption(
-    "Multi-source all-sports predictor. It combines sportsbook odds, SportsDataIO stats/context, "
-    "WeatherAPI conditions, and ARA learning memory through a capped fusion layer. "
-    "Research-only; no guaranteed winners."
-)
 
-st.info(
-    "How to read it: sportsbook odds create the base market probability. Sports/team data, "
-    "injuries/lineups, weather/context, and ARA memory can adjust that probability only within capped limits."
-)
+def _source_inputs(lang: str) -> tuple[str, str, str]:
+    st.subheader(tr("api_sources", lang))
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        odds_key = st.text_input(tr("odds_api_key", lang), type="password")
+    with c2:
+        sports_key = st.text_input(tr("sportsdataio_key", lang), type="password")
+    with c3:
+        weather_key = st.text_input(tr("weatherapi_key", lang), type="password")
+    return odds_key, sports_key, weather_key
 
-st.subheader("1. API sources")
-api1, api2, api3 = st.columns(3)
-with api1:
-    use_odds_api = st.toggle("Use Odds API", value=True)
-    odds_api_key = st.text_input("Odds API key", type="password", help="Used for market probability, best price, book count, and CLV.")
-with api2:
-    use_sportsdataio = st.toggle("Use SportsDataIO", value=True)
-    sportsdataio_key = st.text_input("SportsDataIO key", type="password", help="Used for schedules, scores, team/player data, injuries and lineups.")
-with api3:
-    use_weatherapi = st.toggle("Use WeatherAPI", value=True)
-    weatherapi_key = st.text_input("WeatherAPI key", type="password", help="Used for weather, wind, rain, temperature and venue context.")
 
-st.subheader("2. Game setup")
-setup1, setup2 = st.columns(2)
-with setup1:
-    game = st.text_input("Game", value="Mexico vs South Korea")
-    scan_target = st.radio("Scan target", ["All sports", "One league/sport", "One team/player"], horizontal=True)
-    sport_search = st.text_input("Sport/feed search", value="soccer")
-with setup2:
-    venue_city = st.text_input("Weather location / venue city", value="")
-    league_hint = st.text_input("League / competition hint", value="", placeholder="Example: international, fifa, nba, nfl")
-    use_ara_memory = st.toggle("Use ARA learning memory", value=True)
+def _game_inputs(lang: str, *, default_game: str = "Mexico vs South Korea") -> tuple[str, str, str, list[str], list[str]]:
+    st.subheader(tr("game_setup", lang))
+    g1, g2 = st.columns(2)
+    with g1:
+        game = st.text_input(tr("game", lang), value=default_game)
+        sport_search = st.text_input(tr("sport_search", lang), value="soccer")
+    with g2:
+        weather_location = st.text_input(tr("weather_location", lang), value="")
+        book_regions = st.multiselect(tr("book_regions", lang), ["us", "us2", "uk", "eu", "au"], default=["us", "eu", "uk"])
+    markets = st.multiselect(tr("markets", lang), ["h2h", "spreads", "totals"], default=["h2h", "spreads", "totals"])
+    return game, sport_search, weather_location, book_regions, markets
 
-st.subheader("3. Provider controls")
-ctl1, ctl2 = st.columns(2)
-with ctl1:
-    book_regions = st.multiselect("Bookmaker regions", ["us", "us2", "uk", "eu", "au"], default=["us", "eu", "uk"])
-    markets = st.multiselect("Markets", ["h2h", "spreads", "totals"], default=["h2h", "spreads", "totals"])
-with ctl2:
-    max_sport_feeds = st.number_input("Max sport feeds", min_value=1, max_value=100, value=30, step=1)
-    max_events_per_feed = st.number_input("Max events per feed", min_value=1, max_value=100, value=25, step=1)
 
-with st.expander("Manual signal preview", expanded=False):
-    st.caption("These preview fields let you see the fusion math before live API results are available.")
-    sig1, sig2, sig3 = st.columns(3)
-    with sig1:
-        market_prob = st.number_input("Market probability %", min_value=1.0, max_value=99.0, value=56.2, step=0.1)
-        stats_prob = st.number_input("Stats model probability %", min_value=1.0, max_value=99.0, value=58.3, step=0.1)
-    with sig2:
-        injury_risk_score = st.number_input("Injury/lineup risk score", min_value=0.0, max_value=100.0, value=86.0, step=1.0)
-        key_player_out = st.toggle("Key player out", value=False)
-    with sig3:
-        weather_risk_score = st.number_input("Weather risk score", min_value=0.0, max_value=100.0, value=92.0, step=1.0)
-        memory_roi = st.number_input("ARA memory bucket ROI %", min_value=-100.0, max_value=100.0, value=0.0, step=0.5)
+def _show_status(lang: str, odds_key: str, sports_key: str, weather_key: str, ara: bool = False) -> None:
+    st.subheader(tr("source_status", lang))
+    cols = st.columns(4)
+    cols[0].metric("Odds API", _status(bool(odds_key.strip()), lang))
+    cols[1].metric("SportsDataIO", _status(bool(sports_key.strip()), lang))
+    cols[2].metric("WeatherAPI", _status(bool(weather_key.strip()), lang))
+    cols[3].metric("ARA", tr("enabled", lang) if ara else "Off")
 
-st.subheader("4. Source status")
-s1, s2, s3, s4 = st.columns(4)
-s1.metric("Odds API", _status(use_odds_api and bool(odds_api_key.strip())))
-s2.metric("SportsDataIO", _status(use_sportsdataio and bool(sportsdataio_key.strip())))
-s3.metric("WeatherAPI", _status(use_weatherapi and bool(weatherapi_key.strip())))
-s4.metric("ARA memory", "Enabled" if use_ara_memory else "Off")
 
-config = PredictorProConfig(
-    game=game,
-    scan_target=scan_target,
-    sport_search=sport_search,
-    venue_city=venue_city,
-    book_regions=book_regions,
-    markets=markets,
-    max_sport_feeds=int(max_sport_feeds),
-    max_events_per_feed=int(max_events_per_feed),
-    odds_api_enabled=use_odds_api and bool(odds_api_key.strip()),
-    sportsdataio_enabled=use_sportsdataio and bool(sportsdataio_key.strip()),
-    weatherapi_enabled=use_weatherapi and bool(weatherapi_key.strip()),
-    use_ara_memory=use_ara_memory,
-)
+def render_pro_predictor(lang: str) -> None:
+    st.title("Pro Predictor")
+    st.caption(
+        "Multi-source all-sports predictor. It combines sportsbook odds, SportsDataIO stats/context, "
+        "WeatherAPI conditions, and ARA learning memory through a capped fusion layer."
+        if lang == "en"
+        else "Predictor multifuente para todos los deportes. Combina cuotas, SportsDataIO, WeatherAPI y memoria ARA con una capa de fusión controlada."
+    )
+    odds_key, sports_key, weather_key = _source_inputs(lang)
+    game, sport_search, weather_location, book_regions, markets = _game_inputs(lang)
+    ara_memory = st.toggle("Use ARA learning memory" if lang == "en" else "Usar memoria ARA", value=True)
+    with st.expander("Manual signal preview" if lang == "en" else "Vista previa manual", expanded=False):
+        p1, p2, p3 = st.columns(3)
+        market_prob = p1.number_input("Market probability %", 1.0, 99.0, 56.2, 0.1)
+        stats_prob = p1.number_input("Stats probability %", 1.0, 99.0, 58.3, 0.1)
+        injury_score = p2.number_input("Injury/lineup score", 0.0, 100.0, 86.0, 1.0)
+        weather_score = p3.number_input("Weather score", 0.0, 100.0, 92.0, 1.0)
+        memory_roi = p3.number_input("ARA memory ROI %", -100.0, 100.0, 0.0, 0.5)
+    _show_status(lang, odds_key, sports_key, weather_key, ara_memory)
+    if st.button("Run multi-API Predictor Pro" if lang == "en" else "Ejecutar Predictor Pro multi-API", type="primary", use_container_width=True):
+        row = {
+            "market_probability": market_prob / 100.0 if odds_key.strip() else "",
+            "stats_probability": stats_prob / 100.0 if sports_key.strip() else "",
+            "injury_risk_score": injury_score if sports_key.strip() else "",
+            "weather_risk_score": weather_score if weather_key.strip() else "",
+            "bucket_roi": memory_roi / 100.0 if ara_memory else "",
+        }
+        fused = fuse_row(row)
+        st.subheader("Fusion output" if lang == "en" else "Salida de fusión")
+        o1, o2, o3, o4 = st.columns(4)
+        o1.metric("Market", _pct(fused.market_probability))
+        o2.metric("Final", _pct(fused.final_probability))
+        o3.metric("Reliability", f"{fused.reliability_score}/100")
+        o4.metric("Confidence", fused.confidence.title())
+        a1, a2, a3, a4 = st.columns(4)
+        a1.metric("Stats", _pct(fused.stats_adjustment))
+        a2.metric("Injury", _pct(fused.injury_adjustment))
+        a3.metric("Weather", _pct(fused.weather_adjustment))
+        a4.metric("ARA", _pct(fused.ara_memory_adjustment))
+        config = ProConfig(lang, "pro", game, sport_search, weather_location, book_regions, markets, bool(odds_key.strip()), bool(sports_key.strip()), bool(weather_key.strip()), ara_memory)
+        st.code(json.dumps(asdict(config), indent=2), language="json")
 
-run_button = st.button("Run multi-API Predictor Pro", type="primary", use_container_width=True)
 
-if run_button:
-    fusion_row = {
-        "market_probability": market_prob / 100.0 if config.odds_api_enabled else "",
-        "stats_probability": stats_prob / 100.0 if config.sportsdataio_enabled else "",
-        "injury_risk_score": injury_risk_score if config.sportsdataio_enabled else "",
-        "key_player_out": str(key_player_out).lower() if config.sportsdataio_enabled else "",
-        "weather_risk_score": weather_risk_score if config.weatherapi_enabled else "",
-        "bucket_roi": memory_roi / 100.0 if config.use_ara_memory else "",
-    }
-    fused = fuse_row(fusion_row)
+def render_market_capture(lang: str) -> None:
+    st.title(tr("market_snapshot_title", lang))
+    st.caption(tr("market_snapshot_caption", lang))
+    odds_key = st.text_input(tr("odds_api_key", lang), type="password")
+    game, sport_search, weather_location, book_regions, markets = _game_inputs(lang, default_game="")
+    c1, c2, c3 = st.columns(3)
+    max_sport_feeds = c1.number_input(tr("max_sport_feeds", lang), 1, 100, 30, 1)
+    max_events = c2.number_input(tr("max_events", lang), 1, 250, 25, 1)
+    max_api_calls = c3.number_input(tr("max_api_calls", lang), 1, 500, 25, 1)
+    snapshot_label = st.text_input(tr("snapshot_label", lang), value="latest")
+    output_folder = st.text_input(tr("output_folder", lang), value="data/market_snapshots")
+    _show_status(lang, odds_key, "", "")
+    if st.button(tr("run_snapshot", lang), type="primary", use_container_width=True):
+        if not odds_key.strip():
+            st.warning("Enter The Odds API key." if lang == "en" else "Ingresa la clave de The Odds API.")
+        st.code(json.dumps({"sport_search": sport_search, "game": game, "regions": book_regions, "markets": markets, "max_sport_feeds": max_sport_feeds, "max_events": max_events, "max_api_calls": max_api_calls, "snapshot_label": snapshot_label, "output_folder": output_folder}, indent=2), language="json")
 
-    st.subheader("Fusion output")
-    out1, out2, out3, out4 = st.columns(4)
-    out1.metric("Market probability", _pct(fused.market_probability))
-    out2.metric("Final probability", _pct(fused.final_probability))
-    out3.metric("Reliability", f"{fused.reliability_score}/100")
-    out4.metric("Confidence", fused.confidence.title())
 
-    st.subheader("Why the score moved")
-    move_cols = st.columns(4)
-    move_cols[0].metric("Stats adjustment", _pct(fused.stats_adjustment))
-    move_cols[1].metric("Injury adjustment", _pct(fused.injury_adjustment))
-    move_cols[2].metric("Weather adjustment", _pct(fused.weather_adjustment))
-    move_cols[3].metric("ARA memory adjustment", _pct(fused.ara_memory_adjustment))
+def render_context_layer(lang: str) -> None:
+    st.title(tr("odds_weather_title", lang))
+    st.caption(tr("odds_weather_caption", lang))
+    odds_key, sports_key, weather_key = _source_inputs(lang)
+    game, sport_search, weather_location, book_regions, markets = _game_inputs(lang)
+    st.subheader(tr("manual_weather", lang))
+    w1, w2, w3 = st.columns(3)
+    temp_f = w1.number_input(tr("temperature", lang), -40.0, 130.0, 70.0)
+    wind_mph = w2.number_input(tr("wind", lang), 0.0, 100.0, 0.0)
+    rain_mm = w3.number_input(tr("rain", lang), 0.0, 200.0, 0.0)
+    _show_status(lang, odds_key, sports_key, weather_key)
+    if st.button(tr("run_layer", lang), type="primary", use_container_width=True):
+        score = 100.0 - (30.0 if wind_mph >= 20 else 12.0 if wind_mph >= 12 else 0.0) - (20.0 if rain_mm >= 5 else 8.0 if rain_mm > 0 else 0.0)
+        score = max(0.0, min(100.0, score))
+        st.subheader(tr("decision_output", lang))
+        d1, d2, d3 = st.columns(3)
+        d1.metric(tr("weather_score", lang), f"{score:.1f}/100")
+        d2.metric(tr("markets_selected", lang), len(markets))
+        d3.metric("Sources", sum([bool(odds_key.strip()), bool(sports_key.strip()), bool(weather_key.strip())]))
+        st.code(json.dumps({"game": game, "sport_search": sport_search, "weather_location": weather_location, "regions": book_regions, "markets": markets, "temp_f": temp_f, "wind_mph": wind_mph, "rain_mm": rain_mm}, indent=2), language="json")
 
-    if fused.fusion_warning:
-        st.warning(fused.fusion_warning)
-    st.write("Reason codes:")
-    st.write(fused.fusion_reason)
 
-    if not config.odds_api_enabled:
-        st.warning("Odds API is missing. The market-probability foundation is unavailable.")
-    if not config.sportsdataio_enabled:
-        st.warning("SportsDataIO is missing. Stats, injury, lineup and score context are limited.")
-    if not config.weatherapi_enabled:
-        st.info("WeatherAPI is missing. Weather/context adjustment will stay neutral unless weather fields already exist in uploaded data.")
+st.set_page_config(page_title="Predictor Pro", page_icon="📊", layout="wide")
+language_name = st.sidebar.selectbox("Language / Idioma", list(LANGUAGES.keys()), index=0)
+lang = LANGUAGES[language_name]
+page = st.sidebar.radio("Page" if lang == "en" else "Página", ["Pro Predictor", tr("market_snapshot_title", lang), tr("odds_weather_title", lang)])
 
-    st.subheader("Run config")
-    st.code(json.dumps(asdict(config), indent=2), language="json")
+if page == "Pro Predictor":
+    render_pro_predictor(lang)
+elif page == tr("market_snapshot_title", lang):
+    render_market_capture(lang)
 else:
-    st.info("Add all available API keys, enter the game and sport/feed search, then run the multi-API fusion layer.")
+    render_context_layer(lang)
