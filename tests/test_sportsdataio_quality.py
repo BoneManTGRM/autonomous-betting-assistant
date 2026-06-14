@@ -13,6 +13,8 @@ class SportsDataIOQualityTests(unittest.TestCase):
             counts={
                 "prediction_rows": 10,
                 "prediction_match_matched": 10,
+                "odds_rows": 20,
+                "odds_matched_rows": 10,
                 "player_feature_records": 10,
                 "player_feature_ready": 10,
                 "player_prop_rows": 10,
@@ -46,6 +48,24 @@ class SportsDataIOQualityTests(unittest.TestCase):
         self.assertEqual(gate.status, "WATCH")
         self.assertAlmostEqual(float(gate.metrics["player_prop_feature_match_rate"]), 0.7)
         self.assertTrue(any("player prop feature match rate" in reason for reason in gate.reasons))
+
+    def test_quality_fails_low_odds_match_rate_and_missing_entry(self) -> None:
+        gate = evaluate_pipeline_quality(
+            steps_run=["apply_game_results", "apply_odds_clv"],
+            warnings=[],
+            counts={
+                "prediction_rows": 10,
+                "prediction_match_matched": 10,
+                "odds_rows": 10,
+                "odds_matched_rows": 5,
+                "odds_unmatched_rows": 5,
+                "odds_missing_entry_rows": 1,
+            },
+        )
+        self.assertEqual(gate.status, "FAIL")
+        self.assertAlmostEqual(float(gate.metrics["odds_match_rate"]), 0.5)
+        self.assertTrue(any("odds match rate" in reason for reason in gate.reasons))
+        self.assertTrue(any("missing entry odds" in reason for reason in gate.reasons))
 
     def test_quality_fails_bad_profit_goal_checks(self) -> None:
         gate = evaluate_pipeline_quality(
