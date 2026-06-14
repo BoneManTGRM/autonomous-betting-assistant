@@ -52,7 +52,6 @@ TEXT = {
 }
 
 EXPECTED_COLUMNS = ["event", "sport", "pick", "probability", "predictor_score", "read", "result", "source", "created_at"]
-
 RESULT_MAP = {
     "won": "won", "win": "won", "w": "won", "ganó": "won", "gano": "won", "ganada": "won", "acierto": "won",
     "lost": "lost", "loss": "lost", "l": "lost", "perdió": "lost", "perdio": "lost", "perdida": "lost", "fallo": "lost",
@@ -132,33 +131,25 @@ def normalize_upload(df: pd.DataFrame) -> pd.DataFrame:
     score_col = find_col(df, ["predictor score", "puntaje", "score"])
     read_col = find_col(df, ["classification", "clasificación", "clasificacion", "read", "lectura"])
     result_col = find_col(df, ["result", "resultado"])
-
     if not event_col or not pick_col or not prob_col:
         return pd.DataFrame(columns=EXPECTED_COLUMNS)
-
     rows = []
     for _, row in df.iterrows():
         event = clean_text(row.get(event_col, ""), "")
         pick = clean_text(row.get(pick_col, ""), "")
         if not event or not pick:
             continue
-
-        sport = clean_text(row.get(sport_col, "unknown") if sport_col else "unknown")
-        read = clean_text(row.get(read_col, "unknown") if read_col else "unknown")
-        result = normalize_result(row.get(result_col, "unknown") if result_col else "unknown")
-
         rows.append({
             "event": event,
-            "sport": sport,
+            "sport": clean_text(row.get(sport_col, "unknown") if sport_col else "unknown"),
             "pick": pick,
             "probability": parse_probability(row.get(prob_col, 0)),
             "predictor_score": parse_score(row.get(score_col, 0)) if score_col else 0.0,
-            "read": read,
-            "result": result,
+            "read": clean_text(row.get(read_col, "unknown") if read_col else "unknown"),
+            "result": normalize_result(row.get(result_col, "unknown") if result_col else "unknown"),
             "source": "upload",
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
-
     return pd.DataFrame(rows, columns=EXPECTED_COLUMNS)
 
 
@@ -167,7 +158,6 @@ def clean_tracker(df: pd.DataFrame) -> pd.DataFrame:
     for col in EXPECTED_COLUMNS:
         if col not in df.columns:
             df[col] = 0.0 if col in ["probability", "predictor_score"] else "unknown"
-
     df = df[EXPECTED_COLUMNS]
     df["event"] = df["event"].apply(lambda x: clean_text(x, ""))
     df["sport"] = df["sport"].apply(clean_text)
@@ -203,9 +193,15 @@ def merge_into_tracker(new_df: pd.DataFrame) -> int:
     return max(0, len(tracker_df()) - before)
 
 
-def csv_text(df: pd.DataFrame) -> str:
+def tracker_csv_text(df: pd.DataFrame) -> str:
     output = io.StringIO()
     clean_tracker(df).to_csv(output, index=False, quoting=csv.QUOTE_MINIMAL)
+    return output.getvalue()
+
+
+def raw_csv_text(df: pd.DataFrame) -> str:
+    output = io.StringIO()
+    df.to_csv(output, index=False, quoting=csv.QUOTE_MINIMAL)
     return output.getvalue()
 
 
@@ -213,27 +209,23 @@ def summarize_group(df: pd.DataFrame, group_col: str, area_type: str) -> pd.Data
     rows = []
     grouped = df.copy()
     grouped[group_col] = grouped[group_col].apply(clean_text)
-
     for key, group in grouped.groupby(group_col, dropna=False):
         key = clean_text(key)
         actual = float(group["actual"].mean())
         predicted = float(group["probability"].mean())
         brier = float(((group["probability"] - group["actual"]) ** 2).mean())
-
         rows.append({
             "area": f"{area_type}: {key}",
             "area_type": area_type,
-            group_col: key,
+            "group_value": key,
             "records": int(len(group)),
             "avg_predicted": round(predicted, 3),
             "actual_hit_rate": round(actual, 3),
             "actual_minus_predicted": round(actual - predicted, 3),
             "brier": round(brier, 3),
         })
-
     if not rows:
-        return pd.DataFrame(columns=["area", "area_type", group_col, "records", "avg_predicted", "actual_hit_rate", "actual_minus_predicted", "brier"])
-
+        return pd.DataFrame(columns=["area", "area_type", "group_value", "records", "avg_predicted", "actual_hit_rate", "actual_minus_predicted", "brier"])
     return pd.DataFrame(rows).sort_values(["records", "actual_minus_predicted"], ascending=[False, False])
 
 
@@ -250,13 +242,11 @@ def best_and_worst(summaries: list[pd.DataFrame]) -> tuple[str, str]:
     valid = [df for df in summaries if not df.empty and "area" in df.columns]
     if not valid:
         return "Not enough data", "Not enough data"
-
     combined = pd.concat(valid, ignore_index=True)
     combined["area"] = combined["area"].apply(clean_text)
     qualified = combined[combined["records"] >= 2]
     if qualified.empty:
         qualified = combined
-
     best = qualified.sort_values(["actual_minus_predicted", "records"], ascending=[False, False]).iloc[0]
     worst = qualified.sort_values(["actual_minus_predicted", "records"], ascending=[True, False]).iloc[0]
     return (
@@ -272,7 +262,6 @@ st.info(t("not_auto"))
 latest_predictions = st.session_state.get("ara_latest_predictions", [])
 latest_source = st.session_state.get("ara_latest_predictions_source", "Predictor")
 latest_saved_at = st.session_state.get("ara_latest_predictions_saved_at", "")
-
 if latest_predictions:
     st.success(f"{t('latest_info')}: {len(latest_predictions)} from {latest_source} {latest_saved_at}")
     if st.button(t("import_latest"), type="primary"):
@@ -303,9 +292,9 @@ if memory_upload is not None:
         memory_df = pd.read_csv(memory_upload)
         if {"event", "pick", "probability", "result"}.issubset(memory_df.columns):
             normalized_memory = clean_tracker(memory_df)
+            merge_into_tracker(normalized_memory)
         else:
-            normalized_memory = normalize_upload(memory_df)
-        merge_into_tracker(normalized_memory)
+            st.info("Learning-memory summary files are for review only. Upload the updated tracker CSV here if you want to restore editable picks." if language == "English" else "Los archivos de memoria son solo para revisión. Sube aquí el tracker actualizado si quieres restaurar selecciones editables.")
     except Exception as exc:
         st.warning(f"{t('could_not_load')} {memory_upload.name}: {exc}")
 
@@ -317,7 +306,6 @@ with st.expander(t("manual"), expanded=False):
     predictor_score = st.number_input(t("score"), min_value=0.0, max_value=100.0, value=50.0, step=1.0)
     read = st.text_input(t("read"), "manual")
     result = st.selectbox(t("result"), ["unknown", "won", "lost"])
-
     if st.button(t("add")) and event.strip() and pick.strip():
         new_row = pd.DataFrame([{
             "event": event,
@@ -349,7 +337,6 @@ editable = st.data_editor(
     },
     key="self_learning_editor",
 )
-
 set_tracker(editable)
 editable = tracker_df()
 
@@ -359,7 +346,6 @@ if resolved.empty:
 else:
     resolved["actual"] = resolved["result"].map({"won": 1.0, "lost": 0.0})
     resolved = add_probability_bucket(resolved)
-
     hit_rate = float(resolved["actual"].mean())
     avg_prob = float(resolved["probability"].mean())
     brier = float(((resolved["probability"] - resolved["actual"]) ** 2).mean())
@@ -393,10 +379,9 @@ else:
         sport_summary.assign(memory_type="sport"),
         read_summary.assign(memory_type="read"),
     ], ignore_index=True)
-    st.download_button(t("download_memory"), data=csv_text(learning_memory), file_name="ara_learning_memory.csv", mime="text/csv")
+    st.download_button(t("download_memory"), data=raw_csv_text(learning_memory), file_name="ara_learning_memory.csv", mime="text/csv")
 
-st.download_button(t("download_tracker"), data=csv_text(editable), file_name="ara_self_learning_tracker.csv", mime="text/csv")
-
+st.download_button(t("download_tracker"), data=tracker_csv_text(editable), file_name="ara_self_learning_tracker.csv", mime="text/csv")
 if st.button(t("clear")):
     st.session_state.ara_learning_records = []
     st.rerun()
