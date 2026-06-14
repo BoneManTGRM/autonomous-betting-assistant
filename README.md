@@ -17,6 +17,7 @@ This is **research-only software**. It does not place bets, does not guarantee w
 - calculates expected-value diagnostics for later testing
 - logs a TGRM-style TEST, DETECT, REPAIR, VERIFY cycle
 - supports backtesting metrics such as Brier score, accuracy and closing-line delta
+- learns probability calibration from graded results and applies it to future predictions
 - includes a CLI, sample event file, Streamlit UI and tests
 
 ## ARA/TGRM lineage
@@ -58,6 +59,36 @@ Write JSON output to a file:
 python run_agent.py examples/sample_event.json --json-output result.json
 ```
 
+Run with a learned calibration state:
+
+```bash
+python run_agent.py examples/sample_event.json --learned-state learned_state.json
+```
+
+## Make it learn from graded results
+
+The learning loop is now:
+
+```text
+prediction -> final result -> graded CSV -> train calibration -> learned_state.json -> future predictions
+```
+
+Train from a graded CSV:
+
+```bash
+python learn_from_results.py pro_predictor_updated_win_loss.csv --output learned_state.json
+```
+
+The CSV parser accepts common columns such as:
+
+- `probability`, `predicted_probability`, `favorite_probability`, `model_probability` or `market_probability`
+- `result`, `outcome`, `win_loss`, or `graded_result` with values like `won`, `lost`, `1`, or `0`
+- optional `prediction` / `pick` and `winner` / `actual_winner` columns
+
+The learned state stores calibration parameters, events trained, Brier score before/after, log loss before/after, and accuracy before/after. If `learned_state.json` exists in the project root, the live market scanner applies it automatically.
+
+This is probability calibration, not proof of edge. It learns whether the raw market/model probabilities have been too confident, too cautious, or biased based on past graded predictions. Retrain it whenever more finished games are added.
+
 ## Run the Streamlit app
 
 ```bash
@@ -67,6 +98,8 @@ streamlit run app_streamlit.py
 The Streamlit app asks each user for a provider access token on the app screen. This means the app owner does not have to store a shared token in Streamlit secrets.
 
 Optional owner fallback: the app can still read `THE_ODDS_API_KEY` from Streamlit secrets or environment variables, but this is not required when each user provides their own token.
+
+If `learned_state.json` exists in the app root, live market probabilities are calibrated from the graded-result learning loop before the favorite is displayed.
 
 ## Run tests
 
@@ -81,6 +114,7 @@ The baseline supports:
 - live market feed scanning
 - fuzzy team-name matching
 - market-implied no-vig probabilities
+- learned probability calibration from graded historical predictions
 - likely outcome ranking
 - expected-goals scoreline estimation
 - scoreline and spread table generation
