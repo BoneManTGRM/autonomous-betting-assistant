@@ -187,11 +187,24 @@ def _country_mismatch(query: Any, returned_location: Any) -> bool:
     return not any(alias in returned_country for alias in aliases)
 
 
+def _combined_weather_location(row: Mapping[str, Any]) -> str | None:
+    direct = _field(row, ("weather_location", "returned_weather_location"))
+    if direct:
+        return str(direct)
+    parts = [
+        _field(row, ("location_name", "weather_location_name")),
+        _field(row, ("region", "weather_region")),
+        _field(row, ("country", "weather_country")),
+    ]
+    text = ", ".join(str(part) for part in parts if part)
+    return text or None
+
+
 def weather_location_mismatch(row: Mapping[str, Any]) -> bool:
     query = _field(row, ("weather_location_query", "location_query", "weather_query"))
-    returned = _field(row, ("weather_location", "location_name", "returned_weather_location"))
+    returned = _combined_weather_location(row)
     weather_tier = str(_field(row, ("weather_tier", "weather status", "weather_status")) or "").strip().lower()
-    if not query or not returned or weather_tier in {"", "skipped", "error"}:
+    if not query or not returned or weather_tier in {"skipped", "error"}:
         return False
     return _location_primary_missing(query, returned) or _country_mismatch(query, returned)
 
