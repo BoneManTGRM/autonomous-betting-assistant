@@ -13,6 +13,8 @@ class AraFilterPolicy:
     min_books: int = 5
     limited_books: int = 8
     max_risk_penalty: float = 15.0
+    max_overround: float = 0.15
+    price_range_watch: float = 0.18
     soccer_draw_watch: float = 0.18
     soccer_draw_block: float = 0.25
     soccer_draw_extreme: float = 0.30
@@ -22,6 +24,7 @@ class AraFilterPolicy:
     normal_edge: float = 0.05
     strong_edge: float = 0.08
     watch_edge: float = 0.08
+    weather_watch_edge: float = 0.06
     baseball_low: float = 0.50
     baseball_high: float = 0.56
     prior_strength: float = 8.0
@@ -95,22 +98,23 @@ def fmt_dec(value: float | None) -> str:
 
 
 def _field(row: Mapping[str, Any], names: tuple[str, ...]) -> Any:
-    lookup = {str(k).strip().lower(): v for k, v in row.items()}
+    lookup = {str(k).strip().lower().replace(" ", "_").replace("-", "_"): v for k, v in row.items()}
     for name in names:
-        if name.lower() in lookup:
-            return lookup[name.lower()]
+        key = name.lower().replace(" ", "_").replace("-", "_")
+        if key in lookup:
+            return lookup[key]
     return None
 
 
 def sport_group(value: Any) -> str:
-    text = str(value or "").lower()
+    text = str(value or "").lower().replace("_", " ")
     if any(x in text for x in ("mlb", "milb", "baseball")):
         return "Baseball"
     if any(x in text for x in ("nba", "wnba", "basketball")):
         return "Basketball"
     if any(x in text for x in ("mma", "boxing", "ufc")):
         return "Combat"
-    if any(x in text for x in ("nfl", "ncaaf", "americanfootball", "ufl")):
+    if any(x in text for x in ("nfl", "ncaaf", "american football", "americanfootball", "ufl")):
         return "American football"
     if any(x in text for x in ("nhl", "hockey")):
         return "Hockey"
@@ -124,7 +128,7 @@ def sport_group(value: Any) -> str:
 
 
 def record_key(row: Mapping[str, Any]) -> str:
-    return " | ".join(str(row.get(k, "")).strip() for k in ("Event", "Start", "Prediction"))
+    return " | ".join(str(_field(row, names) or "").strip() for names in (("Event", "event", "game", "match"), ("Start", "start", "commence_time"), ("Prediction", "prediction", "pick")))
 
 
 def bucket(prob: float | None) -> str:
@@ -140,7 +144,7 @@ def market_probability(row: Mapping[str, Any]) -> float | None:
 
 
 def model_probability(row: Mapping[str, Any]) -> float | None:
-    return parse_percent(_field(row, ("ARA model probability", "Model probability", "model_probability", "ara_probability")))
+    return parse_percent(_field(row, ("ARA model probability", "Model probability", "model_probability", "ara_probability", "weather_adjusted_probability")))
 
 
 def best_price(row: Mapping[str, Any]) -> float | None:
@@ -155,20 +159,28 @@ def classification(row: Mapping[str, Any]) -> str:
     return str(_field(row, ("Classification", "classification", "decision")) or "").strip().title()
 
 
+def implied_probability(row: Mapping[str, Any]) -> float | None:
+    price = best_price(row)
+    return 1.0 / price if price and price > 1.0 else None
+
+
 def weather_flags_for(row: Mapping[str, Any], policy: AraFilterPolicy = AraFilterPolicy()) -> tuple[str, ...]:
     flags: list[str] = []
     group = sport_group(_field(row, ("Sport", "sport", "league", "competition")))
     outdoor_raw = _field(row, ("is_outdoor", "outdoor", "venue_outdoor"))
     outdoor_default = group in {"Baseball", "American football", "Soccer", "Tennis", "AFL/NRL/Rugby"}
-    is_outdoor = outdoor_default if outdoor_raw is None else str(outdoor_raw).strip().lower() in {"1", "true", "yes", "outdoor"}
+    is_outdoor = outdoor_default if outdoor_raw is None else str(outdoor_raw).strip().lower() in {"1", "true", "yes", "y", "outdoor"}
     if not is_outdoor:
         return tuple(flags)
+
     wind_mph = parse_float(_field(row, ("wind_mph", "weather_wind_mph", "wind")))
     wind_kph = parse_float(_field(row, ("wind_kph", "weather_wind_kph")))
     if wind_mph is None and wind_kph is not None:
         wind_mph = wind_kph * 0.621371
     precip_mm = parse_float(_field(row, ("precip_mm", "weather_precip_mm", "precipitation_mm", "rain_mm")))
     condition = str(_field(row, ("weather_condition", "condition")) or "").lower()
+    condition_tokens = {token.strip(".,;:!?()[]") for token in condition.replace("/", " ").replace("-", " ").split()}
+
     if wind_mph is not None:
         if wind_mph >= policy.wind_block_mph:
             flags.append("weather_wind_block")
@@ -179,7 +191,7 @@ def weather_flags_for(row: Mapping[str, Any], policy: AraFilterPolicy = AraFilte
             flags.append("weather_precip_block")
         elif precip_mm >= policy.precip_watch_mm:
             flags.append("weather_precip_watch")
-    if any(word in condition for word in ("storm", "thunder", "snow", "ice", "sleet")):
+    if condition_tokens & {"storm", "storms", "thunder", "thunderstorm", "snow", "ice", "icy", "sleet"}:
         flags.append("weather_condition_severe")
     return tuple(flags)
 
@@ -190,12 +202,15 @@ def risk_flags_for(row: Mapping[str, Any], policy: AraFilterPolicy = AraFilterPo
     group = sport_group(_field(row, ("Sport", "sport", "league", "competition")))
     mprob = market_probability(row)
     dprob = draw_probability(row)
-    price = best_price(row)
-    implied = 1.0 / price if price and price > 0 else None
+    implied = implied_probability(row)
     proxy_edge = mprob - implied if mprob is not None and implied is not None else None
     data_quality = parse_float(_field(row, ("Data quality", "data_quality", "quality")))
-    risk_penalty = parse_float(_field(row, ("Risk penalty", "risk_penalty")))
+    risk_penalty = parse_float(_field(row, ("Risk penalty", "risk_penalty", "market_overround")))
+    if risk_penalty is not None and risk_penalty <= 1.0:
+        risk_penalty *= 100.0
     books = parse_int(_field(row, ("Books", "bookmaker_count", "bookmakers", "source_count")))
+    price_range = parse_float(_field(row, ("Price range", "price_range", "market_price_range")))
+
     if cls == "Avoid":
         flags.append("classification_avoid")
     elif cls == "Watch":
@@ -204,14 +219,20 @@ def risk_flags_for(row: Mapping[str, Any], policy: AraFilterPolicy = AraFilterPo
         flags.append("missing_data_quality")
     elif data_quality < policy.min_data_quality:
         flags.append("data_quality_under_80")
-    if risk_penalty is not None and risk_penalty > policy.max_risk_penalty:
-        flags.append("risk_penalty_over_15")
+    if risk_penalty is not None:
+        if risk_penalty > policy.max_risk_penalty:
+            flags.append("risk_penalty_over_15")
+        if risk_penalty / 100.0 > policy.max_overround:
+            flags.append("market_overround_high")
+    if price_range is not None and price_range >= policy.price_range_watch:
+        flags.append("price_range_disagreement")
     if books is None:
         flags.append("missing_book_count")
     elif books < policy.min_books:
         flags.append("low_book_coverage_under_5")
     elif books < policy.limited_books:
         flags.append("limited_book_coverage_under_8")
+
     if group == "Soccer":
         if dprob is None:
             flags.append("soccer_draw_probability_missing")
@@ -223,6 +244,7 @@ def risk_flags_for(row: Mapping[str, Any], policy: AraFilterPolicy = AraFilterPo
             flags.append("soccer_draw_risk_elevated_18_plus")
     if group == "Baseball" and cls == "Watch" and mprob is not None and policy.baseball_low <= mprob <= policy.baseball_high:
         flags.append("baseball_watch_low_edge_50_56")
+    price = best_price(row)
     if price is None:
         flags.append("missing_best_price")
     elif price < policy.min_price:
@@ -249,6 +271,8 @@ def proxy_filter_decision(row: Mapping[str, Any], policy: AraFilterPolicy = AraF
         return "PROXY_WATCH", "Baseball Watch pick in 50-56% probability band is too volatile."
     if "data_quality_under_80" in flags or "low_book_coverage_under_5" in flags:
         return "PROXY_WATCH", "Insufficient data quality or book coverage."
+    if "market_overround_high" in flags or "price_range_disagreement" in flags:
+        return "PROXY_WATCH", "Market is too noisy or books disagree too much."
     if "weather_wind_block" in weather or "weather_precip_block" in weather or "weather_condition_severe" in weather:
         return "PROXY_WATCH", "Severe weather requires weather-adjusted model probability."
     return "PROXY_CANDIDATE", "Passes current leak-control filters; still needs independent edge."
@@ -257,22 +281,27 @@ def proxy_filter_decision(row: Mapping[str, Any], policy: AraFilterPolicy = AraF
 def live_decision(row: Mapping[str, Any], policy: AraFilterPolicy = AraFilterPolicy()) -> tuple[str, float, float | None, str, tuple[str, ...], tuple[str, ...]]:
     flags = risk_flags_for(row, policy)
     weather = weather_flags_for(row, policy)
-    price = best_price(row)
-    implied = 1.0 / price if price and price > 0 else None
+    implied = implied_probability(row)
     model = model_probability(row)
     edge = model - implied if model is not None and implied is not None else None
     hard = {"classification_avoid", "soccer_draw_risk_extreme_30_plus", "soccer_draw_risk_block_ml_25_plus", "missing_best_price", "missing_data_quality", "data_quality_under_80", "low_book_coverage_under_5", "heavy_favorite_price_under_1_30", "longshot_price_over_3_00", "baseball_watch_low_edge_50_56"}
+    noisy = {"market_overround_high", "price_range_disagreement"}
     weather_hard = {"weather_wind_block", "weather_precip_block", "weather_condition_severe"}
     if "classification_avoid" in flags:
         return "AVOID", 0.0, edge, "Avoid classification blocks live action.", flags, weather
     if any(flag in hard for flag in flags):
         return "WATCH", 0.0, edge, "Blocked by hard risk controls: " + ", ".join(flag for flag in flags if flag in hard), flags, weather
-    if any(flag in weather_hard for flag in weather):
-        return "WATCH", 0.0, edge, "Blocked by weather controls: " + ", ".join(flag for flag in weather if flag in weather_hard), flags, weather
+    if any(flag in noisy for flag in flags) and (edge is None or edge < policy.strong_edge):
+        return "WATCH", 0.0, edge, "Market noise requires 8%+ independent edge: " + ", ".join(flag for flag in flags if flag in noisy), flags, weather
+    if any(flag in weather_hard for flag in weather) and model is None:
+        return "WATCH", 0.0, edge, "Blocked by weather controls until weather-adjusted probability exists: " + ", ".join(flag for flag in weather if flag in weather_hard), flags, weather
     if model is None or edge is None:
         return "WATCH", 0.0, edge, "Independent ARA probability is missing; no live action.", flags, weather
-    if edge < policy.min_edge:
-        return "WATCH", 0.0, edge, "Independent edge under 3%.", flags, weather
+    required_edge = policy.min_edge
+    if weather and any(flag.endswith("watch") for flag in weather):
+        required_edge = max(required_edge, policy.weather_watch_edge)
+    if edge < required_edge:
+        return "WATCH", 0.0, edge, f"Independent edge under required threshold ({required_edge:.0%}).", flags, weather
     if "watch_track_only" in flags and edge < policy.watch_edge:
         return "WATCH", 0.0, edge, "Watch classification requires 8%+ independent edge.", flags, weather
     if edge >= policy.strong_edge:
@@ -295,6 +324,7 @@ def _smooth_maps(df: pd.DataFrame, policy: AraFilterPolicy) -> tuple[float | Non
     done["_class"] = done.apply(lambda row: classification(row.to_dict()) or "Missing", axis=1)
     done["_sport"] = done.apply(lambda row: sport_group(_field(row.to_dict(), ("Sport", "sport", "league", "competition"))), axis=1)
     base = float(done["_win"].mean())
+
     def make(column: str) -> dict[str, float]:
         out: dict[str, float] = {}
         for key, group in done.groupby(column):
@@ -302,6 +332,7 @@ def _smooth_maps(df: pd.DataFrame, policy: AraFilterPolicy) -> tuple[float | Non
             count = float(len(group))
             out[str(key)] = (wins + policy.prior_strength * base) / (count + policy.prior_strength)
         return out
+
     return base, make("_bucket"), make("_class"), make("_sport")
 
 
@@ -323,12 +354,15 @@ def _calibrated(row: Mapping[str, Any], base: float | None, by_bucket: dict[str,
 
 def apply_ara_decision_layer(df: pd.DataFrame, policy: AraFilterPolicy = AraFilterPolicy()) -> pd.DataFrame:
     out = df.copy()
+    if out.empty:
+        for column in OUTPUT_COLUMNS:
+            out[column] = pd.Series(dtype="object")
+        return out
     base, by_bucket, by_class, by_sport = _smooth_maps(out, policy)
     rows = []
     for _, series in out.iterrows():
         row = series.to_dict()
-        price = best_price(row)
-        implied = 1.0 / price if price and price > 0 else None
+        implied = implied_probability(row)
         mprob = market_probability(row)
         dprob = draw_probability(row)
         proxy_edge = mprob - implied if mprob is not None and implied is not None else None
