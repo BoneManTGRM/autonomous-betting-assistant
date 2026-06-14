@@ -51,6 +51,29 @@ class AraFilterTests(unittest.TestCase):
         self.assertIn("weather_condition_severe", weather_flags_for({"Sport": "nfl", "weather_condition": "Thunder storm"}))
         self.assertNotIn("weather_condition_severe", weather_flags_for({"Sport": "nfl", "weather_condition": "Nice and clear"}))
 
+    def test_weather_api_error_blocks_live_action(self) -> None:
+        df = pd.DataFrame([
+            {
+                "Event": "Away at Home",
+                "Start": "2026-01-01",
+                "Prediction": "Home",
+                "Sport": "mlb",
+                "Market probability": "60%",
+                "ARA model probability": "67%",
+                "Classification": "Strong",
+                "Data quality": 95,
+                "Risk penalty": 5,
+                "Best price": 1.80,
+                "Books": 10,
+                "weather_tier": "Error",
+                "weather_error": "401 Client Error: Unauthorized",
+            }
+        ])
+        enriched = apply_ara_decision_layer(df)
+        self.assertIn("weather_api_error", enriched.iloc[0]["ara_risk_flags"])
+        self.assertEqual(enriched.iloc[0]["ara_live_decision"], "WATCH")
+        self.assertIn("weather_api_error", enriched.iloc[0]["ara_decision_reason"])
+
     def test_empty_frame_is_safe(self) -> None:
         enriched = apply_ara_decision_layer(pd.DataFrame())
         self.assertIn("ara_live_decision", enriched.columns)
