@@ -5,7 +5,7 @@ import unittest
 import pandas as pd
 
 from autonomous_betting_agent.live_odds import LiveEventSummary, OutcomePrice
-from autonomous_betting_agent.market_snapshots import add_line_movement, event_snapshot_rows, latest_snapshot_with_movement
+from autonomous_betting_agent.market_snapshots import add_line_movement, event_snapshot_rows, latest_snapshot_with_movement, top_market_movers
 
 
 def sample_summary(probability: float, best_price: float) -> LiveEventSummary:
@@ -37,7 +37,7 @@ class MarketSnapshotTests(unittest.TestCase):
         self.assertEqual(rows[0]["event_id"], "event-1")
         self.assertEqual(rows[0]["snapshot_time_utc"], "2026-06-14T10:00:00+00:00")
 
-    def test_line_movement(self) -> None:
+    def test_line_movement_and_signals(self) -> None:
         first = pd.DataFrame(event_snapshot_rows(sample_summary(0.55, 1.95), "2026-06-14T10:00:00+00:00"))
         second = pd.DataFrame(event_snapshot_rows(sample_summary(0.60, 1.85), "2026-06-14T11:00:00+00:00"))
         frame = pd.concat([first, second], ignore_index=True)
@@ -47,10 +47,22 @@ class MarketSnapshotTests(unittest.TestCase):
         self.assertAlmostEqual(home["current_probability"], 0.60)
         self.assertAlmostEqual(home["probability_move"], 0.05)
         self.assertAlmostEqual(home["best_price_move"], -0.10)
+        self.assertEqual(home["movement_signal"], "STEAM")
+        self.assertIn(home["movement_strength"], {"moderate", "strong"})
+        self.assertGreaterEqual(home["market_confidence_score"], 0)
+
+    def test_top_market_movers(self) -> None:
+        first = pd.DataFrame(event_snapshot_rows(sample_summary(0.55, 1.95), "2026-06-14T10:00:00+00:00"))
+        second = pd.DataFrame(event_snapshot_rows(sample_summary(0.62, 1.78), "2026-06-14T11:00:00+00:00"))
+        frame = pd.concat([first, second], ignore_index=True)
+        movers = top_market_movers(frame, limit=1)
+        self.assertEqual(len(movers), 1)
+        self.assertIn("probability_move_abs", movers.columns)
 
     def test_empty_frame(self) -> None:
         moved = add_line_movement(pd.DataFrame())
         self.assertIn("probability_move", moved.columns)
+        self.assertIn("movement_signal", moved.columns)
         self.assertEqual(len(moved), 0)
 
 
