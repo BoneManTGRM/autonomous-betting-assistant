@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Mapping
-import math
 
 import pandas as pd
 
@@ -11,12 +10,15 @@ from .ara_filters import parse_float, parse_percent
 PLAYER_PROP_OUTPUT_COLUMNS = [
     "prop_player_name",
     "prop_type_normalized",
+    "prop_market_source",
     "prop_market_probability",
     "prop_no_vig_probability",
     "prop_model_probability",
     "prop_blended_probability",
     "prop_implied_edge",
     "prop_fair_decimal_price",
+    "prop_data_quality",
+    "prop_confidence_score",
     "prop_status",
     "prop_stake_units",
     "prop_reasons",
@@ -25,34 +27,53 @@ PLAYER_PROP_OUTPUT_COLUMNS = [
 
 PROP_ALIASES = {
     "td": "touchdown",
+    "anytime td": "touchdown",
+    "anytime_td": "touchdown",
     "touchdown": "touchdown",
     "anytime touchdown": "touchdown",
-    "anytime_td": "touchdown",
+    "anytime_touchdown": "touchdown",
     "home run": "home_run",
+    "home_run": "home_run",
     "hr": "home_run",
     "homerun": "home_run",
     "goal": "goal",
     "anytime goal": "goal",
+    "anytime_goal": "goal",
     "shot on goal": "shot_on_goal",
+    "shot_on_goal": "shot_on_goal",
     "sog": "shot_on_goal",
     "assist": "assist",
     "hit": "hit",
     "strikeout": "strikeout",
+    "strikeouts": "strikeout",
     "k": "strikeout",
+    "ks": "strikeout",
     "reception": "reception",
+    "receptions": "reception",
     "rush yard": "rush_yards",
+    "rush_yard": "rush_yards",
     "rush yards": "rush_yards",
+    "rush_yards": "rush_yards",
+    "rushing yards": "rush_yards",
+    "rushing_yards": "rush_yards",
     "receiving yard": "receiving_yards",
+    "receiving_yard": "receiving_yards",
     "receiving yards": "receiving_yards",
+    "receiving_yards": "receiving_yards",
     "passing yard": "passing_yards",
+    "passing_yard": "passing_yards",
     "passing yards": "passing_yards",
+    "passing_yards": "passing_yards",
 }
 
 
 @dataclass(frozen=True)
 class PlayerPropPolicy:
     min_books: int = 4
+    strong_books: int = 8
     min_data_quality: float = 75.0
+    strong_data_quality: float = 85.0
+    min_sample_size: int = 10
     min_model_edge: float = 0.03
     normal_model_edge: float = 0.05
     strong_model_edge: float = 0.08
@@ -80,22 +101,38 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
+def _fmt_prob(value: float | None) -> str | float:
+    return "" if value is None else round(value, 4)
+
+
 def normalize_prop_type(value: Any) -> str:
-    text = _text(value).lower().replace("-", "_").replace(" ", "_")
-    compact = text.replace("_", " ")
-    return PROP_ALIASES.get(text, PROP_ALIASES.get(compact, text or "unknown"))
+    raw = _text(value).lower()
+    spaced = raw.replace("-", " ").replace("_", " ")
+    spaced = " ".join(spaced.split())
+    underscored = spaced.replace(" ", "_")
+    return PROP_ALIASES.get(underscored, PROP_ALIASES.get(spaced, underscored or "unknown"))
 
 
-def decimal_implied_probability(price: Any) -> float | None:
+def implied_probability_from_price(price: Any) -> float | None:
+    """Convert decimal or American odds to implied probability.
+
+    Decimal odds use values like 1.80 or 2.25. American odds use values like +150 or -120.
+    """
     price_float = parse_float(price)
-    if price_float is None or price_float <= 1.0:
+    if price_float is None:
         return None
-    return 1.0 / price_float
+    if price_float >= 100:
+        return 100.0 / (price_float + 100.0)
+    if price_float <= -100:
+        return abs(price_float) / (abs(price_float) + 100.0)
+    if price_float > 1.0:
+        return 1.0 / price_float
+    return None
 
 
 def no_vig_binary_probability(over_price: Any, under_price: Any) -> float | None:
-    over_imp = decimal_implied_probability(over_price)
-    under_imp = decimal_implied_probability(under_price)
+    over_imp = implied_probability_from_price(over_price)
+    under_imp = implied_probability_from_price(under_price)
     if over_imp is None or under_imp is None:
         return None
     total = over_imp + under_imp
@@ -108,14 +145,17 @@ def _player_name(row: Mapping[str, Any]) -> str:
     return _text(_field(row, ("player", "player_name", "athlete", "name")))
 
 
-def _market_probability(row: Mapping[str, Any]) -> float | None:
+def _market_probability_with_source(row: Mapping[str, Any]) -> tuple[float | None, float | None, str]:
     direct = parse_percent(_field(row, ("market_probability", "prop_market_probability", "book_probability", "implied_probability")))
     if direct is not None:
-        return direct
+        return direct, None, "direct_market_probability"
     no_vig = no_vig_binary_probability(_field(row, ("over_price", "yes_price", "best_yes_price")), _field(row, ("under_price", "no_price", "best_no_price")))
     if no_vig is not None:
-        return no_vig
-    return decimal_implied_probability(_field(row, ("best_price", "price", "decimal_odds", "odds")))
+        return no_vig, no_vig, "binary_no_vig"
+    implied = implied_probability_from_price(_field(row, ("best_price", "price", "decimal_odds", "odds", "american_odds")))
+    if implied is not None:
+        return implied, None, "single_price_implied"
+    return None, None, "missing_market_probability"
 
 
 def _model_probability(row: Mapping[str, Any]) -> tuple[float | None, list[str]]:
@@ -124,34 +164,22 @@ def _model_probability(row: Mapping[str, Any]) -> tuple[float | None, list[str]]
     if direct is not None:
         return direct, ["direct_model_probability"]
 
-    rates = []
-    for column, label in (
-        ("recent_rate", "recent_rate"),
-        ("season_rate", "season_rate"),
-        ("player_season_rate", "player_season_rate"),
-        ("opponent_allowed_rate", "opponent_allowed_rate"),
-        ("usage_rate", "usage_rate"),
-    ):
-        value = parse_percent(_field(row, (column,)))
-        if value is not None:
-            rates.append(value)
-            reasons.append(label)
-    if not rates:
-        return None, []
-
-    recency = parse_percent(_field(row, ("recent_rate",)))
-    season = parse_percent(_field(row, ("season_rate", "player_season_rate")))
-    opponent = parse_percent(_field(row, ("opponent_allowed_rate",)))
-    usage = parse_percent(_field(row, ("usage_rate",)))
+    inputs: list[tuple[float | None, float, str]] = [
+        (parse_percent(_field(row, ("recent_rate",))), 0.35, "recent_rate"),
+        (parse_percent(_field(row, ("season_rate", "player_season_rate"))), 0.30, "season_rate"),
+        (parse_percent(_field(row, ("opponent_allowed_rate",))), 0.20, "opponent_allowed_rate"),
+        (parse_percent(_field(row, ("usage_rate",))), 0.15, "usage_rate"),
+    ]
     weighted = 0.0
     weight = 0.0
-    for value, item_weight in ((recency, 0.35), (season, 0.30), (opponent, 0.20), (usage, 0.15)):
+    for value, item_weight, reason in inputs:
         if value is not None:
             weighted += value * item_weight
             weight += item_weight
-    if weight > 0:
-        return max(0.01, min(0.99, weighted / weight)), reasons
-    return max(0.01, min(0.99, sum(rates) / len(rates))), reasons
+            reasons.append(reason)
+    if weight <= 0:
+        return None, []
+    return max(0.01, min(0.99, weighted / weight)), reasons
 
 
 def _data_quality(row: Mapping[str, Any]) -> float | None:
@@ -166,14 +194,45 @@ def _books(row: Mapping[str, Any]) -> int | None:
     return None if value is None else int(round(value))
 
 
+def _sample_size(row: Mapping[str, Any]) -> int | None:
+    values = []
+    for name in ("sample_size", "recent_games", "season_games", "games_played", "player_games", "opponent_sample_size"):
+        value = parse_float(_field(row, (name,)))
+        if value is not None:
+            values.append(int(round(value)))
+    return min(values) if values else None
+
+
 def _market_weight(row: Mapping[str, Any], policy: PlayerPropPolicy) -> float:
     books = _books(row) or 0
     quality = _data_quality(row) or 0.0
-    if books >= 8 and quality >= 85:
+    if books >= policy.strong_books and quality >= policy.strong_data_quality:
         return policy.max_blend_market_weight
     if books >= policy.min_books and quality >= policy.min_data_quality:
         return 0.50
     return policy.min_blend_market_weight
+
+
+def _confidence_score(row: Mapping[str, Any], market: float | None, model: float | None, edge: float | None, policy: PlayerPropPolicy) -> float:
+    score = 40.0
+    books = _books(row)
+    quality = _data_quality(row)
+    sample = _sample_size(row)
+    if market is not None:
+        score += 10
+    if model is not None:
+        score += 15
+    if books is not None:
+        score += min(12.0, books * 1.5)
+    if quality is not None:
+        score += max(-10.0, min(12.0, (quality - policy.min_data_quality) * 0.4))
+    if sample is not None:
+        score += min(8.0, sample * 0.4)
+    if edge is not None and edge >= policy.strong_model_edge:
+        score += 6
+    elif edge is not None and edge < 0:
+        score -= 10
+    return round(max(0.0, min(100.0, score)), 1)
 
 
 def _fair_price(probability: float | None) -> float | None:
@@ -182,45 +241,61 @@ def _fair_price(probability: float | None) -> float | None:
     return round(1.0 / probability, 4)
 
 
-def _grade_status(edge: float | None, required: list[str], hard_reasons: list[str], policy: PlayerPropPolicy) -> tuple[str, float]:
+def _grade_status(edge: float | None, required: list[str], hard_reasons: list[str], watch_reasons: list[str], confidence: float, policy: PlayerPropPolicy) -> tuple[str, float]:
     if hard_reasons:
         return "REJECT", 0.0
     if required:
         return "TRACK_ONLY_NEEDS_PLAYER_MODEL_DATA", 0.0
     if edge is None or edge < policy.min_model_edge:
         return "WATCH", 0.0
-    if edge >= policy.strong_model_edge:
+    if watch_reasons and edge < policy.strong_model_edge:
+        return "WATCH", 0.0
+    if confidence < 60 and edge < policy.strong_model_edge:
+        return "WATCH", 0.0
+    if edge >= policy.strong_model_edge and confidence >= 65:
         return "QUALIFIED_STRONG", min(policy.max_stake_units, 0.50)
-    if edge >= policy.normal_model_edge:
+    if edge >= policy.normal_model_edge and confidence >= 60:
         return "QUALIFIED", min(policy.max_stake_units, 0.35)
     return "QUALIFIED_SMALL", min(policy.max_stake_units, 0.20)
 
 
 def score_player_prop(row: Mapping[str, Any], policy: PlayerPropPolicy = PlayerPropPolicy()) -> dict[str, Any]:
-    market = _market_probability(row)
+    market, no_vig, market_source = _market_probability_with_source(row)
     model, model_reasons = _model_probability(row)
     data_quality = _data_quality(row)
     books = _books(row)
+    sample_size = _sample_size(row)
     prop_type = normalize_prop_type(_field(row, ("prop_type", "market", "stat", "bet_type")))
     required: list[str] = []
     hard: list[str] = []
-    reasons: list[str] = []
+    watch: list[str] = []
+    reasons: list[str] = [market_source] if market_source != "missing_market_probability" else []
 
     if not _player_name(row):
         required.append("player_name")
     if prop_type == "unknown":
         required.append("prop_type")
     if market is None:
-        required.append("market_probability_or_decimal_price")
+        required.append("market_probability_or_price")
     if model is None:
         required.append("player_model_probability_or_player_rates")
-    if books is not None and books < policy.min_books:
+    if books is None:
+        watch.append("missing_book_coverage")
+    elif books < policy.min_books:
         hard.append("low_book_coverage")
-    if data_quality is not None and data_quality < policy.min_data_quality:
+    if data_quality is None:
+        watch.append("missing_data_quality")
+    elif data_quality < policy.min_data_quality:
         hard.append("low_data_quality")
+    if sample_size is None:
+        watch.append("missing_sample_size")
+    elif sample_size < policy.min_sample_size:
+        watch.append("small_sample_size")
     injury_status = _text(_field(row, ("injury_status", "status", "player_status"))).lower()
     if injury_status in {"out", "doubtful", "inactive", "injured reserve", "ir"}:
         hard.append("bad_player_status")
+    elif injury_status in {"questionable", "probable", "limited"}:
+        watch.append("player_status_watch")
 
     blend = None
     edge = None
@@ -233,8 +308,10 @@ def score_player_prop(row: Mapping[str, Any], policy: PlayerPropPolicy = PlayerP
     elif model_reasons:
         reasons.extend(model_reasons)
 
-    status, stake = _grade_status(edge, required, hard, policy)
+    confidence = _confidence_score(row, market, model, edge, policy)
+    status, stake = _grade_status(edge, required, hard, watch, confidence, policy)
     reasons.extend(hard)
+    reasons.extend(watch)
     if edge is not None:
         if edge >= policy.strong_model_edge:
             reasons.append("edge_8pct_plus")
@@ -248,12 +325,15 @@ def score_player_prop(row: Mapping[str, Any], policy: PlayerPropPolicy = PlayerP
     return {
         "prop_player_name": _player_name(row),
         "prop_type_normalized": prop_type,
-        "prop_market_probability": "" if market is None else round(market, 4),
-        "prop_no_vig_probability": "" if market is None else round(market, 4),
-        "prop_model_probability": "" if model is None else round(model, 4),
-        "prop_blended_probability": "" if blend is None else round(blend, 4),
-        "prop_implied_edge": "" if edge is None else round(edge, 4),
+        "prop_market_source": market_source,
+        "prop_market_probability": _fmt_prob(market),
+        "prop_no_vig_probability": _fmt_prob(no_vig),
+        "prop_model_probability": _fmt_prob(model),
+        "prop_blended_probability": _fmt_prob(blend),
+        "prop_implied_edge": _fmt_prob(edge),
         "prop_fair_decimal_price": "" if blend is None else _fair_price(blend),
+        "prop_data_quality": "" if data_quality is None else round(data_quality, 1),
+        "prop_confidence_score": confidence,
         "prop_status": status,
         "prop_stake_units": f"{stake:.2f}",
         "prop_reasons": "; ".join(dict.fromkeys(reasons)),
@@ -285,8 +365,10 @@ def rank_player_props(df: pd.DataFrame, *, include_watch: bool = False, top_n: i
     }
     scored["_status_order"] = scored["prop_status"].map(status_order).fillna(9)
     edge_numeric = pd.to_numeric(scored["prop_implied_edge"], errors="coerce").fillna(-999)
+    confidence_numeric = pd.to_numeric(scored["prop_confidence_score"], errors="coerce").fillna(0)
     scored["_edge_sort"] = edge_numeric
+    scored["_confidence_sort"] = confidence_numeric
     if not include_watch:
         scored = scored[scored["prop_status"].isin({"QUALIFIED_STRONG", "QUALIFIED", "QUALIFIED_SMALL"})]
-    scored = scored.sort_values(["_status_order", "_edge_sort"], ascending=[True, False]).head(top_n)
-    return scored.drop(columns=["_status_order", "_edge_sort"], errors="ignore")
+    scored = scored.sort_values(["_status_order", "_edge_sort", "_confidence_sort"], ascending=[True, False, False]).head(top_n)
+    return scored.drop(columns=["_status_order", "_edge_sort", "_confidence_sort"], errors="ignore")
