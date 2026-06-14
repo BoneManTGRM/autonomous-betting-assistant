@@ -1,0 +1,18 @@
+{
+  "accuracy_after": 0.6451612903225806,
+  "accuracy_before": 0.5806451612903226,
+  "brier_after": 0.21759178213389715,
+  "brier_before": 0.22468567741935483,
+  "events_trained": 31,
+  "intercept": -0.4578876357000906,
+  "log_loss_after": 0.6156451524077097,
+  "log_loss_before": 0.6331113399153795,
+  "notes": [
+    "Learns probability calibration from graded historical predictions.",
+    "This does not prove betting profitability; use untouched forward tests before making performance claims.",
+    "Parsed 43 usable graded rows; trained on 31 unique rows."
+  ],
+  "slope": 1.2187225146828826,
+  "source": "pro_predictor_updated_win_loss.csv",
+  "trained_at_utc": "2026-06-14T00:45:39+00:00"
+}
