@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 
 from autonomous_betting_agent.sportsdataio import (
     SportsDataIOClient,
     SportsDataIOConfig,
     SportsDataIOError,
     payload_row_count,
+    payload_to_records,
+    write_csv_records,
 )
 
 
@@ -60,6 +64,26 @@ class SportsDataIOTests(unittest.TestCase):
         self.assertEqual(payload_row_count([{"a": 1}, {"a": 2}]), 2)
         self.assertEqual(payload_row_count({"items": [{"a": 1}]}), 1)
         self.assertEqual(payload_row_count({"single": "value"}), 1)
+
+    def test_payload_to_records_flattens_nested_payload(self) -> None:
+        payload = {
+            "Games": [
+                {"GameID": 1, "HomeTeam": "DAL", "Score": {"Home": 24, "Away": 17}, "Officials": [{"Name": "A"}]},
+                {"GameID": 2, "HomeTeam": "NYG", "Score": {"Home": 10, "Away": 20}},
+            ]
+        }
+        records = payload_to_records(payload, record_key="Games")
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[0]["Score_Home"], 24)
+        self.assertIn("Officials", records[0])
+
+    def test_write_csv_records_creates_flat_csv(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "out.csv"
+            write_csv_records([{"b": 2, "a": 1}], path)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("a,b", text.splitlines()[0])
+            self.assertIn("1,2", text)
 
 
 if __name__ == "__main__":
