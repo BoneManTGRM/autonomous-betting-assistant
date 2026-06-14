@@ -52,6 +52,9 @@ TEXT = {
     "target_tolerance": {"en": "Tolerance ±", "es": "Tolerancia ±"},
     "target_min_books": {"en": "70-mode minimum books", "es": "Mínimo de casas modo 70"},
     "target_min_reliability": {"en": "70-mode minimum reliability", "es": "Confiabilidad mínima modo 70"},
+    "target_min_market": {"en": "70-mode market probability floor", "es": "Piso de probabilidad de mercado modo 70"},
+    "target_min_ev": {"en": "70-mode minimum EV", "es": "EV mínimo modo 70"},
+    "target_max_mismatch": {"en": "Max price/probability mismatch", "es": "Máxima diferencia precio/probabilidad"},
     "h2h_only": {"en": "70-mode h2h only", "es": "Modo 70 solo h2h"},
     "manual_preview": {"en": "Manual signal preview", "es": "Vista previa manual"},
     "stats_prob": {"en": "Stats probability %", "es": "Probabilidad por datos %"},
@@ -136,26 +139,69 @@ def implied_probability(decimal_price: Any) -> float | None:
     return 1.0 / price
 
 
-def price_probability_mismatch(decimal_price: Any, market_probability: float, tolerance: float = 0.20) -> bool:
+def price_probability_gap(decimal_price: Any, market_probability: float) -> float | None:
     implied = implied_probability(decimal_price)
     if implied is None:
-        return True
-    return abs(implied - market_probability) > tolerance
+        return None
+    return abs(implied - market_probability)
 
 
-def target_70_rejection_reason(row: dict[str, Any], target_probability: float, tolerance: float, min_books: int, min_reliability: float, h2h_only: bool) -> str:
+def estimated_ev(final_probability: float, decimal_price: Any) -> float | None:
+    try:
+        price = float(decimal_price)
+    except Exception:
+        return None
+    if price <= 1.0:
+        return None
+    return final_probability * price - 1.0
+
+
+def target_70_quality_score(row: dict[str, Any], target_probability: float, tolerance: float) -> int:
+    distance = abs(float(row["final_probability_value"]) - target_probability)
+    score = 100.0
+    score -= min(35.0, (distance / max(tolerance, 0.001)) * 12.0)
+    score += min(8.0, max(0.0, float(row.get("estimated_ev_value") or 0.0)) * 100.0)
+    score += min(6.0, max(0.0, int(row["books"]) - 4) * 1.5)
+    score += min(8.0, max(0.0, float(row["reliability_score"]) - 95.0) * 0.8)
+    gap = row.get("price_probability_gap_value")
+    if gap is not None:
+        score -= min(15.0, float(gap) * 100.0)
+    if row.get("duplicate_event_pick"):
+        score -= 50.0
+    if row.get("confidence") not in {"high", "HIGH", "High"}:
+        score -= 20.0
+    return int(max(0, min(100, round(score))))
+
+
+def target_70_rejection_reason(
+    row: dict[str, Any],
+    target_probability: float,
+    tolerance: float,
+    min_books: int,
+    min_reliability: float,
+    min_market_probability: float,
+    min_ev: float,
+    max_mismatch: float,
+    h2h_only: bool,
+) -> str:
     reasons: list[str] = []
     low = target_probability - tolerance
     high = target_probability + tolerance
     final_probability = float(row["final_probability_value"])
     if final_probability < low or final_probability > high:
         reasons.append(f"outside {low:.0%}-{high:.0%} band")
+    if float(row["market_probability_value"]) < float(min_market_probability):
+        reasons.append("market probability below floor")
     if int(row["books"]) < int(min_books):
         reasons.append("not enough books")
     if float(row["reliability_score"]) < float(min_reliability):
         reasons.append("reliability below target")
-    if row.get("price_probability_mismatch"):
+    if row.get("price_probability_gap_value") is None or float(row["price_probability_gap_value"]) > float(max_mismatch):
         reasons.append("price/probability mismatch")
+    if row.get("estimated_ev_value") is None or float(row["estimated_ev_value"]) < float(min_ev):
+        reasons.append("EV below target")
+    if row.get("duplicate_event_pick"):
+        reasons.append("duplicate event/pick")
     if h2h_only and row.get("market_type") != "h2h":
         reasons.append("not h2h")
     if row.get("confidence") not in {"high", "HIGH", "High"}:
@@ -184,6 +230,9 @@ class UIConfig:
     target_tolerance: float
     target_min_books: int
     target_min_reliability: float
+    target_min_market_probability: float
+    target_min_ev: float
+    target_max_mismatch: float
     target_h2h_only: bool
 
 
@@ -234,12 +283,16 @@ with st.expander(t("controls"), expanded=True):
     min_reliability = c4.slider(t("min_reliability"), min_value=0.0, max_value=100.0, value=90.0, step=1.0)
     st.divider()
     target_70_mode = st.toggle(t("target_70_mode"), value=True)
-    t1, t2, t3, t4, t5 = st.columns(5)
+    t1, t2, t3, t4 = st.columns(4)
     target_probability = t1.number_input(t("target_probability"), min_value=0.50, max_value=0.90, value=0.70, step=0.01, format="%.2f")
     target_tolerance = t2.number_input(t("target_tolerance"), min_value=0.00, max_value=0.10, value=0.01, step=0.01, format="%.2f")
     target_min_books = t3.number_input(t("target_min_books"), min_value=1, max_value=25, value=4, step=1)
     target_min_reliability = t4.number_input(t("target_min_reliability"), min_value=0.0, max_value=100.0, value=95.0, step=1.0)
-    target_h2h_only = t5.toggle(t("h2h_only"), value=True)
+    q1, q2, q3, q4 = st.columns(4)
+    target_min_market_probability = q1.number_input(t("target_min_market"), min_value=0.50, max_value=0.90, value=0.62, step=0.01, format="%.2f")
+    target_min_ev = q2.number_input(t("target_min_ev"), min_value=-0.50, max_value=1.00, value=0.00, step=0.01, format="%.2f")
+    target_max_mismatch = q3.number_input(t("target_max_mismatch"), min_value=0.01, max_value=0.50, value=0.12, step=0.01, format="%.2f")
+    target_h2h_only = q4.toggle(t("h2h_only"), value=True)
 
 with st.expander(t("manual_preview"), expanded=False):
     p1, p2, p3 = st.columns(3)
@@ -276,6 +329,9 @@ config = UIConfig(
     target_tolerance=float(target_tolerance),
     target_min_books=int(target_min_books),
     target_min_reliability=float(target_min_reliability),
+    target_min_market_probability=float(target_min_market_probability),
+    target_min_ev=float(target_min_ev),
+    target_max_mismatch=float(target_max_mismatch),
     target_h2h_only=bool(target_h2h_only),
 )
 
@@ -335,22 +391,24 @@ if st.button(t("run"), type="primary", use_container_width=True):
             fused = fuse_row(fusion_input)
             if fused.reliability_score < float(min_reliability):
                 continue
-            mismatch = price_probability_mismatch(best_price, market_probability)
             final_value = float(fused.final_probability)
-            estimated_ev = None
-            try:
-                estimated_ev = final_value * float(best_price) - 1.0
-            except Exception:
-                pass
+            gap_value = price_probability_gap(best_price, market_probability)
+            ev_value = estimated_ev(final_value, best_price)
+            event_name = f"{getattr(event, 'away_team', '')} at {getattr(event, 'home_team', '')}"
+            prediction = getattr(pick, "name", "")
             row = {
-                "event": f"{getattr(event, 'away_team', '')} at {getattr(event, 'home_team', '')}",
+                "event": event_name,
                 "sport": getattr(event, "sport_title", getattr(sport, "title", "")),
                 "start": getattr(event, "commence_time", ""),
                 "market_type": "h2h",
-                "prediction": getattr(pick, "name", ""),
+                "prediction": prediction,
+                "dedupe_key": clean(f"{event_name} {prediction}"),
+                "duplicate_event_pick": False,
                 "best_price": best_price,
                 "implied_probability_from_price": pct(implied_probability(best_price)),
-                "price_probability_mismatch": mismatch,
+                "price_probability_gap": "" if gap_value is None else pct(gap_value),
+                "price_probability_gap_value": gap_value,
+                "price_probability_mismatch": gap_value is None or gap_value > float(target_max_mismatch),
                 "books": books,
                 "market_probability_value": market_probability,
                 "final_probability_value": final_value,
@@ -360,21 +418,13 @@ if st.button(t("run"), type="primary", use_container_width=True):
                 "weather_adjustment": pct(fused.weather_adjustment),
                 "ara_memory_adjustment": pct(fused.ara_memory_adjustment),
                 "final_probability": pct(fused.final_probability),
-                "estimated_ev_decimal": "" if estimated_ev is None else round(estimated_ev, 4),
+                "estimated_ev_value": ev_value,
+                "estimated_ev_decimal": "" if ev_value is None else round(ev_value, 4),
                 "reliability_score": fused.reliability_score,
                 "confidence": fused.confidence,
                 "fusion_reason": fused.fusion_reason,
                 "match_score": f"{match:.0%}",
             }
-            row["target_70_rejection_reason"] = target_70_rejection_reason(
-                row,
-                float(target_probability),
-                float(target_tolerance),
-                int(target_min_books),
-                float(target_min_reliability),
-                bool(target_h2h_only),
-            )
-            row["target_70_mode"] = not bool(row["target_70_rejection_reason"])
             rows.append(row)
         progress.progress((index + 1) / max(1, len(selected_sports)))
     progress.empty()
@@ -387,15 +437,36 @@ if st.button(t("run"), type="primary", use_container_width=True):
                     st.write(f"- {item}")
         st.stop()
 
-    ranked = sorted(rows, key=lambda row: (row["target_70_mode"], row["reliability_score"], row["final_probability_value"]), reverse=True)
+    prelim_ranked = sorted(rows, key=lambda row: (row["reliability_score"], row["final_probability_value"], row.get("estimated_ev_value") or -999), reverse=True)
+    seen_keys: set[str] = set()
+    for row in prelim_ranked:
+        duplicate = row["dedupe_key"] in seen_keys
+        row["duplicate_event_pick"] = duplicate
+        seen_keys.add(row["dedupe_key"])
+        row["target_70_quality_score"] = target_70_quality_score(row, float(target_probability), float(target_tolerance))
+        row["target_70_rejection_reason"] = target_70_rejection_reason(
+            row,
+            float(target_probability),
+            float(target_tolerance),
+            int(target_min_books),
+            float(target_min_reliability),
+            float(target_min_market_probability),
+            float(target_min_ev),
+            float(target_max_mismatch),
+            bool(target_h2h_only),
+        )
+        row["target_70_mode"] = not bool(row["target_70_rejection_reason"])
+
+    ranked = sorted(prelim_ranked, key=lambda row: (row["target_70_mode"], row["target_70_quality_score"], row["reliability_score"], row["final_probability_value"]), reverse=True)
     target_rows = [row for row in ranked if row["target_70_mode"]]
     rejected_70 = [row for row in ranked if not row["target_70_mode"]]
 
-    metric_cols = st.columns(4)
+    metric_cols = st.columns(5)
     metric_cols[0].metric(t("table"), len(ranked))
     metric_cols[1].metric(t("target_table"), len(target_rows))
     metric_cols[2].metric(t("target_probability"), pct(float(target_probability)))
     metric_cols[3].metric(t("target_tolerance"), f"±{float(target_tolerance) * 100:.1f}%")
+    metric_cols[4].metric("Duplicates rejected", sum(1 for row in ranked if row["duplicate_event_pick"]))
 
     if target_70_mode:
         st.subheader(t("target_table"))
