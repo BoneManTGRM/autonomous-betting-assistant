@@ -1,6 +1,6 @@
 # Autonomous Betting Agent
 
-Autonomous Betting Agent is a standalone sports research agent built from the ARA/TGRM idea: run repeatable research cycles, detect weak evidence, repair the analysis, verify uncertainty, and produce a transparent probability report.
+Autonomous Betting Agent is a standalone sports research agent built from the ARA/TGRM idea: run repeatable research cycles, detect weak evidence, repair the analysis, verify uncertainty, and produce transparent probability reports.
 
 This is **research-only software**. It does not place bets, does not guarantee winners, and should not be treated as proof of profitability without rigorous backtesting and prospective testing.
 
@@ -19,8 +19,8 @@ This is **research-only software**. It does not place bets, does not guarantee w
 - supports backtesting metrics such as Brier score, accuracy and closing-line delta
 - learns probability calibration from graded results and applies it to future predictions
 - tracks predicted winner, model probability, calibrated probability, sportsbook odds, implied probability, edge, result, profit/loss, closing-line value, confidence buckets and sport-level performance
-- adds a stricter selection policy that marks candidates as STRONG, WATCH or AVOID so weak/low-edge picks can be filtered out instead of counted as real recommendations
-- includes a CLI, sample event file, Streamlit UI and tests
+- adds strict ARA, deep-analysis and best-bet layers so weak, low-edge, bad-weather, bad-location or favorite-heavy picks can be filtered instead of counted as real recommendations
+- includes a CLI, sample event file, Streamlit UI, unit tests and GitHub Actions test workflow
 
 ## ARA/TGRM lineage
 
@@ -31,7 +31,7 @@ This project is separated from the original ARA repository so the original resea
 3. **REPAIR** the analysis by converting evidence into auditable factors.
 4. **VERIFY** with confidence, RYE-style efficiency and stability metrics.
 
-The domain target is now sports analytics rather than longevity or scientific literature review.
+The domain target is sports analytics rather than longevity or scientific literature review.
 
 ## Install
 
@@ -120,32 +120,101 @@ The tracker accepts flexible CSV columns and enriches each row with:
 - `sport`
 - `bookmaker_count`
 
-The report summarizes:
+The report summarizes resolved picks, wins/losses/pushes, hit rate, average probabilities, Brier score, log loss, unit profit/loss, ROI, average edge, average closing-line value and performance by decision, confidence bucket and sport.
 
-- resolved picks
-- wins/losses/pushes
-- hit rate
-- average model probability
-- average calibrated probability
-- Brier score
-- log loss
-- total unit profit/loss
-- ROI
-- average edge
-- average closing-line value
-- performance by STRONG/WATCH/AVOID decision
-- performance by confidence bucket
-- performance by sport
+## ARA decision layer
+
+The ARA decision layer lives in `autonomous_betting_agent/ara_filters.py`. It adds auditable columns such as:
+
+- `ara_risk_flags`
+- `ara_weather_flags`
+- `ara_live_decision`
+- `ara_live_stake_units`
+- `ara_proxy_filter_decision`
+- `ara_requires_independent_probability`
+
+It blocks or watches common failure modes, including:
+
+- heavy favorites under `1.30`
+- longshots over `3.00`
+- low book coverage
+- low data quality
+- soccer draw-risk moneylines
+- missing independent model probability
+- WeatherAPI errors
+- missing weather for weather-relevant games
+- non-exact weather forecast dates
+- returned WeatherAPI location mismatches
+
+Weather location validation compares the original query against the returned city/region/country. A successful WeatherAPI call is not automatically trusted if the returned place does not match the intended event location.
+
+## Deep analysis layer
+
+The deep-analysis layer lives in `autonomous_betting_agent/deep_analysis.py`. It blends ARA flags, market movement, data quality, book coverage and independent edge into:
+
+- `ara_deep_score`
+- `ara_deep_grade`
+- `ara_deep_recommendation`
+- `ara_deep_primary_risk`
+- `ara_deep_factors`
+
+Deep analysis is still diagnostic. It should not be treated as a final betting signal by itself.
+
+## Best-bet shortlist layer
+
+The final shortlist layer lives in `autonomous_betting_agent/best_bets.py`. It turns enriched rows into stricter final statuses:
+
+- `QUALIFIED_STRONG`
+- `QUALIFIED`
+- `QUALIFIED_SMALL`
+- `WATCH`
+- `TRACK_ONLY_NEEDS_MODEL_PROBABILITY`
+- `REJECT`
+
+Only `QUALIFIED_STRONG`, `QUALIFIED` and `QUALIFIED_SMALL` should be treated as shortlist candidates. `WATCH`, `TRACK_ONLY_NEEDS_MODEL_PROBABILITY` and `REJECT` are not bet-ready.
+
+Generate a full best-bet ranking and a qualified-only shortlist:
+
+```bash
+python generate_best_bets.py "weather_enhanced_predictions.csv"
+```
+
+Optional with market movement:
+
+```bash
+python generate_best_bets.py "weather_enhanced_predictions.csv" --movement-csv data/latest_market_movement.csv
+```
+
+Default outputs:
+
+```text
+data/best_bet_ranked.csv
+data/best_bet_shortlist.csv
+```
+
+Use review mode when you also want `WATCH` and track-only rows in the shortlist output:
+
+```bash
+python generate_best_bets.py "weather_enhanced_predictions.csv" --include-watch
+```
+
+## WeatherAPI safety
+
+Set a real WeatherAPI key with:
+
+```bash
+export WEATHERAPI_KEY="your_real_key"
+```
+
+The code rejects placeholder keys such as `your_weatherapi_key_here`, `weatherapi_key`, `your_key_here`, `paste_key_here` and `replace_me`.
+
+Weather output rows include the original query and returned location so location mismatches can be audited. Wrong returned location means the row should be watched or rejected, not trusted.
 
 ## Selection policy for higher-quality picks
 
-The selection policy is intentionally stricter than simply taking every favorite. It marks a candidate:
+The selection policy is intentionally stricter than simply taking every favorite. A candidate must survive data-quality, odds, weather, location, book-coverage, draw-risk and independent-edge checks before it can reach the final shortlist.
 
-- `STRONG` when calibrated probability is at least 60%, edge is at least 5%, and expected value is positive
-- `WATCH` when calibrated probability is at least 54%, edge is at least 2.5%, and expected value is positive
-- `AVOID` when probability, edge, odds, or market quality are not good enough
-
-This can raise the hit rate of reported recommendations by filtering out weaker candidates, but it will usually reduce the number of picks. A higher hit rate is not the same thing as guaranteed profit, so ROI and closing-line value still need to be tracked.
+A higher hit rate is not the same thing as guaranteed profit. Main performance metrics should be ROI, closing-line value, Brier score, log loss and performance by odds bucket.
 
 ## Run the Streamlit app
 
@@ -162,8 +231,10 @@ If `learned_state.json` exists in the app root, live market probabilities are ca
 ## Run tests
 
 ```bash
-python -m unittest discover -s tests
+python -m unittest discover -s tests -v
 ```
+
+GitHub Actions is configured to run the unit test suite on pushes and pull requests to `main` for Python 3.11 and 3.12.
 
 ## Current model signals
 
@@ -183,6 +254,7 @@ The baseline supports:
 - confidence-bucket performance analysis
 - sport-specific performance analysis
 - STRONG/WATCH/AVOID filtering to avoid weak picks
+- ARA/deep/best-bet shortlist filtering for stricter final review
 
 All inputs are normalized so results remain interpretable. Future sport-specific modules should replace generic signals with validated features for each sport.
 
@@ -204,4 +276,4 @@ No claim of accuracy or profitability should be made until the system is tested 
 
 ## License
 
-MIT License.
+MIT License
