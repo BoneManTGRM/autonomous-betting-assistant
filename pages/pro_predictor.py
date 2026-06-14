@@ -25,7 +25,6 @@ TEXT = {
         "en": "How to read it: market odds create the base probability. Stats, injuries/lineups, weather/context, and learning memory can move the probability only within capped limits.",
         "es": "Cómo leerlo: las cuotas crean la probabilidad base. Estadísticas, lesiones/alineaciones, clima/contexto y memoria pueden mover la probabilidad solo dentro de límites.",
     },
-    "language": {"en": "Language", "es": "Idioma"},
     "api_sources": {"en": "API sources", "es": "Fuentes API"},
     "odds_key": {"en": "Odds API key", "es": "Clave de Odds API"},
     "sports_key": {"en": "SportsDataIO key", "es": "Clave de SportsDataIO"},
@@ -48,6 +47,12 @@ TEXT = {
     "max_events": {"en": "Max events per feed", "es": "Máximo de eventos por feed"},
     "min_books": {"en": "Minimum books", "es": "Mínimo de casas"},
     "min_reliability": {"en": "Minimum reliability", "es": "Confiabilidad mínima"},
+    "target_70_mode": {"en": "70% ±1 Target Mode", "es": "Modo objetivo 70% ±1"},
+    "target_probability": {"en": "Target win probability", "es": "Probabilidad objetivo"},
+    "target_tolerance": {"en": "Tolerance ±", "es": "Tolerancia ±"},
+    "target_min_books": {"en": "70-mode minimum books", "es": "Mínimo de casas modo 70"},
+    "target_min_reliability": {"en": "70-mode minimum reliability", "es": "Confiabilidad mínima modo 70"},
+    "h2h_only": {"en": "70-mode h2h only", "es": "Modo 70 solo h2h"},
     "manual_preview": {"en": "Manual signal preview", "es": "Vista previa manual"},
     "stats_prob": {"en": "Stats probability %", "es": "Probabilidad por datos %"},
     "injury_score": {"en": "Injury/lineup score", "es": "Puntaje lesión/alineación"},
@@ -56,7 +61,9 @@ TEXT = {
     "memory_upload": {"en": "Upload learning memory CSV", "es": "Subir CSV de memoria"},
     "run": {"en": "Run multi-API Predictor Pro", "es": "Ejecutar Predictor Pro multi-API"},
     "output": {"en": "Fusion output", "es": "Salida de fusión"},
+    "target_table": {"en": "70% ±1 Target Picks", "es": "Picks objetivo 70% ±1"},
     "table": {"en": "Ranked markets", "es": "Mercados ordenados"},
+    "rejected_70": {"en": "Rejected from 70% ±1 Mode", "es": "Rechazados del modo 70% ±1"},
     "config": {"en": "Run config", "es": "Configuración"},
 }
 
@@ -119,6 +126,43 @@ def pct(value: float | None) -> str:
     return "" if value is None else f"{value * 100:.1f}%"
 
 
+def implied_probability(decimal_price: Any) -> float | None:
+    try:
+        price = float(decimal_price)
+    except Exception:
+        return None
+    if price <= 1.0:
+        return None
+    return 1.0 / price
+
+
+def price_probability_mismatch(decimal_price: Any, market_probability: float, tolerance: float = 0.20) -> bool:
+    implied = implied_probability(decimal_price)
+    if implied is None:
+        return True
+    return abs(implied - market_probability) > tolerance
+
+
+def target_70_rejection_reason(row: dict[str, Any], target_probability: float, tolerance: float, min_books: int, min_reliability: float, h2h_only: bool) -> str:
+    reasons: list[str] = []
+    low = target_probability - tolerance
+    high = target_probability + tolerance
+    final_probability = float(row["final_probability_value"])
+    if final_probability < low or final_probability > high:
+        reasons.append(f"outside {low:.0%}-{high:.0%} band")
+    if int(row["books"]) < int(min_books):
+        reasons.append("not enough books")
+    if float(row["reliability_score"]) < float(min_reliability):
+        reasons.append("reliability below target")
+    if row.get("price_probability_mismatch"):
+        reasons.append("price/probability mismatch")
+    if h2h_only and row.get("market_type") != "h2h":
+        reasons.append("not h2h")
+    if row.get("confidence") not in {"high", "HIGH", "High"}:
+        reasons.append("not high confidence")
+    return "; ".join(reasons)
+
+
 @dataclass(frozen=True)
 class UIConfig:
     language: str
@@ -135,6 +179,12 @@ class UIConfig:
     max_events: int
     min_books: int
     min_reliability: float
+    target_70_mode: bool
+    target_probability: float
+    target_tolerance: float
+    target_min_books: int
+    target_min_reliability: float
+    target_h2h_only: bool
 
 
 language_name = st.selectbox("Language / Idioma", list(LANGUAGES.keys()), index=0)
@@ -170,18 +220,26 @@ with setup1:
     game = st.text_input(t("game"), value="Mexico vs South Korea")
     target_options = [t("all_sports"), t("one_league"), t("one_team")]
     scan_target = st.radio(t("scan_target"), target_options, horizontal=True)
-    sport_query = st.text_input(t("sport_search"), value="soccer")
+    sport_query = st.text_input(t("sport_search"), value="auto")
 with setup2:
     team_filter = st.text_input(t("team_filter"), value=game if scan_target == t("one_team") else "")
     regions = st.multiselect(t("regions"), ["us", "us2", "uk", "eu", "au"], default=["us", "eu", "uk"])
-    markets = st.multiselect(t("markets"), ["h2h", "spreads", "totals"], default=["h2h", "spreads", "totals"])
+    markets = st.multiselect(t("markets"), ["h2h", "spreads", "totals"], default=["h2h"])
 
 with st.expander(t("controls"), expanded=True):
     c1, c2, c3, c4 = st.columns(4)
-    max_feeds = c1.number_input(t("max_feeds"), min_value=1, max_value=120, value=40, step=1)
-    max_events = c2.number_input(t("max_events"), min_value=1, max_value=75, value=25, step=1)
-    min_books = c3.number_input(t("min_books"), min_value=1, max_value=25, value=1, step=1)
-    min_reliability = c4.slider(t("min_reliability"), min_value=0.0, max_value=100.0, value=0.0, step=1.0)
+    max_feeds = c1.number_input(t("max_feeds"), min_value=1, max_value=120, value=50, step=1)
+    max_events = c2.number_input(t("max_events"), min_value=1, max_value=75, value=35, step=1)
+    min_books = c3.number_input(t("min_books"), min_value=1, max_value=25, value=4, step=1)
+    min_reliability = c4.slider(t("min_reliability"), min_value=0.0, max_value=100.0, value=90.0, step=1.0)
+    st.divider()
+    target_70_mode = st.toggle(t("target_70_mode"), value=True)
+    t1, t2, t3, t4, t5 = st.columns(5)
+    target_probability = t1.number_input(t("target_probability"), min_value=0.50, max_value=0.90, value=0.70, step=0.01, format="%.2f")
+    target_tolerance = t2.number_input(t("target_tolerance"), min_value=0.00, max_value=0.10, value=0.01, step=0.01, format="%.2f")
+    target_min_books = t3.number_input(t("target_min_books"), min_value=1, max_value=25, value=4, step=1)
+    target_min_reliability = t4.number_input(t("target_min_reliability"), min_value=0.0, max_value=100.0, value=95.0, step=1.0)
+    target_h2h_only = t5.toggle(t("h2h_only"), value=True)
 
 with st.expander(t("manual_preview"), expanded=False):
     p1, p2, p3 = st.columns(3)
@@ -213,13 +271,19 @@ config = UIConfig(
     max_events=int(max_events),
     min_books=int(min_books),
     min_reliability=float(min_reliability),
+    target_70_mode=bool(target_70_mode),
+    target_probability=float(target_probability),
+    target_tolerance=float(target_tolerance),
+    target_min_books=int(target_min_books),
+    target_min_reliability=float(target_min_reliability),
+    target_h2h_only=bool(target_h2h_only),
 )
 
 if st.button(t("run"), type="primary", use_container_width=True):
     if not odds_key:
         st.warning("Odds API key is required for live market scan." if LANG == "en" else "La clave de Odds API es necesaria para escanear mercados en vivo.")
         preview_row = {
-            "market_probability": 0.562,
+            "market_probability": 0.70,
             "stats_probability": stats_probability / 100.0 if sports_key else "",
             "injury_risk_score": injury_score if sports_key else "",
             "weather_risk_score": weather_score if weather_key else "",
@@ -242,9 +306,10 @@ if st.button(t("run"), type="primary", use_container_width=True):
     rows: list[dict[str, Any]] = []
     skipped: list[str] = []
     progress = st.progress(0)
+    market_param = ",".join(markets)
     for index, sport in enumerate(selected_sports):
         try:
-            events = scan_market(odds_key, sport.key, regions=",".join(regions), max_events=int(max_events), markets=",".join(markets))
+            events = scan_market(odds_key, sport.key, regions=",".join(regions), max_events=int(max_events), markets=market_param)
         except Exception as exc:
             skipped.append(f"{getattr(sport, 'title', sport.key)}: {exc}")
             events = []
@@ -256,6 +321,7 @@ if st.button(t("run"), type="primary", use_container_width=True):
             if pick is None:
                 continue
             market_probability = float(getattr(pick, "normalized_probability", 0.0) or 0.0)
+            best_price = getattr(pick, "best_price", None) or getattr(pick, "average_price", "")
             books = int(getattr(event, "bookmaker_count", 0) or getattr(pick, "source_count", 0) or 0)
             if books < int(min_books):
                 continue
@@ -269,24 +335,47 @@ if st.button(t("run"), type="primary", use_container_width=True):
             fused = fuse_row(fusion_input)
             if fused.reliability_score < float(min_reliability):
                 continue
-            rows.append({
+            mismatch = price_probability_mismatch(best_price, market_probability)
+            final_value = float(fused.final_probability)
+            estimated_ev = None
+            try:
+                estimated_ev = final_value * float(best_price) - 1.0
+            except Exception:
+                pass
+            row = {
                 "event": f"{getattr(event, 'away_team', '')} at {getattr(event, 'home_team', '')}",
                 "sport": getattr(event, "sport_title", getattr(sport, "title", "")),
                 "start": getattr(event, "commence_time", ""),
+                "market_type": "h2h",
                 "prediction": getattr(pick, "name", ""),
-                "best_price": getattr(pick, "best_price", None) or getattr(pick, "average_price", ""),
+                "best_price": best_price,
+                "implied_probability_from_price": pct(implied_probability(best_price)),
+                "price_probability_mismatch": mismatch,
                 "books": books,
+                "market_probability_value": market_probability,
+                "final_probability_value": final_value,
                 "market_probability": pct(fused.market_probability),
                 "stats_adjustment": pct(fused.stats_adjustment),
                 "injury_adjustment": pct(fused.injury_adjustment),
                 "weather_adjustment": pct(fused.weather_adjustment),
                 "ara_memory_adjustment": pct(fused.ara_memory_adjustment),
                 "final_probability": pct(fused.final_probability),
+                "estimated_ev_decimal": "" if estimated_ev is None else round(estimated_ev, 4),
                 "reliability_score": fused.reliability_score,
                 "confidence": fused.confidence,
                 "fusion_reason": fused.fusion_reason,
                 "match_score": f"{match:.0%}",
-            })
+            }
+            row["target_70_rejection_reason"] = target_70_rejection_reason(
+                row,
+                float(target_probability),
+                float(target_tolerance),
+                int(target_min_books),
+                float(target_min_reliability),
+                bool(target_h2h_only),
+            )
+            row["target_70_mode"] = not bool(row["target_70_rejection_reason"])
+            rows.append(row)
         progress.progress((index + 1) / max(1, len(selected_sports)))
     progress.empty()
 
@@ -298,10 +387,30 @@ if st.button(t("run"), type="primary", use_container_width=True):
                     st.write(f"- {item}")
         st.stop()
 
-    ranked = sorted(rows, key=lambda row: (row["reliability_score"], row["final_probability"]), reverse=True)
+    ranked = sorted(rows, key=lambda row: (row["target_70_mode"], row["reliability_score"], row["final_probability_value"]), reverse=True)
+    target_rows = [row for row in ranked if row["target_70_mode"]]
+    rejected_70 = [row for row in ranked if not row["target_70_mode"]]
+
+    metric_cols = st.columns(4)
+    metric_cols[0].metric(t("table"), len(ranked))
+    metric_cols[1].metric(t("target_table"), len(target_rows))
+    metric_cols[2].metric(t("target_probability"), pct(float(target_probability)))
+    metric_cols[3].metric(t("target_tolerance"), f"±{float(target_tolerance) * 100:.1f}%")
+
+    if target_70_mode:
+        st.subheader(t("target_table"))
+        if target_rows:
+            st.dataframe(target_rows, use_container_width=True, hide_index=True)
+            st.download_button("Download 70% target CSV" if LANG == "en" else "Descargar CSV objetivo 70%", pd.DataFrame(target_rows).to_csv(index=False), file_name="pro_predictor_70_target_mode.csv", mime="text/csv")
+        else:
+            st.info("No picks passed 70% ±1 mode. That is acceptable; the filter is intentionally strict." if LANG == "en" else "Ningún pick pasó el modo 70% ±1. Es aceptable; el filtro es intencionalmente estricto.")
+
+        with st.expander(t("rejected_70"), expanded=False):
+            st.dataframe(rejected_70, use_container_width=True, hide_index=True)
+
     st.subheader(t("table"))
     st.dataframe(ranked, use_container_width=True, hide_index=True)
-    st.download_button("Download CSV" if LANG == "en" else "Descargar CSV", pd.DataFrame(ranked).to_csv(index=False), file_name="pro_predictor_multi_api.csv", mime="text/csv")
+    st.download_button("Download all ranked CSV" if LANG == "en" else "Descargar CSV completo", pd.DataFrame(ranked).to_csv(index=False), file_name="pro_predictor_multi_api.csv", mime="text/csv")
     st.subheader(t("config"))
     st.code(json.dumps(asdict(config), indent=2), language="json")
 else:
