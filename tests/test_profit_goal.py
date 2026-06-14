@@ -47,12 +47,30 @@ class ProfitGoalTests(unittest.TestCase):
 
     def test_duplicates_are_not_counted_as_finished_padding(self) -> None:
         rows = [
-            {"event": "same", "start": "1", "prediction": "A", "result": "won", "best_price": 1.50, "closing_odds": 1.45},
-            {"event": "same", "start": "1", "prediction": "A", "result": "won", "best_price": 1.50, "closing_odds": 1.45},
+            {"event": "same", "start": "1", "market": "h2h", "prediction": "A", "result": "won", "best_price": 1.50, "closing_odds": 1.45},
+            {"event": "same", "start": "1", "market": "h2h", "prediction": "A", "result": "won", "best_price": 1.50, "closing_odds": 1.45},
         ]
         report = review_profit_goal_rows(rows, ProfitGoalPolicy(min_finished=1))
         self.assertEqual(report.duplicate_rows, 1)
         self.assertFalse(report.goal_checks["no_duplicate_padding"])
+
+    def test_game_id_market_pick_dedupe_allows_same_pick_on_different_games(self) -> None:
+        rows = [
+            {"sdio_result_game_id": "10", "market": "h2h", "prediction": "A", "result": "won", "best_price": 1.50},
+            {"sdio_result_game_id": "11", "market": "h2h", "prediction": "A", "result": "lost", "best_price": 1.50},
+        ]
+        report = review_profit_goal_rows(rows, ProfitGoalPolicy(min_finished=1, require_positive_clv=False))
+        self.assertEqual(report.duplicate_rows, 0)
+        self.assertEqual(report.finished_rows, 2)
+
+    def test_same_game_id_market_pick_is_duplicate(self) -> None:
+        rows = [
+            {"sdio_result_game_id": "10", "market": "h2h", "prediction": "A", "result": "won", "best_price": 1.50},
+            {"sdio_result_game_id": "10", "market": "h2h", "prediction": "A", "result": "won", "best_price": 1.50},
+        ]
+        report = review_profit_goal_rows(rows, ProfitGoalPolicy(min_finished=1, require_positive_clv=False))
+        self.assertEqual(report.duplicate_rows, 1)
+        self.assertEqual(report.finished_rows, 1)
 
 
 if __name__ == "__main__":
