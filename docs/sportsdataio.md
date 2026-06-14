@@ -147,6 +147,42 @@ actual_winner
 
 Rows that are unmatched, ambiguous or not final are not graded as wins/losses. This protects the tracker from dirty result data.
 
+## Build player-stat features
+
+After fetching a player stats endpoint and writing a flattened CSV, build model-ready player features:
+
+```bash
+python tools/build_sportsdataio_player_features.py data/sportsdataio_player_season_stats.csv --sport nfl --output data/sportsdataio_player_features.csv
+```
+
+The feature builder normalizes common stat names across sports and creates totals plus per-game/per-minute rates, including:
+
+```text
+passing_yards_per_game
+rushing_yards_per_game
+receiving_yards_per_game
+receptions_per_game
+touchdowns_per_game
+home_runs_per_game
+hits_per_game
+strikeouts_per_game
+goals_per_game
+assists_per_game
+shots_on_goal_per_game
+points_per_game
+rebounds_per_game
+```
+
+It also adds:
+
+```text
+feature_ready
+feature_quality_flags
+feature_source
+```
+
+Rows with missing player identity, missing team, missing/zero games, or no core stats are marked as not feature-ready.
+
 ## Common examples
 
 Teams:
@@ -171,6 +207,7 @@ Stats feed endpoint:
 
 ```bash
 python tools/fetch_sportsdataio.py PlayerSeasonStats/2026 --sport nfl --subfeed stats --output data/sportsdataio_player_season_stats.json --csv-output data/sportsdataio_player_season_stats.csv
+python tools/build_sportsdataio_player_features.py data/sportsdataio_player_season_stats.csv --sport nfl --output data/sportsdataio_player_features.csv
 ```
 
 Exact endpoint names depend on your SportsDataIO product, sport, and feed access. If SportsDataIO says an endpoint requires production access, the client will raise a clear HTTP error.
