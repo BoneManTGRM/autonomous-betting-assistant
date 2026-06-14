@@ -16,6 +16,7 @@ def main() -> int:
     parser.add_argument("--predictions-csv", type=Path, default=None)
     parser.add_argument("--player-props-csv", type=Path, default=None)
     parser.add_argument("--odds-csv", type=Path, default=None)
+    parser.add_argument("--calibration-history-csv", type=Path, default=None, help="Historical graded predictions used to calibrate model probabilities")
     parser.add_argument("--existing-canonical-games-csv", type=Path, default=None)
     parser.add_argument("--existing-player-features-csv", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=Path("data/sportsdataio_pipeline"))
@@ -49,6 +50,7 @@ def main() -> int:
         predictions_csv=args.predictions_csv,
         player_props_csv=args.player_props_csv,
         odds_csv=args.odds_csv,
+        calibration_history_csv=args.calibration_history_csv,
         existing_canonical_games_csv=args.existing_canonical_games_csv,
         existing_player_features_csv=args.existing_player_features_csv,
         output_dir=args.output_dir,
