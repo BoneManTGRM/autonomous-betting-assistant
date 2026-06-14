@@ -5,6 +5,7 @@ from dataclasses import asdict
 from typing import Dict, List, Tuple
 
 from .cycle_log import CycleLog
+from .learning import ProbabilityCalibrator
 from .market_math import normalize_two_way_market, unit_edge
 from .models import EventResearchInput, PredictionResult, TeamSnapshot
 
@@ -20,13 +21,14 @@ class AutonomousBettingAgent:
         "home_advantage": 0.18,
     }
 
-    def __init__(self, weights: Dict[str, float] | None = None) -> None:
+    def __init__(self, weights: Dict[str, float] | None = None, calibrator: ProbabilityCalibrator | None = None) -> None:
         self.weights = dict(self.DEFAULT_WEIGHTS)
         if weights:
             unknown = set(weights) - set(self.DEFAULT_WEIGHTS)
             if unknown:
                 raise ValueError(f"Unknown weights: {sorted(unknown)}")
             self.weights.update({key: float(value) for key, value in weights.items()})
+        self.calibrator = calibrator
 
     @staticmethod
     def _clamp(value: float, low: float, high: float) -> float:
@@ -101,7 +103,13 @@ class AutonomousBettingAgent:
         warnings = self._validate_team(event.home) + self._validate_team(event.away)
         log.add("DETECT", warnings or ["No input-range issues detected."])
         score, contributions = self._signal_difference(event.home, event.away, event.neutral_site)
-        home_probability = self._sigmoid(score)
+        uncalibrated_home_probability = self._sigmoid(score)
+        if self.calibrator is not None:
+            home_probability = self.calibrator.apply(uncalibrated_home_probability)
+            calibration_note = f"Applied learned probability calibration from {self.calibrator.events_trained} graded events."
+        else:
+            home_probability = uncalibrated_home_probability
+            calibration_note = "No learned calibration state was supplied."
         away_probability = 1.0 - home_probability
         completeness = (self._clamp(event.home.data_completeness, 0.0, 1.0) + self._clamp(event.away.data_completeness, 0.0, 1.0)) / 2.0
         source_strength = min(max(event.home.source_count, 0) + max(event.away.source_count, 0), 20) / 20.0
@@ -112,14 +120,16 @@ class AutonomousBettingAgent:
             warnings.append("Few independent sources were supplied; evidence diversity is weak.")
         if separation < 0.08:
             warnings.append("The event is close to a coin flip under the current inputs.")
-        log.add("REPAIR", ["Converted normalized research factors into an auditable probability score.", "Separated model probability from market probability."])
+        if self.calibrator is not None:
+            warnings.append(calibration_note)
+        log.add("REPAIR", ["Converted normalized research factors into an auditable probability score.", "Separated model probability from market probability.", calibration_note])
         confidence = self._clamp(0.55 * completeness + 0.25 * source_strength + 0.20 * separation, 0.0, 1.0)
         market_home, market_away, overround = normalize_two_way_market(event.home_market_price, event.away_market_price)
         home_edge = None if market_home is None else home_probability - market_home
         away_edge = None if market_away is None else away_probability - market_away
         favored_side = event.home.name if home_probability >= away_probability else event.away.name
         log.add("VERIFY", ["Computed confidence and market comparison."], {"confidence": confidence, "separation": separation})
-        warnings.append("Research output only: probabilities are estimates and require backtesting before financial use.")
+        warnings.append("Research output only: probabilities are estimates and require backtesting before real-world use.")
         return PredictionResult(
             event_name=event.event_name,
             sport=event.sport,
@@ -140,6 +150,14 @@ class AutonomousBettingAgent:
                 "home_unit_edge": unit_edge(home_probability, event.home_market_price),
                 "away_unit_edge": unit_edge(away_probability, event.away_market_price),
             },
-            diagnostics={"raw_score": score, **contributions, "data_completeness": completeness, "source_strength": source_strength},
+            diagnostics={
+                "raw_score": score,
+                **contributions,
+                "data_completeness": completeness,
+                "source_strength": source_strength,
+                "uncalibrated_home_probability": uncalibrated_home_probability,
+                "calibration_intercept": self.calibrator.intercept if self.calibrator is not None else 0.0,
+                "calibration_slope": self.calibrator.slope if self.calibrator is not None else 1.0,
+            },
             tgrm=log.to_dict(),
         )
