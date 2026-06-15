@@ -18,13 +18,9 @@ from .tracking import PredictionLedgerRow, SelectionDecision, SelectionPolicy, T
 
 
 def _install_bilingual_sidebar() -> None:
-    """Install one global Streamlit language/nav/report translator.
-
-    The selected language is stored in session state and in the URL query params,
-    so one choice applies across pages and survives refresh/page changes. Report
-    tables and CSV downloads are translated centrally when Español is selected.
-    """
+    """Install one global Streamlit language, sidebar, table, and CSV translator."""
     try:
+        import io
         import pandas as pd
         import streamlit as st
         from streamlit.delta_generator import DeltaGenerator
@@ -80,7 +76,6 @@ def _install_bilingual_sidebar() -> None:
         "winner": "ganador",
         "actual_winner": "ganador_real",
         "probability": "probabilidad",
-        "prob": "probabilidad",
         "market_probability": "probabilidad_mercado",
         "market_probability_value": "valor_probabilidad_mercado",
         "final_probability": "probabilidad_final",
@@ -91,9 +86,7 @@ def _install_bilingual_sidebar() -> None:
         "actual_hit_rate": "tasa_acierto_real",
         "actual_win_rate": "tasa_victoria_real",
         "hit_rate": "tasa_acierto",
-        "brier": "brier",
         "brier_score": "puntaje_brier",
-        "log_loss": "log_loss",
         "best_price": "mejor_cuota",
         "avg_price": "cuota_promedio",
         "average_price": "cuota_promedio",
@@ -140,7 +133,6 @@ def _install_bilingual_sidebar() -> None:
         "ciudad_area": "ciudad_area",
         "pais_sede": "pais_sede",
         "fuente_sede": "fuente_sede",
-        "area": "area",
         "area_type": "tipo_area",
         "group_value": "valor_grupo",
         "records": "registros",
@@ -213,8 +205,7 @@ def _install_bilingual_sidebar() -> None:
             st.session_state["global_language"] = query_language() or "English"
         return str(st.session_state.get("global_language", "English"))
 
-    def save_language(value: str) -> None:
-        st.session_state["global_language"] = value
+    def save_language_query(value: str) -> None:
         try:
             st.query_params["lang"] = "es" if value == "Español" else "en"
         except Exception:
@@ -230,9 +221,7 @@ def _install_bilingual_sidebar() -> None:
         return text
 
     def translate_frame(data: Any) -> Any:
-        if language_value() != "Español":
-            return data
-        if not isinstance(data, pd.DataFrame):
+        if language_value() != "Español" or not isinstance(data, pd.DataFrame):
             return data
         frame = data.copy()
         for col in frame.columns:
@@ -252,8 +241,7 @@ def _install_bilingual_sidebar() -> None:
                 was_bytes = False
             else:
                 return data
-            frame = pd.read_csv(__import__("io").StringIO(text))
-            translated = translate_frame(frame).to_csv(index=False)
+            translated = translate_frame(pd.read_csv(io.StringIO(text))).to_csv(index=False)
             return translated.encode("utf-8") if was_bytes else translated
         except Exception:
             return data
@@ -295,11 +283,12 @@ def _install_bilingual_sidebar() -> None:
             kwargs["key"] = "global_language"
             current = language_value()
             kwargs["index"] = opts.index(current) if current in opts else 0
+            selector_label = "Idioma" if current == "Español" else "Language"
             if target is None:
-                value = st.sidebar.selectbox("Idioma" if current == "Español" else "Language", opts, *args, **kwargs)
+                value = real_dg_selectbox(st.sidebar, selector_label, opts, *args, **kwargs)
             else:
-                value = original(target, "Idioma" if current == "Español" else "Language", opts, *args, **kwargs)
-            save_language(str(value))
+                value = original(target, selector_label, opts, *args, **kwargs)
+            save_language_query(str(value))
             render_nav(str(value))
             return value
         if target is None:
@@ -328,8 +317,7 @@ def _install_bilingual_sidebar() -> None:
         kwargs = dict(kwargs)
         file_name = str(kwargs.get("file_name", ""))
         mime = str(kwargs.get("mime", ""))
-        should_translate = language_value() == "Español" and (file_name.endswith(".csv") or mime == "text/csv")
-        if not should_translate:
+        if language_value() != "Español" or not (file_name.endswith(".csv") or mime == "text/csv"):
             return args, kwargs
         if "data" in kwargs:
             kwargs["data"] = translate_csv_text(kwargs["data"])
