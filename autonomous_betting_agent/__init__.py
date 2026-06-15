@@ -18,11 +18,11 @@ from .tracking import PredictionLedgerRow, SelectionDecision, SelectionPolicy, T
 
 
 def _install_bilingual_sidebar() -> None:
-    """Install a Streamlit sidebar patch when the package is imported by app pages.
+    """Install a reliable Streamlit sidebar language/nav patch.
 
-    Streamlit Cloud does not reliably import sitecustomize in every deployment.
-    Installing here is more reliable because every page imports at least one
-    autonomous_betting_agent module before rendering its UI.
+    The sidebar renders after the language selector so it can show only one
+    language at a time. The selected language is stored in session state and in
+    the URL query params, so it stays selected when switching pages or refreshing.
     """
     try:
         import streamlit as st
@@ -61,24 +61,44 @@ def _install_bilingual_sidebar() -> None:
         "Herramientas especializadas: las páginas USA, México, Universitario, Combate y NBA son buscadores enfocados, no reemplazos completos del Predictor Pro.",
     )
 
+    def query_language() -> str:
+        try:
+            value = st.query_params.get("lang", "")
+            if isinstance(value, list):
+                value = value[0] if value else ""
+            if str(value).lower().startswith("es"):
+                return "Español"
+            if str(value).lower().startswith("en"):
+                return "English"
+        except Exception:
+            pass
+        return ""
+
     def language_value() -> str:
+        if "global_language" not in st.session_state:
+            st.session_state["global_language"] = query_language() or "English"
         return str(st.session_state.get("global_language", "English"))
 
-    def render_nav() -> None:
-        if st.session_state.get("_bilingual_nav_rendered"):
-            return
-        st.session_state["_bilingual_nav_rendered"] = True
+    def save_language(value: str) -> None:
+        st.session_state["global_language"] = value
+        try:
+            st.query_params["lang"] = "es" if value == "Español" else "en"
+        except Exception:
+            pass
+
+    def render_nav(lang: str) -> None:
         with st.sidebar:
             st.markdown("---")
-            st.markdown("### Tools / Herramientas")
+            st.markdown("### Herramientas" if lang == "Español" else "### Tools")
             for english, spanish, path in tools:
+                label = spanish if lang == "Español" else english
                 try:
-                    st.page_link(path, label=f"{english} / {spanish}")
+                    st.page_link(path, label=label)
                 except Exception:
-                    st.caption(f"{english} / {spanish}")
+                    st.caption(label)
             st.markdown("---")
-            st.markdown("### Tool cleanup / Limpieza")
-            for note in (notes_es if language_value() == "Español" else notes_en):
+            st.markdown("### Limpieza de herramientas" if lang == "Español" else "### Tool cleanup")
+            for note in (notes_es if lang == "Español" else notes_en):
                 st.caption(note)
 
     real_set_page_config = st.set_page_config
@@ -86,9 +106,7 @@ def _install_bilingual_sidebar() -> None:
     real_dg_selectbox = DeltaGenerator.selectbox
 
     def patched_set_page_config(*args: Any, **kwargs: Any) -> Any:
-        result = real_set_page_config(*args, **kwargs)
-        render_nav()
-        return result
+        return real_set_page_config(*args, **kwargs)
 
     def language_selectbox(label: Any, options: Any, args: tuple[Any, ...], kwargs: dict[str, Any], original: Any, target: Any = None) -> Any:
         label_text = str(label or "").lower()
@@ -96,16 +114,15 @@ def _install_bilingual_sidebar() -> None:
         opts = list(options)
         if is_language and "English" in opts and "Español" in opts:
             kwargs = dict(kwargs)
-            kwargs.setdefault("key", "global_language")
+            kwargs["key"] = "global_language"
             current = language_value()
-            if "index" not in kwargs and current in opts:
-                kwargs["index"] = opts.index(current)
+            kwargs["index"] = opts.index(current) if current in opts else 0
             if target is None:
-                value = st.sidebar.selectbox("Language / Idioma", opts, *args, **kwargs)
+                value = st.sidebar.selectbox("Idioma" if current == "Español" else "Language", opts, *args, **kwargs)
             else:
-                value = original(target, "Language / Idioma", opts, *args, **kwargs)
-            st.session_state["global_language"] = value
-            render_nav()
+                value = original(target, "Idioma" if current == "Español" else "Language", opts, *args, **kwargs)
+            save_language(str(value))
+            render_nav(str(value))
             return value
         if target is None:
             return original(label, options, *args, **kwargs)
