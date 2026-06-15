@@ -1,0 +1,29 @@
+area,area_type,group_value,records,avg_predicted,actual_hit_rate,actual_minus_predicted,smoothed_hit_rate,smoothed_edge,reliability,brier,memory_type
+Probability bucket: 50-60%,Probability bucket,50-60%,49,0.542,0.531,-0.012,0.531,-0.011,0.86,0.251,probability_bucket
+Probability bucket: 60-70%,Probability bucket,60-70%,12,0.633,0.417,-0.216,0.463,-0.17,0.6,0.296,probability_bucket
+Probability bucket: 70-80%,Probability bucket,70-80%,7,0.74,0.571,-0.168,0.551,-0.189,0.467,0.283,probability_bucket
+Probability bucket: 80-100%,Probability bucket,80-100%,5,0.923,1.0,0.077,0.712,-0.211,0.385,0.008,probability_bucket
+Probability bucket: 0-40%,Probability bucket,0-40%,2,0.253,0.0,-0.253,0.426,0.173,0.2,0.078,probability_bucket
+Probability bucket: 40-50%,Probability bucket,40-50%,2,0.488,0.5,0.012,0.526,0.038,0.2,0.238,probability_bucket
+Sport: MiLB,Sport,MiLB,15,0.549,0.533,-0.016,0.533,-0.016,0.652,0.271,sport
+Sport: MLB,Sport,MLB,15,0.545,0.467,-0.078,0.49,-0.055,0.652,0.254,sport
+Sport: MMA,Sport,MMA,9,0.681,0.667,-0.014,0.604,-0.077,0.529,0.202,sport
+Sport: NPB,Sport,NPB,6,0.563,0.333,-0.229,0.447,-0.115,0.429,0.3,sport
+Sport: KBO,Sport,KBO,4,0.574,0.75,0.176,0.605,0.031,0.333,0.209,sport
+Sport: WNBA,Sport,WNBA,4,0.634,0.75,0.116,0.605,-0.029,0.333,0.226,sport
+Sport: Primera División - Chile,Sport,Primera División - Chile,4,0.532,0.25,-0.282,0.438,-0.094,0.333,0.18,sport
+Sport: FIFA World Cup,Sport,FIFA World Cup,4,0.64,0.25,-0.39,0.438,-0.201,0.333,0.356,sport
+Sport: Boxing,Sport,Boxing,3,0.707,0.333,-0.373,0.478,-0.229,0.273,0.264,sport
+Sport: NCAA Baseball,Sport,NCAA Baseball,2,0.53,0.5,-0.03,0.526,-0.004,0.2,0.253,sport
+Sport: Veikkausliiga - Finland,Sport,Veikkausliiga - Finland,2,0.561,0.5,-0.061,0.526,-0.036,0.2,0.009,sport
+Sport: AFL,Sport,AFL,2,0.717,1.0,0.283,0.626,-0.091,0.2,0.114,sport
+Sport: UFL,Sport,UFL,1,0.512,1.0,0.488,0.584,0.072,0.111,0.238,sport
+Sport: One Day Internationals,Sport,One Day Internationals,1,0.52,1.0,0.48,0.584,0.064,0.111,0.23,sport
+Sport: CFL,Sport,CFL,1,0.546,1.0,0.454,0.584,0.038,0.111,0.206,sport
+Sport: NRL,Sport,NRL,1,0.605,1.0,0.395,0.584,-0.021,0.111,0.156,sport
+Sport: International Twenty20,Sport,International Twenty20,1,0.576,0.0,-0.576,0.473,-0.103,0.111,0.332,sport
+Sport: NBA,Sport,NBA,1,0.639,0.0,-0.639,0.473,-0.166,0.111,0.408,sport
+Sport: WTA Queen's Club Championships,Sport,WTA Queen's Club Championships,1,0.885,1.0,0.115,0.584,-0.301,0.111,0.013,sport
+Read: Watch,Read,Watch,52,0.552,0.558,0.005,0.554,0.002,0.867,0.239,read
+Read: Strong,Read,Strong,23,0.705,0.522,-0.183,0.525,-0.18,0.742,0.257,read
+Read: Avoid,Read,Avoid,2,0.253,0.0,-0.253,0.426,0.173,0.2,0.078,read
