@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from io import StringIO
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -22,7 +23,8 @@ from autonomous_betting_agent.target_mode import (
     price_probability_gap,
 )
 
-APP_VERSION = "direct-upload-fix-v9"
+APP_VERSION = "built-in-memory-v10"
+REPO_MEMORY_PATH = Path(__file__).resolve().parents[1] / "data" / "ara_learning_memory.csv"
 
 st.set_page_config(page_title="Pro Predictor", layout="wide")
 
@@ -30,6 +32,8 @@ st.set_page_config(page_title="Pro Predictor", layout="wide")
 @dataclass(frozen=True)
 class RunConfig:
     app_version: str
+    memory_source: str
+    memory_rows: int
     odds_api_enabled: bool
     sportsdataio_enabled: bool
     weatherapi_enabled: bool
@@ -53,8 +57,6 @@ class RunConfig:
     target_min_api_coverage: float
     require_all_configured_apis: bool
     target_h2h_only: bool
-    ara_memory_source: str
-    ara_memory_rows: int
 
 
 def get_secret(*names: str) -> str:
@@ -133,6 +135,7 @@ def memory_signal_from_frame(frame: pd.DataFrame | None, manual_roi_percent: flo
         "ara_memory_adjustment",
         "memory_adjustment",
         "learning_adjustment",
+        "smoothed_edge",
         "roi",
     )
     lowered = {str(col).lower().replace(" ", "_").replace("-", "_"): col for col in frame.columns}
@@ -141,32 +144,29 @@ def memory_signal_from_frame(frame: pd.DataFrame | None, manual_roi_percent: flo
         if original is None:
             continue
         values: list[float] = []
-        for item in frame[original].dropna().tolist():
+        weights: list[float] = []
+        records_col = lowered.get("records")
+        reliability_col = lowered.get("reliability")
+        for idx, item in frame[original].dropna().items():
             parsed = parse_number(item)
             if parsed is None:
                 continue
             if abs(parsed) > 1.0:
                 parsed /= 100.0
-            values.append(parsed)
-        if values:
-            return round(sum(values) / len(values), 6), f"{source_prefix}:{original}", len(frame)
+            weight = 1.0
+            if records_col is not None:
+                record_val = parse_number(frame.loc[idx, records_col])
+                if record_val is not None:
+                    weight *= max(1.0, min(record_val, 50.0))
+            if reliability_col is not None:
+                rel_val = parse_number(frame.loc[idx, reliability_col])
+                if rel_val is not None:
+                    weight *= max(0.1, min(rel_val, 1.0))
+            values.append(parsed * weight)
+            weights.append(weight)
+        if values and weights:
+            return round(sum(values) / sum(weights), 6), f"{source_prefix}:{original}", len(frame)
     return manual_signal, f"{source_prefix}_no_signal_column_using_manual", len(frame)
-
-
-def memory_signal_from_inputs(uploaded_file: Any, csv_text: str, manual_roi_percent: float) -> tuple[float, str, int]:
-    if uploaded_file is not None:
-        try:
-            frame = pd.read_csv(uploaded_file)
-            return memory_signal_from_frame(frame, manual_roi_percent, "uploaded_memory")
-        except Exception as exc:
-            st.warning(f"Could not read uploaded memory file. Using manual ARA ROI. Error: {exc}")
-    if csv_text.strip():
-        try:
-            frame = pd.read_csv(StringIO(csv_text.strip()))
-            return memory_signal_from_frame(frame, manual_roi_percent, "pasted_memory")
-        except Exception as exc:
-            st.warning(f"Could not read pasted memory CSV. Using manual ARA ROI. Error: {exc}")
-    return manual_roi_percent / 100.0, "manual_memory_roi", 0
 
 
 def next_sunday(today: date | None = None) -> date:
@@ -224,7 +224,7 @@ def api_coverage_fields(api_context: dict[str, Any], *, odds_configured: bool, s
 
 
 st.title("Pro Predictor")
-st.caption("Multi-source all-sports predictor. Direct uploader fix build.")
+st.caption("Multi-source all-sports predictor. ARA memory now auto-loads from the repo; upload is optional.")
 st.info(f"App version: {APP_VERSION}")
 
 st.subheader("API sources")
@@ -287,46 +287,58 @@ with st.expander("Manual signal preview", expanded=False):
     stats_probability = p1.number_input("Stats probability %", min_value=1.0, max_value=99.0, value=58.0, step=0.1)
     injury_score = p2.number_input("Injury/lineup score", min_value=0.0, max_value=100.0, value=90.0, step=1.0)
     weather_score = p3.number_input("Weather score", min_value=0.0, max_value=100.0, value=95.0, step=1.0)
-    memory_roi = p3.number_input("ARA memory ROI %", min_value=-100.0, max_value=100.0, value=0.0, step=0.5)
+    memory_roi = p3.number_input("Manual ARA memory ROI %", min_value=-100.0, max_value=100.0, value=0.0, step=0.5)
 
 st.subheader("ARA memory")
-st.caption("Upload accepts any file type. Choose your CSV file, or paste CSV text below. ARA memory is optional.")
-memory_file = st.file_uploader(
-    "Upload ARA learning memory file",
+st.caption("Built-in repo memory loads automatically. Upload and paste are optional overrides.")
+memory_upload = st.file_uploader(
+    "Optional override: upload ARA memory file",
     type=None,
     accept_multiple_files=False,
-    key="direct_page_memory_upload_v9",
-    help="Accepts any file type. Choose your CSV file. If the picker does not open, paste CSV text below.",
+    key="optional_memory_override_v10",
+    help="Optional. The app already has built-in ARA memory. Upload only if you want to override it.",
 )
-memory_csv_text = st.text_area(
-    "Paste ARA learning memory CSV here",
+memory_paste = st.text_area(
+    "Optional override: paste ARA memory CSV",
     value="",
-    height=150,
-    key="direct_page_memory_paste_v9",
+    height=120,
+    key="optional_memory_paste_v10",
     placeholder="bucket_roi,profile_win_rate\n0.03,0.58",
 )
 
 memory_df: pd.DataFrame | None = None
-if memory_file is not None:
+memory_source_label = "manual_memory_roi"
+if memory_upload is not None:
     try:
-        memory_df = pd.read_csv(memory_file)
-        st.success(f"{len(memory_df)} memory rows loaded from upload")
+        memory_df = pd.read_csv(memory_upload)
+        memory_source_label = "uploaded_memory_override"
+        st.success(f"{len(memory_df)} ARA memory rows loaded from upload override")
     except Exception as exc:
-        st.warning(f"Could not load uploaded memory file: {exc}")
-elif memory_csv_text.strip():
+        st.warning(f"Could not read uploaded memory file; using built-in memory if available. Error: {exc}")
+if memory_df is None and memory_paste.strip():
     try:
-        memory_df = pd.read_csv(StringIO(memory_csv_text.strip()))
-        st.success(f"{len(memory_df)} memory rows loaded from pasted CSV")
+        memory_df = pd.read_csv(StringIO(memory_paste.strip()))
+        memory_source_label = "pasted_memory_override"
+        st.success(f"{len(memory_df)} ARA memory rows loaded from paste override")
     except Exception as exc:
-        st.warning(f"Could not load pasted memory CSV: {exc}")
-else:
-    st.caption("ARA memory is optional. The predictor can run without it.")
+        st.warning(f"Could not read pasted memory CSV; using built-in memory if available. Error: {exc}")
+if memory_df is None and REPO_MEMORY_PATH.exists():
+    try:
+        memory_df = pd.read_csv(REPO_MEMORY_PATH)
+        memory_source_label = "built_in_repo_memory"
+        st.success(f"{len(memory_df)} ARA memory rows loaded automatically from repo")
+    except Exception as exc:
+        st.warning(f"Built-in repo memory exists but could not be read. Error: {exc}")
+if memory_df is None:
+    st.caption("No ARA memory file loaded. Using manual ROI only.")
 
-memory_signal, memory_source, memory_rows = memory_signal_from_frame(memory_df, float(memory_roi), "ara_memory")
+memory_signal, memory_source, memory_rows = memory_signal_from_frame(memory_df, float(memory_roi), memory_source_label)
 st.caption(f"ARA memory source: {memory_source}; rows: {memory_rows}; signal: {memory_signal:.4f}")
 
 config = RunConfig(
     app_version=APP_VERSION,
+    memory_source=memory_source,
+    memory_rows=memory_rows,
     odds_api_enabled=bool(odds_key),
     sportsdataio_enabled=bool(sports_key),
     weatherapi_enabled=bool(weather_key),
@@ -350,8 +362,6 @@ config = RunConfig(
     target_min_api_coverage=float(target_min_api_coverage),
     require_all_configured_apis=bool(require_all_configured_apis),
     target_h2h_only=bool(target_h2h_only),
-    ara_memory_source=memory_source,
-    ara_memory_rows=memory_rows,
 )
 
 target_policy = TargetModePolicy(
