@@ -11,29 +11,31 @@ from autonomous_betting_agent.row_normalizer import normalize_frame
 
 WORKFLOW_STEPS = [
     {'step': 1, 'page': 'Export Templates', 'purpose': 'Create future CSVs with the correct columns.', 'when_to_use': 'Before generating new prediction exports.'},
-    {'step': 2, 'page': 'Data Intake Gate', 'purpose': 'Check whether a CSV is ready for learning, statistics, proof, ROI, line movement, or tracking.', 'when_to_use': 'First stop for every new CSV.'},
-    {'step': 3, 'page': 'CSV Doctor', 'purpose': 'Diagnose exact column mapping and missing fields.', 'when_to_use': 'When a CSV does not behave as expected.'},
-    {'step': 4, 'page': 'Quality Control Center', 'purpose': 'Check duplicates, conflicts, grading, line movement, bankroll path, and version coverage.', 'when_to_use': 'Before trusting or presenting a dataset.'},
-    {'step': 5, 'page': 'Agent Decision Engine', 'purpose': 'Recommend play_strong, play_small, watch_only, no_action, or review_needed from edge, odds, coverage, and line movement.', 'when_to_use': 'Before locking new candidate rows.'},
-    {'step': 6, 'page': 'Odds Lock', 'purpose': 'Create a timestamped lock for new predictions before events start.', 'when_to_use': 'Only before games/events start.'},
-    {'step': 7, 'page': 'Learning Memory', 'purpose': 'The only training page. Save durable learned_state, cumulative memory, and ARA memory patterns.', 'when_to_use': 'After results are graded and before judging what the model learned.'},
-    {'step': 8, 'page': 'Max Agent Intelligence', 'purpose': 'Run API snapshot memory, loss autopsy, CLV intelligence, walk-forward validation, and sport-specific routing together.', 'when_to_use': 'After candidate decisions or after importing resolved results.'},
-    {'step': 9, 'page': 'Statistical Validation', 'purpose': 'Measure sample size, observed hit rate, confidence interval, and ROI scenarios.', 'when_to_use': 'After rows have clean win/loss results.'},
-    {'step': 10, 'page': 'Proof Readiness', 'purpose': 'Separate official proof from historical learning/backfill rows.', 'when_to_use': 'Before showing results to a serious reviewer.'},
-    {'step': 11, 'page': 'Forward Test Tracker', 'purpose': 'Track progress toward 25, 100, 500, and 1,000 locked rows.', 'when_to_use': 'During live forward testing.'},
-    {'step': 12, 'page': 'Performance Segments', 'purpose': 'Find strengths and weak spots by sport, market, source, probability bucket, odds bucket, and version.', 'when_to_use': 'After enough resolved rows exist.'},
-    {'step': 13, 'page': 'Row Explanations', 'purpose': 'Explain available signals and missing information for each row.', 'when_to_use': 'Before reviewing individual rows.'},
-    {'step': 14, 'page': 'Daily Operations Report', 'purpose': 'Create daily status reports with results, units, quality warnings, and recommendations.', 'when_to_use': 'Daily operating review.'},
-    {'step': 15, 'page': 'Review Bundle Export', 'purpose': 'Export combined Markdown, JSON, and normalized CSV for serious review.', 'when_to_use': 'When preparing a clean review package.'},
-    {'step': 16, 'page': 'Readiness Scorecard', 'purpose': 'Score whether the current data is ready for serious review.', 'when_to_use': 'Before making valuation or performance claims.'},
-    {'step': 17, 'page': 'Live Command Center', 'purpose': 'See current status, warnings, quality, stake sizing, locks, and ledger metrics together.', 'when_to_use': 'Daily operational view.'},
-    {'step': 18, 'page': 'Demo Data Mode', 'purpose': 'Show the workflow with safe sample data.', 'when_to_use': 'When demonstrating the app without private files.'},
-    {'step': 19, 'page': 'Executive Demo Mode', 'purpose': 'Show a cleaner demo view after proof rows and reports are ready.', 'when_to_use': 'Final presentation view.'},
+    {'step': 2, 'page': 'Scanner Pro', 'purpose': 'One consolidated live scanner for all supported sports, leagues, books, and markets.', 'when_to_use': 'When you want fresh live odds/market discovery.'},
+    {'step': 3, 'page': 'Pro Predictor', 'purpose': 'Main all-sports prediction engine. This replaces separate single-sport predictors such as NBA-only pages.', 'when_to_use': 'When you want final scored predictions.'},
+    {'step': 4, 'page': 'Market Finder Pro', 'purpose': 'One consolidated market/value finder for scanner rows, predictor rows, odds exports, props, CLV, and segments.', 'when_to_use': 'When you want to find playable value or lock-ready candidates.'},
+    {'step': 5, 'page': 'Data Intake Gate', 'purpose': 'Check whether a CSV is ready for learning, statistics, proof, ROI, line movement, or tracking.', 'when_to_use': 'First stop for any outside CSV.'},
+    {'step': 6, 'page': 'CSV Doctor', 'purpose': 'Diagnose exact column mapping and missing fields.', 'when_to_use': 'When a CSV does not behave as expected.'},
+    {'step': 7, 'page': 'Quality Control Center', 'purpose': 'Check duplicates, conflicts, grading, line movement, bankroll path, and version coverage.', 'when_to_use': 'Before trusting or presenting a dataset.'},
+    {'step': 8, 'page': 'Agent Decision Engine', 'purpose': 'Recommend play_strong, play_small, watch_only, no_action, or review_needed from edge, odds, coverage, timing, and line movement.', 'when_to_use': 'Before locking new candidate rows.'},
+    {'step': 9, 'page': 'Odds Lock', 'purpose': 'Create a timestamped lock for new predictions before events start.', 'when_to_use': 'Only before games/events start.'},
+    {'step': 10, 'page': 'Learning Memory', 'purpose': 'The only training page. Save durable learned_state, cumulative memory, and ARA memory patterns.', 'when_to_use': 'After results are graded and before judging what the model learned.'},
+    {'step': 11, 'page': 'Max Agent Intelligence', 'purpose': 'Run API snapshot memory, loss autopsy, CLV intelligence, walk-forward validation, and sport-specific routing together.', 'when_to_use': 'After candidate decisions or after importing resolved results.'},
+    {'step': 12, 'page': 'Statistical Validation', 'purpose': 'Measure sample size, observed hit rate, confidence interval, and ROI scenarios.', 'when_to_use': 'After rows have clean win/loss results.'},
+    {'step': 13, 'page': 'Proof Readiness', 'purpose': 'Separate official proof from historical learning/backfill rows.', 'when_to_use': 'Before showing results to a serious reviewer.'},
+    {'step': 14, 'page': 'Forward Test Tracker', 'purpose': 'Track progress toward 25, 100, 500, and 1,000 locked rows.', 'when_to_use': 'During live forward testing.'},
+    {'step': 15, 'page': 'Performance Segments', 'purpose': 'Find strengths and weak spots by sport, market, source, probability bucket, odds bucket, and version.', 'when_to_use': 'After enough resolved rows exist.'},
+    {'step': 16, 'page': 'Daily Operations Report', 'purpose': 'Create daily status reports with results, units, quality warnings, and recommendations.', 'when_to_use': 'Daily operating review.'},
+    {'step': 17, 'page': 'Review Bundle Export', 'purpose': 'Export combined Markdown, JSON, and normalized CSV for serious review.', 'when_to_use': 'When preparing a clean review package.'},
+    {'step': 18, 'page': 'Readiness Scorecard', 'purpose': 'Score whether the current data is ready for serious review.', 'when_to_use': 'Before making valuation or performance claims.'},
+    {'step': 19, 'page': 'Live Command Center', 'purpose': 'See current status, warnings, quality, stake sizing, locks, and ledger metrics together.', 'when_to_use': 'Daily operational view.'},
+    {'step': 20, 'page': 'Demo Data Mode', 'purpose': 'Show the workflow with safe sample data.', 'when_to_use': 'When demonstrating the app without private files.'},
+    {'step': 21, 'page': 'Executive Demo Mode', 'purpose': 'Show a cleaner demo view after proof rows and reports are ready.', 'when_to_use': 'Final presentation view.'},
 ]
 
 st.set_page_config(page_title='Proof Workflow Hub', layout='wide')
 st.title('Proof Workflow Hub')
-st.caption('A guided workflow for turning raw prediction exports into clean learning, proof, decisions, intelligence, statistics, reports, and review-ready packages.')
+st.caption('A guided workflow for turning raw prediction exports into clean scanning, prediction, market finding, learning, proof, intelligence, reports, and review-ready packages.')
 
 st.subheader('Recommended workflow')
 st.dataframe(pd.DataFrame(WORKFLOW_STEPS), use_container_width=True, hide_index=True)
@@ -71,13 +73,13 @@ st.subheader('Recommended next page')
 if report['blockers']:
     st.error('Go to CSV Doctor first. The file has blockers that should be fixed before using the rest of the app.')
 elif 'Odds lock readiness' in ready_gates and 'Official proof readiness' not in ready_gates:
-    st.success('Go to Quality Control Center, Agent Decision Engine, Odds Lock, Learning Memory, then Max Agent Intelligence.')
+    st.success('Go to Market Finder Pro, Quality Control Center, Agent Decision Engine, Odds Lock, Learning Memory, then Max Agent Intelligence.')
 elif 'Statistical validation' in ready_gates and 'Official proof readiness' not in ready_gates:
     st.success('Go to Learning Memory, Max Agent Intelligence, Statistical Validation, Proof Readiness, and Readiness Scorecard.')
 elif 'Official proof readiness' in ready_gates:
     st.success('Go to Learning Memory, Max Agent Intelligence, Forward Test Tracker, Daily Operations Report, Review Bundle Export, and Live Command Center.')
 else:
-    st.warning('Go to Data Intake Gate or CSV Doctor. The file is limited and needs more required fields.')
+    st.warning('Go to Scanner Pro or Pro Predictor for fresh rows. For outside CSVs, use Data Intake Gate or CSV Doctor.')
 
 if report['warnings']:
     st.subheader('Warnings')
