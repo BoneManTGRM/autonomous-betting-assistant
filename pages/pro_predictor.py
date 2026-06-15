@@ -23,8 +23,10 @@ from autonomous_betting_agent.target_mode import (
     price_probability_gap,
 )
 
-APP_VERSION = "built-in-memory-v10"
-REPO_MEMORY_PATH = Path(__file__).resolve().parents[1] / "data" / "ara_learning_memory.csv"
+APP_VERSION = "forward-test-defaults-v11"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_MEMORY_PATH = REPO_ROOT / "data" / "ara_learning_memory.csv"
+LEARNED_STATE_PATH = REPO_ROOT / "learned_state.json"
 
 st.set_page_config(page_title="Pro Predictor", layout="wide")
 
@@ -32,8 +34,10 @@ st.set_page_config(page_title="Pro Predictor", layout="wide")
 @dataclass(frozen=True)
 class RunConfig:
     app_version: str
+    learned_events_trained: int
     memory_source: str
     memory_rows: int
+    memory_signal: float
     odds_api_enabled: bool
     sportsdataio_enabled: bool
     weatherapi_enabled: bool
@@ -115,12 +119,23 @@ def pct(value: float | None) -> str:
 
 def parse_number(value: Any) -> float | None:
     text = str(value or "").strip().replace(",", "").replace("%", "")
-    if not text or text.lower() in {"none", "null", "nan", "unknown"}:
+    if not text or text.lower() in {"none", "null", "nan", "unknown", "n/a"}:
         return None
     try:
         return float(text)
     except ValueError:
         return None
+
+
+def load_learned_state_summary() -> dict[str, Any]:
+    try:
+        if LEARNED_STATE_PATH.exists():
+            payload = json.loads(LEARNED_STATE_PATH.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                return payload
+    except Exception:
+        pass
+    return {}
 
 
 def memory_signal_from_frame(frame: pd.DataFrame | None, manual_roi_percent: float, source_prefix: str) -> tuple[float, str, int]:
@@ -147,6 +162,7 @@ def memory_signal_from_frame(frame: pd.DataFrame | None, manual_roi_percent: flo
         weights: list[float] = []
         records_col = lowered.get("records")
         reliability_col = lowered.get("reliability")
+        importance_col = lowered.get("importance")
         for idx, item in frame[original].dropna().items():
             parsed = parse_number(item)
             if parsed is None:
@@ -162,6 +178,10 @@ def memory_signal_from_frame(frame: pd.DataFrame | None, manual_roi_percent: flo
                 rel_val = parse_number(frame.loc[idx, reliability_col])
                 if rel_val is not None:
                     weight *= max(0.1, min(rel_val, 1.0))
+            if importance_col is not None:
+                imp_val = parse_number(frame.loc[idx, importance_col])
+                if imp_val is not None:
+                    weight *= max(0.25, min(2.0, 1.0 + imp_val * 5.0))
             values.append(parsed * weight)
             weights.append(weight)
         if values and weights:
@@ -224,8 +244,16 @@ def api_coverage_fields(api_context: dict[str, Any], *, odds_configured: bool, s
 
 
 st.title("Pro Predictor")
-st.caption("Multi-source all-sports predictor. ARA memory now auto-loads from the repo; upload is optional.")
+st.caption("Multi-source all-sports predictor. Built-in learned memory loads automatically. Upload override is off by default.")
 st.info(f"App version: {APP_VERSION}")
+
+learned_state = load_learned_state_summary()
+learned_events = int(learned_state.get("events_trained", 0) or 0)
+learned_cols = st.columns(4)
+learned_cols[0].metric("Learned events", learned_events)
+learned_cols[1].metric("Raw accuracy", "" if not learned_state else pct(float(learned_state.get("accuracy_before", 0) or 0)))
+learned_cols[2].metric("Calibrated accuracy", "" if not learned_state else pct(float(learned_state.get("accuracy_after", 0) or 0)))
+learned_cols[3].metric("Brier after", "" if not learned_state else f"{float(learned_state.get('brier_after', 0) or 0):.4f}")
 
 st.subheader("API sources")
 saved_odds = get_secret("ODDS_API_KEY", "THE_ODDS_API_KEY")
@@ -259,6 +287,7 @@ with setup2:
     markets = st.multiselect("Markets", ["h2h", "spreads", "totals"], default=["h2h"])
 
 with st.expander("Predictor controls", expanded=True):
+    st.caption("Default profile: forward-test 70% scouting. It allows 2 of 3 APIs when SportsDataIO is unsupported or blocked for a sport.")
     c1, c2, c3, c4, c5 = st.columns(5)
     max_feeds = c1.number_input("Max feeds", min_value=1, max_value=120, value=50, step=1)
     max_events = c2.number_input("Max events per feed", min_value=1, max_value=75, value=35, step=1)
@@ -271,15 +300,17 @@ with st.expander("Predictor controls", expanded=True):
     target_probability = t1.number_input("Target win probability", min_value=0.50, max_value=0.90, value=0.70, step=0.01, format="%.2f")
     target_tolerance = t2.number_input("Tolerance ±", min_value=0.00, max_value=0.10, value=0.01, step=0.01, format="%.2f")
     target_min_books = t3.number_input("70-mode minimum books", min_value=1, max_value=25, value=4, step=1)
-    target_min_reliability = t4.number_input("70-mode minimum reliability", min_value=0.0, max_value=100.0, value=95.0, step=1.0)
+    target_min_reliability = t4.number_input("70-mode minimum reliability", min_value=0.0, max_value=100.0, value=90.0, step=1.0)
     q1, q2, q3, q4 = st.columns(4)
     target_min_market_probability = q1.number_input("70-mode market probability floor", min_value=0.50, max_value=0.90, value=0.62, step=0.01, format="%.2f")
     target_min_ev = q2.number_input("70-mode minimum EV", min_value=-0.50, max_value=1.00, value=0.00, step=0.01, format="%.2f")
     target_max_mismatch = q3.number_input("Max price/probability mismatch", min_value=0.01, max_value=0.50, value=0.12, step=0.01, format="%.2f")
     target_h2h_only = q4.toggle("70-mode h2h only", value=True)
     a1, a2 = st.columns(2)
-    target_min_api_coverage = a1.number_input("70-mode minimum API coverage", min_value=0.0, max_value=1.0, value=1.0, step=0.05, format="%.2f")
-    require_all_configured_apis = a2.toggle("Require all configured APIs", value=True)
+    target_min_api_coverage = a1.number_input("70-mode minimum API coverage", min_value=0.0, max_value=1.0, value=0.66, step=0.01, format="%.2f")
+    require_all_configured_apis = a2.toggle("Require all configured APIs", value=False)
+    with st.expander("Strict official mode values", expanded=False):
+        st.write("For a strict official run after SportsDataIO works, use: 70-mode reliability 95, API coverage 1.00, and Require all configured APIs ON.")
 
 with st.expander("Manual signal preview", expanded=False):
     st.caption("Manual preview is used only when live API data is unavailable; live scan rows use real API context fields.")
@@ -290,38 +321,41 @@ with st.expander("Manual signal preview", expanded=False):
     memory_roi = p3.number_input("Manual ARA memory ROI %", min_value=-100.0, max_value=100.0, value=0.0, step=0.5)
 
 st.subheader("ARA memory")
-st.caption("Built-in repo memory loads automatically. Upload and paste are optional overrides.")
-memory_upload = st.file_uploader(
-    "Optional override: upload ARA memory file",
-    type=None,
-    accept_multiple_files=False,
-    key="optional_memory_override_v10",
-    help="Optional. The app already has built-in ARA memory. Upload only if you want to override it.",
-)
-memory_paste = st.text_area(
-    "Optional override: paste ARA memory CSV",
-    value="",
-    height=120,
-    key="optional_memory_paste_v10",
-    placeholder="bucket_roi,profile_win_rate\n0.03,0.58",
-)
-
+st.caption("Built-in repo memory loads automatically. Finished-game CSVs belong on the Learning Memory page, not here.")
+use_memory_override = st.toggle("Advanced: use uploaded/pasted ARA memory override", value=False)
 memory_df: pd.DataFrame | None = None
 memory_source_label = "manual_memory_roi"
-if memory_upload is not None:
-    try:
-        memory_df = pd.read_csv(memory_upload)
-        memory_source_label = "uploaded_memory_override"
-        st.success(f"{len(memory_df)} ARA memory rows loaded from upload override")
-    except Exception as exc:
-        st.warning(f"Could not read uploaded memory file; using built-in memory if available. Error: {exc}")
-if memory_df is None and memory_paste.strip():
-    try:
-        memory_df = pd.read_csv(StringIO(memory_paste.strip()))
-        memory_source_label = "pasted_memory_override"
-        st.success(f"{len(memory_df)} ARA memory rows loaded from paste override")
-    except Exception as exc:
-        st.warning(f"Could not read pasted memory CSV; using built-in memory if available. Error: {exc}")
+
+if use_memory_override:
+    memory_upload = st.file_uploader(
+        "Optional override: upload generated ARA memory CSV only",
+        type=["csv"],
+        accept_multiple_files=False,
+        key="optional_memory_override_v11",
+        help="Use this only for generated ara_learning_memory.csv files. Do not upload finished-game prediction CSVs here.",
+    )
+    memory_paste = st.text_area(
+        "Optional override: paste generated ARA memory CSV",
+        value="",
+        height=120,
+        key="optional_memory_paste_v11",
+        placeholder="area,area_type,group_value,records,smoothed_edge,reliability\nProbability bucket: 60-70%,probability_bucket,60-70%,18,-0.0549,0.61",
+    )
+    if memory_upload is not None:
+        try:
+            memory_df = pd.read_csv(memory_upload)
+            memory_source_label = "uploaded_memory_override"
+            st.success(f"{len(memory_df)} ARA memory rows loaded from upload override")
+        except Exception as exc:
+            st.warning(f"Could not read uploaded memory file; using built-in memory if available. Error: {exc}")
+    if memory_df is None and memory_paste.strip():
+        try:
+            memory_df = pd.read_csv(StringIO(memory_paste.strip()))
+            memory_source_label = "pasted_memory_override"
+            st.success(f"{len(memory_df)} ARA memory rows loaded from paste override")
+        except Exception as exc:
+            st.warning(f"Could not read pasted memory CSV; using built-in memory if available. Error: {exc}")
+
 if memory_df is None and REPO_MEMORY_PATH.exists():
     try:
         memory_df = pd.read_csv(REPO_MEMORY_PATH)
@@ -334,11 +368,15 @@ if memory_df is None:
 
 memory_signal, memory_source, memory_rows = memory_signal_from_frame(memory_df, float(memory_roi), memory_source_label)
 st.caption(f"ARA memory source: {memory_source}; rows: {memory_rows}; signal: {memory_signal:.4f}")
+if "no_signal_column" in memory_source:
+    st.warning("The uploaded memory file did not contain a usable memory signal column. Use the Learning Memory output file named ara_learning_memory.csv, or turn off the override.")
 
 config = RunConfig(
     app_version=APP_VERSION,
+    learned_events_trained=learned_events,
     memory_source=memory_source,
     memory_rows=memory_rows,
+    memory_signal=memory_signal,
     odds_api_enabled=bool(odds_key),
     sportsdataio_enabled=bool(sports_key),
     weatherapi_enabled=bool(weather_key),
@@ -523,7 +561,7 @@ if st.button("Run multi-API Predictor Pro", type="primary", use_container_width=
             st.dataframe(target_rows, use_container_width=True, hide_index=True)
             st.download_button("Download 70% target CSV", pd.DataFrame(target_rows).to_csv(index=False), file_name="pro_predictor_70_target_mode.csv", mime="text/csv")
         else:
-            st.info("No picks passed 70% ±1 mode. That is acceptable; the filter is intentionally strict.")
+            st.info("No picks passed 70% ±1 mode. Check rejected rows for the exact blockers.")
         with st.expander("Rejected from 70% ±1 Mode", expanded=False):
             st.dataframe(rejected_70, use_container_width=True, hide_index=True)
 
