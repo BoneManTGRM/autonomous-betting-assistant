@@ -10,65 +10,27 @@ from autonomous_betting_agent.data_intake_gate import gates_frame, intake_gate, 
 from autonomous_betting_agent.row_normalizer import normalize_frame
 
 WORKFLOW_STEPS = [
-    {
-        'step': 1,
-        'page': 'Export Templates',
-        'purpose': 'Create future CSVs with the correct columns.',
-        'when_to_use': 'Before generating new prediction exports.',
-    },
-    {
-        'step': 2,
-        'page': 'Data Intake Gate',
-        'purpose': 'Check whether a CSV is ready for learning, stats, proof, ROI, CLV, or forward testing.',
-        'when_to_use': 'First stop for every new CSV.',
-    },
-    {
-        'step': 3,
-        'page': 'CSV Doctor',
-        'purpose': 'Diagnose exact column mapping and missing fields.',
-        'when_to_use': 'When a CSV does not behave as expected.',
-    },
-    {
-        'step': 4,
-        'page': 'Odds Lock',
-        'purpose': 'Create a timestamped lock for new predictions before events start.',
-        'when_to_use': 'Only before games/events start.',
-    },
-    {
-        'step': 5,
-        'page': 'Statistical Validation',
-        'purpose': 'Measure sample size, observed hit rate, confidence interval, and ROI scenarios.',
-        'when_to_use': 'After rows have clean win/loss results.',
-    },
-    {
-        'step': 6,
-        'page': 'Proof Readiness',
-        'purpose': 'Separate official proof from historical learning/backfill rows.',
-        'when_to_use': 'Before showing results to a buyer or serious user.',
-    },
-    {
-        'step': 7,
-        'page': 'Forward Test Tracker',
-        'purpose': 'Track progress toward 25, 100, 500, and 1,000 locked rows.',
-        'when_to_use': 'During live forward testing.',
-    },
-    {
-        'step': 8,
-        'page': 'Live Command Center',
-        'purpose': 'See current status, warnings, quality, stake sizing, locks, and ledger metrics together.',
-        'when_to_use': 'Daily operational view.',
-    },
-    {
-        'step': 9,
-        'page': 'Executive Demo Mode',
-        'purpose': 'Show a cleaner buyer/investor demo view.',
-        'when_to_use': 'After proof rows and reports are ready.',
-    },
+    {'step': 1, 'page': 'Export Templates', 'purpose': 'Create future CSVs with the correct columns.', 'when_to_use': 'Before generating new prediction exports.'},
+    {'step': 2, 'page': 'Data Intake Gate', 'purpose': 'Check whether a CSV is ready for learning, statistics, proof, ROI, line movement, or tracking.', 'when_to_use': 'First stop for every new CSV.'},
+    {'step': 3, 'page': 'CSV Doctor', 'purpose': 'Diagnose exact column mapping and missing fields.', 'when_to_use': 'When a CSV does not behave as expected.'},
+    {'step': 4, 'page': 'Quality Control Center', 'purpose': 'Check duplicates, conflicts, grading, line movement, bankroll path, and version coverage.', 'when_to_use': 'Before trusting or presenting a dataset.'},
+    {'step': 5, 'page': 'Odds Lock', 'purpose': 'Create a timestamped lock for new predictions before events start.', 'when_to_use': 'Only before games/events start.'},
+    {'step': 6, 'page': 'Statistical Validation', 'purpose': 'Measure sample size, observed hit rate, confidence interval, and ROI scenarios.', 'when_to_use': 'After rows have clean win/loss results.'},
+    {'step': 7, 'page': 'Proof Readiness', 'purpose': 'Separate official proof from historical learning/backfill rows.', 'when_to_use': 'Before showing results to a serious reviewer.'},
+    {'step': 8, 'page': 'Forward Test Tracker', 'purpose': 'Track progress toward 25, 100, 500, and 1,000 locked rows.', 'when_to_use': 'During live forward testing.'},
+    {'step': 9, 'page': 'Performance Segments', 'purpose': 'Find strengths and weak spots by sport, market, source, probability bucket, odds bucket, and version.', 'when_to_use': 'After enough resolved rows exist.'},
+    {'step': 10, 'page': 'Row Explanations', 'purpose': 'Explain available signals and missing information for each row.', 'when_to_use': 'Before reviewing individual rows.'},
+    {'step': 11, 'page': 'Daily Operations Report', 'purpose': 'Create daily status reports with results, units, quality warnings, and recommendations.', 'when_to_use': 'Daily operating review.'},
+    {'step': 12, 'page': 'Review Bundle Export', 'purpose': 'Export combined Markdown, JSON, and normalized CSV for serious review.', 'when_to_use': 'When preparing a clean review package.'},
+    {'step': 13, 'page': 'Readiness Scorecard', 'purpose': 'Score whether the current data is ready for serious review.', 'when_to_use': 'Before making valuation or performance claims.'},
+    {'step': 14, 'page': 'Live Command Center', 'purpose': 'See current status, warnings, quality, stake sizing, locks, and ledger metrics together.', 'when_to_use': 'Daily operational view.'},
+    {'step': 15, 'page': 'Demo Data Mode', 'purpose': 'Show the workflow with safe sample data.', 'when_to_use': 'When demonstrating the app without private files.'},
+    {'step': 16, 'page': 'Executive Demo Mode', 'purpose': 'Show a cleaner demo view after proof rows and reports are ready.', 'when_to_use': 'Final presentation view.'},
 ]
 
 st.set_page_config(page_title='Proof Workflow Hub', layout='wide')
 st.title('Proof Workflow Hub')
-st.caption('A guided workflow for turning raw prediction exports into clean learning, proof, statistics, and buyer-ready reports.')
+st.caption('A guided workflow for turning raw prediction exports into clean learning, proof, statistics, reports, and review-ready packages.')
 
 st.subheader('Recommended workflow')
 st.dataframe(pd.DataFrame(WORKFLOW_STEPS), use_container_width=True, hide_index=True)
@@ -106,11 +68,11 @@ st.subheader('Recommended next page')
 if report['blockers']:
     st.error('Go to CSV Doctor first. The file has blockers that should be fixed before using the rest of the app.')
 elif 'Odds lock readiness' in ready_gates and 'Official proof readiness' not in ready_gates:
-    st.success('Go to Odds Lock if these are current pre-event predictions. Do not use Odds Lock for historical rows.')
+    st.success('Go to Quality Control Center, then Odds Lock if these are current pre-event predictions.')
 elif 'Statistical validation' in ready_gates and 'Official proof readiness' not in ready_gates:
-    st.success('Go to Statistical Validation and Proof Readiness. This file has results, but not official forward locks.')
+    st.success('Go to Quality Control Center, Statistical Validation, Proof Readiness, and Readiness Scorecard.')
 elif 'Official proof readiness' in ready_gates:
-    st.success('Go to Forward Test Tracker and Live Command Center. Official locked rows were detected.')
+    st.success('Go to Forward Test Tracker, Daily Operations Report, Review Bundle Export, and Live Command Center.')
 else:
     st.warning('Go to Data Intake Gate or CSV Doctor. The file is limited and needs more required fields.')
 
