@@ -65,6 +65,18 @@ def freshness_check(name: str, timestamp: Any, limit_hours: float, *, now: datet
     return {'check': name, 'status': 'stale', 'age_hours': round(age, 2), 'limit_hours': limit_hours, 'message': f'{name} is stale: {age:.1f} hours old.'}
 
 
+def memory_timestamp(memory_bank: Mapping[str, Any] | None) -> str:
+    if not isinstance(memory_bank, dict):
+        return ''
+    direct = memory_bank.get('trained_at_utc')
+    if _safe(direct):
+        return _safe(direct)
+    calibrator = memory_bank.get('global_calibrator')
+    if isinstance(calibrator, dict):
+        return _safe(calibrator.get('trained_at_utc'))
+    return ''
+
+
 def build_freshness_frame(frame: pd.DataFrame, *, memory_bank: Mapping[str, Any] | None = None, now: datetime | None = None) -> pd.DataFrame:
     now = now or datetime.now(timezone.utc)
     rows: list[dict[str, Any]] = []
@@ -85,8 +97,7 @@ def build_freshness_frame(frame: pd.DataFrame, *, memory_bank: Mapping[str, Any]
                 result_check['event'] = event
                 rows.append(result_check)
     if memory_bank is not None:
-        memory_ts = memory_bank.get('trained_at_utc') or memory_bank.get('global_calibrator', {}).get('trained_at_utc') if isinstance(memory_bank, dict) else ''
-        check = freshness_check('memory', memory_ts, DEFAULT_LIMITS_HOURS['memory'], now=now)
+        check = freshness_check('memory', memory_timestamp(memory_bank), DEFAULT_LIMITS_HOURS['memory'], now=now)
         check['event'] = 'learning_memory'
         rows.append(check)
     return pd.DataFrame(rows)
