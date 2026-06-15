@@ -12,7 +12,7 @@ from .audit import enrich_prediction_frame, parse_float
 from .local_users import DEFAULT_USER_ID, sanitize_user_id
 from .row_normalizer import normalize_frame, normalize_row, safe_text
 
-SNAPSHOT_SCHEMA_VERSION = 'prediction-snapshot-v3'
+SNAPSHOT_SCHEMA_VERSION = 'prediction-snapshot-v4'
 REQUIRED_OFFICIAL_FIELDS = ('event', 'prediction', 'model_probability', 'decimal_price', 'locked_at_utc')
 
 
@@ -89,16 +89,17 @@ def build_prediction_snapshots(
         existing_lock_time = normalized.get('prediction_timestamp', '')
         lock_time = existing_lock_time or new_lock_time
         if existing_lock_time:
-            lock_origin = 'existing_timestamp'
+            lock_origin = 'existing_prediction_timestamp'
         elif new_lock_time and allow_auto_lock:
             lock_origin = 'new_lock_created_now'
         else:
-            lock_origin = 'missing_timestamp'
+            lock_origin = 'missing_prediction_timestamp'
         row = {
             'snapshot_schema_version': SNAPSHOT_SCHEMA_VERSION,
             'local_user_id': clean_user,
             'snapshot_id': '',
             'locked_at_utc': lock_time,
+            'event_start_utc': normalized.get('event_start_utc', ''),
             'lock_origin': lock_origin,
             'event': normalized.get('event', ''),
             'sport': normalized.get('sport', ''),
