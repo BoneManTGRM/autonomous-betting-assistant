@@ -6,7 +6,6 @@ import io
 import json
 import math
 import os
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -91,7 +90,7 @@ def parse_probability(value: Any) -> float | None:
 
 
 def parse_result(value: Any) -> int | None:
-    text = str(value or "").strip().lower()
+    text = "" if value is None else str(value).strip().lower()
     if text in {"won", "win", "w", "correct", "hit", "true", "yes", "1"}:
         return 1
     if text in {"lost", "loss", "l", "incorrect", "miss", "false", "no", "0"}:
@@ -492,6 +491,8 @@ if st.button("Train and remember", type="primary", use_container_width=True):
             st.error(f"Could not save all learning files to GitHub: {exc}")
     st.subheader("Training summary")
     st.json(memory_bank["summary"])
+    with st.expander("Calibration details", expanded=False):
+        st.json(calibrator.to_dict())
     st.subheader("Top learned patterns")
     st.dataframe(pd.DataFrame(segments[:40]), use_container_width=True, hide_index=True)
     st.download_button("Download ARA memory CSV", ara_csv, file_name="ara_learning_memory.csv", mime="text/csv")
