@@ -1663,17 +1663,17 @@
     "notes": [
       "Learns probability calibration from graded historical predictions.",
       "This does not prove betting profitability; use untouched forward tests before making performance claims.",
-      "Merged 109 existing rows with 1 uploaded rows; removed 0 duplicates; trained on 110 rows."
+      "Merged 110 existing rows with 0 uploaded rows; removed 0 duplicates; trained on 110 rows."
     ],
     "slope": 1.1111665067328516,
-    "source": "pro_predictor_multi_api_high_confidence_only_updated_win_loss.csv",
-    "trained_at_utc": "2026-06-15T16:09:53+00:00"
+    "source": "2026-06-15T16-19_export_3_marked_win_loss.csv",
+    "trained_at_utc": "2026-06-15T18:33:46+00:00"
   },
   "parse_stats": {
     "input_rows": 108,
-    "missing_probability": 0,
-    "missing_result": 107,
-    "usable_rows": 1
+    "missing_probability": 108,
+    "missing_result": 96,
+    "usable_rows": 0
   },
   "patterns": [
     {
@@ -2213,11 +2213,11 @@
   },
   "summary": {
     "duplicates_removed": 0,
-    "existing_rows_before_upload": 109,
+    "existing_rows_before_upload": 110,
     "patterns_saved": 33,
     "rows_after_pruning": 110,
-    "uploaded_usable_rows": 1
+    "uploaded_usable_rows": 0
   },
-  "trained_at_utc": "2026-06-15T16:09:53+00:00",
+  "trained_at_utc": "2026-06-15T18:33:46+00:00",
   "version": "learning-memory-bank-v2"
 }
