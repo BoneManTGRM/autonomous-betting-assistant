@@ -6,3 +6,10 @@ try:
     install_odds_breakdown_normalizer()
 except Exception:
     pass
+
+try:
+    from autonomous_betting_agent.local_users import install_streamlit_local_user_selector
+
+    install_streamlit_local_user_selector()
+except Exception:
+    pass
