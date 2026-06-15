@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import asdict
 from pathlib import Path
 
-from autonomous_betting_agent.profit_goal import ProfitGoalPolicy, review_profit_goal_csv, write_report
+from autonomous_betting_agent.profit_goal import ProfitGoalPolicy, read_csv_rows, review_profit_goal_rows
+from autonomous_betting_agent.report_proof import attach_proof_audit
 
 
 def main() -> int:
@@ -25,9 +27,12 @@ def main() -> int:
         min_finished=args.min_finished,
         require_positive_clv=not args.allow_missing_clv,
     )
-    report = review_profit_goal_csv(args.input_csv, policy=policy)
-    write_report(report, args.output)
-    print(asdict(report))
+    rows = read_csv_rows(args.input_csv)
+    report = review_profit_goal_rows(rows, policy=policy)
+    report_payload = attach_proof_audit(asdict(report), rows, report_name="profit_goal_review")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(report_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps(report_payload, indent=2, sort_keys=True))
     print(f"Saved profit goal report to {args.output}")
     return 0
 
