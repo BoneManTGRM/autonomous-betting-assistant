@@ -1634,31 +1634,46 @@
       "source": "pro_predictor_updated_win_loss_new_finished_marked.csv",
       "sport": "NHL",
       "start": "2026-06-15T00:20:00Z"
+    },
+    {
+      "api_coverage_score": 0.666667,
+      "best_price": 1.69,
+      "books": 46,
+      "confidence": "HIGH",
+      "dedupe_key": "martin landaluce at terence atmane|2026-06-15|terence atmane|1",
+      "error_abs": 0.315031,
+      "event": "Martin Landaluce at Terence Atmane",
+      "outcome": 1,
+      "prediction": "Terence Atmane",
+      "probability": 0.684969,
+      "source": "pro_predictor_multi_api_high_confidence_only_updated_win_loss.csv",
+      "sport": "ATP Halle Open",
+      "start": "2026-06-15T10:40:00Z"
     }
   ],
   "global_calibrator": {
-    "accuracy_after": 0.5688073394495413,
-    "accuracy_before": 0.6146788990825688,
-    "brier_after": 0.22686851380892042,
-    "brier_before": 0.2276088623853211,
-    "events_trained": 109,
-    "intercept": -0.15390831028472596,
-    "log_loss_after": 0.6386403424488106,
-    "log_loss_before": 0.6408535181114161,
+    "accuracy_after": 0.5818181818181818,
+    "accuracy_before": 0.6181818181818182,
+    "brier_after": 0.22583904673735516,
+    "brier_before": 0.22644191391782725,
+    "events_trained": 110,
+    "intercept": -0.14680747106771538,
+    "log_loss_after": 0.636465575614385,
+    "log_loss_before": 0.6384674106487526,
     "notes": [
       "Learns probability calibration from graded historical predictions.",
       "This does not prove betting profitability; use untouched forward tests before making performance claims.",
-      "Merged 0 existing rows with 109 uploaded rows; removed 0 duplicates; trained on 109 rows."
+      "Merged 109 existing rows with 1 uploaded rows; removed 0 duplicates; trained on 110 rows."
     ],
-    "slope": 1.0881050899866582,
-    "source": "pro_predictor_updated_win_loss_new_finished_marked.csv",
-    "trained_at_utc": "2026-06-15T12:21:44+00:00"
+    "slope": 1.1111665067328516,
+    "source": "pro_predictor_multi_api_high_confidence_only_updated_win_loss.csv",
+    "trained_at_utc": "2026-06-15T16:09:53+00:00"
   },
   "parse_stats": {
-    "input_rows": 295,
+    "input_rows": 108,
     "missing_probability": 0,
-    "missing_result": 186,
-    "usable_rows": 109
+    "missing_result": 107,
+    "usable_rows": 1
   },
   "patterns": [
     {
@@ -1711,22 +1726,6 @@
     },
     {
       "action": "lower_trust",
-      "actual_hit_rate": 0.555556,
-      "actual_minus_predicted": -0.079333,
-      "area": "Probability bucket: 60-70%",
-      "area_type": "probability_bucket",
-      "avg_predicted": 0.634889,
-      "brier": 0.256689,
-      "group_value": "60-70%",
-      "importance": 0.065809,
-      "memory_type": "probability_bucket",
-      "records": 18,
-      "reliability": 0.612164,
-      "smoothed_edge": -0.054923,
-      "smoothed_hit_rate": 0.579966
-    },
-    {
-      "action": "lower_trust",
       "actual_hit_rate": 0.333333,
       "actual_minus_predicted": -0.229167,
       "area": "Sport: NPB",
@@ -1740,22 +1739,6 @@
       "reliability": 0.408911,
       "smoothed_edge": -0.098214,
       "smoothed_hit_rate": 0.464286
-    },
-    {
-      "action": "watch",
-      "actual_hit_rate": 0.542169,
-      "actual_minus_predicted": -0.030253,
-      "area": "Books: 11+",
-      "area_type": "books_bucket",
-      "avg_predicted": 0.572422,
-      "brier": 0.222066,
-      "group_value": "11+",
-      "importance": 0.055187,
-      "memory_type": "books_bucket",
-      "records": 83,
-      "reliability": 0.805692,
-      "smoothed_edge": -0.027593,
-      "smoothed_hit_rate": 0.544828
     },
     {
       "action": "lower_trust",
@@ -1772,6 +1755,38 @@
       "reliability": 0.586134,
       "smoothed_edge": -0.050783,
       "smoothed_hit_rate": 0.493751
+    },
+    {
+      "action": "lower_trust",
+      "actual_hit_rate": 0.578947,
+      "actual_minus_predicted": -0.058577,
+      "area": "Probability bucket: 60-70%",
+      "area_type": "probability_bucket",
+      "avg_predicted": 0.637525,
+      "brier": 0.248403,
+      "group_value": "60-70%",
+      "importance": 0.051298,
+      "memory_type": "probability_bucket",
+      "records": 19,
+      "reliability": 0.627895,
+      "smoothed_edge": -0.041221,
+      "smoothed_hit_rate": 0.596304
+    },
+    {
+      "action": "watch",
+      "actual_hit_rate": 0.547619,
+      "actual_minus_predicted": -0.026142,
+      "area": "Books: 11+",
+      "area_type": "books_bucket",
+      "avg_predicted": 0.573762,
+      "brier": 0.220604,
+      "group_value": "11+",
+      "importance": 0.047738,
+      "memory_type": "books_bucket",
+      "records": 84,
+      "reliability": 0.806972,
+      "smoothed_edge": -0.023869,
+      "smoothed_hit_rate": 0.549892
     },
     {
       "action": "lower_trust",
@@ -2191,18 +2206,18 @@
     }
   ],
   "prune_report": {
-    "rows_after": 109,
-    "rows_before": 109,
+    "rows_after": 110,
+    "rows_before": 110,
     "rows_pruned": 0,
     "strategy": "no_pruning_needed"
   },
   "summary": {
     "duplicates_removed": 0,
-    "existing_rows_before_upload": 0,
+    "existing_rows_before_upload": 109,
     "patterns_saved": 33,
-    "rows_after_pruning": 109,
-    "uploaded_usable_rows": 109
+    "rows_after_pruning": 110,
+    "uploaded_usable_rows": 1
   },
-  "trained_at_utc": "2026-06-15T12:21:44+00:00",
+  "trained_at_utc": "2026-06-15T16:09:53+00:00",
   "version": "learning-memory-bank-v2"
 }
