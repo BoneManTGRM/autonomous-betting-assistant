@@ -47,16 +47,20 @@ if active.empty:
     st.warning('No active prediction data found. Upload a CSV or add proof-ledger rows first.')
     st.stop()
 
-quality = build_pick_quality_frame(active, patterns)
-sizing = build_bet_sizing_frame(quality, score_quality=False)
 snapshots = build_prediction_snapshots(active, user_id=profile.user_id)
+quality_input = snapshots.copy()
+for optional_column in ['result_status', 'clean_grading_status', 'profit_units', 'stake_units']:
+    if optional_column in active.columns and optional_column not in quality_input.columns:
+        quality_input[optional_column] = active[optional_column].values
+quality = build_pick_quality_frame(quality_input, patterns)
+sizing = build_bet_sizing_frame(quality, score_quality=False, require_official_lock=True)
 review_queue = build_review_queue(active)
-freshness = build_freshness_frame(active, memory_bank=memory_bank)
+freshness = build_freshness_frame(snapshots, memory_bank=memory_bank)
 health = data_health_score(active)
 ledger_stats = ledger_summary(ledger)
 lock_stats = snapshot_summary(snapshots)
 quality_stats = pick_quality_summary(quality)
-sizing_stats = bet_sizing_summary(quality)
+sizing_stats = bet_sizing_summary(quality, require_official_lock=True)
 fresh_stats = freshness_summary(freshness)
 review_stats = review_summary(review_queue)
 verification = verify_hash_chain(ledger)
@@ -71,7 +75,7 @@ m6.metric('Ledger Win Rate', '' if ledger_stats['win_rate'] is None else f"{ledg
 
 warnings: list[str] = []
 if lock_stats['not_official']:
-    warnings.append(f"{lock_stats['not_official']} rows are not official locked.")
+    warnings.append(f"{lock_stats['not_official']} rows are not official locked. Stake sizing is disabled for those rows.")
 if fresh_stats['stale'] or fresh_stats['missing']:
     warnings.append(f"Freshness warnings: {fresh_stats['stale']} stale, {fresh_stats['missing']} missing timestamps.")
 if not verification.valid:
@@ -84,12 +88,13 @@ if warnings:
 else:
     st.success('No major command-center warnings detected.')
 
-tab_quality, tab_stakes, tab_review, tab_health, tab_fresh, tab_ledger = st.tabs(['Best Picks', 'Smart Stakes', 'Review Queue', 'Data Health', 'Freshness', 'Ledger'])
+tab_quality, tab_stakes, tab_review, tab_health, tab_fresh, tab_locks, tab_ledger = st.tabs(['Best Picks', 'Smart Stakes', 'Review Queue', 'Data Health', 'Freshness', 'Odds Locks', 'Ledger'])
 with tab_quality:
     st.subheader('Best picks by quality')
     st.dataframe(quality.head(50), use_container_width=True, hide_index=True)
 with tab_stakes:
     st.subheader('Smart stake plan')
+    st.caption('Stake sizing requires official locked odds and model probability. Rows without an official lock stay at 0 units.')
     st.dataframe(sizing.head(50), use_container_width=True, hide_index=True)
 with tab_review:
     st.subheader('Review summary')
@@ -102,6 +107,9 @@ with tab_health:
 with tab_fresh:
     st.subheader('Freshness checks')
     st.dataframe(freshness, use_container_width=True, hide_index=True)
+with tab_locks:
+    st.subheader('Official lock snapshots')
+    st.dataframe(snapshots.head(100), use_container_width=True, hide_index=True)
 with tab_ledger:
     st.subheader('Proof ledger summary')
     st.json(ledger_stats)
