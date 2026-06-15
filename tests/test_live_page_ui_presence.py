@@ -50,6 +50,18 @@ class LivePageUiPresenceTests(unittest.TestCase):
         self.assertIn("row.update(api_context)", self.text)
         self.assertIn("fusion_input", self.text)
 
+    def test_live_pro_predictor_page_has_api_coverage_and_date_cutoff(self) -> None:
+        self.assertIn("latest_event_date", self.text)
+        self.assertIn("parse_event_date", self.text)
+        self.assertIn("api_coverage_fields", self.text)
+        self.assertIn("target_min_api_coverage", self.text)
+        self.assertIn("require_all_configured_apis", self.text)
+        self.assertIn("configured_api_sources_count", self.text)
+        self.assertIn("api_sources_used_count", self.text)
+        self.assertIn("api_coverage_score", self.text)
+        self.assertIn("all_configured_apis_used", self.text)
+        self.assertIn("Full API rows", self.text)
+
 
 if __name__ == "__main__":
     unittest.main()
