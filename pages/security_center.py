@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from autonomous_betting_agent.security import (
+    SecurityCheck,
     all_checks_passed,
     checks_to_frame,
     file_sha256,
@@ -39,7 +40,7 @@ try:
     frame = pd.read_csv(BytesIO(raw))
     checks.extend(validate_dataframe(frame))
 except Exception as exc:
-    checks.append(type('Check', (), {'name': 'csv_parse', 'passed': False, 'severity': 'high', 'message': f'Could not parse CSV: {exc}'})())
+    checks.append(SecurityCheck('csv_parse', False, 'high', f'Could not parse CSV: {exc}'))
 
 results = checks_to_frame(checks)
 st.dataframe(results, use_container_width=True, hide_index=True)
