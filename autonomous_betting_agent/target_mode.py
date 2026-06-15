@@ -9,13 +9,13 @@ class TargetModePolicy:
     target_probability: float = 0.70
     tolerance: float = 0.01
     min_books: int = 4
-    min_reliability: float = 95.0
+    min_reliability: float = 90.0
     min_market_probability: float = 0.62
     min_ev: float = 0.0
     max_price_probability_gap: float = 0.12
     h2h_only: bool = True
     require_high_confidence: bool = True
-    min_api_coverage_score: float = 0.0
+    min_api_coverage_score: float = 0.66
     require_all_configured_apis: bool = False
 
 
@@ -113,17 +113,17 @@ def evaluate_target_mode(row: dict[str, Any], policy: TargetModePolicy = TargetM
     if final_probability < low or final_probability > high:
         reasons.append(f"outside {low:.0%}-{high:.0%} band")
     if market_probability < policy.min_market_probability:
-        reasons.append("market probability below floor")
+        reasons.append(f"market probability below floor ({market_probability:.1%} < {policy.min_market_probability:.1%})")
     if books < policy.min_books:
-        reasons.append("not enough books")
+        reasons.append(f"not enough books ({books} < {policy.min_books})")
     if reliability < policy.min_reliability:
-        reasons.append("reliability below target")
+        reasons.append(f"reliability below target ({reliability:.1f} < {policy.min_reliability:.1f})")
     if gap is None or float(gap) > policy.max_price_probability_gap:
         reasons.append("price/probability mismatch")
     if ev_value is None or float(ev_value) < policy.min_ev:
         reasons.append("EV below target")
     if coverage < policy.min_api_coverage_score:
-        reasons.append("API coverage below target")
+        reasons.append(f"API coverage below target ({coverage:.1%} < {policy.min_api_coverage_score:.1%})")
     if policy.require_all_configured_apis and not _truthy(row.get("all_configured_apis_used")):
         reasons.append("not all configured APIs used")
     if row.get("duplicate_event_pick"):
