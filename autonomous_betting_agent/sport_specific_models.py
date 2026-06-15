@@ -21,14 +21,14 @@ def sport_key(value: Any) -> str:
     text = safe_text(value).lower()
     if 'tennis' in text or 'atp' in text or 'wta' in text:
         return 'tennis'
-    if 'soccer' in text or 'football' in text and 'american' not in text or 'fifa' in text or 'liga' in text or 'premier' in text:
-        return 'soccer'
+    if 'nfl' in text or 'american football' in text or 'ncaaf' in text:
+        return 'football'
     if 'nba' in text or 'basketball' in text or 'ncaab' in text:
         return 'basketball'
     if 'mlb' in text or 'baseball' in text:
         return 'baseball'
-    if 'nfl' in text or 'american football' in text or 'ncaaf' in text:
-        return 'football'
+    if 'soccer' in text or 'fifa' in text or 'liga' in text or 'premier' in text or text == 'football':
+        return 'soccer'
     return 'default'
 
 
