@@ -99,9 +99,7 @@ if st is not None and DeltaGenerator is not None:
     _real_dg_selectbox = DeltaGenerator.selectbox
 
     def _patched_set_page_config(*args: Any, **kwargs: Any) -> Any:
-        result = _real_set_page_config(*args, **kwargs)
-        _render_bilingual_nav()
-        return result
+        return _real_set_page_config(*args, **kwargs)
 
     def _patched_st_selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
         return _language_selectbox(label, options, args, kwargs, _real_st_selectbox)
