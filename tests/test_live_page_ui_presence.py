@@ -43,6 +43,17 @@ class LivePageUiPresenceTests(unittest.TestCase):
         self.assertIn("TargetModePolicy", self.text)
         self.assertIn("evaluate_target_mode", self.text)
 
+    def test_live_pro_predictor_page_uses_real_api_context_builder(self) -> None:
+        self.assertIn("LiveAPIContextBuilder", self.text)
+        self.assertIn("context_builder.context_for_event", self.text)
+        self.assertIn("odds_api_source_used", self.text)
+        self.assertIn("sportsdataio_source_used", self.text)
+        self.assertIn("stats_source_used", self.text)
+        self.assertIn("injury_source_used", self.text)
+        self.assertIn("weather_source_used", self.text)
+        self.assertIn("sportsdataio_status", self.text)
+        self.assertIn("weatherapi_status", self.text)
+
 
 if __name__ == "__main__":
     unittest.main()
