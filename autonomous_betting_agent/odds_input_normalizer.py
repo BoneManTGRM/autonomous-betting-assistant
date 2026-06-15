@@ -91,9 +91,11 @@ def _derive_price_from_implied_probability(frame: pd.DataFrame) -> None:
     source = _find_column(frame, IMPLIED_PROBABILITY_ALIASES)
     if source is None:
         return
+
     def convert(value: Any) -> float | str:
         probability = parse_probability(value)
         return '' if probability is None else round(1.0 / probability, 4)
+
     frame['best_price'] = frame[source].map(convert)
 
 
@@ -111,3 +113,20 @@ def normalize_odds_input(frame: pd.DataFrame) -> pd.DataFrame:
         _copy_if_missing(out, target, aliases)
     _derive_price_from_implied_probability(out)
     return out
+
+
+def install_odds_breakdown_normalizer() -> None:
+    """Ensure every odds breakdown call receives canonical odds/probability fields."""
+    try:
+        from . import odds_breakdown
+    except Exception:
+        return
+    if getattr(odds_breakdown, '_input_normalizer_installed', False):
+        return
+    original = odds_breakdown.build_odds_breakdown
+
+    def normalized_build_odds_breakdown(frame: pd.DataFrame):
+        return original(normalize_odds_input(frame))
+
+    odds_breakdown.build_odds_breakdown = normalized_build_odds_breakdown
+    odds_breakdown._input_normalizer_installed = True
