@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from autonomous_betting_agent.live_odds import list_sports, scan_market
+from autonomous_betting_agent.scanner_strength import score_scanner_frame, scanner_strength_summary
 
 st.set_page_config(page_title='Scanner Pro', layout='wide')
 LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='scanner_pro_language') == 'Español' else 'en'
@@ -38,9 +39,13 @@ TEXT = {
         'events': 'Events',
         'books': 'Avg books',
         'best_price_rows': 'Rows with best price',
+        'avg_strength': 'Avg strength',
+        'premium': 'Premium',
+        'usable': 'Usable',
         'moneyline': 'Moneyline outcomes',
         'spreads': 'Spreads',
         'totals': 'Totals',
+        'top_scans': 'Top scanner-ranked markets',
         'download': 'Download Scanner Pro CSV',
         'no_rows': 'No rows returned. Try fewer filters, another region, or a valid manual sport key.',
         'stored': 'Scanner rows saved in session for What Are the Odds and Learning Memory review.',
@@ -71,9 +76,13 @@ TEXT = {
         'events': 'Eventos',
         'books': 'Promedio de casas',
         'best_price_rows': 'Filas con mejor cuota',
+        'avg_strength': 'Fuerza promedio',
+        'premium': 'Premium',
+        'usable': 'Utilizables',
         'moneyline': 'Resultados moneyline',
         'spreads': 'Spreads',
         'totals': 'Totales',
+        'top_scans': 'Mercados mejor calificados por el escáner',
         'download': 'Descargar CSV de Scanner Pro',
         'no_rows': 'No se encontraron filas. Prueba menos filtros, otra región o una clave manual válida.',
         'stored': 'Las filas se guardaron en sesión para What Are the Odds y Memoria de Aprendizaje.',
@@ -189,7 +198,7 @@ def scan_to_frame(api_key: str, sports_to_scan: list[str], regions: str, markets
     if not frame.empty and min_books > 1 and 'bookmaker_count' in frame.columns:
         frame = frame[pd.to_numeric(frame['bookmaker_count'], errors='coerce').fillna(0) >= min_books]
     st.session_state['scanner_pro_skipped'] = skipped
-    return frame
+    return score_scanner_frame(frame)
 
 
 st.title(t('title'))
@@ -245,7 +254,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
     st.session_state['ara_latest_predictions_source'] = 'Scanner Pro'
     st.session_state['ara_latest_predictions_saved_at'] = pd.Timestamp.utcnow().isoformat()
 else:
-    result = pd.DataFrame(st.session_state.get('scanner_pro_latest_rows', []))
+    result = score_scanner_frame(pd.DataFrame(st.session_state.get('scanner_pro_latest_rows', [])))
 
 if result.empty:
     st.warning(t('no_rows'))
@@ -255,13 +264,20 @@ if result.empty:
         st.dataframe(skipped, use_container_width=True, hide_index=True)
     st.stop()
 
+strength = scanner_strength_summary(result)
 st.success(t('stored'))
-cols = st.columns(5)
+cols = st.columns(7)
 cols[0].metric(t('rows'), len(result))
 cols[1].metric(t('sports'), result['sport_key'].nunique() if 'sport_key' in result else 0)
 cols[2].metric(t('events'), result['event_id'].nunique() if 'event_id' in result else 0)
 cols[3].metric(t('books'), round(float(pd.to_numeric(result.get('bookmaker_count', pd.Series(dtype=float)), errors='coerce').fillna(0).mean()), 2))
 cols[4].metric(t('best_price_rows'), int(result.get('best_price', pd.Series(dtype=str)).fillna('').astype(str).str.strip().ne('').sum()) if 'best_price' in result else 0)
+cols[5].metric(t('avg_strength'), 'N/A' if strength['avg_score'] is None else strength['avg_score'])
+cols[6].metric(t('premium'), strength['premium_scan'])
+
+st.subheader(t('top_scans'))
+rank_cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'decimal_price', 'bookmaker', 'bookmaker_count', 'scanner_strength_score', 'scanner_strength_tier', 'scanner_recommendation', 'scanner_reasons'] if col in result.columns]
+st.dataframe(result[rank_cols].head(50) if rank_cols else result.head(50), use_container_width=True, hide_index=True)
 
 tabs = st.tabs([t('moneyline'), t('spreads'), t('totals'), 'All'])
 with tabs[0]:
