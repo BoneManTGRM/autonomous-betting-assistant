@@ -1,21 +1,55 @@
-MIT License
+Autonomous Betting Agent Commercial Source-Available License v1.0
 
-Copyright (c) 2026 Reparodynamics
+Copyright (c) 2026 Reparodynamics. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software, including the Autonomous Betting Agent, Pro Predictor workflows, ARA/TGRM-derived decision layers, documentation, examples, reports, interfaces, and related source code, is proprietary software owned by Reparodynamics unless a separate written agreement states otherwise.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. License Status
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+This repository is source-available for review, testing, evaluation, and development discussion only. It is not open-source software. Public visibility of the repository does not grant commercial rights, redistribution rights, resale rights, sublicensing rights, managed-service rights, or white-label rights.
+
+2. Evaluation Grant
+
+You may view the source code and run a local copy for personal, internal, non-commercial evaluation. This limited evaluation grant does not include the right to:
+
+- sell, lease, sublicense, host, or commercially provide the software;
+- use the software to operate a paid betting, sports analytics, prediction, subscription, advisory, consulting, SaaS, API, or white-label product;
+- copy, redistribute, repackage, mirror, publish, or make derivative commercial versions of the software;
+- remove copyright, licensing, attribution, warranty, or risk notices;
+- use Reparodynamics, ARA, TGRM, Pro Predictor, or related marks in a way that implies endorsement or ownership without written permission.
+
+3. Commercial Use Requires Written Permission
+
+Any commercial use requires a separate written commercial license from Reparodynamics. Commercial use includes, but is not limited to, paid access, client work, investor demos, resale, affiliate products, sports advisory services, betting groups, subscription communities, private signal channels, SaaS deployments, API access, enterprise deployment, or monetized derivative products.
+
+4. Ownership and Derivatives
+
+All rights not expressly granted are reserved by Reparodynamics. Derivative works, modifications, forks, integrations, model layers, user interfaces, reports, and deployment packages based on this software may not be used commercially without a written commercial license.
+
+5. Third-Party Services and Data
+
+This software may connect to third-party APIs, sportsbooks, odds providers, sports-data providers, weather providers, or other external services. Users are solely responsible for obtaining their own API keys, complying with provider terms, and ensuring that any use of third-party data is lawful and properly licensed.
+
+6. Sports, Gambling, and Financial Risk Notice
+
+This software is a research and analytics tool. It does not place bets, does not guarantee winners, does not guarantee profit, and does not provide financial, gambling, legal, or investment advice. Sports outcomes are uncertain. Betting involves risk and may be illegal or restricted in some jurisdictions. Users are solely responsible for their decisions and compliance with applicable law.
+
+7. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, RELIABILITY, AVAILABILITY, OR PROFITABILITY.
+
+8. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, REPARODYNAMICS AND ITS AUTHORS, OWNERS, CONTRIBUTORS, LICENSORS, AND AFFILIATES SHALL NOT BE LIABLE FOR ANY CLAIM, LOSS, DAMAGE, LIABILITY, COST, EXPENSE, LOST PROFIT, LOST DATA, LOST OPPORTUNITY, BETTING LOSS, BUSINESS INTERRUPTION, OR CONSEQUENTIAL, INCIDENTAL, SPECIAL, EXEMPLARY, OR PUNITIVE DAMAGES ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
+
+9. Termination
+
+Any violation of this license automatically terminates all rights granted under it. Upon termination, you must stop using the software and delete all copies in your possession or control unless a separate written agreement states otherwise.
+
+10. Separate Written Agreements
+
+A signed written agreement with Reparodynamics may grant additional rights, including commercial deployment, white-label use, resale, support, customization, hosting, or private integration. If a signed agreement conflicts with this license, the signed agreement controls for the parties to that agreement.
+
+11. Prior Versions
+
+This license applies to repository versions distributed with this notice. Earlier public versions may have been distributed under different terms. This notice does not by itself revoke rights that may have already been granted under a prior valid license for earlier copies, but all future versions and updates distributed with this notice are governed by this license unless stated otherwise in writing.
