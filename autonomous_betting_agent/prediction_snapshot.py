@@ -8,11 +8,11 @@ from typing import Any, Mapping
 
 import pandas as pd
 
-from .audit import enrich_prediction_frame, parse_float
+from .audit import parse_float
 from .local_users import DEFAULT_USER_ID, sanitize_user_id
 from .row_normalizer import normalize_frame, normalize_row, safe_text
 
-SNAPSHOT_SCHEMA_VERSION = 'prediction-snapshot-v4'
+SNAPSHOT_SCHEMA_VERSION = 'prediction-snapshot-v5'
 REQUIRED_OFFICIAL_FIELDS = ('event', 'prediction', 'model_probability', 'decimal_price', 'locked_at_utc')
 
 
@@ -81,10 +81,10 @@ def build_prediction_snapshots(
     if frame is None or frame.empty:
         return pd.DataFrame()
     clean_user = sanitize_user_id(user_id)
-    enriched = normalize_frame(enrich_prediction_frame(frame))
+    normalized_frame = normalize_frame(frame)
     new_lock_time = locked_at_utc or (utc_now_iso() if allow_auto_lock else '')
     rows: list[dict[str, Any]] = []
-    for raw in enriched.to_dict(orient='records'):
+    for raw in normalized_frame.to_dict(orient='records'):
         normalized = normalize_row(raw)
         existing_lock_time = normalized.get('prediction_timestamp', '')
         lock_time = existing_lock_time or new_lock_time
