@@ -369,7 +369,7 @@ class LiveAPIContextBuilder:
                 {
                     "sportsdataio_sport": sdio_sport,
                     "sportsdataio_status": teams_status,
-                    "sportsdataio_source_used": "yes" if teams_status == "used" else "no",
+                    "sportsdataio_team_metadata_used": "yes" if teams_status == "used" and (home_record or away_record) else "no",
                     "sportsdataio_home_team_matched": "yes" if home_record else "no",
                     "sportsdataio_away_team_matched": "yes" if away_record else "no",
                     "sportsdataio_home_city": _first(home_record or {}, ("City", "School", "StadiumDetails_City")),
@@ -381,15 +381,21 @@ class LiveAPIContextBuilder:
             if stats_probability is not None:
                 context["stats_probability"] = stats_probability
                 context["stats_source_used"] = "yes"
+                context["sportsdataio_source_used"] = "yes"
 
             injuries, injuries_status = self._injuries(sdio_sport)
             context["sportsdataio_injuries_status"] = injuries_status
-            injury_score, injury_reason, injury_count = _injury_score(injuries, picked_record)
-            context["injury_source_reason"] = injury_reason
-            context["sportsdataio_picked_team_injury_count"] = injury_count
-            if injury_score is not None and injuries_status == "used":
-                context["injury_risk_score"] = injury_score
-                context["injury_source_used"] = "yes"
+            if injuries_status == "used":
+                injury_score, injury_reason, injury_count = _injury_score(injuries, picked_record)
+                context["injury_source_reason"] = injury_reason
+                context["sportsdataio_picked_team_injury_count"] = injury_count
+                if injury_score is not None:
+                    context["injury_risk_score"] = injury_score
+                    context["injury_source_used"] = "yes"
+                    context["sportsdataio_source_used"] = "yes"
+            else:
+                context["injury_source_reason"] = f"SportsDataIO injuries unavailable: {injuries_status}"
+                context["sportsdataio_picked_team_injury_count"] = 0
 
         location = _location_from_team(home_record, home_team)
         weather_row, weather_status = self._weather(location, start)
