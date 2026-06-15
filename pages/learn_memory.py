@@ -88,6 +88,8 @@ TEXT = {
         "metric_check": "Metric check",
         "metric_mismatch": "Saved calibration and cumulative memory do not match. Re-train once with the latest graded CSV and save to GitHub so both sections use the same rows.",
         "metric_match": "Saved calibration and cumulative memory are aligned.",
+        "saved_implies": "Saved calibration implies",
+        "memory_shows": "cumulative memory shows",
         "best_area": "Best reliable area",
         "weakest_area": "Weakest reliable area",
         "records": "records",
@@ -135,6 +137,8 @@ TEXT = {
         "metric_check": "Revisión de métricas",
         "metric_mismatch": "La calibración guardada y la memoria acumulativa no coinciden. Entrena una vez con el CSV calificado más reciente y guarda en GitHub para que ambas secciones usen las mismas filas.",
         "metric_match": "La calibración guardada y la memoria acumulativa están alineadas.",
+        "saved_implies": "La calibración guardada implica",
+        "memory_shows": "la memoria acumulativa muestra",
         "best_area": "Mejor área confiable",
         "weakest_area": "Área confiable más débil",
         "records": "registros",
@@ -624,7 +628,7 @@ win_cols[2].metric(t("losses"), existing_metrics["losses"])
 if current is not None and saved_raw_wins is not None and int(current.events_trained) == int(existing_metrics["resolved"]):
     memory_wins = int(existing_metrics["wins"] or 0)
     if saved_raw_wins != memory_wins:
-        st.warning(f"{t('metric_mismatch')} Saved calibration implies {saved_raw_wins} wins; cumulative memory shows {memory_wins} wins.")
+        st.warning(f"{t('metric_mismatch')} {t('saved_implies')} {saved_raw_wins} {t('wins').lower()}; {t('memory_shows')} {memory_wins} {t('wins').lower()}.")
     else:
         st.success(t("metric_match"))
 
