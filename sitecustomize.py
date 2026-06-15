@@ -46,11 +46,20 @@ except Exception:
     pass
 
 
-def _called_from_pro_predictor() -> bool:
+def _called_from_page(page_name: str) -> bool:
     try:
-        return any(str(frame.filename).replace("\\", "/").endswith("pages/pro_predictor.py") for frame in inspect.stack())
+        suffix = f"pages/{page_name}".replace("\\", "/")
+        return any(str(frame.filename).replace("\\", "/").endswith(suffix) for frame in inspect.stack())
     except Exception:
         return False
+
+
+def _called_from_pro_predictor() -> bool:
+    return _called_from_page("pro_predictor.py")
+
+
+def _called_from_learning_memory() -> bool:
+    return _called_from_page("learn_memory.py")
 
 
 def _looks_like_predictor_report(data: Any) -> bool:
@@ -69,17 +78,18 @@ def _looks_like_predictor_report(data: Any) -> bool:
     )
 
 
-def _install_latest_report_capture() -> None:
+def _install_page_helpers() -> None:
     try:
         import streamlit as st
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, "_aba_latest_report_capture_installed", False):
+    if getattr(st, "_aba_page_helpers_installed", False):
         return
-    st._aba_latest_report_capture_installed = True
+    st._aba_page_helpers_installed = True
     real_st_dataframe = st.dataframe
     real_dg_dataframe = DeltaGenerator.dataframe
+    real_subheader = st.subheader
 
     def capture(data: Any) -> None:
         if _called_from_pro_predictor() and _looks_like_predictor_report(data):
@@ -96,8 +106,27 @@ def _install_latest_report_capture() -> None:
         capture(data)
         return real_dg_dataframe(self, data, *args, **kwargs)
 
+    def render_learning_reader_once() -> None:
+        if st.session_state.get("_aba_learning_report_reader_rendered"):
+            return
+        st.session_state["_aba_learning_report_reader_rendered"] = True
+        try:
+            from autonomous_betting_agent.learning_report_reader import render_learning_report_reader
+
+            render_learning_report_reader()
+        except Exception as exc:
+            real_subheader(f"Odds report reader could not load: {exc}")
+
+    def patched_subheader(body: Any, *args: Any, **kwargs: Any) -> Any:
+        result = real_subheader(body, *args, **kwargs)
+        text = str(body)
+        if _called_from_learning_memory() and ("Train from finished games" in text or "Entrenar con partidos terminados" in text):
+            render_learning_reader_once()
+        return result
+
     st.dataframe = patched_st_dataframe
     DeltaGenerator.dataframe = patched_dg_dataframe
+    st.subheader = patched_subheader
 
 
-_install_latest_report_capture()
+_install_page_helpers()
