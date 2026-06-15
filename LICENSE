@@ -1,55 +1,128 @@
-Autonomous Betting Agent Commercial Source-Available License v1.0
+Reparodynamics Proprietary Evaluation License v1.1
 
 Copyright (c) 2026 Reparodynamics. All rights reserved.
 
-This software, including the Autonomous Betting Agent, Pro Predictor workflows, ARA/TGRM-derived decision layers, documentation, examples, reports, interfaces, and related source code, is proprietary software owned by Reparodynamics unless a separate written agreement states otherwise.
+This license governs the Autonomous Betting Agent, Pro Predictor workflows, ARA/TGRM-derived decision layers, source code, documentation, examples, reports, user interfaces, configurations, tests, prompts, scripts, workflows, and related materials distributed with this repository, except for third-party components that are governed by their own separate licenses.
 
-1. License Status
+This software is proprietary. It is source-available for limited evaluation only. It is not open-source software, free software, public-domain software, or a grant of commercial rights.
 
-This repository is source-available for review, testing, evaluation, and development discussion only. It is not open-source software. Public visibility of the repository does not grant commercial rights, redistribution rights, resale rights, sublicensing rights, managed-service rights, or white-label rights.
+1. Definitions
 
-2. Evaluation Grant
+"Software" means this repository and all code, documentation, models, prompts, workflows, reports, interfaces, examples, tests, configuration files, and related materials included in or derived from it.
 
-You may view the source code and run a local copy for personal, internal, non-commercial evaluation. This limited evaluation grant does not include the right to:
+"Owner" means Reparodynamics and its authorized successors or assigns.
 
-- sell, lease, sublicense, host, or commercially provide the software;
-- use the software to operate a paid betting, sports analytics, prediction, subscription, advisory, consulting, SaaS, API, or white-label product;
-- copy, redistribute, repackage, mirror, publish, or make derivative commercial versions of the software;
-- remove copyright, licensing, attribution, warranty, or risk notices;
-- use Reparodynamics, ARA, TGRM, Pro Predictor, or related marks in a way that implies endorsement or ownership without written permission.
+"You" means any individual or entity accessing, downloading, cloning, copying, viewing, testing, running, modifying, or otherwise using the Software.
 
-3. Commercial Use Requires Written Permission
+"Evaluation Use" means private, internal, non-commercial review of the Software to determine whether to request a paid commercial license from the Owner.
 
-Any commercial use requires a separate written commercial license from Reparodynamics. Commercial use includes, but is not limited to, paid access, client work, investor demos, resale, affiliate products, sports advisory services, betting groups, subscription communities, private signal channels, SaaS deployments, API access, enterprise deployment, or monetized derivative products.
+"Commercial Use" means any use connected to money, business, clients, customers, subscriptions, investor demos, affiliate activity, paid groups, consulting, resale, licensing, hosting, SaaS, API access, white-labeling, managed services, signal channels, sports advisory services, prediction services, gambling or betting services, or any product or service offered to third parties.
 
-4. Ownership and Derivatives
+"Hosted Use" means making the Software or any derivative available over a network, cloud service, website, app, API, bot, dashboard, Discord/Telegram group, Streamlit deployment, private server, or other remote-access system.
 
-All rights not expressly granted are reserved by Reparodynamics. Derivative works, modifications, forks, integrations, model layers, user interfaces, reports, and deployment packages based on this software may not be used commercially without a written commercial license.
+"Competitive Use" means using the Software to build, train, benchmark, evaluate, improve, operate, or support a competing sports analytics, betting, prediction, odds-analysis, prop-analysis, research-agent, or decision-support product or service.
 
-5. Third-Party Services and Data
+"Derivative Work" means any modification, fork, adaptation, integration, extension, plug-in, translation, model layer, UI layer, deployment package, report system, workflow, or product that is based on, incorporates, copies, learns from, or substantially uses the Software.
 
-This software may connect to third-party APIs, sportsbooks, odds providers, sports-data providers, weather providers, or other external services. Users are solely responsible for obtaining their own API keys, complying with provider terms, and ensuring that any use of third-party data is lawful and properly licensed.
+2. Limited Evaluation Grant
 
-6. Sports, Gambling, and Financial Risk Notice
+Subject to full compliance with this license, the Owner grants You a limited, revocable, non-exclusive, non-transferable, non-sublicensable license to view the Software and run one local copy solely for Evaluation Use.
 
-This software is a research and analytics tool. It does not place bets, does not guarantee winners, does not guarantee profit, and does not provide financial, gambling, legal, or investment advice. Sports outcomes are uncertain. Betting involves risk and may be illegal or restricted in some jurisdictions. Users are solely responsible for their decisions and compliance with applicable law.
+This grant does not include Commercial Use, Hosted Use, Competitive Use, redistribution, sublicensing, resale, publication, training, benchmarking, or production deployment.
 
-7. No Warranty
+3. No Commercial Rights Without a Signed Agreement
 
-THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, RELIABILITY, AVAILABILITY, OR PROFITABILITY.
+You may not use the Software for any Commercial Use unless You have a separate written agreement signed by the Owner.
 
-8. Limitation of Liability
+Commercial rights cannot be created by implication, verbal permission, repository access, public visibility, a GitHub fork, a download, a clone, a pull request, an issue, a message, an email thread, or payment not accepted under a signed written commercial agreement.
 
-TO THE MAXIMUM EXTENT PERMITTED BY LAW, REPARODYNAMICS AND ITS AUTHORS, OWNERS, CONTRIBUTORS, LICENSORS, AND AFFILIATES SHALL NOT BE LIABLE FOR ANY CLAIM, LOSS, DAMAGE, LIABILITY, COST, EXPENSE, LOST PROFIT, LOST DATA, LOST OPPORTUNITY, BETTING LOSS, BUSINESS INTERRUPTION, OR CONSEQUENTIAL, INCIDENTAL, SPECIAL, EXEMPLARY, OR PUNITIVE DAMAGES ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
+4. Strict Restrictions
 
-9. Termination
+You may not, directly or indirectly:
 
-Any violation of this license automatically terminates all rights granted under it. Upon termination, you must stop using the software and delete all copies in your possession or control unless a separate written agreement states otherwise.
+- sell, resell, lease, rent, license, sublicense, distribute, publish, mirror, repackage, or transfer the Software;
+- provide access to the Software as a hosted product, SaaS product, API, dashboard, app, bot, group, signal service, managed service, consulting deliverable, or white-label product;
+- use the Software to operate, support, or improve any paid or monetized sports analytics, betting, prediction, odds-analysis, player-prop, handicapping, advisory, or research product;
+- use the Software for Competitive Use;
+- use the Software, its outputs, structure, prompts, reports, workflows, or source code to train, fine-tune, distill, evaluate, benchmark, or improve any machine-learning model, AI system, agent, prediction engine, or automated decision system;
+- scrape, mine, index, bulk copy, or extract the Software for dataset creation, model training, code generation, competitive analysis, or commercial research;
+- remove, alter, hide, or misrepresent copyright notices, license notices, attribution, warranty disclaimers, risk notices, or commercial-use restrictions;
+- represent that You own the Software or that You are authorized to sell, license, host, or commercially exploit it without written permission;
+- use the names Reparodynamics, Autonomous Betting Agent, Pro Predictor, ARA, TGRM, BoneManTGRM, or related marks in a way that implies ownership, sponsorship, endorsement, partnership, or commercial authorization without written permission;
+- use the Software in violation of any law, regulation, sportsbook rule, data-provider term, platform term, gambling law, consumer-protection law, export-control law, or third-party right.
 
-10. Separate Written Agreements
+5. Derivatives and Modifications
 
-A signed written agreement with Reparodynamics may grant additional rights, including commercial deployment, white-label use, resale, support, customization, hosting, or private integration. If a signed agreement conflicts with this license, the signed agreement controls for the parties to that agreement.
+You may modify the Software only for private Evaluation Use. You may not distribute, publish, host, sell, sublicense, or commercially use any Derivative Work without a signed written commercial agreement with the Owner.
 
-11. Prior Versions
+All rights in the original Software remain with the Owner. No ownership rights are transferred to You.
 
-This license applies to repository versions distributed with this notice. Earlier public versions may have been distributed under different terms. This notice does not by itself revoke rights that may have already been granted under a prior valid license for earlier copies, but all future versions and updates distributed with this notice are governed by this license unless stated otherwise in writing.
+6. Outputs, Reports, and Predictions
+
+The Software may generate outputs, reports, predictions, rankings, probabilities, scores, recommendations, alerts, CSV files, JSON files, dashboards, or other analytics.
+
+No output is guaranteed to be accurate, profitable, complete, current, legal to use, or suitable for betting or financial decisions. You are solely responsible for reviewing outputs, validating results, complying with applicable law, and deciding whether and how to use any information.
+
+Use of outputs for Commercial Use requires a signed written commercial agreement unless the Owner states otherwise in that agreement.
+
+7. Third-Party Services, Data, and Dependencies
+
+The Software may interact with third-party services, APIs, sportsbooks, odds providers, sports-data providers, weather providers, hosting platforms, and software dependencies. This license does not grant rights to any third-party service, API, data feed, database, sportsbook content, statistics provider, weather provider, logo, trademark, or dependency.
+
+You are solely responsible for obtaining valid API keys, licenses, subscriptions, permissions, and data rights, and for complying with all third-party terms and applicable laws.
+
+8. Betting, Gambling, and Financial Risk Notice
+
+The Software is a research and analytics tool. It does not place bets, does not guarantee winners, does not guarantee profit, does not eliminate risk, and does not provide legal, financial, investment, gambling, tax, or professional advice.
+
+Sports outcomes are uncertain. Betting can cause financial loss and may be illegal, restricted, age-limited, or regulated in Your jurisdiction. You are solely responsible for Your decisions, losses, compliance obligations, and use of the Software.
+
+9. Confidentiality of Non-Public Materials
+
+If the Owner provides You with non-public versions, private branches, private documentation, custom integrations, credentials, pricing, roadmap details, datasets, demos, business plans, or support materials, You must treat them as confidential unless a separate written agreement says otherwise.
+
+10. Feedback
+
+If You provide suggestions, comments, bug reports, feature requests, ideas, improvements, or other feedback about the Software, You grant the Owner a perpetual, worldwide, irrevocable, royalty-free right to use that feedback for any purpose without compensation or obligation to You.
+
+11. No Support or Updates
+
+The Owner has no obligation to provide support, maintenance, updates, hosting, bug fixes, documentation, training, security patches, or commercial access unless a signed written agreement states otherwise.
+
+12. Termination
+
+This license terminates automatically if You violate any term. Upon termination, You must immediately stop using the Software and delete all copies, forks, clones, builds, deployments, derived files, and non-public materials in Your possession or control, unless a signed written agreement states otherwise.
+
+13. Reservation of Rights
+
+All rights not expressly granted are reserved by the Owner. No rights are granted by waiver, implication, estoppel, course of dealing, repository visibility, public access, issue participation, pull-request participation, or other conduct.
+
+14. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTY OF ANY KIND, EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING WITHOUT LIMITATION WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, RELIABILITY, AVAILABILITY, SECURITY, DATA INTEGRITY, LEGALITY, PERFORMANCE, OR PROFITABILITY.
+
+15. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE OWNER AND ITS AUTHORS, CONTRIBUTORS, AFFILIATES, LICENSORS, SUPPLIERS, AND REPRESENTATIVES SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, PUNITIVE, OR ENHANCED DAMAGES; LOST PROFITS; LOST REVENUE; LOST DATA; LOST BUSINESS; LOST OPPORTUNITY; BUSINESS INTERRUPTION; REPUTATIONAL HARM; BETTING LOSSES; GAMBLING LOSSES; REGULATORY LOSSES; OR DAMAGES ARISING FROM OR RELATED TO THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE OWNER'S TOTAL LIABILITY FOR ANY CLAIM ARISING FROM OR RELATED TO THE SOFTWARE SHALL NOT EXCEED ONE HUNDRED U.S. DOLLARS (US $100) OR THE AMOUNT YOU PAID DIRECTLY TO THE OWNER FOR THE SOFTWARE IN THE THREE MONTHS BEFORE THE CLAIM, WHICHEVER IS GREATER.
+
+16. Injunctive Relief
+
+Unauthorized Commercial Use, Hosted Use, Competitive Use, redistribution, sublicensing, publication, or disclosure of non-public materials may cause irreparable harm. The Owner may seek injunctive or equitable relief in addition to any other available remedies.
+
+17. Separate Commercial Agreements
+
+A separate written agreement signed by the Owner may grant additional rights, including commercial deployment, resale, private hosting, white-label use, support, custom integrations, client work, or paid access. If a signed written agreement conflicts with this license, the signed written agreement controls only for the parties and scope covered by that agreement.
+
+18. Prior Versions
+
+Earlier public versions of this repository may have been distributed under different license terms, including MIT. This license does not by itself revoke rights that may already have been validly granted for earlier copies under a prior license. This license governs versions distributed with this notice and all future versions, updates, branches, releases, and materials that include or reference this license unless a signed written agreement states otherwise.
+
+19. Severability
+
+If any provision of this license is held unenforceable, the remaining provisions remain in effect to the maximum extent permitted by law.
+
+20. Contact
+
+For commercial licensing, private deployment, white-label rights, resale rights, custom integrations, or written permission, contact Reparodynamics / BoneManTGRM through the repository owner account.
