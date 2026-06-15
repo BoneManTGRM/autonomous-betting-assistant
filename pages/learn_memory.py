@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import builtins
 import csv
 import io
 import json
@@ -16,6 +17,26 @@ import requests
 import streamlit as st
 
 from autonomous_betting_agent.learning import GradedPrediction, ProbabilityCalibrator, fit_probability_calibrator
+
+
+def get_secret(*names: str) -> str:
+    """Read Streamlit secrets or environment variables safely on every runtime."""
+    for name in names:
+        if not name:
+            continue
+        try:
+            value = str(st.secrets.get(name, "")).strip()
+            if value:
+                return value
+        except Exception:
+            pass
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+builtins.get_secret = get_secret
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LEARNED_STATE_PATH = REPO_ROOT / "learned_state.json"
@@ -52,7 +73,7 @@ TEXT = {
         "caption": "Cumulative zero-cost learning. Upload graded results, merge with prior memory, prune low-value history, rebuild calibration, and save back to GitHub.",
         "saved_calibration": "Saved calibration summary",
         "cumulative_summary": "Cumulative memory summary",
-        "metrics_note": "These two sections can differ: saved calibration shows the current calibrator report, while cumulative memory shows the raw resolved rows stored in memory.",
+        "metrics_note": "Saved calibration is the trained calibrator file. Cumulative memory is the raw stored graded rows. If both show the same row count but different win rate, one file is stale or came from a different upload.",
         "events_trained": "Events trained",
         "raw_accuracy": "Raw accuracy",
         "calibrated_accuracy": "Calibrated accuracy",
@@ -62,6 +83,11 @@ TEXT = {
         "hit_rate": "Hit rate",
         "avg_predicted": "Avg predicted",
         "brier_score": "Brier score",
+        "wins": "Wins",
+        "losses": "Losses",
+        "metric_check": "Metric check",
+        "metric_mismatch": "Saved calibration and cumulative memory do not match. Re-train once with the latest graded CSV and save to GitHub so both sections use the same rows.",
+        "metric_match": "Saved calibration and cumulative memory are aligned.",
         "best_area": "Best reliable area",
         "weakest_area": "Weakest reliable area",
         "records": "records",
@@ -94,7 +120,7 @@ TEXT = {
         "caption": "Aprendizaje acumulativo sin costo extra. Sube resultados ya calificados, combínalos con la memoria anterior, elimina historial de bajo valor, reconstruye la calibración y guárdalo en GitHub.",
         "saved_calibration": "Resumen de calibración guardado",
         "cumulative_summary": "Resumen de memoria acumulativa",
-        "metrics_note": "Estas dos secciones pueden ser diferentes: la calibración guardada muestra el reporte del calibrador actual, mientras la memoria acumulativa muestra las filas resueltas guardadas en memoria.",
+        "metrics_note": "La calibración guardada es el archivo entrenado. La memoria acumulativa son las filas calificadas crudas. Si ambas muestran el mismo número de filas pero distinta tasa de acierto, un archivo está desactualizado o vino de otra carga.",
         "events_trained": "Eventos entrenados",
         "raw_accuracy": "Precisión bruta",
         "calibrated_accuracy": "Precisión calibrada",
@@ -104,6 +130,11 @@ TEXT = {
         "hit_rate": "Tasa de acierto",
         "avg_predicted": "Promedio pronosticado",
         "brier_score": "Puntaje Brier",
+        "wins": "Ganadas",
+        "losses": "Perdidas",
+        "metric_check": "Revisión de métricas",
+        "metric_mismatch": "La calibración guardada y la memoria acumulativa no coinciden. Entrena una vez con el CSV calificado más reciente y guarda en GitHub para que ambas secciones usen las mismas filas.",
+        "metric_match": "La calibración guardada y la memoria acumulativa están alineadas.",
         "best_area": "Mejor área confiable",
         "weakest_area": "Área confiable más débil",
         "records": "registros",
@@ -537,14 +568,18 @@ def current_learned_state() -> ProbabilityCalibrator | None:
 
 def memory_metrics(rows: list[dict[str, Any]]) -> dict[str, float | int | None]:
     if not rows:
-        return {"resolved": 0, "hit_rate": None, "avg_predicted": None, "brier": None}
+        return {"resolved": 0, "hit_rate": None, "avg_predicted": None, "brier": None, "wins": 0, "losses": 0}
     probabilities = [float(row["probability"]) for row in rows]
     outcomes = [int(row["outcome"]) for row in rows]
+    wins = sum(outcomes)
+    losses = len(outcomes) - wins
     return {
         "resolved": len(rows),
-        "hit_rate": sum(outcomes) / len(rows),
+        "hit_rate": wins / len(rows),
         "avg_predicted": sum(probabilities) / len(rows),
         "brier": sum((p - y) ** 2 for p, y in zip(probabilities, outcomes)) / len(rows),
+        "wins": wins,
+        "losses": losses,
     }
 
 
@@ -562,12 +597,15 @@ existing_metrics = memory_metrics(existing_rows)
 existing_segments = build_segments(existing_rows, 3, 160) if existing_rows else []
 
 st.subheader(t("saved_calibration"))
+saved_raw_wins = None
 if current is not None:
     cols = st.columns(4)
     cols[0].metric(t("events_trained"), current.events_trained)
     cols[1].metric(t("raw_accuracy"), "" if current.accuracy_before is None else pct(current.accuracy_before))
     cols[2].metric(t("calibrated_accuracy"), "" if current.accuracy_after is None else pct(current.accuracy_after))
     cols[3].metric(t("brier_after"), "" if current.brier_after is None else f"{current.brier_after:.4f}")
+    if current.accuracy_before is not None:
+        saved_raw_wins = int(round(float(current.accuracy_before) * int(current.events_trained)))
 else:
     st.info(t("no_state"))
 
@@ -578,7 +616,17 @@ cols[0].metric(t("resolved_picks"), existing_metrics["resolved"])
 cols[1].metric(t("hit_rate"), pct(existing_metrics["hit_rate"]) if existing_metrics["hit_rate"] is not None else "")
 cols[2].metric(t("avg_predicted"), pct(existing_metrics["avg_predicted"]) if existing_metrics["avg_predicted"] is not None else "")
 cols[3].metric(t("brier_score"), "" if existing_metrics["brier"] is None else f"{float(existing_metrics['brier']):.4f}")
-st.metric(t("existing_rows"), len(existing_rows))
+win_cols = st.columns(3)
+win_cols[0].metric(t("existing_rows"), len(existing_rows))
+win_cols[1].metric(t("wins"), existing_metrics["wins"])
+win_cols[2].metric(t("losses"), existing_metrics["losses"])
+
+if current is not None and saved_raw_wins is not None and int(current.events_trained) == int(existing_metrics["resolved"]):
+    memory_wins = int(existing_metrics["wins"] or 0)
+    if saved_raw_wins != memory_wins:
+        st.warning(f"{t('metric_mismatch')} Saved calibration implies {saved_raw_wins} wins; cumulative memory shows {memory_wins} wins.")
+    else:
+        st.success(t("metric_match"))
 
 if existing_segments:
     best = max(existing_segments, key=lambda row: (float(row.get("reliability", 0)), float(row.get("smoothed_edge", 0))))
