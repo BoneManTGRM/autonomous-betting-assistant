@@ -4,6 +4,7 @@ import unittest
 
 from autonomous_betting_agent.target_mode import (
     TargetModePolicy,
+    api_coverage_score,
     estimated_ev,
     evaluate_target_mode,
     implied_probability,
@@ -22,6 +23,10 @@ def clean_row(**overrides):
         "duplicate_event_pick": False,
         "market_type": "h2h",
         "confidence": "high",
+        "configured_api_sources_count": 3,
+        "api_sources_used_count": 3,
+        "api_coverage_score": 1.0,
+        "all_configured_apis_used": True,
     }
     row.update(overrides)
     return row
@@ -36,6 +41,10 @@ class TargetModeTests(unittest.TestCase):
     def test_estimated_ev(self) -> None:
         self.assertEqual(round(estimated_ev(0.70, 1.55), 4), 0.085)
         self.assertIsNone(estimated_ev(0.70, 1.0))
+
+    def test_api_coverage_score(self) -> None:
+        self.assertEqual(api_coverage_score({"configured_api_sources_count": 3, "api_sources_used_count": 2}), 0.666667)
+        self.assertEqual(api_coverage_score({"configured_api_sources_count": 0, "api_sources_used_count": 0}), 0.0)
 
     def test_target_mode_passes_clean_70_candidate(self) -> None:
         result = evaluate_target_mode(clean_row())
@@ -71,6 +80,18 @@ class TargetModeTests(unittest.TestCase):
         self.assertIn("duplicate event/pick", result.rejection_reason)
         self.assertIn("not h2h", result.rejection_reason)
         self.assertIn("not high confidence", result.rejection_reason)
+
+    def test_target_mode_rejects_low_api_coverage(self) -> None:
+        policy = TargetModePolicy(min_api_coverage_score=1.0)
+        result = evaluate_target_mode(clean_row(api_coverage_score=0.666667, api_sources_used_count=2))
+        self.assertFalse(result.passed)
+        self.assertIn("API coverage below target", result.rejection_reason)
+
+    def test_target_mode_rejects_when_not_all_configured_apis_used(self) -> None:
+        policy = TargetModePolicy(require_all_configured_apis=True)
+        result = evaluate_target_mode(clean_row(api_coverage_score=0.666667, api_sources_used_count=2, all_configured_apis_used=False), policy)
+        self.assertFalse(result.passed)
+        self.assertIn("not all configured APIs used", result.rejection_reason)
 
     def test_policy_can_relax_probability_band(self) -> None:
         policy = TargetModePolicy(tolerance=0.03)
