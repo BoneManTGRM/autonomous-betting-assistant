@@ -10,9 +10,10 @@ import pandas as pd
 
 from .audit import enrich_prediction_frame, parse_float
 from .local_users import DEFAULT_USER_ID, sanitize_user_id
+from .row_normalizer import normalize_frame, normalize_row, safe_text
 
-SNAPSHOT_SCHEMA_VERSION = 'prediction-snapshot-v1'
-REQUIRED_OFFICIAL_FIELDS = ('event', 'prediction', 'model_probability', 'decimal_price')
+SNAPSHOT_SCHEMA_VERSION = 'prediction-snapshot-v2'
+REQUIRED_OFFICIAL_FIELDS = ('event', 'prediction', 'model_probability', 'decimal_price', 'locked_at_utc')
 
 
 @dataclass(frozen=True)
@@ -28,27 +29,7 @@ def utc_now_iso() -> str:
 
 
 def _safe(value: Any) -> str:
-    if value is None:
-        return ''
-    try:
-        if pd.isna(value):
-            return ''
-    except Exception:
-        pass
-    return str(value).strip()
-
-
-def _first(row: Mapping[str, Any], *names: str) -> str:
-    normalized = {str(key).lower().replace(' ', '_').replace('-', '_'): value for key, value in row.items()}
-    for name in names:
-        value = normalized.get(name.lower().replace(' ', '_').replace('-', '_'))
-        if _safe(value):
-            return _safe(value)
-    return ''
-
-
-def _probability(row: Mapping[str, Any]) -> str:
-    return _first(row, 'model_probability', 'final_probability', 'final_probability_value', 'probability')
+    return safe_text(value)
 
 
 def _canonical_payload(row: Mapping[str, Any]) -> str:
@@ -80,7 +61,8 @@ def official_lock_status(row: Mapping[str, Any]) -> tuple[str, str]:
         missing.append('prediction')
     if parse_float(row.get('model_probability')) is None:
         missing.append('model_probability')
-    if parse_float(row.get('decimal_price')) is None:
+    decimal_price = parse_float(row.get('decimal_price'))
+    if decimal_price is None or decimal_price <= 1.0:
         missing.append('decimal_price')
     if not _safe(row.get('locked_at_utc')):
         missing.append('locked_at_utc')
@@ -93,29 +75,34 @@ def build_prediction_snapshots(frame: pd.DataFrame, *, user_id: str = DEFAULT_US
     if frame is None or frame.empty:
         return pd.DataFrame()
     clean_user = sanitize_user_id(user_id)
-    enriched = enrich_prediction_frame(frame)
+    enriched = normalize_frame(enrich_prediction_frame(frame))
     locked_at = locked_at_utc or utc_now_iso()
     rows: list[dict[str, Any]] = []
     for raw in enriched.to_dict(orient='records'):
+        normalized = normalize_row(raw)
         row = {
             'snapshot_schema_version': SNAPSHOT_SCHEMA_VERSION,
             'local_user_id': clean_user,
             'snapshot_id': '',
-            'locked_at_utc': _first(raw, 'prediction_timestamp', 'locked_at_utc', 'odds_timestamp') or locked_at,
-            'event': _first(raw, 'event', 'game', 'match'),
-            'sport': _first(raw, 'sport', 'league'),
-            'market_type': _first(raw, 'market_type', 'market', 'bet_type'),
-            'prediction': _first(raw, 'prediction', 'pick', 'selection'),
-            'model_probability': _probability(raw),
-            'decimal_price': _first(raw, 'decimal_price', 'best_price', 'odds'),
-            'american_odds': _first(raw, 'american_odds', 'american_price'),
-            'implied_probability': _first(raw, 'implied_probability', 'break_even_win_rate'),
-            'estimated_ev_decimal': _first(raw, 'estimated_ev_decimal', 'computed_ev_decimal', 'estimated_ev_value'),
-            'bookmaker': _first(raw, 'bookmaker', 'best_bookmaker', 'sportsbook'),
-            'odds_source': _first(raw, 'odds_source', 'source'),
-            'data_sources_used': _first(raw, 'data_sources_used', 'api_sources', 'source_file'),
-            'decision': _first(raw, 'decision'),
-            'confidence_tier': _first(raw, 'confidence_tier'),
+            'locked_at_utc': normalized.get('prediction_timestamp') or locked_at,
+            'event': normalized.get('event', ''),
+            'sport': normalized.get('sport', ''),
+            'market_type': normalized.get('market_type', ''),
+            'prediction': normalized.get('prediction', ''),
+            'model_probability': normalized.get('model_probability', ''),
+            'decimal_price': normalized.get('decimal_price', ''),
+            'american_odds': normalized.get('american_odds', ''),
+            'implied_probability': raw.get('implied_probability', raw.get('break_even_win_rate', '')),
+            'estimated_ev_decimal': normalized.get('computed_ev_decimal', ''),
+            'bookmaker': normalized.get('bookmaker', ''),
+            'odds_source': normalized.get('odds_source', ''),
+            'data_sources_used': raw.get('data_sources_used', raw.get('api_sources', normalized.get('odds_source', ''))),
+            'decision': normalized.get('decision', ''),
+            'confidence_tier': normalized.get('confidence_tier', ''),
+            'result_status': normalized.get('result_status', ''),
+            'stake_units': normalized.get('stake_units', ''),
+            'profit_units': normalized.get('profit_units', ''),
+            'closing_decimal_price': normalized.get('closing_decimal_price', ''),
             'lock_status': '',
             'lock_reason': '',
             'lock_hash': '',
