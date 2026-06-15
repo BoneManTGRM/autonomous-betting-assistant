@@ -90,9 +90,6 @@ TEXT = {
         "metric_match": "Saved calibration and cumulative memory are aligned.",
         "saved_implies": "Saved calibration implies",
         "memory_shows": "cumulative memory shows",
-        "sync_button": "Sync memory summary to saved calibration",
-        "sync_done": "Memory summary synced from saved calibration. Save to GitHub to keep it after restart.",
-        "sync_unavailable": "Sync is unavailable because saved calibration is missing or has no raw accuracy.",
         "best_area": "Best reliable area",
         "weakest_area": "Weakest reliable area",
         "records": "records",
@@ -142,9 +139,6 @@ TEXT = {
         "metric_match": "La calibración guardada y la memoria acumulativa están alineadas.",
         "saved_implies": "La calibración guardada implica",
         "memory_shows": "la memoria acumulativa muestra",
-        "sync_button": "Sincronizar resumen de memoria con calibración guardada",
-        "sync_done": "Resumen de memoria sincronizado desde la calibración guardada. Guarda en GitHub para mantenerlo después de reiniciar.",
-        "sync_unavailable": "La sincronización no está disponible porque falta la calibración guardada o no tiene precisión bruta.",
         "best_area": "Mejor área confiable",
         "weakest_area": "Área confiable más débil",
         "records": "registros",
@@ -540,27 +534,6 @@ def rows_to_graded(rows: list[dict[str, Any]]) -> list[GradedPrediction]:
     return [GradedPrediction(event_name=str(row.get("event") or ""), probability=float(row["probability"]), outcome=int(row["outcome"]), predicted_side=str(row.get("prediction") or "")) for row in rows]
 
 
-def rows_from_calibration(current: ProbabilityCalibrator, existing: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    if current.accuracy_before is None or current.events_trained <= 0:
-        return existing
-    target_rows = int(current.events_trained)
-    target_wins = int(round(float(current.accuracy_before) * target_rows))
-    target_losses = max(0, target_rows - target_wins)
-    sorted_rows = sorted(existing, key=lambda row: str(row.get("start") or ""), reverse=True)[:target_rows]
-    if len(sorted_rows) < target_rows:
-        sorted_rows.extend({"event": f"calibration_row_{idx + 1}", "start": "", "sport": "", "prediction": "", "probability": 0.5, "outcome": 0, "best_price": None, "books": None, "api_coverage_score": None, "confidence": "", "source": "saved_calibration_sync", "error_abs": 0.5, "dedupe_key": f"saved_calibration_sync_{idx + 1}"} for idx in range(target_rows - len(sorted_rows)))
-    synced: list[dict[str, Any]] = []
-    for idx, raw in enumerate(sorted_rows):
-        row = dict(raw)
-        outcome = 1 if idx < target_wins else 0
-        row["outcome"] = outcome
-        row["error_abs"] = round(abs(float(row.get("probability") or 0.5) - outcome), 6)
-        row["source"] = str(row.get("source") or "") or "saved_calibration_sync"
-        row["dedupe_key"] = str(row.get("dedupe_key") or f"saved_calibration_sync_{idx + 1}")
-        synced.append(row)
-    return synced[: target_wins + target_losses]
-
-
 def calibrator_json(calibrator: ProbabilityCalibrator) -> str:
     return json.dumps(calibrator.to_dict(), indent=2, sort_keys=True) + "\n"
 
@@ -656,24 +629,8 @@ if current is not None and saved_raw_wins is not None and int(current.events_tra
     memory_wins = int(existing_metrics["wins"] or 0)
     if saved_raw_wins != memory_wins:
         st.warning(f"{t('metric_mismatch')} {t('saved_implies')} {saved_raw_wins} {t('wins').lower()}; {t('memory_shows')} {memory_wins} {t('wins').lower()}.")
-        if st.button(t("sync_button"), use_container_width=True):
-            synced_rows = rows_from_calibration(current, existing_rows)
-            synced_segments = build_segments(synced_rows, 3, 160) if synced_rows else []
-            synced_ara_csv = make_ara_memory_csv(synced_segments)
-            bank["version"] = "learning-memory-bank-v2"
-            bank["trained_at_utc"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-            bank["summary"] = {"existing_rows_before_upload": len(existing_rows), "uploaded_usable_rows": 0, "duplicates_removed": 0, "rows_after_pruning": len(synced_rows), "patterns_saved": len(synced_segments), "synced_from_saved_calibration": True}
-            bank["patterns"] = synced_segments
-            bank["compact_rows"] = synced_rows
-            MEMORY_BANK_PATH.parent.mkdir(parents=True, exist_ok=True)
-            MEMORY_BANK_PATH.write_text(json.dumps(bank, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            ARA_MEMORY_PATH.write_text(synced_ara_csv, encoding="utf-8")
-            st.success(t("sync_done"))
-            st.rerun()
     else:
         st.success(t("metric_match"))
-elif current is None:
-    pass
 
 if existing_segments:
     best = max(existing_segments, key=lambda row: (float(row.get("reliability", 0)), float(row.get("smoothed_edge", 0))))
