@@ -1,7 +1,7 @@
 area,area_type,group_value,records,avg_predicted,actual_hit_rate,actual_minus_predicted,smoothed_hit_rate,smoothed_edge,reliability,brier,memory_type,importance,action
 Probability bucket: 70-80%,probability_bucket,70-80%,10,0.7,0.8,0.1,0.755556,0.055556,0.597664,0.17,probability_bucket,0.045175,raise_trust
-Probability source: fallback_high_confidence,probability_source,fallback_high_confidence,10,0.7,0.8,0.1,0.755556,0.055556,0.597664,0.17,probability_source,0.045175,raise_trust
 Sport: ATP Queen's Club Championships,sport,ATP Queen's Club Championships,3,0.7,1.0,0.3,0.781818,0.081818,0.500429,0.09,sport,0.031732,raise_trust
 ATP Queen's Club Championships / 70-80%,sport_probability_bucket,ATP Queen's Club Championships|70-80%,3,0.7,1.0,0.3,0.781818,0.081818,0.500429,0.09,sport_probability_bucket,0.031732,raise_trust
+Probability source: fallback_high_confidence,probability_source,fallback_high_confidence,12,0.695,0.75,0.055,0.728,0.033,0.6094,0.18815,probability_source,0.030139,watch
 Sport: WTA German Open,sport,WTA German Open,3,0.7,0.666667,-0.033333,0.690909,-0.009091,0.383762,0.223333,sport,0.003526,watch
 WTA German Open / 70-80%,sport_probability_bucket,WTA German Open|70-80%,3,0.7,0.666667,-0.033333,0.690909,-0.009091,0.383762,0.223333,sport_probability_bucket,0.003526,watch
