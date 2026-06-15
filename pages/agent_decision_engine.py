@@ -5,7 +5,12 @@ from io import StringIO
 import pandas as pd
 import streamlit as st
 
-from autonomous_betting_agent.agent_decision_engine import build_agent_decisions, agent_decision_summary
+from autonomous_betting_agent.agent_decision_engine import (
+    agent_decision_summary,
+    build_agent_decisions,
+    lock_ready_candidates,
+    playable_candidates,
+)
 
 st.set_page_config(page_title='Agent Decision Engine', layout='wide')
 st.title('Agent Decision Engine')
@@ -31,17 +36,21 @@ if raw.empty:
     st.stop()
 
 decisions = build_agent_decisions(raw, min_edge=float(min_edge), strong_edge=float(strong_edge))
-summary = agent_decision_summary(raw)
+plays = playable_candidates(raw, min_edge=float(min_edge), strong_edge=float(strong_edge))
+lock_ready = lock_ready_candidates(raw, min_edge=float(min_edge), strong_edge=float(strong_edge))
+summary = agent_decision_summary(raw, min_edge=float(min_edge), strong_edge=float(strong_edge))
 
-st.info(f'Source: {source_label} | Rows: {summary["rows"]}')
-cols = st.columns(7)
+st.info(f'Source: {source_label} | Rows: {summary["rows"]} | Min edge: {min_edge:.3f} | Strong edge: {strong_edge:.3f}')
+cols = st.columns(9)
 cols[0].metric('Strong', summary['play_strong'])
 cols[1].metric('Small', summary['play_small'])
 cols[2].metric('Watch', summary['watch_only'])
 cols[3].metric('No Action', summary['no_action'])
 cols[4].metric('Review', summary['review_needed'])
-cols[5].metric('Avg Score', 'N/A' if summary['average_score'] is None else summary['average_score'])
-cols[6].metric('Rows', summary['rows'])
+cols[5].metric('Lock Ready', summary['lock_ready_candidates'])
+cols[6].metric('Stake Units', summary['recommended_total_stake_units'])
+cols[7].metric('Avg Score', 'N/A' if summary['average_score'] is None else summary['average_score'])
+cols[8].metric('Rows', summary['rows'])
 
 priority_cols = [
     'event',
@@ -51,9 +60,13 @@ priority_cols = [
     'model_probability_clean',
     'market_implied_probability',
     'model_market_edge',
+    'model_market_edge_percent',
     'decimal_price',
     'agent_decision',
     'agent_score',
+    'recommended_stake_units',
+    'lock_ready',
+    'already_locked',
     'field_coverage_score',
     'line_value_signal',
     'decision_reasons',
@@ -61,7 +74,14 @@ priority_cols = [
 ]
 view_cols = [col for col in priority_cols if col in decisions.columns]
 
-st.subheader('Agent decisions')
-st.dataframe(decisions[view_cols].head(500) if view_cols else decisions.head(500), use_container_width=True, hide_index=True)
+tab_all, tab_plays, tab_lock_ready = st.tabs(['All Decisions', 'Playable Candidates', 'Lock-Ready Candidates'])
+with tab_all:
+    st.dataframe(decisions[view_cols].head(500) if view_cols else decisions.head(500), use_container_width=True, hide_index=True)
+with tab_plays:
+    st.dataframe(plays[view_cols].head(500) if not plays.empty and view_cols else plays.head(500), use_container_width=True, hide_index=True)
+with tab_lock_ready:
+    st.dataframe(lock_ready[view_cols].head(500) if not lock_ready.empty and view_cols else lock_ready.head(500), use_container_width=True, hide_index=True)
 
-st.download_button('Download agent decisions CSV', decisions.to_csv(index=False), file_name='agent_decisions.csv', mime='text/csv')
+st.download_button('Download all agent decisions CSV', decisions.to_csv(index=False), file_name='agent_decisions.csv', mime='text/csv')
+st.download_button('Download playable candidates CSV', plays.to_csv(index=False), file_name='agent_playable_candidates.csv', mime='text/csv')
+st.download_button('Download lock-ready candidates CSV', lock_ready.to_csv(index=False), file_name='agent_lock_ready_candidates.csv', mime='text/csv')
