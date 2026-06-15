@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import builtins
 import json
 import os
 from datetime import datetime, timezone
@@ -25,12 +24,86 @@ from autonomous_betting_agent.learning_memory_tools import (
     rows_to_graded,
     valid_bank_row,
 )
+from autonomous_betting_agent.learning_strength import learning_memory_health
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+LEARNED_STATE_PATH = REPO_ROOT / 'learned_state.json'
+MEMORY_BANK_PATH = REPO_ROOT / 'data' / 'learning_memory_bank.json'
+ARA_MEMORY_PATH = REPO_ROOT / 'data' / 'ara_learning_memory.csv'
+DEFAULT_GITHUB_REPOSITORY = 'BoneManTGRM/autonomous-betting-agent'
+DEFAULT_GITHUB_BRANCH = 'main'
+
+st.set_page_config(page_title='Learning Memory', layout='wide')
+LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='learning_memory_language') == 'Español' else 'en'
+
+TEXT = {
+    'en': {
+        'title': 'Learning Memory',
+        'caption': 'The durable training page. It previews usable rows, audits memory health, trains calibration, saves cumulative memory, and exports ARA pattern memory.',
+        'workflow': 'Clean path: Scanner Pro → Pro Predictor → What Are the Odds → Learning Memory.',
+        'source_truth': 'Learning source of truth',
+        'saved_calibration': 'Saved calibration',
+        'cumulative': 'Cumulative memory',
+        'health': 'Learning health',
+        'upload': 'Upload graded results CSV',
+        'preview': 'Upload preview',
+        'train': 'Train and remember',
+        'replace': 'Replace old memory with this upload',
+        'merge': 'Merge upload with existing memory',
+        'min_events': 'Minimum graded events',
+        'max_rows': 'Max stored rows',
+        'min_patterns': 'Min rows per pattern',
+        'max_patterns': 'Max stored patterns',
+        'save': 'Save learning files back to GitHub',
+        'missing_token': 'GitHub saving is enabled, but GITHUB_TOKEN is missing.',
+        'need_upload': 'Upload a graded CSV first.',
+        'too_few': 'Not enough usable rows after pruning.',
+        'saved_local': 'Learning memory updated locally for this running app session.',
+        'saved_github': 'Saved learned_state.json, cumulative memory, and ARA memory patterns to GitHub.',
+        'save_error': 'GitHub save failed',
+        'patterns': 'Top learned patterns',
+        'download_patterns': 'Download ARA memory CSV',
+    },
+    'es': {
+        'title': 'Memoria de Aprendizaje',
+        'caption': 'Página de entrenamiento duradero. Revisa filas útiles, audita salud de memoria, entrena calibración, guarda memoria acumulativa y exporta patrones ARA.',
+        'workflow': 'Ruta limpia: Scanner Pro → Predictor Pro → What Are the Odds → Memoria de Aprendizaje.',
+        'source_truth': 'Fuente única de aprendizaje',
+        'saved_calibration': 'Calibración guardada',
+        'cumulative': 'Memoria acumulativa',
+        'health': 'Salud del aprendizaje',
+        'upload': 'Subir CSV de resultados calificados',
+        'preview': 'Vista previa de carga',
+        'train': 'Entrenar y recordar',
+        'replace': 'Reemplazar memoria anterior con esta carga',
+        'merge': 'Combinar carga con memoria existente',
+        'min_events': 'Mínimo de eventos calificados',
+        'max_rows': 'Máximo de filas guardadas',
+        'min_patterns': 'Mínimo de filas por patrón',
+        'max_patterns': 'Máximo de patrones guardados',
+        'save': 'Guardar archivos de aprendizaje en GitHub',
+        'missing_token': 'Guardar en GitHub está activado, pero falta GITHUB_TOKEN.',
+        'need_upload': 'Primero sube un CSV calificado.',
+        'too_few': 'No hay suficientes filas útiles después de podar.',
+        'saved_local': 'Memoria de aprendizaje actualizada localmente en esta sesión.',
+        'saved_github': 'Se guardaron learned_state.json, memoria acumulativa y patrones ARA en GitHub.',
+        'save_error': 'Falló el guardado en GitHub',
+        'patterns': 'Principales patrones aprendidos',
+        'download_patterns': 'Descargar CSV de memoria ARA',
+    },
+}
+
+
+def t(key: str) -> str:
+    return TEXT[LANG].get(key, TEXT['en'].get(key, key))
+
+
+def pct(value: float | None) -> str:
+    return 'N/A' if value is None else f'{value * 100:.1f}%'
 
 
 def get_secret(*names: str) -> str:
     for name in names:
-        if not name:
-            continue
         try:
             value = str(st.secrets.get(name, '')).strip()
             if value:
@@ -41,187 +114,6 @@ def get_secret(*names: str) -> str:
         if value:
             return value
     return ''
-
-
-builtins.get_secret = get_secret
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-LEARNED_STATE_PATH = REPO_ROOT / 'learned_state.json'
-MEMORY_BANK_PATH = REPO_ROOT / 'data' / 'learning_memory_bank.json'
-ARA_MEMORY_PATH = REPO_ROOT / 'data' / 'ara_learning_memory.csv'
-DEFAULT_GITHUB_REPOSITORY = 'BoneManTGRM/autonomous-betting-agent'
-DEFAULT_GITHUB_BRANCH = 'main'
-
-TEXT = {
-    'en': {
-        'title': 'Learning Memory',
-        'caption': 'The single source-of-truth training page. Upload graded results, preview exactly what the trainer can use, replace or merge memory, rebuild calibration, and save it back to GitHub.',
-        'single_source': 'Use this page for actual learning/training. The old Self Learning Engine page was removed because it duplicated this workflow and did not save durable learning memory.',
-        'workflow_note': 'Recommended path: Agent Decision Engine → Odds Lock → results grading → Learning Memory → Max Agent Intelligence → Proof Readiness.',
-        'saved_calibration': 'Saved calibration summary',
-        'cumulative_summary': 'Cumulative memory summary',
-        'metrics_note': 'Saved calibration is the trained file. Cumulative memory is the raw stored graded rows. Upload preview below shows whether your new CSV is actually usable before training.',
-        'source_of_truth': 'Learning source of truth',
-        'memory_status': 'Memory status',
-        'ready_to_train': 'Ready to train',
-        'not_ready_to_train': 'Not ready to train',
-        'durable_memory': 'Durable memory files',
-        'events_trained': 'Events trained',
-        'raw_accuracy': 'Raw accuracy',
-        'calibrated_accuracy': 'Calibrated accuracy',
-        'brier_after': 'Brier after',
-        'resolved_picks': 'Resolved picks',
-        'hit_rate': 'Hit rate',
-        'avg_predicted': 'Avg predicted',
-        'brier_score': 'Brier score',
-        'existing_rows': 'Existing cumulative memory rows',
-        'wins': 'Wins',
-        'losses': 'Losses',
-        'metric_mismatch': 'Saved calibration and cumulative memory do not match. Train with the latest graded CSV and save to GitHub so both sections use the same rows.',
-        'metric_match': 'Saved calibration and cumulative memory are aligned.',
-        'saved_implies': 'Saved calibration implies',
-        'memory_shows': 'cumulative memory shows',
-        'best_area': 'Best reliable area',
-        'weakest_area': 'Weakest reliable area',
-        'records': 'records',
-        'actual': 'actual',
-        'smoothed': 'smoothed',
-        'what_learned': 'What ARA learned',
-        'train_from_finished': 'Train from finished games',
-        'upload_graded': 'Upload graded results CSV',
-        'upload_preview': 'Uploaded CSV preview',
-        'training_mode': 'Training mode',
-        'replace': 'Replace old memory with this upload',
-        'merge': 'Merge upload with existing memory',
-        'min_events': 'Minimum graded events',
-        'max_rows': 'Max stored memory rows',
-        'min_pattern_rows': 'Min rows per pattern',
-        'max_patterns': 'Max stored patterns',
-        'save_github': 'Save learning files back to GitHub so the app remembers after restart',
-        'missing_token': 'GitHub saving is enabled, but GITHUB_TOKEN is missing from Streamlit secrets.',
-        'button': 'Train and remember',
-        'upload_first': 'Upload a graded results CSV first.',
-        'too_few': 'Found {rows} usable unique graded rows after pruning. Need at least {needed}.',
-        'updated_local': 'Learning memory updated locally for this running app session.',
-        'saved_github': 'Saved learned_state.json, cumulative memory, and ARA memory patterns to GitHub.',
-        'save_error': 'Could not save all learning files to GitHub: {error}',
-        'training_summary': 'Training summary',
-        'calibration_details': 'Calibration details',
-        'top_patterns': 'Top learned patterns',
-        'download_ara': 'Download ARA memory CSV',
-        'no_state': 'No learned_state.json is currently loaded.',
-        'fallback_note': 'Some rows used a fallback probability because the CSV had results but no probability/odds column. This is acceptable for rough learning, but stronger proof needs real probabilities and odds.',
-    },
-    'es': {
-        'title': 'Memoria de Aprendizaje',
-        'caption': 'La página única de entrenamiento. Sube resultados calificados, revisa exactamente qué puede usar el entrenador, reemplaza o combina memoria, reconstruye la calibración y guarda en GitHub.',
-        'single_source': 'Usa esta página para aprendizaje/entrenamiento real. La página antigua Self Learning Engine fue eliminada porque duplicaba este flujo y no guardaba memoria duradera.',
-        'workflow_note': 'Ruta recomendada: Agent Decision Engine → Odds Lock → calificación de resultados → Memoria de Aprendizaje → Max Agent Intelligence → Proof Readiness.',
-        'saved_calibration': 'Resumen de calibración guardado',
-        'cumulative_summary': 'Resumen de memoria acumulativa',
-        'metrics_note': 'La calibración guardada es el archivo entrenado. La memoria acumulativa son las filas crudas guardadas. La vista previa muestra si el nuevo CSV sirve antes de entrenar.',
-        'source_of_truth': 'Fuente única de aprendizaje',
-        'memory_status': 'Estado de memoria',
-        'ready_to_train': 'Listo para entrenar',
-        'not_ready_to_train': 'No listo para entrenar',
-        'durable_memory': 'Archivos de memoria duradera',
-        'events_trained': 'Eventos entrenados',
-        'raw_accuracy': 'Precisión bruta',
-        'calibrated_accuracy': 'Precisión calibrada',
-        'brier_after': 'Brier después',
-        'resolved_picks': 'Pronósticos resueltos',
-        'hit_rate': 'Tasa de acierto',
-        'avg_predicted': 'Promedio pronosticado',
-        'brier_score': 'Puntaje Brier',
-        'existing_rows': 'Filas acumuladas en memoria',
-        'wins': 'Ganadas',
-        'losses': 'Perdidas',
-        'metric_mismatch': 'La calibración guardada y la memoria acumulativa no coinciden. Entrena con el CSV calificado más reciente y guarda en GitHub.',
-        'metric_match': 'La calibración guardada y la memoria acumulativa están alineadas.',
-        'saved_implies': 'La calibración guardada implica',
-        'memory_shows': 'la memoria acumulativa muestra',
-        'best_area': 'Mejor área confiable',
-        'weakest_area': 'Área confiable más débil',
-        'records': 'registros',
-        'actual': 'real',
-        'smoothed': 'suavizado',
-        'what_learned': 'Lo que ARA aprendió',
-        'train_from_finished': 'Entrenar con partidos terminados',
-        'upload_graded': 'Subir CSV de resultados calificados',
-        'upload_preview': 'Vista previa del CSV subido',
-        'training_mode': 'Modo de entrenamiento',
-        'replace': 'Reemplazar memoria anterior con esta carga',
-        'merge': 'Combinar carga con memoria existente',
-        'min_events': 'Mínimo de eventos calificados',
-        'max_rows': 'Máximo de filas guardadas',
-        'min_pattern_rows': 'Mínimo de filas por patrón',
-        'max_patterns': 'Máximo de patrones guardados',
-        'save_github': 'Guardar archivos de aprendizaje en GitHub para recordar después de reiniciar',
-        'missing_token': 'Guardar en GitHub está activado, pero falta GITHUB_TOKEN en secretos.',
-        'button': 'Entrenar y recordar',
-        'upload_first': 'Primero sube un CSV de resultados calificados.',
-        'too_few': 'Se encontraron {rows} filas únicas utilizables después de podar. Se necesitan al menos {needed}.',
-        'updated_local': 'Memoria de aprendizaje actualizada localmente en esta sesión.',
-        'saved_github': 'Se guardaron learned_state.json, memoria acumulativa y patrones ARA en GitHub.',
-        'save_error': 'No se pudieron guardar todos los archivos en GitHub: {error}',
-        'training_summary': 'Resumen del entrenamiento',
-        'calibration_details': 'Detalles de calibración',
-        'top_patterns': 'Principales patrones aprendidos',
-        'download_ara': 'Descargar CSV de memoria ARA',
-        'no_state': 'Actualmente no hay learned_state.json cargado.',
-        'fallback_note': 'Algunas filas usaron probabilidad estimada porque el CSV tenía resultados pero no probabilidad/cuotas. Sirve para aprendizaje aproximado; para prueba fuerte se necesitan probabilidades y cuotas reales.',
-    },
-}
-
-SPANISH_COLUMNS = {
-    'area': 'area',
-    'area_type': 'tipo_area',
-    'group_value': 'valor_grupo',
-    'records': 'registros',
-    'avg_predicted': 'promedio_pronosticado',
-    'actual_hit_rate': 'tasa_acierto_real',
-    'actual_minus_predicted': 'real_menos_pronosticado',
-    'smoothed_hit_rate': 'tasa_suavizada',
-    'smoothed_edge': 'ventaja_suavizada',
-    'reliability': 'confiabilidad',
-    'brier': 'brier',
-    'memory_type': 'tipo_memoria',
-    'importance': 'importancia',
-    'action': 'accion',
-}
-
-st.set_page_config(page_title='Learning Memory', layout='wide')
-language_choice = st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='learning_memory_language')
-LANG = 'es' if language_choice == 'Español' else 'en'
-
-
-def t(key: str) -> str:
-    return TEXT[LANG].get(key, TEXT['en'].get(key, key))
-
-
-def pct(value: float | None) -> str:
-    return '' if value is None else f'{value * 100:.1f}%'
-
-
-def display_segments(rows: list[dict[str, Any]] | pd.DataFrame) -> pd.DataFrame:
-    frame = rows.copy() if isinstance(rows, pd.DataFrame) else pd.DataFrame(rows)
-    if frame.empty or LANG != 'es':
-        return frame
-    return frame.rename(columns={col: SPANISH_COLUMNS.get(str(col), str(col)) for col in frame.columns})
-
-
-def summary_for_display(summary: dict[str, Any]) -> dict[str, Any]:
-    if LANG != 'es':
-        return summary
-    names = {
-        'existing_rows_before_upload': 'filas_existentes_antes_de_subir',
-        'uploaded_usable_rows': 'filas_subidas_utilizables',
-        'duplicates_removed': 'duplicados_eliminados',
-        'rows_after_pruning': 'filas_despues_de_poda',
-        'patterns_saved': 'patrones_guardados',
-        'fallback_probability_rows': 'filas_con_probabilidad_estimada',
-    }
-    return {names.get(key, key): value for key, value in summary.items()}
 
 
 def load_memory_bank() -> dict[str, Any]:
@@ -242,7 +134,7 @@ def current_learned_state() -> ProbabilityCalibrator | None:
     return None
 
 
-def github_put_text_file(*, path: str, content: str, message: str) -> dict[str, Any]:
+def github_put_text_file(*, path: str, content: str, message: str) -> None:
     token = get_secret('GITHUB_TOKEN', 'GH_TOKEN')
     if not token:
         raise RuntimeError('Missing GITHUB_TOKEN in Streamlit secrets.')
@@ -262,145 +154,132 @@ def github_put_text_file(*, path: str, content: str, message: str) -> dict[str, 
     write_response = requests.put(url, headers=headers, json=payload, timeout=20)
     if write_response.status_code not in (200, 201):
         raise RuntimeError(f'GitHub write failed: {write_response.status_code} {write_response.text[:500]}')
-    return write_response.json()
 
 
-def area_line(label: str, segment: dict[str, Any]) -> str:
-    return f"{label}: {segment.get('area')} | {segment.get('records')} {t('records')} | {float(segment.get('actual_hit_rate', 0)):.1%} {t('actual')} | {float(segment.get('smoothed_hit_rate', 0)):.1%} {t('smoothed')}"
+def health_badge(health: dict[str, Any]) -> None:
+    tier = str(health.get('learning_health_tier', 'not_ready'))
+    action = str(health.get('recommended_learning_action', 'collect_more_finished_results'))
+    message = f"{tier} | {action} | {health.get('health_notes', '')}"
+    if tier == 'strong_learning_memory':
+        st.success(message)
+    elif tier == 'usable_learning_memory':
+        st.info(message)
+    elif tier == 'rough_learning_memory':
+        st.warning(message)
+    else:
+        st.error(message)
+
+
+def show_health(rows: list[dict[str, Any]], title: str) -> dict[str, Any]:
+    health = learning_memory_health(rows)
+    st.subheader(title)
+    cols = st.columns(7)
+    cols[0].metric('Health', health['learning_health_score'])
+    cols[1].metric('Tier', health['learning_health_tier'])
+    cols[2].metric('Resolved', health['resolved_rows'])
+    cols[3].metric('Wins', health['wins'])
+    cols[4].metric('Losses', health['losses'])
+    cols[5].metric('Real probs', health['real_probability_rows'])
+    cols[6].metric('Markets', health['market_count'])
+    health_badge(health)
+    return health
 
 
 st.title(t('title'))
 st.caption(t('caption'))
-st.info(t('single_source'))
-st.caption(t('workflow_note'))
+st.info(t('workflow'))
 
 current = current_learned_state()
 bank = load_memory_bank()
 existing_rows = [row for row in (valid_bank_row(row) for row in bank.get('compact_rows', [])) if row is not None]
 existing_metrics = memory_metrics(existing_rows)
-existing_segments = build_segments(existing_rows, 3, 160) if existing_rows else []
+existing_segments = build_segments(existing_rows, 3, 200) if existing_rows else []
 
-st.subheader(t('source_of_truth'))
-st.caption(t('durable_memory'))
-truth_cols = st.columns(4)
-truth_cols[0].metric('learned_state.json', 'Loaded' if current is not None else 'Missing')
-truth_cols[1].metric('learning_memory_bank.json', f"{len(existing_rows)} rows")
-truth_cols[2].metric('ara_learning_memory.csv', 'Ready' if existing_segments else 'No patterns yet')
-truth_cols[3].metric(t('memory_status'), t('ready_to_train') if len(existing_rows) >= 5 else t('not_ready_to_train'))
+st.subheader(t('source_truth'))
+truth = st.columns(4)
+truth[0].metric('learned_state.json', 'Loaded' if current is not None else 'Missing')
+truth[1].metric('learning_memory_bank.json', f'{len(existing_rows)} rows')
+truth[2].metric('ara_learning_memory.csv', 'Ready' if existing_segments else 'No patterns')
+truth[3].metric('Bank version', str(bank.get('version', 'unknown')))
 
 st.subheader(t('saved_calibration'))
-saved_raw_wins = None
+cal = st.columns(4)
 if current is not None:
-    cols = st.columns(4)
-    cols[0].metric(t('events_trained'), current.events_trained)
-    cols[1].metric(t('raw_accuracy'), '' if current.accuracy_before is None else pct(current.accuracy_before))
-    cols[2].metric(t('calibrated_accuracy'), '' if current.accuracy_after is None else pct(current.accuracy_after))
-    cols[3].metric(t('brier_after'), '' if current.brier_after is None else f'{current.brier_after:.4f}')
-    if current.accuracy_before is not None:
-        saved_raw_wins = int(round(float(current.accuracy_before) * int(current.events_trained)))
+    cal[0].metric('Events', current.events_trained)
+    cal[1].metric('Raw accuracy', pct(current.accuracy_before))
+    cal[2].metric('Calibrated accuracy', pct(current.accuracy_after))
+    cal[3].metric('Brier after', 'N/A' if current.brier_after is None else f'{current.brier_after:.4f}')
 else:
-    st.info(t('no_state'))
+    st.warning('No learned_state.json loaded.' if LANG == 'en' else 'No se cargó learned_state.json.')
 
-st.subheader(t('cumulative_summary'))
-st.caption(t('metrics_note'))
-cols = st.columns(4)
-cols[0].metric(t('resolved_picks'), existing_metrics['resolved'])
-cols[1].metric(t('hit_rate'), pct(existing_metrics['hit_rate']) if existing_metrics['hit_rate'] is not None else '')
-cols[2].metric(t('avg_predicted'), pct(existing_metrics['avg_predicted']) if existing_metrics['avg_predicted'] is not None else '')
-cols[3].metric(t('brier_score'), '' if existing_metrics['brier'] is None else f"{float(existing_metrics['brier']):.4f}")
-win_cols = st.columns(3)
-win_cols[0].metric(t('existing_rows'), len(existing_rows))
-win_cols[1].metric(t('wins'), existing_metrics['wins'])
-win_cols[2].metric(t('losses'), existing_metrics['losses'])
-
-if current is not None and saved_raw_wins is not None and int(current.events_trained) == int(existing_metrics['resolved']):
-    memory_wins = int(existing_metrics['wins'] or 0)
-    if saved_raw_wins != memory_wins:
-        st.warning(f"{t('metric_mismatch')} {t('saved_implies')} {saved_raw_wins} {t('wins').lower()}; {t('memory_shows')} {memory_wins} {t('wins').lower()}.")
-    else:
-        st.success(t('metric_match'))
+st.subheader(t('cumulative'))
+summary_cols = st.columns(6)
+summary_cols[0].metric('Resolved', existing_metrics['resolved'])
+summary_cols[1].metric('Hit rate', pct(existing_metrics['hit_rate']) if existing_metrics['hit_rate'] is not None else 'N/A')
+summary_cols[2].metric('Avg predicted', pct(existing_metrics['avg_predicted']) if existing_metrics['avg_predicted'] is not None else 'N/A')
+summary_cols[3].metric('Brier', 'N/A' if existing_metrics['brier'] is None else f"{float(existing_metrics['brier']):.4f}")
+summary_cols[4].metric('Wins', existing_metrics['wins'])
+summary_cols[5].metric('Losses', existing_metrics['losses'])
+existing_health = show_health(existing_rows, t('health'))
 
 if existing_segments:
-    best = max(existing_segments, key=lambda row: (float(row.get('reliability', 0)), float(row.get('smoothed_edge', 0))))
-    weakest = min(existing_segments, key=lambda row: (float(row.get('reliability', 0)), float(row.get('smoothed_edge', 0))))
-    st.success(area_line(t('best_area'), best))
-    st.warning(area_line(t('weakest_area'), weakest))
-    with st.expander(t('what_learned'), expanded=False):
-        st.dataframe(display_segments(existing_segments[:40]), use_container_width=True, hide_index=True)
+    st.subheader(t('patterns'))
+    st.dataframe(pd.DataFrame(existing_segments[:40]), use_container_width=True, hide_index=True)
 
-st.subheader(t('train_from_finished'))
-graded_upload = st.file_uploader(t('upload_graded'), type=['csv'], accept_multiple_files=False, key='graded_results_for_learning_memory')
-
+st.subheader(t('upload'))
+graded_upload = st.file_uploader(t('upload'), type=['csv'], accept_multiple_files=False, key='graded_results_for_learning_memory')
 uploaded_rows: list[dict[str, Any]] = []
 parse_stats: dict[str, Any] = {}
 if graded_upload is not None:
-    uploaded_bytes = graded_upload.getvalue()
-    uploaded_rows, parse_stats = read_compact_csv_bytes(uploaded_bytes, getattr(graded_upload, 'name', 'uploaded_graded_results.csv'))
-    st.subheader(t('upload_preview'))
-    pcols = st.columns(7)
-    pcols[0].metric('Input rows', parse_stats.get('input_rows', 0))
-    pcols[1].metric('Usable rows', parse_stats.get('usable_rows', 0))
-    pcols[2].metric(t('wins'), parse_stats.get('wins', 0))
-    pcols[3].metric(t('losses'), parse_stats.get('losses', 0))
-    pcols[4].metric('Missing probability', parse_stats.get('missing_probability', 0))
-    pcols[5].metric('Missing result', parse_stats.get('missing_result', 0))
-    pcols[6].metric('Fallback rows', parse_stats.get('fallback_probability_rows', 0))
-    if int(parse_stats.get('usable_rows', 0)) == 0:
-        st.error('This file is not useful for training yet. It needs resolved win/loss results plus probability/odds or a confidence signal.')
-    elif int(parse_stats.get('fallback_probability_rows', 0)) > 0:
-        st.warning(f"{t('fallback_note')} Rows: {parse_stats.get('fallback_probability_rows', 0)}")
-    else:
-        st.success('This upload has usable resolved rows with direct probability/odds information.')
+    uploaded_rows, parse_stats = read_compact_csv_bytes(graded_upload.getvalue(), getattr(graded_upload, 'name', 'uploaded_graded_results.csv'))
+    st.subheader(t('preview'))
+    pcols = st.columns(8)
+    pcols[0].metric('Input', parse_stats.get('input_rows', 0))
+    pcols[1].metric('Usable', parse_stats.get('usable_rows', 0))
+    pcols[2].metric('Wins', parse_stats.get('wins', 0))
+    pcols[3].metric('Losses', parse_stats.get('losses', 0))
+    pcols[4].metric('Direct probs', parse_stats.get('direct_probability_rows', 0))
+    pcols[5].metric('Price-implied', parse_stats.get('price_implied_probability_rows', 0))
+    pcols[6].metric('Fallback', parse_stats.get('fallback_probability_rows', 0))
+    pcols[7].metric('Missing result', parse_stats.get('missing_result', 0))
+    show_health(uploaded_rows, 'Upload health' if LANG == 'en' else 'Salud de la carga')
     if uploaded_rows:
-        st.dataframe(pd.DataFrame(uploaded_rows).head(50), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(uploaded_rows).head(100), use_container_width=True, hide_index=True)
     else:
-        st.error('This CSV has no usable resolved rows for training. It needs win/loss results plus either probabilities/odds or a confidence signal such as High confidence.')
+        st.error('This CSV has no usable resolved rows.' if LANG == 'en' else 'Este CSV no tiene filas resueltas útiles.')
 
 settings = st.columns(4)
 min_events = settings[0].number_input(t('min_events'), min_value=5, max_value=500, value=5, step=1)
 max_rows = settings[1].number_input(t('max_rows'), min_value=10, max_value=10000, value=2500, step=100)
-min_segment_records = settings[2].number_input(t('min_pattern_rows'), min_value=2, max_value=50, value=3, step=1)
-max_segments = settings[3].number_input(t('max_patterns'), min_value=20, max_value=1000, value=160, step=20)
-training_mode = st.radio(t('training_mode'), [t('replace'), t('merge')], index=0, horizontal=False)
-save_to_github = st.toggle(t('save_github'), value=bool(get_secret('GITHUB_TOKEN', 'GH_TOKEN')))
-
+min_segment_records = settings[2].number_input(t('min_patterns'), min_value=2, max_value=50, value=3, step=1)
+max_segments = settings[3].number_input(t('max_patterns'), min_value=20, max_value=1000, value=200, step=20)
+training_mode = st.radio('Training mode' if LANG == 'en' else 'Modo de entrenamiento', [t('replace'), t('merge')], index=0, horizontal=False)
+save_to_github = st.toggle(t('save'), value=bool(get_secret('GITHUB_TOKEN', 'GH_TOKEN')))
 if save_to_github and not get_secret('GITHUB_TOKEN', 'GH_TOKEN'):
     st.warning(t('missing_token'))
 
-if st.button(t('button'), type='primary', use_container_width=True):
+if st.button(t('train'), type='primary', use_container_width=True):
     if graded_upload is None:
-        st.warning(t('upload_first'))
+        st.warning(t('need_upload'))
         st.stop()
     source_rows = [] if training_mode == t('replace') else existing_rows
     merged_rows, duplicates_removed = merge_dedupe_rows(source_rows, uploaded_rows)
     pruned_rows, prune_report = prune_rows(merged_rows, int(max_rows))
     if len(pruned_rows) < int(min_events):
-        st.error(t('too_few').format(rows=len(pruned_rows), needed=int(min_events)))
+        st.error(f"{t('too_few')} Rows={len(pruned_rows)} Need={int(min_events)}")
         st.stop()
     graded_rows = rows_to_graded(pruned_rows)
     calibrator = fit_probability_calibrator(graded_rows, min_events=int(min_events), source=getattr(graded_upload, 'name', 'uploaded_graded_results.csv'))
     mode_name = 'replace' if training_mode == t('replace') else 'merge'
-    calibrator.notes.append(f"Mode={mode_name}. Existing rows used={len(source_rows)}. Uploaded usable rows={len(uploaded_rows)}. Duplicates removed={duplicates_removed}. Trained on {len(pruned_rows)} rows.")
-    if int(parse_stats.get('fallback_probability_rows', 0)) > 0:
-        calibrator.notes.append(f"Used fallback confidence probability for {parse_stats.get('fallback_probability_rows', 0)} rows because probability/odds were missing.")
+    calibrator.notes.append(f'Mode={mode_name}. Existing rows used={len(source_rows)}. Uploaded usable rows={len(uploaded_rows)}. Duplicates removed={duplicates_removed}. Trained on {len(pruned_rows)} rows.')
     segments = build_segments(pruned_rows, int(min_segment_records), int(max_segments))
     ara_csv = make_ara_memory_csv(segments)
-    memory_bank = build_memory_bank(
-        compact_rows=pruned_rows,
-        calibrator=calibrator,
-        segments=segments,
-        parse_stats=parse_stats,
-        prune_report=prune_report,
-        mode=mode_name,
-        existing_count=len(existing_rows),
-        uploaded_count=len(uploaded_rows),
-        duplicates_removed=duplicates_removed,
-    )
+    memory_bank = build_memory_bank(compact_rows=pruned_rows, calibrator=calibrator, segments=segments, parse_stats=parse_stats, prune_report=prune_report, mode=mode_name, existing_count=len(existing_rows), uploaded_count=len(uploaded_rows), duplicates_removed=duplicates_removed)
     MEMORY_BANK_PATH.parent.mkdir(parents=True, exist_ok=True)
     MEMORY_BANK_PATH.write_text(json.dumps(memory_bank, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     LEARNED_STATE_PATH.write_text(calibrator_json(calibrator), encoding='utf-8')
     ARA_MEMORY_PATH.write_text(ara_csv, encoding='utf-8')
-    st.success(t('updated_local'))
+    st.success(t('saved_local'))
     if save_to_github:
         try:
             today = datetime.now(timezone.utc).date().isoformat()
@@ -409,15 +288,11 @@ if st.button(t('button'), type='primary', use_container_width=True):
             github_put_text_file(path='data/ara_learning_memory.csv', content=ara_csv, message=f'Update ARA memory patterns {today}')
             st.success(t('saved_github'))
         except Exception as exc:
-            st.error(t('save_error').format(error=exc))
-    st.subheader(t('training_summary'))
-    st.json(summary_for_display(memory_bank['summary']))
-    with st.expander(t('calibration_details'), expanded=False):
-        st.json(calibrator.to_dict())
-    st.subheader(t('top_patterns'))
-    segments_frame = display_segments(segments[:40])
+            st.error(f"{t('save_error')}: {exc}")
+    st.subheader('Training summary' if LANG == 'en' else 'Resumen del entrenamiento')
+    st.json(memory_bank['summary'])
+    show_health(pruned_rows, 'Final trained memory health' if LANG == 'en' else 'Salud final de la memoria entrenada')
+    st.subheader(t('patterns'))
+    segments_frame = pd.DataFrame(segments[:60])
     st.dataframe(segments_frame, use_container_width=True, hide_index=True)
-    download_csv = segments_frame.to_csv(index=False) if LANG == 'es' else ara_csv
-    download_name = 'memoria_ara.csv' if LANG == 'es' else 'ara_learning_memory.csv'
-    st.download_button(t('download_ara'), download_csv, file_name=download_name, mime='text/csv')
-    st.info('Refresh the page after saving to see the top summary numbers change to the newly saved memory.')
+    st.download_button(t('download_patterns'), ara_csv, file_name='ara_learning_memory.csv', mime='text/csv')
