@@ -21,6 +21,10 @@ OFFICIAL_PICK_COLUMNS = [
     'api_coverage_score',
     'books',
     'computed_ev_decimal',
+    'model_version',
+    'calibration_version',
+    'memory_version',
+    'api_bundle_version',
     'result_status',
     'result_source_url',
     'final_score',
@@ -55,6 +59,10 @@ OPTIONAL_BUT_VALUABLE = [
     'api_coverage_score',
     'books',
     'computed_ev_decimal',
+    'model_version',
+    'calibration_version',
+    'memory_version',
+    'api_bundle_version',
 ]
 
 
@@ -82,6 +90,10 @@ def example_template() -> pd.DataFrame:
             'api_coverage_score': 0.9,
             'books': 8,
             'computed_ev_decimal': 0.209,
+            'model_version': 'model-v1',
+            'calibration_version': 'calibration-v1',
+            'memory_version': 'memory-v1',
+            'api_bundle_version': 'api-bundle-v1',
             'result_status': '',
             'result_source_url': '',
             'final_score': '',
