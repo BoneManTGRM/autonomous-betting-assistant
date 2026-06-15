@@ -47,6 +47,7 @@ class LiveAPIContextTests(unittest.TestCase):
     def test_sportsdataio_sport_mapping(self) -> None:
         self.assertEqual(sportsdataio_sport_from_odds("americanfootball_nfl", "NFL"), "nfl")
         self.assertEqual(sportsdataio_sport_from_odds("basketball_nba", "NBA"), "nba")
+        self.assertEqual(sportsdataio_sport_from_odds("basketball_wnba", "WNBA"), "wnba")
         self.assertEqual(sportsdataio_sport_from_odds("baseball_mlb", "MLB"), "mlb")
 
     def test_context_uses_sportsdataio_and_weatherapi_when_available(self) -> None:
