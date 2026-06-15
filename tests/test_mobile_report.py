@@ -5,6 +5,7 @@ import unittest
 import pandas as pd
 
 from autonomous_betting_agent.mobile_report import compact_report_frame, prepare_mobile_report, rejection_summary
+from autonomous_betting_agent.odds_breakdown import build_odds_breakdown
 
 
 class MobileReportTests(unittest.TestCase):
@@ -41,6 +42,18 @@ class MobileReportTests(unittest.TestCase):
         self.assertGreaterEqual(prepared["missing_odds_count"], 1)
         self.assertIn("compact", prepared)
         self.assertIn("rejection", prepared)
+
+    def test_odds_breakdown_missing_price_gets_mobile_warning_data(self) -> None:
+        source = pd.DataFrame([
+            {"event": "A at B", "prediction": "B", "model_probability": "58%", "confidence": "HIGH"},
+            {"event": "C at D", "prediction": "C", "model_probability": "72%", "best_price": 1.80, "confidence": "HIGH", "books": 5, "api_coverage_score": 1.0},
+        ])
+        main, props, diag = build_odds_breakdown(source)
+        prepared = prepare_mobile_report(main)
+        self.assertEqual(prepared["missing_odds_count"], 1)
+        self.assertGreaterEqual(len(prepared["actionable"]), 1)
+        self.assertFalse(props.empty)
+        self.assertFalse(diag.empty)
 
 
 if __name__ == "__main__":
