@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
-from autonomous_betting_agent.calibration_review import review_calibration_csv, write_report
+from autonomous_betting_agent.calibration_review import read_csv_rows, review_calibration_rows
+from autonomous_betting_agent.report_proof import attach_proof_audit
 
 
 def main() -> int:
@@ -14,9 +16,13 @@ def main() -> int:
     parser.add_argument("--gap-threshold", type=float, default=0.08)
     args = parser.parse_args()
 
-    report = review_calibration_csv(args.input_csv, min_records=args.min_records, gap_threshold=args.gap_threshold)
-    write_report(report, args.output)
+    rows = read_csv_rows(args.input_csv)
+    report = review_calibration_rows(rows, min_records=args.min_records, gap_threshold=args.gap_threshold)
+    report = attach_proof_audit(report, rows, report_name="calibration_review")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print("Calibration review complete")
+    print(f"Saved calibration report to {args.output}")
     return 0
 
 
