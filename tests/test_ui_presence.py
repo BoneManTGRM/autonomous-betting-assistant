@@ -5,17 +5,12 @@ from pathlib import Path
 
 
 class UiPresenceTests(unittest.TestCase):
-    def test_streamlit_app_contains_bilingual_page_selector_and_api_fields(self) -> None:
+    def test_streamlit_app_launches_full_pro_predictor_page(self) -> None:
         text = Path("streamlit_app.py").read_text(encoding="utf-8")
-        self.assertIn("Language / Idioma", text)
-        self.assertIn("Pro Predictor", text)
-        self.assertIn("market_snapshot_title", text)
-        self.assertIn("odds_weather_title", text)
-        self.assertIn("odds_api_key", text)
-        self.assertIn("sportsdataio_key", text)
-        self.assertIn("weatherapi_key", text)
-        self.assertIn("render_market_capture", text)
-        self.assertIn("render_context_layer", text)
+        self.assertIn("pages", text)
+        self.assertIn("pro_predictor.py", text)
+        self.assertIn("runpy.run_path", text)
+        self.assertIn("PRO_PREDICTOR_PAGE", text)
 
     def test_standalone_pages_contain_fields(self) -> None:
         market = Path("market_capture_page.py").read_text(encoding="utf-8")
