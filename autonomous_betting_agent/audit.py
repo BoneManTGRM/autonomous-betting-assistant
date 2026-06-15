@@ -139,7 +139,10 @@ def confidence_tier(row: Mapping[str, Any]) -> str:
     if clean_grading_status(row) == 'review_needed':
         return 'Watch Only'
     final_probability = parse_float(_first(row, ('final_probability_value', 'model_probability', 'probability')))
-    reliability = parse_float(_first(row, ('reliability_score', 'reliability'))) or 0.0
+    reliability = parse_float(_first(row, ('reliability_score', 'reliability')))
+    odds_quality = parse_float(_first(row, ('odds_quality_score', 'quality_score')))
+    if reliability is None or reliability <= 0.0:
+        reliability = odds_quality or 0.0
     books = int(parse_float(_first(row, ('books', 'bookmaker_count'))) or 0)
     ev = parse_float(_first(row, ('estimated_ev_value', 'estimated_ev_decimal', 'computed_ev_decimal', 'ev')))
     coverage = parse_float(_first(row, ('api_coverage_score',))) or 0.0
