@@ -12,12 +12,13 @@ import pandas as pd
 import streamlit as st
 
 from autonomous_betting_agent.agent_decision_engine import agent_decision_summary, build_agent_decisions, lock_ready_candidates
+from autonomous_betting_agent.four_tool_orchestrator import page_health, page_health_frame
 from autonomous_betting_agent.live_api_context import LiveAPIContextBuilder
 from autonomous_betting_agent.live_odds import list_sports, scan_market
 from autonomous_betting_agent.multi_source_fusion import fuse_row
 from autonomous_betting_agent.scanner_strength import score_scanner_frame, scanner_strength_summary
 
-APP_VERSION = 'four-tool-pro-v13'
+APP_VERSION = 'four-tool-pro-v14'
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REPO_MEMORY_PATH = REPO_ROOT / 'data' / 'ara_learning_memory.csv'
 LEARNED_STATE_PATH = REPO_ROOT / 'learned_state.json'
@@ -31,105 +32,25 @@ TEXT = {
         'title': 'Pro Predictor',
         'caption': 'Main all-sports prediction engine. It scans live markets, applies learned memory, builds model probabilities, scores agent decisions, and forwards rows to What Are the Odds.',
         'workflow': 'Clean path: Scanner Pro → Pro Predictor → What Are the Odds → Learning Memory.',
-        'version': 'App version',
-        'learned_events': 'Learned events',
-        'raw_accuracy': 'Raw accuracy',
-        'calibrated_accuracy': 'Calibrated accuracy',
-        'brier_after': 'Brier after',
-        'api_sources': 'API sources',
-        'odds_key': 'Odds API key',
-        'sports_key': 'SportsDataIO key',
-        'weather_key': 'WeatherAPI key',
-        'enabled': 'Enabled',
-        'missing': 'Missing',
-        'setup': 'Prediction setup',
-        'scan_scope': 'Scan scope',
-        'all_sports': 'All active sports',
-        'one_sport': 'One sport/league',
-        'team_player': 'One team/player',
-        'manual_sports': 'Manual sport keys only',
-        'sport_search': 'Sport/feed search',
-        'team_filter': 'Team/player filter',
-        'manual_keys': 'Manual sport keys',
-        'regions': 'Bookmaker regions',
-        'markets': 'Markets',
-        'max_sports': 'Max sports',
-        'max_events': 'Max events per sport',
-        'latest_date': 'Latest event date',
-        'min_books': 'Minimum books',
-        'min_model_prob': 'Minimum model probability',
-        'min_edge': 'Minimum edge',
-        'strong_edge': 'Strong edge threshold',
-        'min_strength': 'Minimum scanner strength',
-        'run': 'Run Pro Predictor',
-        'api_error': 'Could not load sports list. Check API key/quota or use manual sport keys.',
-        'no_rows': 'No prediction rows passed the filters.',
-        'skipped': 'Skipped feeds / API errors',
-        'saved': 'Prediction rows saved for What Are the Odds, Odds Lock, and Learning Memory review.',
-        'ranked': 'Ranked prediction board',
-        'lock_ready': 'Lock-ready candidates',
-        'all_rows': 'All rows',
-        'download': 'Download Pro Predictor CSV',
-        'rows': 'Rows',
-        'playable': 'Playable',
-        'lock_ready_metric': 'Lock ready',
-        'avg_strength': 'Avg strength',
-        'premium': 'Premium scans',
-        'strong': 'Strong plays',
-        'small': 'Small plays',
-        'memory_source': 'Memory source',
+        'version': 'App version', 'learned_events': 'Learned events', 'raw_accuracy': 'Raw accuracy', 'calibrated_accuracy': 'Calibrated accuracy', 'brier_after': 'Brier after',
+        'api_sources': 'API sources', 'odds_key': 'Odds API key', 'sports_key': 'SportsDataIO key', 'weather_key': 'WeatherAPI key', 'enabled': 'Enabled', 'missing': 'Missing',
+        'setup': 'Prediction setup', 'scan_scope': 'Scan scope', 'all_sports': 'All active sports', 'one_sport': 'One sport/league', 'team_player': 'One team/player', 'manual_sports': 'Manual sport keys only',
+        'sport_search': 'Sport/feed search', 'team_filter': 'Team/player filter', 'manual_keys': 'Manual sport keys', 'regions': 'Bookmaker regions', 'markets': 'Markets', 'max_sports': 'Max sports', 'max_events': 'Max events per sport', 'latest_date': 'Latest event date',
+        'min_books': 'Minimum books', 'min_model_prob': 'Minimum model probability', 'min_edge': 'Minimum edge', 'strong_edge': 'Strong edge threshold', 'min_strength': 'Minimum scanner strength', 'run': 'Run Pro Predictor',
+        'api_error': 'Could not load sports list. Check API key/quota or use manual sport keys.', 'no_rows': 'No prediction rows passed the filters.', 'skipped': 'Skipped feeds / API errors', 'saved': 'Prediction rows saved for What Are the Odds, Odds Lock, and Learning Memory review.',
+        'ranked': 'Ranked prediction board', 'lock_ready': 'Lock-ready candidates', 'all_rows': 'All rows', 'download': 'Download Pro Predictor CSV', 'rows': 'Rows', 'playable': 'Playable', 'lock_ready_metric': 'Lock ready', 'avg_strength': 'Avg strength', 'premium': 'Premium scans', 'strong': 'Strong plays', 'small': 'Small plays', 'memory_source': 'Memory source', 'next': 'Next', 'handoff': 'Four-tool handoff health',
     },
     'es': {
         'title': 'Predictor Pro',
         'caption': 'Motor principal de predicción para todos los deportes. Escanea mercados en vivo, aplica memoria aprendida, crea probabilidades del modelo, califica decisiones del agente y envía filas a What Are the Odds.',
         'workflow': 'Ruta limpia: Scanner Pro → Predictor Pro → What Are the Odds → Memoria de Aprendizaje.',
-        'version': 'Versión de la app',
-        'learned_events': 'Eventos aprendidos',
-        'raw_accuracy': 'Precisión bruta',
-        'calibrated_accuracy': 'Precisión calibrada',
-        'brier_after': 'Brier después',
-        'api_sources': 'Fuentes API',
-        'odds_key': 'Clave de Odds API',
-        'sports_key': 'Clave de SportsDataIO',
-        'weather_key': 'Clave de WeatherAPI',
-        'enabled': 'Activada',
-        'missing': 'Falta',
-        'setup': 'Configuración de predicción',
-        'scan_scope': 'Alcance del escaneo',
-        'all_sports': 'Todos los deportes activos',
-        'one_sport': 'Un deporte/liga',
-        'team_player': 'Un equipo/jugador',
-        'manual_sports': 'Solo claves manuales',
-        'sport_search': 'Buscar deporte/feed',
-        'team_filter': 'Filtro de equipo/jugador',
-        'manual_keys': 'Claves manuales de deporte',
-        'regions': 'Regiones de casas de apuestas',
-        'markets': 'Mercados',
-        'max_sports': 'Máximo de deportes',
-        'max_events': 'Máximo de eventos por deporte',
-        'latest_date': 'Fecha máxima del evento',
-        'min_books': 'Mínimo de casas',
-        'min_model_prob': 'Probabilidad mínima del modelo',
-        'min_edge': 'Ventaja mínima',
-        'strong_edge': 'Umbral de ventaja fuerte',
-        'min_strength': 'Fuerza mínima del escáner',
-        'run': 'Ejecutar Predictor Pro',
-        'api_error': 'No se pudo cargar la lista de deportes. Revisa la clave/cuota API o usa claves manuales.',
-        'no_rows': 'Ninguna fila de predicción pasó los filtros.',
-        'skipped': 'Feeds omitidos / errores API',
-        'saved': 'Las filas de predicción se guardaron para What Are the Odds, Odds Lock y Memoria de Aprendizaje.',
-        'ranked': 'Tablero de predicciones clasificadas',
-        'lock_ready': 'Candidatos listos para bloquear',
-        'all_rows': 'Todas las filas',
-        'download': 'Descargar CSV de Predictor Pro',
-        'rows': 'Filas',
-        'playable': 'Jugables',
-        'lock_ready_metric': 'Listas para bloquear',
-        'avg_strength': 'Fuerza promedio',
-        'premium': 'Escaneos premium',
-        'strong': 'Jugadas fuertes',
-        'small': 'Jugadas pequeñas',
-        'memory_source': 'Fuente de memoria',
+        'version': 'Versión de la app', 'learned_events': 'Eventos aprendidos', 'raw_accuracy': 'Precisión bruta', 'calibrated_accuracy': 'Precisión calibrada', 'brier_after': 'Brier después',
+        'api_sources': 'Fuentes API', 'odds_key': 'Clave de Odds API', 'sports_key': 'Clave de SportsDataIO', 'weather_key': 'Clave de WeatherAPI', 'enabled': 'Activada', 'missing': 'Falta',
+        'setup': 'Configuración de predicción', 'scan_scope': 'Alcance del escaneo', 'all_sports': 'Todos los deportes activos', 'one_sport': 'Un deporte/liga', 'team_player': 'Un equipo/jugador', 'manual_sports': 'Solo claves manuales',
+        'sport_search': 'Buscar deporte/feed', 'team_filter': 'Filtro de equipo/jugador', 'manual_keys': 'Claves manuales de deporte', 'regions': 'Regiones de casas de apuestas', 'markets': 'Mercados', 'max_sports': 'Máximo de deportes', 'max_events': 'Máximo de eventos por deporte', 'latest_date': 'Fecha máxima del evento',
+        'min_books': 'Mínimo de casas', 'min_model_prob': 'Probabilidad mínima del modelo', 'min_edge': 'Ventaja mínima', 'strong_edge': 'Umbral de ventaja fuerte', 'min_strength': 'Fuerza mínima del escáner', 'run': 'Ejecutar Predictor Pro',
+        'api_error': 'No se pudo cargar la lista de deportes. Revisa la clave/cuota API o usa claves manuales.', 'no_rows': 'Ninguna fila de predicción pasó los filtros.', 'skipped': 'Feeds omitidos / errores API', 'saved': 'Las filas de predicción se guardaron para What Are the Odds, Odds Lock y Memoria de Aprendizaje.',
+        'ranked': 'Tablero de predicciones clasificadas', 'lock_ready': 'Candidatos listos para bloquear', 'all_rows': 'Todas las filas', 'download': 'Descargar CSV de Predictor Pro', 'rows': 'Filas', 'playable': 'Jugables', 'lock_ready_metric': 'Listas para bloquear', 'avg_strength': 'Fuerza promedio', 'premium': 'Escaneos premium', 'strong': 'Jugadas fuertes', 'small': 'Jugadas pequeñas', 'memory_source': 'Fuente de memoria', 'next': 'Siguiente', 'handoff': 'Salud del traspaso entre herramientas',
     },
 }
 
@@ -224,11 +145,9 @@ def memory_signal() -> tuple[float, str, int]:
 
 
 def api_coverage_fields(api_context: dict[str, Any], *, odds: bool, sports: bool, weather: bool) -> dict[str, Any]:
-    configured = []
-    used = []
+    configured, used = [], []
     if odds:
-        configured.append('odds_api')
-        used.append('odds_api')
+        configured.append('odds_api'); used.append('odds_api')
     if sports:
         configured.append('sportsdataio')
         if str(api_context.get('sportsdataio_source_used', '')).lower() == 'yes':
@@ -239,14 +158,7 @@ def api_coverage_fields(api_context: dict[str, Any], *, odds: bool, sports: bool
             used.append('weatherapi')
     score = 0.0 if not configured else round(len(used) / len(configured), 6)
     missing = [item for item in configured if item not in used]
-    return {
-        'configured_api_sources': ','.join(configured),
-        'api_sources_used': ','.join(used),
-        'api_sources_missing': ','.join(missing),
-        'api_coverage_score': score,
-        'api_coverage_percent': pct(score),
-        'all_configured_apis_used': bool(configured) and len(used) == len(configured),
-    }
+    return {'configured_api_sources': ','.join(configured), 'api_sources_used': ','.join(used), 'api_sources_missing': ','.join(missing), 'api_coverage_score': score, 'api_coverage_percent': pct(score), 'all_configured_apis_used': bool(configured) and len(used) == len(configured)}
 
 
 def sport_score(sport: Any, query: str) -> float:
@@ -282,7 +194,6 @@ def build_rows(events: list[Any], sport: Any, *, context_builder: LiveAPIContext
             prediction = getattr(outcome, 'name', '')
             market_probability = float(getattr(outcome, 'normalized_probability', 0.0) or 0.0)
             best_price = getattr(outcome, 'best_price', None) or getattr(outcome, 'average_price', None)
-            api_context: dict[str, Any] = {}
             try:
                 api_context = context_builder.context_for_event(event, pick_name=prediction)
             except Exception as exc:
@@ -294,38 +205,13 @@ def build_rows(events: list[Any], sport: Any, *, context_builder: LiveAPIContext
                     fusion_input[key] = api_context[key]
             fused = fuse_row(fusion_input)
             row = {
-                'event': event_name,
-                'event_id': getattr(event, 'event_id', ''),
-                'sport': getattr(event, 'sport_title', getattr(sport, 'title', '')),
-                'sport_key': getattr(event, 'sport_key', getattr(sport, 'key', '')),
-                'event_start_utc': getattr(event, 'commence_time', ''),
-                'event_date': str(event_day),
-                'home_team': getattr(event, 'home_team', ''),
-                'away_team': getattr(event, 'away_team', ''),
-                'market_type': 'h2h',
-                'prediction': prediction,
-                'model_probability': round(float(fused.final_probability), 6),
-                'model_probability_clean': round(float(fused.final_probability), 6),
-                'market_probability': round(market_probability, 6),
-                'decimal_price': best_price,
-                'best_price': best_price,
-                'average_price': getattr(outcome, 'average_price', None),
-                'worst_price': getattr(outcome, 'worst_price', None),
-                'price_range': getattr(outcome, 'price_range', None),
-                'bookmaker': getattr(outcome, 'best_bookmaker', '') or '',
-                'bookmaker_count': books,
-                'books': books,
-                'market_overround': getattr(event, 'market_overround', None),
-                'odds_source': 'The Odds API',
-                'ara_memory_signal': memory_edge,
-                'final_probability': pct(float(fused.final_probability)),
-                'reliability_score': fused.reliability_score,
-                'confidence': fused.confidence,
-                'fusion_reason': fused.fusion_reason,
-                'fusion_warning': fused.fusion_warning,
-                'match_score': f'{match:.0%}',
-                'prediction_timestamp': '',
-                'result_status': '',
+                'event': event_name, 'event_id': getattr(event, 'event_id', ''), 'sport': getattr(event, 'sport_title', getattr(sport, 'title', '')), 'sport_key': getattr(event, 'sport_key', getattr(sport, 'key', '')),
+                'event_start_utc': getattr(event, 'commence_time', ''), 'event_date': str(event_day), 'home_team': getattr(event, 'home_team', ''), 'away_team': getattr(event, 'away_team', ''),
+                'market_type': 'h2h', 'prediction': prediction, 'model_probability': round(float(fused.final_probability), 6), 'model_probability_clean': round(float(fused.final_probability), 6), 'market_probability': round(market_probability, 6),
+                'decimal_price': best_price, 'best_price': best_price, 'average_price': getattr(outcome, 'average_price', None), 'worst_price': getattr(outcome, 'worst_price', None), 'price_range': getattr(outcome, 'price_range', None),
+                'bookmaker': getattr(outcome, 'best_bookmaker', '') or '', 'bookmaker_count': books, 'books': books, 'market_overround': getattr(event, 'market_overround', None), 'odds_source': 'The Odds API',
+                'ara_memory_signal': memory_edge, 'final_probability': pct(float(fused.final_probability)), 'reliability_score': fused.reliability_score, 'confidence': fused.confidence, 'fusion_reason': fused.fusion_reason, 'fusion_warning': fused.fusion_warning,
+                'match_score': f'{match:.0%}', 'prediction_timestamp': '', 'result_status': '',
             }
             row.update(api_context)
             rows.append(row)
@@ -387,11 +273,9 @@ if st.button(t('run'), type='primary', use_container_width=True):
     if not odds_key:
         st.error('Odds API key is required.' if LANG == 'en' else 'La clave de Odds API es obligatoria.')
         st.stop()
-    sports_df = pd.DataFrame()
     skipped: list[str] = []
     try:
         sports = list_sports(odds_key, include_all=False)
-        sports_df = pd.DataFrame([asdict(item) for item in sports])
     except Exception as exc:
         st.warning(f"{t('api_error')} Error: {str(exc)[:220]}")
         sports = []
@@ -440,6 +324,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
         decisions = decisions.sort_values(sort_cols, ascending=False).reset_index(drop=True)
     summary = agent_decision_summary(decisions, min_edge=float(min_edge), strong_edge=float(strong_edge))
     strength = scanner_strength_summary(decisions)
+    health = page_health(decisions, page='pro_predictor')
     lock_ready = lock_ready_candidates(decisions, min_edge=float(min_edge), strong_edge=float(strong_edge))
     playable = int(summary['play_strong'] + summary['play_small'])
     st.session_state['pro_predictor_latest_rows'] = decisions.to_dict('records')
@@ -447,14 +332,17 @@ if st.button(t('run'), type='primary', use_container_width=True):
     st.session_state['ara_latest_predictions_source'] = 'Pro Predictor'
     st.session_state['ara_latest_predictions_saved_at'] = pd.Timestamp.utcnow().isoformat()
     st.success(t('saved'))
-    metrics = st.columns(7)
+    metrics = st.columns(8)
     metrics[0].metric(t('rows'), len(decisions))
     metrics[1].metric(t('playable'), playable)
     metrics[2].metric(t('strong'), summary['play_strong'])
     metrics[3].metric(t('small'), summary['play_small'])
-    metrics[4].metric(t('lock_ready_metric'), len(lock_ready))
+    metrics[4].metric(t('lock_ready_metric'), health['lock_ready_rows'])
     metrics[5].metric(t('avg_strength'), 'N/A' if strength['avg_score'] is None else strength['avg_score'])
     metrics[6].metric(t('premium'), strength['premium_scan'])
+    metrics[7].metric(t('next'), health['next_action'])
+    st.subheader(t('handoff'))
+    st.dataframe(page_health_frame(decisions, page='pro_predictor'), use_container_width=True, hide_index=True)
     tabs = st.tabs([t('ranked'), t('lock_ready'), t('all_rows'), t('skipped')])
     display_cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'model_probability_clean', 'market_implied_probability', 'model_market_edge', 'decimal_price', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score', 'scanner_strength_tier', 'lock_ready', 'decision_reasons'] if col in decisions.columns]
     with tabs[0]:
