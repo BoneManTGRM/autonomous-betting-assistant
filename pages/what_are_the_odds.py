@@ -8,6 +8,7 @@ import streamlit as st
 from autonomous_betting_agent.agent_decision_engine import agent_decision_summary, build_agent_decisions, lock_ready_candidates, playable_candidates
 from autonomous_betting_agent.api_snapshot_memory import build_api_snapshots, snapshot_memory_summary
 from autonomous_betting_agent.clv_intelligence import build_clv_intelligence, clv_by_segment, clv_summary
+from autonomous_betting_agent.four_tool_orchestrator import page_health, page_health_frame
 from autonomous_betting_agent.mobile_report import compact_report_frame
 from autonomous_betting_agent.odds_breakdown import build_odds_breakdown
 from autonomous_betting_agent.performance_segments import build_segment_frame, top_segments
@@ -43,6 +44,8 @@ TEXT = {
         'avg_strength': 'Avg scan strength',
         'premium': 'Premium scans',
         'clv_ready': 'CLV ready',
+        'next': 'Next',
+        'handoff': 'Four-tool handoff health',
         'best_board': 'Best Board',
         'all_decisions': 'All decisions',
         'lock_candidates': 'Lock-ready',
@@ -79,6 +82,8 @@ TEXT = {
         'avg_strength': 'Fuerza promedio',
         'premium': 'Escaneos premium',
         'clv_ready': 'CLV listo',
+        'next': 'Siguiente',
+        'handoff': 'Salud del traspaso entre herramientas',
         'best_board': 'Best Board',
         'all_decisions': 'Todas las decisiones',
         'lock_candidates': 'Listas para bloquear',
@@ -203,6 +208,7 @@ plays = playable_candidates(decisions, min_edge=float(min_edge), strong_edge=flo
 lock_ready = lock_ready_candidates(decisions, min_edge=float(min_edge), strong_edge=float(strong_edge))
 summary = agent_decision_summary(decisions, min_edge=float(min_edge), strong_edge=float(strong_edge))
 strength = scanner_strength_summary(decisions)
+health = page_health(decisions, page='what_are_the_odds')
 best = max_board(decisions, min_strength=float(min_strength))
 segments = build_segment_frame(normalized)
 top = top_segments(normalized, min_resolved=1, limit=30)
@@ -233,14 +239,17 @@ st.caption(f"{t('source')}: {source}")
 cols = st.columns(10)
 cols[0].metric(t('rows'), len(normalized))
 cols[1].metric(t('playable'), summary['play_strong'] + summary['play_small'])
-cols[2].metric(t('lock_ready'), len(lock_ready))
+cols[2].metric(t('lock_ready'), health['lock_ready_rows'])
 cols[3].metric(t('watch'), summary['watch_only'])
 cols[4].metric(t('review'), summary['review_needed'])
 cols[5].metric(t('avg_strength'), 'N/A' if strength['avg_score'] is None else strength['avg_score'])
 cols[6].metric(t('premium'), strength['premium_scan'])
 cols[7].metric(t('clv_ready'), clv_stats['ready'])
 cols[8].metric('WF rows', walk_stats['tested_rows'])
-cols[9].metric('Brier WF', 'N/A' if walk_stats['avg_brier_walk_forward'] is None else walk_stats['avg_brier_walk_forward'])
+cols[9].metric(t('next'), health['next_action'])
+
+st.subheader(t('handoff'))
+st.dataframe(page_health_frame(decisions, page='what_are_the_odds'), use_container_width=True, hide_index=True)
 
 tabs = st.tabs([t('best_board'), t('all_decisions'), t('lock_candidates'), t('scanner_rank'), t('odds_breakdown'), t('segments'), t('clv'), t('loss_autopsy'), t('walk_lab'), t('sport_models'), t('exports')])
 with tabs[0]:
