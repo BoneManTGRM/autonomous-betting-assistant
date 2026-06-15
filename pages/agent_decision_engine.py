@@ -14,7 +14,7 @@ from autonomous_betting_agent.agent_decision_engine import (
 
 st.set_page_config(page_title='Agent Decision Engine', layout='wide')
 st.title('Agent Decision Engine')
-st.caption('Evaluates rows and recommends play_strong, play_small, watch_only, no_action, or review_needed using edge, odds, field coverage, and line movement.')
+st.caption('Evaluates rows and recommends play_strong, play_small, watch_only, no_action, or review_needed using edge, odds, field coverage, line movement, and event timing safety.')
 
 min_edge = st.slider('Minimum model-vs-market edge', min_value=0.0, max_value=0.20, value=0.035, step=0.005)
 strong_edge = st.slider('Strong edge threshold', min_value=0.0, max_value=0.30, value=0.075, step=0.005)
@@ -65,6 +65,7 @@ priority_cols = [
     'agent_decision',
     'agent_score',
     'recommended_stake_units',
+    'event_timing_status',
     'lock_ready',
     'already_locked',
     'field_coverage_score',
