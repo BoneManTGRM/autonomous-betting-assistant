@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/tests.yml)
 
-Autonomous Betting Agent is a commercial source-available sports research and prediction-analysis platform built from the ARA/TGRM workflow: test the available evidence, detect weak signals, repair the analysis, verify uncertainty, and produce auditable probability reports.
+Autonomous Betting Agent is a proprietary, source-available sports research and prediction-analysis platform built from the ARA/TGRM workflow: test the available evidence, detect weak signals, repair the analysis, verify uncertainty, and produce auditable probability reports.
 
 It is designed for serious sports analysts, betting researchers, prediction-market reviewers, private handicapping groups, and commercial operators who need a repeatable decision layer instead of manual guesswork.
 
@@ -20,7 +20,7 @@ This project is intended to become a sellable product, not a free open-source be
 - custom integrations with odds, weather, injury, lineup, statistics, and player-prop providers
 - private deployment, support, and model-tuning packages
 
-The repository is public for review and evaluation, but the code is now governed by a commercial source-available license. Commercial use, resale, sublicensing, hosting, paid access, SaaS deployment, white-label use, or monetized derivative use requires written permission from Reparodynamics.
+The repository is public for limited review and evaluation, but the code is governed by a proprietary evaluation license. Commercial use, resale, sublicensing, hosting, paid access, SaaS deployment, API access, white-label use, competing-product use, AI/model training use, or monetized derivative use requires written permission from Reparodynamics.
 
 ## What it does
 
@@ -375,18 +375,21 @@ No claim of accuracy or profitability should be made until the system is tested 
 
 The safest commercial claim is that the system provides repeatable sports research, structured decision review, probability tracking, and audit-ready reporting. Performance claims should be made only after independent testing.
 
-## Commercial licensing
+## License
 
-This repository is governed by the **Autonomous Betting Agent Commercial Source-Available License v1.0** in `LICENSE`.
+This repository is governed by the **Reparodynamics Proprietary Evaluation License v1.1** in `LICENSE`.
 
 Summary:
 
-- source is visible for review and non-commercial evaluation
-- commercial use requires written permission from Reparodynamics
-- resale, sublicensing, hosting, paid access, SaaS use, white-label use, and monetized derivatives are not allowed without a commercial license
+- this is proprietary, source-available software, not open-source software
+- source visibility is allowed only for limited private evaluation
+- commercial use requires a signed written agreement from Reparodynamics
+- resale, sublicensing, redistribution, hosting, paid access, SaaS use, API access, white-label use, managed-service use, and monetized derivatives are prohibited without written permission
+- competing-product use is prohibited without written permission
+- AI/model training, scraping, dataset creation, benchmarking, fine-tuning, distillation, or automated extraction using this software is prohibited without written permission
 - users must bring their own third-party API keys and comply with third-party provider terms
 - the software is provided as-is with no guarantee of accuracy, legality, availability, winners, or profit
 
-Earlier public versions may have been distributed under different terms. This license governs versions distributed with the current `LICENSE` file and future updates unless a separate written agreement states otherwise.
+Earlier public versions may have been distributed under different terms, including MIT. The current license governs versions distributed with the current `LICENSE` file and future updates unless a signed written agreement states otherwise.
 
-For commercial licensing, private deployment, custom integrations, or white-label discussions, contact Reparodynamics / BoneManTGRM through the repository owner account.
+For commercial licensing, private deployment, custom integrations, resale rights, or white-label discussions, contact Reparodynamics / BoneManTGRM through the repository owner account.
