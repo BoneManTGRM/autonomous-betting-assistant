@@ -285,7 +285,7 @@ st.caption(t('durable_memory'))
 truth_cols = st.columns(4)
 truth_cols[0].metric('learned_state.json', 'Loaded' if current is not None else 'Missing')
 truth_cols[1].metric('learning_memory_bank.json', f"{len(existing_rows)} rows")
-truth_cols[2].metric('ara_learning_memory.csv', 'Generated patterns')
+truth_cols[2].metric('ara_learning_memory.csv', 'Ready' if existing_segments else 'No patterns yet')
 truth_cols[3].metric(t('memory_status'), t('ready_to_train') if len(existing_rows) >= 5 else t('not_ready_to_train'))
 
 st.subheader(t('saved_calibration'))
