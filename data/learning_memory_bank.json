@@ -1667,7 +1667,7 @@
     ],
     "slope": 1.1111665067328516,
     "source": "High confidence.csv",
-    "trained_at_utc": "2026-06-15T18:41:49+00:00"
+    "trained_at_utc": "2026-06-15T19:59:30+00:00"
   },
   "parse_stats": {
     "input_rows": 108,
@@ -2218,6 +2218,6 @@
     "rows_after_pruning": 110,
     "uploaded_usable_rows": 0
   },
-  "trained_at_utc": "2026-06-15T18:41:49+00:00",
+  "trained_at_utc": "2026-06-15T19:59:30+00:00",
   "version": "learning-memory-bank-v2"
 }
