@@ -55,10 +55,17 @@ DEFAULT_GITHUB_BRANCH = 'main'
 TEXT = {
     'en': {
         'title': 'Learning Memory',
-        'caption': 'Upload graded results, preview exactly what the trainer can use, replace or merge memory, rebuild calibration, and save it back to GitHub.',
+        'caption': 'The single source-of-truth training page. Upload graded results, preview exactly what the trainer can use, replace or merge memory, rebuild calibration, and save it back to GitHub.',
+        'single_source': 'Use this page for actual learning/training. The old Self Learning Engine page was removed because it duplicated this workflow and did not save durable learning memory.',
+        'workflow_note': 'Recommended path: Agent Decision Engine → Odds Lock → results grading → Learning Memory → Max Agent Intelligence → Proof Readiness.',
         'saved_calibration': 'Saved calibration summary',
         'cumulative_summary': 'Cumulative memory summary',
         'metrics_note': 'Saved calibration is the trained file. Cumulative memory is the raw stored graded rows. Upload preview below shows whether your new CSV is actually usable before training.',
+        'source_of_truth': 'Learning source of truth',
+        'memory_status': 'Memory status',
+        'ready_to_train': 'Ready to train',
+        'not_ready_to_train': 'Not ready to train',
+        'durable_memory': 'Durable memory files',
         'events_trained': 'Events trained',
         'raw_accuracy': 'Raw accuracy',
         'calibrated_accuracy': 'Calibrated accuracy',
@@ -107,10 +114,17 @@ TEXT = {
     },
     'es': {
         'title': 'Memoria de Aprendizaje',
-        'caption': 'Sube resultados calificados, revisa exactamente qué puede usar el entrenador, reemplaza o combina memoria, reconstruye la calibración y guarda en GitHub.',
+        'caption': 'La página única de entrenamiento. Sube resultados calificados, revisa exactamente qué puede usar el entrenador, reemplaza o combina memoria, reconstruye la calibración y guarda en GitHub.',
+        'single_source': 'Usa esta página para aprendizaje/entrenamiento real. La página antigua Self Learning Engine fue eliminada porque duplicaba este flujo y no guardaba memoria duradera.',
+        'workflow_note': 'Ruta recomendada: Agent Decision Engine → Odds Lock → calificación de resultados → Memoria de Aprendizaje → Max Agent Intelligence → Proof Readiness.',
         'saved_calibration': 'Resumen de calibración guardado',
         'cumulative_summary': 'Resumen de memoria acumulativa',
         'metrics_note': 'La calibración guardada es el archivo entrenado. La memoria acumulativa son las filas crudas guardadas. La vista previa muestra si el nuevo CSV sirve antes de entrenar.',
+        'source_of_truth': 'Fuente única de aprendizaje',
+        'memory_status': 'Estado de memoria',
+        'ready_to_train': 'Listo para entrenar',
+        'not_ready_to_train': 'No listo para entrenar',
+        'durable_memory': 'Archivos de memoria duradera',
         'events_trained': 'Eventos entrenados',
         'raw_accuracy': 'Precisión bruta',
         'calibrated_accuracy': 'Precisión calibrada',
@@ -257,12 +271,22 @@ def area_line(label: str, segment: dict[str, Any]) -> str:
 
 st.title(t('title'))
 st.caption(t('caption'))
+st.info(t('single_source'))
+st.caption(t('workflow_note'))
 
 current = current_learned_state()
 bank = load_memory_bank()
 existing_rows = [row for row in (valid_bank_row(row) for row in bank.get('compact_rows', [])) if row is not None]
 existing_metrics = memory_metrics(existing_rows)
 existing_segments = build_segments(existing_rows, 3, 160) if existing_rows else []
+
+st.subheader(t('source_of_truth'))
+st.caption(t('durable_memory'))
+truth_cols = st.columns(4)
+truth_cols[0].metric('learned_state.json', 'Loaded' if current is not None else 'Missing')
+truth_cols[1].metric('learning_memory_bank.json', f"{len(existing_rows)} rows")
+truth_cols[2].metric('ara_learning_memory.csv', 'Generated patterns')
+truth_cols[3].metric(t('memory_status'), t('ready_to_train') if len(existing_rows) >= 5 else t('not_ready_to_train'))
 
 st.subheader(t('saved_calibration'))
 saved_raw_wins = None
@@ -313,15 +337,20 @@ if graded_upload is not None:
     uploaded_bytes = graded_upload.getvalue()
     uploaded_rows, parse_stats = read_compact_csv_bytes(uploaded_bytes, getattr(graded_upload, 'name', 'uploaded_graded_results.csv'))
     st.subheader(t('upload_preview'))
-    pcols = st.columns(6)
+    pcols = st.columns(7)
     pcols[0].metric('Input rows', parse_stats.get('input_rows', 0))
     pcols[1].metric('Usable rows', parse_stats.get('usable_rows', 0))
     pcols[2].metric(t('wins'), parse_stats.get('wins', 0))
     pcols[3].metric(t('losses'), parse_stats.get('losses', 0))
     pcols[4].metric('Missing probability', parse_stats.get('missing_probability', 0))
     pcols[5].metric('Missing result', parse_stats.get('missing_result', 0))
-    if int(parse_stats.get('fallback_probability_rows', 0)) > 0:
+    pcols[6].metric('Fallback rows', parse_stats.get('fallback_probability_rows', 0))
+    if int(parse_stats.get('usable_rows', 0)) == 0:
+        st.error('This file is not useful for training yet. It needs resolved win/loss results plus probability/odds or a confidence signal.')
+    elif int(parse_stats.get('fallback_probability_rows', 0)) > 0:
         st.warning(f"{t('fallback_note')} Rows: {parse_stats.get('fallback_probability_rows', 0)}")
+    else:
+        st.success('This upload has usable resolved rows with direct probability/odds information.')
     if uploaded_rows:
         st.dataframe(pd.DataFrame(uploaded_rows).head(50), use_container_width=True, hide_index=True)
     else:
