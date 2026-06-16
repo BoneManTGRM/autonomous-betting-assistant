@@ -13,13 +13,7 @@ MINIMUM_EDGE = 0.035
 STRONG_EDGE = 0.075
 HIGH_PROBABILITY = 0.62
 TERMINAL_RESULTS = {'win', 'loss', 'void'}
-DECISION_ORDER = {
-    'play_strong': 1,
-    'play_small': 2,
-    'watch_only': 3,
-    'no_action': 4,
-    'review_needed': 5,
-}
+DECISION_ORDER = {'play_strong': 1, 'play_small': 2, 'watch_only': 3, 'no_action': 4, 'review_needed': 5}
 
 
 def implied_probability(decimal_price: Any) -> float | None:
@@ -80,28 +74,23 @@ def event_timing_status(row: dict[str, Any], *, now_utc: datetime | None = None)
 
 
 def field_coverage_score(row: dict[str, Any]) -> float:
-    fields = [
-        'event',
-        'sport',
-        'market_type',
-        'prediction',
-        'model_probability',
-        'decimal_price',
-        'bookmaker',
-        'odds_source',
-        'prediction_timestamp',
-        'event_start_utc',
-    ]
+    fields = ['event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'bookmaker', 'odds_source', 'prediction_timestamp', 'event_start_utc']
     present = sum(1 for field in fields if safe_text(row.get(field)))
     return round(present / len(fields), 6)
 
 
 def can_lock_candidate(row: dict[str, Any], *, now_utc: datetime | None = None) -> bool:
     required = ['event', 'prediction', 'model_probability', 'decimal_price', 'event_start_utc']
-    status = event_timing_status(row, now_utc=now_utc)
-    if status not in {'future_event_not_locked_yet', 'prediction_before_start'}:
+    if not all(safe_text(row.get(field)) for field in required):
         return False
-    return all(safe_text(row.get(field)) for field in required)
+    start = parse_datetime_utc(row.get('event_start_utc'))
+    prediction_time = parse_datetime_utc(row.get('prediction_timestamp'))
+    if start is None:
+        return False
+    if prediction_time is not None:
+        return prediction_time < start
+    status = event_timing_status(row, now_utc=now_utc)
+    return status == 'future_event_not_locked_yet'
 
 
 def stake_guidance(decision: str, score: float, locked: bool) -> float:
@@ -124,24 +113,10 @@ def odds_quality_context(row: dict[str, Any]) -> dict[str, Any]:
     rating = safe_text(row.get('value_rating')).lower()
     trust_grade = safe_text(row.get('odds_trust_grade'))
     flags = safe_text(row.get('odds_quality_flags'))
-    return {
-        'odds_accuracy_score': quality,
-        'expected_value_per_unit': ev,
-        'edge_probability': edge_override,
-        'recommended_action': action,
-        'value_rating': rating,
-        'odds_trust_grade': trust_grade,
-        'odds_quality_flags': flags,
-    }
+    return {'odds_accuracy_score': quality, 'expected_value_per_unit': ev, 'edge_probability': edge_override, 'recommended_action': action, 'value_rating': rating, 'odds_trust_grade': trust_grade, 'odds_quality_flags': flags}
 
 
-def evaluate_row(
-    row: dict[str, Any],
-    *,
-    min_edge: float = MINIMUM_EDGE,
-    strong_edge: float = STRONG_EDGE,
-    now_utc: datetime | None = None,
-) -> dict[str, Any]:
+def evaluate_row(row: dict[str, Any], *, min_edge: float = MINIMUM_EDGE, strong_edge: float = STRONG_EDGE, now_utc: datetime | None = None) -> dict[str, Any]:
     model_prob = clean_probability(row.get('model_probability'))
     market_prob = implied_probability(row.get('decimal_price'))
     coverage = field_coverage_score(row)
@@ -156,10 +131,8 @@ def evaluate_row(
     odds_action = odds_ctx['recommended_action']
     value_rating = odds_ctx['value_rating']
     trust_grade = odds_ctx['odds_trust_grade']
-
     reasons: list[str] = []
     signals: list[str] = []
-
     if result_status in TERMINAL_RESULTS:
         reasons.append('historical_result_present')
     if not safe_text(row.get('event')):
@@ -192,7 +165,6 @@ def evaluate_row(
         signals.append('prediction_before_start')
     if coverage < 0.70:
         reasons.append('low_field_coverage')
-
     edge = None if model_prob is None or market_prob is None else round(model_prob - market_prob, 6)
     if odds_ctx['edge_probability'] is not None:
         edge = round(float(odds_ctx['edge_probability']), 6)
@@ -208,14 +180,12 @@ def evaluate_row(
             signals.append('strong_edge')
         else:
             signals.append('positive_edge')
-
     if expected_ev is not None:
         signals.append(f'ev={expected_ev:.3f}')
         if expected_ev <= -0.02:
             reasons.append('negative_expected_value')
         elif expected_ev > 0:
             signals.append('positive_expected_value')
-
     if odds_quality is not None:
         signals.append(f'odds_quality={odds_quality:.0f}')
         if odds_quality < 50:
@@ -232,7 +202,6 @@ def evaluate_row(
         signals.append(f'odds_grade={trust_grade}')
     if 'manual-review' in trust_grade.lower() or value_rating == 'manual_review_needed':
         reasons.append('manual_review_needed')
-
     line_signal = line.get('line_value_signal', 'unknown')
     if line_signal == 'positive':
         signals.append('positive_line_movement')
@@ -240,15 +209,9 @@ def evaluate_row(
         reasons.append('negative_line_movement')
     elif line.get('line_status') != 'ready':
         signals.append('line_movement_unavailable')
-
     critical_missing = {'missing_event', 'missing_prediction', 'missing_model_probability', 'missing_decimal_price'}
     source_missing = {'missing_bookmaker', 'missing_odds_source'}
-    hard_no_action = {
-        'historical_result_present',
-        'prediction_timestamp_not_before_start',
-        'event_already_started_without_prediction_timestamp',
-    }
-
+    hard_no_action = {'historical_result_present', 'prediction_timestamp_not_before_start', 'event_already_started_without_prediction_timestamp'}
     if any(reason in reasons for reason in critical_missing):
         decision = 'review_needed'
     elif any(reason in reasons for reason in hard_no_action):
@@ -271,7 +234,6 @@ def evaluate_row(
         decision = 'play_small'
     else:
         decision = 'watch_only'
-
     score = 0.0
     if model_prob is not None:
         score += model_prob * 40.0
@@ -297,33 +259,10 @@ def evaluate_row(
     if decision == 'watch_only':
         score = min(score, 55.0)
     score = round(max(0.0, min(100.0, score)), 3)
-
-    return {
-        'agent_decision': decision,
-        'agent_score': score,
-        'decision_rank': DECISION_ORDER.get(decision, 99),
-        'event_timing_status': timing,
-        'lock_ready': bool(lock_ready),
-        'already_locked': bool(has_lock_time),
-        'recommended_stake_units': stake_guidance(decision, score, has_lock_time),
-        'model_probability_clean': model_prob,
-        'market_implied_probability': market_prob,
-        'model_market_edge': edge,
-        'model_market_edge_percent': edge_percent,
-        'field_coverage_score': coverage,
-        'line_value_signal': line_signal,
-        'decision_reasons': ' | '.join(sorted(set(reasons))),
-        'decision_signals': ' | '.join(signals),
-    }
+    return {'agent_decision': decision, 'agent_score': score, 'decision_rank': DECISION_ORDER.get(decision, 99), 'event_timing_status': timing, 'lock_ready': bool(lock_ready), 'already_locked': bool(has_lock_time), 'recommended_stake_units': stake_guidance(decision, score, has_lock_time), 'model_probability_clean': model_prob, 'market_implied_probability': market_prob, 'model_market_edge': edge, 'model_market_edge_percent': edge_percent, 'field_coverage_score': coverage, 'line_value_signal': line_signal, 'decision_reasons': ' | '.join(sorted(set(reasons))), 'decision_signals': ' | '.join(signals)}
 
 
-def build_agent_decisions(
-    frame: pd.DataFrame,
-    *,
-    min_edge: float = MINIMUM_EDGE,
-    strong_edge: float = STRONG_EDGE,
-    now_utc: datetime | None = None,
-) -> pd.DataFrame:
+def build_agent_decisions(frame: pd.DataFrame, *, min_edge: float = MINIMUM_EDGE, strong_edge: float = STRONG_EDGE, now_utc: datetime | None = None) -> pd.DataFrame:
     if frame is None or frame.empty:
         return pd.DataFrame()
     data = normalize_frame(frame)
@@ -358,14 +297,4 @@ def agent_decision_summary(frame: pd.DataFrame, *, min_edge: float = MINIMUM_EDG
     if decisions.empty:
         return {'rows': 0, 'play_strong': 0, 'play_small': 0, 'watch_only': 0, 'no_action': 0, 'review_needed': 0, 'lock_ready_candidates': 0, 'recommended_total_stake_units': 0.0, 'average_score': None}
     decision = decisions['agent_decision'].fillna('').astype(str)
-    return {
-        'rows': int(len(decisions)),
-        'play_strong': int(decision.eq('play_strong').sum()),
-        'play_small': int(decision.eq('play_small').sum()),
-        'watch_only': int(decision.eq('watch_only').sum()),
-        'no_action': int(decision.eq('no_action').sum()),
-        'review_needed': int(decision.eq('review_needed').sum()),
-        'lock_ready_candidates': int(decisions.get('lock_ready', pd.Series(dtype=bool)).fillna(False).astype(bool).sum()),
-        'recommended_total_stake_units': round(float(pd.to_numeric(decisions.get('recommended_stake_units', pd.Series(dtype=float)), errors='coerce').fillna(0).sum()), 3),
-        'average_score': round(float(pd.to_numeric(decisions['agent_score'], errors='coerce').fillna(0).mean()), 3),
-    }
+    return {'rows': int(len(decisions)), 'play_strong': int(decision.eq('play_strong').sum()), 'play_small': int(decision.eq('play_small').sum()), 'watch_only': int(decision.eq('watch_only').sum()), 'no_action': int(decision.eq('no_action').sum()), 'review_needed': int(decision.eq('review_needed').sum()), 'lock_ready_candidates': int(decisions.get('lock_ready', pd.Series(dtype=bool)).fillna(False).astype(bool).sum()), 'recommended_total_stake_units': round(float(pd.to_numeric(decisions.get('recommended_stake_units', pd.Series(dtype=float)), errors='coerce').fillna(0).sum()), 3), 'average_score': round(float(pd.to_numeric(decisions['agent_score'], errors='coerce').fillna(0).mean()), 3)}
