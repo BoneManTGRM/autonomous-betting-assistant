@@ -8,43 +8,43 @@ import streamlit as st
 from autonomous_betting_agent.agent_decision_engine import build_agent_decisions
 from autonomous_betting_agent.four_tool_orchestrator import page_health, page_health_frame
 
-st.set_page_config(page_title='Ultra 80 Profit Mode', layout='wide')
+st.set_page_config(page_title='Ultra 70/80 Profit Mode', layout='wide')
 LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='ultra80_profit_mode_language') == 'Español' else 'en'
 
 TEXT = {
     'en': {
-        'title': 'Ultra 80 Profit + Max Volume Mode',
-        'caption': 'Builds the strict 80%+ profitable proof list, then adds the largest safe reserve list without mixing the tiers.',
+        'title': 'Ultra 70/80 Profit + Max Volume Mode',
+        'caption': 'Keeps strict 80% proof separate, but adds a practical 70% max-profitable shortlist for current slates.',
         'source': 'Prediction source', 'session': 'Use latest Pro Predictor session', 'upload': 'Upload Pro Predictor CSV', 'upload_label': 'Upload CSV',
-        'run': 'Build max-volume shortlist', 'no_rows': 'No rows available. Run Pro Predictor first or upload a CSV.',
+        'run': 'Build 70% max-volume shortlist', 'no_rows': 'No rows available. Run Pro Predictor first or upload a CSV.',
         'no_pass': 'No rows passed the selected tier. That is normal when the filters are strict.',
-        'all_rows': 'All reviewed rows', 'strict_rows': 'A — Strict Ultra 80 proof', 'max_rows_tab': 'B — Max profitable volume', 'reserve_rows': 'C — Rescan/watch reserve', 'selected_rows': 'Selected handoff',
+        'all_rows': 'All reviewed rows', 'strict_rows': 'A — Strict Ultra 80 proof', 'max_rows_tab': 'B — 70% max profitable volume', 'reserve_rows': 'C — 65–70% reserve/watch', 'selected_rows': 'Selected handoff',
         'download': 'Download selected CSV', 'download_strict': 'Download strict Ultra 80 CSV', 'download_all': 'Download reviewed CSV',
-        'reviewed': 'Rows reviewed', 'strict': 'Strict Ultra 80', 'max_profit': 'Max-profit volume', 'reserve': 'Reserve/watch', 'handoff': 'Handoff rows', 'avg_prob': 'Avg model probability', 'avg_ev': 'Avg EV/unit', 'avg_profit80': 'Avg profit at 80%', 'next': 'Next action',
+        'reviewed': 'Rows reviewed', 'strict': 'Strict Ultra 80', 'max_profit': '70% volume', 'reserve': 'Reserve/watch', 'handoff': 'Handoff rows', 'avg_prob': 'Avg model probability', 'avg_ev': 'Avg EV/unit', 'avg_profit70': 'Avg profit at 70%', 'next': 'Next action',
         'rules': 'Tier rules',
-        'rule_text': 'A = official proof tier. Requires 80%+ probability, profitable odds at 80%, positive EV, strong edge, 6+ books, API coverage, no draw, clean timing, no bad line movement, no negative memory pattern, and now positive robust EV using conservative pricing. B = more volume but still profitable-leaning. C = close rows to rescan or manually review. Do not mix B/C into proof unless they are locked and tracked separately.',
-        'proof': 'Lock before start time. Track A, B, and C separately. A is the only 80% proof tier.',
-        'handoff_mode': 'Handoff mode', 'strict_only': 'A only — strict proof', 'max_volume': 'A+B — max profitable volume', 'research_volume': 'A+B+C — research/rescan volume',
+        'rule_text': 'A = strict 80% proof tier. B = 70% operating tier for max profitable volume. C = 65–70% reserve/watch rows for rescan or manual review. Keep A separate from B/C when making proof claims.',
+        'proof': 'Lock before start time. Track A, B, and C separately. A is still the only 80% proof tier.',
+        'handoff_mode': 'Handoff mode', 'strict_only': 'A only — strict proof', 'max_volume': 'A+B — 70% max profitable volume', 'research_volume': 'A+B+C — research/rescan volume',
         'one_per_event': 'Keep only the best pick per event', 'max_a': 'Max A rows', 'max_b': 'Max B rows', 'max_c': 'Max C rows',
         'saved': 'Selected rows saved as the active handoff list for Odds Lock Pro.', 'blockers': 'Top rejection/blocker reasons', 'quality_note': 'Conflict guard active: when multiple picks come from the same event, the system keeps the strongest row by tier quality score.',
-        'robust_note': 'Robust profit guard active: rows must still look profitable using conservative pricing, not only the best advertised price.',
+        'robust_note': 'Robust profit guard active: B rows must look profitable at a 70% hit-rate using conservative pricing.',
     },
     'es': {
-        'title': 'Modo Ultra 80 Rentable + Volumen Máximo',
-        'caption': 'Crea la lista estricta de prueba 80%+ rentable y luego agrega la mayor lista de reserva segura sin mezclar los niveles.',
+        'title': 'Modo Ultra 70/80 Rentable + Volumen Máximo',
+        'caption': 'Mantiene la prueba estricta 80% separada, pero agrega una lista práctica 70% rentable para slates actuales.',
         'source': 'Fuente de predicciones', 'session': 'Usar última sesión de Predictor Pro', 'upload': 'Subir CSV de Predictor Pro', 'upload_label': 'Subir CSV',
-        'run': 'Crear lista de volumen máximo', 'no_rows': 'No hay filas disponibles. Ejecuta Predictor Pro primero o sube un CSV.',
+        'run': 'Crear lista 70% volumen máximo', 'no_rows': 'No hay filas disponibles. Ejecuta Predictor Pro primero o sube un CSV.',
         'no_pass': 'Ninguna fila pasó el nivel seleccionado. Eso es normal con filtros estrictos.',
-        'all_rows': 'Todas las filas revisadas', 'strict_rows': 'A — Prueba Ultra 80 estricta', 'max_rows_tab': 'B — Volumen rentable máximo', 'reserve_rows': 'C — Reserva para reescanear/vigilar', 'selected_rows': 'Traspaso seleccionado',
+        'all_rows': 'Todas las filas revisadas', 'strict_rows': 'A — Prueba Ultra 80 estricta', 'max_rows_tab': 'B — Volumen rentable 70%', 'reserve_rows': 'C — Reserva 65–70%', 'selected_rows': 'Traspaso seleccionado',
         'download': 'Descargar CSV seleccionado', 'download_strict': 'Descargar CSV Ultra 80 estricto', 'download_all': 'Descargar CSV revisado',
-        'reviewed': 'Filas revisadas', 'strict': 'Ultra 80 estricto', 'max_profit': 'Volumen rentable', 'reserve': 'Reserva/vigilar', 'handoff': 'Filas traspaso', 'avg_prob': 'Probabilidad promedio', 'avg_ev': 'EV promedio/unidad', 'avg_profit80': 'Ganancia promedio al 80%', 'next': 'Siguiente acción',
+        'reviewed': 'Filas revisadas', 'strict': 'Ultra 80 estricto', 'max_profit': 'Volumen 70%', 'reserve': 'Reserva/vigilar', 'handoff': 'Filas traspaso', 'avg_prob': 'Probabilidad promedio', 'avg_ev': 'EV promedio/unidad', 'avg_profit70': 'Ganancia promedio al 70%', 'next': 'Siguiente acción',
         'rules': 'Reglas por nivel',
-        'rule_text': 'A = nivel oficial de prueba. Requiere 80%+ probabilidad, cuotas rentables al 80%, EV positivo, ventaja fuerte, 6+ casas, cobertura API, sin empates, timing limpio, sin mal movimiento de línea, sin patrón negativo de memoria y EV robusto positivo usando precio conservador. B = más volumen pero todavía con sesgo rentable. C = filas cercanas para reescanear o revisar manualmente. No mezcles B/C como prueba si no están bloqueadas y separadas.',
-        'proof': 'Bloquear antes del inicio. Rastrear A, B y C por separado. A es el único nivel de prueba 80%.',
-        'handoff_mode': 'Modo de traspaso', 'strict_only': 'Solo A — prueba estricta', 'max_volume': 'A+B — volumen rentable máximo', 'research_volume': 'A+B+C — volumen de investigación/reescanear',
+        'rule_text': 'A = prueba estricta 80%. B = nivel operativo 70% para volumen rentable. C = filas 65–70% para reescanear o revisar manualmente. Mantén A separada de B/C para reclamos de prueba.',
+        'proof': 'Bloquear antes del inicio. Rastrear A, B y C por separado. A sigue siendo el único nivel de prueba 80%.',
+        'handoff_mode': 'Modo de traspaso', 'strict_only': 'Solo A — prueba estricta', 'max_volume': 'A+B — volumen rentable 70%', 'research_volume': 'A+B+C — volumen de investigación/reescanear',
         'one_per_event': 'Mantener solo el mejor pick por evento', 'max_a': 'Máx filas A', 'max_b': 'Máx filas B', 'max_c': 'Máx filas C',
         'saved': 'Filas seleccionadas guardadas como lista activa para Odds Lock Pro.', 'blockers': 'Principales razones de rechazo/bloqueo', 'quality_note': 'Protección de conflicto activa: cuando salen varios picks del mismo evento, el sistema conserva la fila más fuerte según el puntaje de calidad del nivel.',
-        'robust_note': 'Protección de ganancia robusta activa: las filas deben seguir siendo rentables usando precio conservador, no solo la mejor cuota anunciada.',
+        'robust_note': 'Protección de ganancia robusta activa: las filas B deben verse rentables al 70% usando precio conservador.',
     },
 }
 
@@ -72,7 +72,12 @@ def clean_numeric(frame: pd.DataFrame, column: str) -> pd.Series:
     if frame is None or frame.empty or column not in frame.columns:
         return pd.Series(index=frame.index if frame is not None else None, dtype=float)
     values = pd.to_numeric(frame[column], errors='coerce')
-    if 'prob' in column.lower() or column in {'ultra80_profit_at_80_percent', 'profit_at_80_percent', 'expected_value_per_unit', 'model_market_edge', 'pattern_ara_memory_signal'}:
+    percent_like = {
+        'ultra80_profit_at_80_percent', 'profit_at_80_percent', 'expected_value_per_unit',
+        'model_market_edge', 'pattern_ara_memory_signal', '_robust_expected_value',
+        '_robust_profit_at_80_percent', '_robust_profit_at_70_percent', '_price_range_risk',
+    }
+    if 'prob' in column.lower() or column in percent_like:
         values = values.where(values <= 1.0, values / 100.0)
     return values
 
@@ -106,16 +111,9 @@ def source_frame() -> tuple[pd.DataFrame, str]:
 def non_hard_blocked(frame: pd.DataFrame) -> pd.Series:
     reasons = text_series(frame, 'ultra80_reasons') + ' | ' + text_series(frame, 'decision_reasons')
     hard_tokens = (
-        'historical_result_present',
-        'bad_timing',
-        'prediction_timestamp_not_before_start',
-        'event_already_started_without_prediction_timestamp',
-        'missing_event',
-        'missing_prediction',
-        'missing_model_probability',
-        'missing_decimal_price',
-        'blocks_draws',
-        'negative_line_movement',
+        'historical_result_present', 'bad_timing', 'prediction_timestamp_not_before_start',
+        'event_already_started_without_prediction_timestamp', 'missing_event', 'missing_prediction',
+        'missing_model_probability', 'missing_decimal_price', 'blocks_draws', 'negative_line_movement',
     )
     blocked = pd.Series(False, index=frame.index)
     for token in hard_tokens:
@@ -146,6 +144,7 @@ def add_robust_profit_columns(frame: pd.DataFrame) -> pd.DataFrame:
     out['_robust_decimal_price'] = robust_price
     out['_robust_expected_value'] = probability * robust_price - 1.0
     out['_robust_profit_at_80_percent'] = 0.80 * robust_price - 1.0
+    out['_robust_profit_at_70_percent'] = 0.70 * robust_price - 1.0
     out['_price_range_risk'] = price_range_risk(out)
     return out
 
@@ -153,15 +152,15 @@ def add_robust_profit_columns(frame: pd.DataFrame) -> pd.DataFrame:
 def quality_score(frame: pd.DataFrame) -> pd.Series:
     probability = clean_numeric(frame, 'model_probability_clean').fillna(clean_numeric(frame, 'model_probability')).fillna(0.0)
     ev = clean_numeric(frame, 'expected_value_per_unit').fillna(0.0)
-    profit80 = clean_numeric(frame, 'ultra80_profit_at_80_percent').fillna(clean_numeric(frame, 'profit_at_80_percent')).fillna(0.0)
+    profit70 = clean_numeric(frame, '_robust_profit_at_70_percent').fillna(0.0)
+    profit80 = clean_numeric(frame, 'ultra80_profit_at_80_percent').fillna(clean_numeric(frame, '_robust_profit_at_80_percent')).fillna(0.0)
     robust_ev = clean_numeric(frame, '_robust_expected_value').fillna(ev).fillna(0.0)
-    robust_profit80 = clean_numeric(frame, '_robust_profit_at_80_percent').fillna(profit80).fillna(0.0)
     price_risk = clean_numeric(frame, '_price_range_risk').fillna(0.0)
     edge = clean_numeric(frame, 'model_market_edge').fillna(0.0)
     agent_score = clean_numeric(frame, 'agent_score').fillna(0.0) / 100.0
     scanner = clean_numeric(frame, 'scanner_strength_score').fillna(0.0) / 100.0
     pattern = clean_numeric(frame, 'pattern_ara_memory_signal').fillna(clean_numeric(frame, 'ara_memory_signal')).fillna(0.0)
-    return (probability * 42.0) + (edge.clip(-0.10, 0.20) * 110.0) + (ev.clip(-0.10, 0.25) * 45.0) + (profit80.clip(-0.10, 0.25) * 30.0) + (robust_ev.clip(-0.10, 0.25) * 55.0) + (robust_profit80.clip(-0.10, 0.25) * 35.0) + (agent_score * 18.0) + (scanner * 8.0) + (pattern.clip(-0.05, 0.05) * 90.0) - (price_risk.clip(0.0, 0.50) * 30.0)
+    return (probability * 42.0) + (edge.clip(-0.10, 0.20) * 110.0) + (ev.clip(-0.10, 0.25) * 45.0) + (profit70.clip(-0.10, 0.25) * 45.0) + (profit80.clip(-0.10, 0.25) * 15.0) + (robust_ev.clip(-0.10, 0.25) * 55.0) + (agent_score * 18.0) + (scanner * 8.0) + (pattern.clip(-0.05, 0.05) * 90.0) - (price_risk.clip(0.0, 0.50) * 30.0)
 
 
 def event_key_frame(frame: pd.DataFrame) -> pd.Series:
@@ -206,13 +205,16 @@ def build_tiers(reviewed: pd.DataFrame, *, max_a: int, max_b: int, max_c: int, o
     pattern_signal = clean_numeric(reviewed, 'pattern_ara_memory_signal').fillna(clean_numeric(reviewed, 'ara_memory_signal')).fillna(0.0)
     robust_ev = clean_numeric(reviewed, '_robust_expected_value')
     robust_profit80 = clean_numeric(reviewed, '_robust_profit_at_80_percent')
+    robust_profit70 = clean_numeric(reviewed, '_robust_profit_at_70_percent')
     price_risk = clean_numeric(reviewed, '_price_range_risk').fillna(0.0)
     draw = bool_series(reviewed, 'is_draw_prediction')
     safe_timing = non_hard_blocked(reviewed)
 
     strict_mask = (
         strict_base
+        & probability.ge(0.80).fillna(False)
         & robust_ev.ge(0.015).fillna(False)
+        & profit80.gt(0.0).fillna(False)
         & robust_profit80.gt(0.0).fillna(False)
         & price_risk.le(0.25).fillna(True)
     )
@@ -221,17 +223,16 @@ def build_tiers(reviewed: pd.DataFrame, *, max_a: int, max_b: int, max_c: int, o
         ~strict_mask
         & safe_timing
         & ~draw
-        & probability.ge(0.76).fillna(False)
-        & profit80.gt(0.0).fillna(False)
-        & robust_profit80.gt(0.0).fillna(False)
-        & ev.ge(0.005).fillna(False)
-        & robust_ev.ge(0.0).fillna(False)
-        & edge.ge(0.04).fillna(False)
-        & books.ge(4).fillna(False)
-        & api_coverage.ge(0.50).fillna(False)
-        & agent_score.ge(60).fillna(False)
-        & pattern_signal.ge(-0.02).fillna(False)
-        & price_risk.le(0.35).fillna(True)
+        & probability.ge(0.70).fillna(False)
+        & robust_profit70.gt(0.0).fillna(False)
+        & ev.ge(-0.005).fillna(False)
+        & robust_ev.ge(-0.010).fillna(False)
+        & edge.ge(0.020).fillna(False)
+        & books.ge(2).fillna(False)
+        & api_coverage.ge(0.33).fillna(True)
+        & agent_score.ge(50).fillna(False)
+        & pattern_signal.ge(-0.040).fillna(False)
+        & price_risk.le(0.50).fillna(True)
     )
 
     reserve_mask = (
@@ -239,13 +240,12 @@ def build_tiers(reviewed: pd.DataFrame, *, max_a: int, max_b: int, max_c: int, o
         & ~max_mask
         & safe_timing
         & ~draw
-        & probability.ge(0.72).fillna(False)
-        & profit80.gt(0.0).fillna(False)
-        & robust_profit80.gt(0.0).fillna(False)
-        & edge.ge(0.02).fillna(False)
-        & books.ge(3).fillna(False)
-        & pattern_signal.ge(-0.035).fillna(False)
-        & price_risk.le(0.50).fillna(True)
+        & probability.ge(0.65).fillna(False)
+        & edge.ge(0.010).fillna(False)
+        & books.ge(1).fillna(False)
+        & agent_score.ge(45).fillna(False)
+        & pattern_signal.ge(-0.060).fillna(False)
+        & price_risk.le(0.75).fillna(True)
     )
 
     strict = limit_and_resolve_conflicts(reviewed[strict_mask], tier='A_strict_ultra80_proof', max_rows=max_a, one_per_event=one_per_event)
@@ -254,13 +254,13 @@ def build_tiers(reviewed: pd.DataFrame, *, max_a: int, max_b: int, max_c: int, o
     max_profit_source = reviewed[max_mask].copy()
     if one_per_event and used_keys and not max_profit_source.empty:
         max_profit_source = max_profit_source[~event_key_frame(max_profit_source).isin(used_keys)]
-    max_profit = limit_and_resolve_conflicts(max_profit_source, tier='B_max_profitable_volume', max_rows=max_b, one_per_event=one_per_event)
+    max_profit = limit_and_resolve_conflicts(max_profit_source, tier='B_70pct_max_profitable_volume', max_rows=max_b, one_per_event=one_per_event)
     used_keys |= set(event_key_frame(max_profit)) if one_per_event and not max_profit.empty else set()
 
     reserve_source = reviewed[reserve_mask].copy()
     if one_per_event and used_keys and not reserve_source.empty:
         reserve_source = reserve_source[~event_key_frame(reserve_source).isin(used_keys)]
-    reserve = limit_and_resolve_conflicts(reserve_source, tier='C_rescan_watch_reserve', max_rows=max_c, one_per_event=one_per_event)
+    reserve = limit_and_resolve_conflicts(reserve_source, tier='C_65_70pct_rescan_watch_reserve', max_rows=max_c, one_per_event=one_per_event)
     return strict, max_profit, reserve
 
 
@@ -277,7 +277,7 @@ def display_columns(frame: pd.DataFrame) -> list[str]:
         col for col in [
             'volume_tier', 'event', 'sport', 'market_type', 'prediction', 'model_probability_clean', 'decimal_price',
             '_robust_decimal_price', 'market_implied_probability', 'model_market_edge', 'expected_value_per_unit',
-            '_robust_expected_value', 'ultra80_profit_at_80_percent', '_robust_profit_at_80_percent', '_price_range_risk',
+            '_robust_expected_value', 'ultra80_profit_at_80_percent', '_robust_profit_at_80_percent', '_robust_profit_at_70_percent', '_price_range_risk',
             'bookmaker_count', 'api_coverage_score', 'pattern_ara_memory_signal', 'line_value_signal', 'agent_score',
             '_tier_quality_score', 'recommended_stake_units', 'ultra80_signals', 'ultra80_reasons', 'decision_reasons'
         ] if col in frame.columns
@@ -307,10 +307,12 @@ def blocker_breakdown(reviewed: pd.DataFrame) -> pd.DataFrame:
             counts[reason] = counts.get(reason, 0) + 1
     robust_ev = clean_numeric(reviewed, '_robust_expected_value')
     robust_profit80 = clean_numeric(reviewed, '_robust_profit_at_80_percent')
+    robust_profit70 = clean_numeric(reviewed, '_robust_profit_at_70_percent')
     price_risk = clean_numeric(reviewed, '_price_range_risk')
     counts['robust_ev_below_0'] = int(robust_ev.lt(0).fillna(False).sum())
     counts['robust_profit80_below_0'] = int(robust_profit80.le(0).fillna(False).sum())
-    counts['price_range_risk_over_0_35'] = int(price_risk.gt(0.35).fillna(False).sum())
+    counts['robust_profit70_below_0'] = int(robust_profit70.le(0).fillna(False).sum())
+    counts['price_range_risk_over_0_50'] = int(price_risk.gt(0.50).fillna(False).sum())
     counts = {key: value for key, value in counts.items() if value > 0}
     if not counts:
         return pd.DataFrame()
@@ -348,7 +350,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
         st.session_state['ultra80_reserve_rows'] = reserve.to_dict('records')
         st.session_state['pro_predictor_latest_rows'] = handoff.to_dict('records')
         st.session_state['ara_latest_predictions'] = handoff.to_dict('records')
-        st.session_state['ara_latest_predictions_source'] = f'Ultra 80 Profit Mode — {handoff_mode}'
+        st.session_state['ara_latest_predictions_source'] = f'Ultra 70/80 Profit Mode — {handoff_mode}'
         st.success(t('saved'))
     else:
         st.warning(t('no_pass'))
@@ -361,7 +363,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
     metrics[4].metric(t('handoff'), len(handoff))
     metrics[5].metric(t('avg_prob'), pct(clean_numeric(handoff, 'model_probability_clean').mean()) if not handoff.empty else 'N/A')
     metrics[6].metric(t('avg_ev'), pct(clean_numeric(handoff, '_robust_expected_value').mean()) if not handoff.empty else 'N/A')
-    metrics[7].metric(t('avg_profit80'), pct(clean_numeric(handoff, '_robust_profit_at_80_percent').mean()) if not handoff.empty else 'N/A')
+    metrics[7].metric(t('avg_profit70'), pct(clean_numeric(handoff, '_robust_profit_at_70_percent').mean()) if not handoff.empty else 'N/A')
 
     health = page_health(handoff if not handoff.empty else reviewed, page='ultra80_profit_mode')
     st.metric(t('next'), health.get('next_action', 'review'))
@@ -373,15 +375,15 @@ if st.button(t('run'), type='primary', use_container_width=True):
 
     tabs = st.tabs([t('selected_rows'), t('strict_rows'), t('max_rows_tab'), t('reserve_rows'), t('all_rows')])
     with tabs[0]:
-        show_table(handoff, t('download'), 'ultra80_selected_handoff.csv')
+        show_table(handoff, t('download'), 'ultra70_selected_handoff.csv')
         if not handoff.empty:
             st.subheader('Handoff health')
             st.dataframe(page_health_frame(handoff, page='ultra80_profit_mode'), use_container_width=True, hide_index=True)
     with tabs[1]:
         show_table(strict, t('download_strict'), 'ultra80_strict_proof.csv')
     with tabs[2]:
-        show_table(max_profit, 'Download max-volume CSV' if LANG == 'en' else 'Descargar CSV volumen máximo', 'ultra80_max_profitable_volume.csv')
+        show_table(max_profit, 'Download 70% max-volume CSV' if LANG == 'en' else 'Descargar CSV volumen máximo 70%', 'ultra70_max_profitable_volume.csv')
     with tabs[3]:
-        show_table(reserve, 'Download reserve CSV' if LANG == 'en' else 'Descargar CSV reserva', 'ultra80_rescan_watch_reserve.csv')
+        show_table(reserve, 'Download reserve CSV' if LANG == 'en' else 'Descargar CSV reserva', 'ultra70_rescan_watch_reserve.csv')
     with tabs[4]:
-        show_table(add_robust_profit_columns(reviewed), t('download_all'), 'ultra80_reviewed_all_rows.csv')
+        show_table(add_robust_profit_columns(reviewed), t('download_all'), 'ultra70_reviewed_all_rows.csv')
