@@ -11,9 +11,11 @@ from autonomous_betting_agent.deployment_health_tools import (
     file_status_frame,
     ledger_status,
 )
+from autonomous_betting_agent.tool_sidebar import render_tool_sidebar
 
 st.set_page_config(page_title='Deployment Health', layout='wide')
 LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='deployment_health_language') == 'Español' else 'en'
+render_tool_sidebar('deployment_health', 'Español' if LANG == 'es' else 'English')
 
 TEXT = {
     'en': {
