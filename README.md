@@ -1,6 +1,6 @@
 # Autonomous Sports Analytics Agent
 
-[![tests](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/tests.yml)
+[![CI](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/ci.yml)
 
 Autonomous Sports Analytics Agent is a proprietary, source-available sports research and prediction-analysis platform built from the ARA/TGRM workflow: test available evidence, detect weak signals, repair the analysis, verify uncertainty, and produce auditable probability reports.
 
@@ -157,13 +157,19 @@ GITHUB_BRANCH
 
 Do not put real API keys in GitHub, README files, screenshots, or public CSVs.
 
-## Run tests
+## Run tests and CI
+
+Run the local checks with:
 
 ```bash
-python -m unittest discover -s tests
+pip install -r requirements.txt -r requirements-dev.txt
+python -m compileall autonomous_betting_agent pages tests
+python -m pytest tests -q
 ```
 
-The repository also includes a GitHub Actions workflow for tests, but a green badge or workflow run should be checked directly in GitHub before claiming that a deployment passed.
+GitHub Actions also runs these checks automatically on pushes to `main`, pull requests, and manual `workflow_dispatch` runs using `.github/workflows/ci.yml`.
+
+A green badge or workflow run should be checked directly in GitHub before claiming that a deployment passed.
 
 ## Commercial positioning
 
