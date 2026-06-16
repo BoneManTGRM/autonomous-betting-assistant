@@ -12,8 +12,14 @@ from .row_normalizer import normalize_frame, safe_text
 MINIMUM_EDGE = 0.035
 STRONG_EDGE = 0.075
 HIGH_PROBABILITY = 0.62
+DRAW_MIN_EDGE = 0.065
+DRAW_STRONG_EDGE = 0.095
+DRAW_MIN_BOOKS = 4
+DRAW_MAX_STAKE_UNITS = 0.25
 TERMINAL_RESULTS = {'win', 'loss', 'void'}
 DECISION_ORDER = {'play_strong': 1, 'play_small': 2, 'watch_only': 3, 'no_action': 4, 'review_needed': 5}
+DRAW_NAMES = {'draw', 'tie', 'empate', 'x', 'the_draw', 'match_draw'}
+DRAW_MARKET_HINTS = {'h2h', 'moneyline', '1x2', 'match_winner', 'winner'}
 
 
 def implied_probability(decimal_price: Any) -> float | None:
@@ -41,17 +47,26 @@ def clean_number(value: Any) -> float | None:
     return float(parsed)
 
 
-def parse_datetime_utc(value: Any) -> datetime | None:
-    text = safe_text(value)
-    if not text:
+def clean_token(value: Any) -> str:
+    return safe_text(value).lower().strip().replace('-', '_').replace(' ', '_')
+
+
+def is_draw_prediction(row: dict[str, Any]) -> bool:
+    prediction = clean_token(row.get('prediction'))
+    market_type = clean_token(row.get('market_type'))
+    if prediction not in DRAW_NAMES:
+        return False
+    if not market_type:
+        return True
+    return market_type in DRAW_MARKET_HINTS or 'h2h' in market_type or 'winner' in market_type
+
+
+def parse_int(value: Any) -> int | None:
+    parsed = parse_float(value)
+    if parsed is None:
         return None
     try:
-        if text.endswith('Z'):
-            text = text[:-1] + '+00:00'
-        parsed = datetime.fromisoformat(text)
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return parsed.astimezone(timezone.utc)
+        return int(round(float(parsed)))
     except Exception:
         return None
 
@@ -71,6 +86,21 @@ def event_timing_status(row: dict[str, Any], *, now_utc: datetime | None = None)
     if prediction_time is None:
         return 'future_event_not_locked_yet'
     return 'prediction_before_start'
+
+
+def parse_datetime_utc(value: Any) -> datetime | None:
+    text = safe_text(value)
+    if not text:
+        return None
+    try:
+        if text.endswith('Z'):
+            text = text[:-1] + '+00:00'
+        parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except Exception:
+        return None
 
 
 def field_coverage_score(row: dict[str, Any]) -> float:
@@ -93,13 +123,15 @@ def can_lock_candidate(row: dict[str, Any], *, now_utc: datetime | None = None) 
     return status == 'future_event_not_locked_yet'
 
 
-def stake_guidance(decision: str, score: float, locked: bool) -> float:
+def stake_guidance(decision: str, score: float, locked: bool, *, draw_risk: bool = False) -> float:
     if decision == 'play_strong':
         base = 1.0 if score >= 65.0 else 0.75
     elif decision == 'play_small':
         base = 0.35 if score >= 50.0 else 0.25
     else:
         base = 0.0
+    if draw_risk and base > 0:
+        base = min(base, DRAW_MAX_STAKE_UNITS)
     if base > 0 and not locked:
         base = min(base, 0.25)
     return round(base, 3)
@@ -131,8 +163,16 @@ def evaluate_row(row: dict[str, Any], *, min_edge: float = MINIMUM_EDGE, strong_
     odds_action = odds_ctx['recommended_action']
     value_rating = odds_ctx['value_rating']
     trust_grade = odds_ctx['odds_trust_grade']
+    draw_risk = is_draw_prediction(row)
+    books = parse_int(row.get('bookmaker_count')) or parse_int(row.get('books')) or 0
     reasons: list[str] = []
     signals: list[str] = []
+    if draw_risk:
+        signals.append('draw_market_candidate')
+        if books and books < DRAW_MIN_BOOKS:
+            reasons.append('draw_needs_more_books')
+        elif books == 0:
+            reasons.append('draw_missing_book_count')
     if result_status in TERMINAL_RESULTS:
         reasons.append('historical_result_present')
     if not safe_text(row.get('event')):
@@ -169,6 +209,14 @@ def evaluate_row(row: dict[str, Any], *, min_edge: float = MINIMUM_EDGE, strong_
     if odds_ctx['edge_probability'] is not None:
         edge = round(float(odds_ctx['edge_probability']), 6)
         signals.append('odds_accuracy_edge_used')
+    if draw_risk and edge is not None:
+        effective_draw_min = max(float(min_edge), DRAW_MIN_EDGE)
+        effective_draw_strong = max(float(strong_edge), DRAW_STRONG_EDGE)
+        signals.append(f'draw_edge_required={effective_draw_min:.3f}')
+        if edge < effective_draw_min:
+            reasons.append('draw_edge_below_minimum')
+        if model_prob is not None and model_prob < 0.20:
+            reasons.append('draw_probability_too_low')
     edge_percent = None if edge is None else round(edge * 100.0, 3)
     if edge is not None:
         signals.append(f'edge={edge:.3f}')
@@ -212,6 +260,7 @@ def evaluate_row(row: dict[str, Any], *, min_edge: float = MINIMUM_EDGE, strong_
     critical_missing = {'missing_event', 'missing_prediction', 'missing_model_probability', 'missing_decimal_price'}
     source_missing = {'missing_bookmaker', 'missing_odds_source'}
     hard_no_action = {'historical_result_present', 'prediction_timestamp_not_before_start', 'event_already_started_without_prediction_timestamp'}
+    draw_blockers = {'draw_needs_more_books', 'draw_missing_book_count', 'draw_edge_below_minimum', 'draw_probability_too_low'}
     if any(reason in reasons for reason in critical_missing):
         decision = 'review_needed'
     elif any(reason in reasons for reason in hard_no_action):
@@ -220,12 +269,16 @@ def evaluate_row(row: dict[str, Any], *, min_edge: float = MINIMUM_EDGE, strong_
         decision = 'no_action'
     elif any(reason in reasons for reason in {'needs_more_info', 'rescan_prices', 'manual_review_needed'}):
         decision = 'watch_only'
+    elif draw_risk and any(reason in reasons for reason in draw_blockers):
+        decision = 'watch_only'
     elif 'low_field_coverage' in reasons:
         decision = 'no_action'
     elif any(reason in reasons for reason in source_missing):
         decision = 'watch_only'
     elif 'edge_below_minimum' in reasons or 'negative_line_movement' in reasons:
         decision = 'watch_only'
+    elif draw_risk and edge is not None and edge >= max(float(strong_edge), DRAW_STRONG_EDGE) and model_prob is not None and model_prob >= 0.28:
+        decision = 'play_small'
     elif odds_action == 'lock_candidate' and edge is not None and edge >= strong_edge and model_prob is not None and model_prob >= HIGH_PROBABILITY:
         decision = 'play_strong'
     elif edge is not None and edge >= strong_edge and model_prob is not None and model_prob >= HIGH_PROBABILITY:
@@ -252,6 +305,11 @@ def evaluate_row(row: dict[str, Any], *, min_edge: float = MINIMUM_EDGE, strong_
         score += 5.0
     if timing == 'prediction_before_start':
         score += 5.0
+    if draw_risk:
+        score -= 8.0
+        if decision == 'play_strong':
+            decision = 'play_small'
+        signals.append('draw_stake_capped')
     if decision == 'review_needed':
         score = min(score, 35.0)
     if decision == 'no_action':
@@ -259,7 +317,25 @@ def evaluate_row(row: dict[str, Any], *, min_edge: float = MINIMUM_EDGE, strong_
     if decision == 'watch_only':
         score = min(score, 55.0)
     score = round(max(0.0, min(100.0, score)), 3)
-    return {'agent_decision': decision, 'agent_score': score, 'decision_rank': DECISION_ORDER.get(decision, 99), 'event_timing_status': timing, 'lock_ready': bool(lock_ready), 'already_locked': bool(has_lock_time), 'recommended_stake_units': stake_guidance(decision, score, has_lock_time), 'model_probability_clean': model_prob, 'market_implied_probability': market_prob, 'model_market_edge': edge, 'model_market_edge_percent': edge_percent, 'field_coverage_score': coverage, 'line_value_signal': line_signal, 'decision_reasons': ' | '.join(sorted(set(reasons))), 'decision_signals': ' | '.join(signals)}
+    return {
+        'agent_decision': decision,
+        'agent_score': score,
+        'decision_rank': DECISION_ORDER.get(decision, 99),
+        'event_timing_status': timing,
+        'lock_ready': bool(lock_ready),
+        'already_locked': bool(has_lock_time),
+        'recommended_stake_units': stake_guidance(decision, score, has_lock_time, draw_risk=draw_risk),
+        'model_probability_clean': model_prob,
+        'market_implied_probability': market_prob,
+        'model_market_edge': edge,
+        'model_market_edge_percent': edge_percent,
+        'field_coverage_score': coverage,
+        'line_value_signal': line_signal,
+        'is_draw_prediction': bool(draw_risk),
+        'draw_guardrail': 'strict_draw_rules_applied' if draw_risk else '',
+        'decision_reasons': ' | '.join(sorted(set(reasons))),
+        'decision_signals': ' | '.join(signals),
+    }
 
 
 def build_agent_decisions(frame: pd.DataFrame, *, min_edge: float = MINIMUM_EDGE, strong_edge: float = STRONG_EDGE, now_utc: datetime | None = None) -> pd.DataFrame:
@@ -295,6 +371,17 @@ def lock_ready_candidates(frame: pd.DataFrame, *, min_edge: float = MINIMUM_EDGE
 def agent_decision_summary(frame: pd.DataFrame, *, min_edge: float = MINIMUM_EDGE, strong_edge: float = STRONG_EDGE) -> dict[str, Any]:
     decisions = build_agent_decisions(frame, min_edge=min_edge, strong_edge=strong_edge)
     if decisions.empty:
-        return {'rows': 0, 'play_strong': 0, 'play_small': 0, 'watch_only': 0, 'no_action': 0, 'review_needed': 0, 'lock_ready_candidates': 0, 'recommended_total_stake_units': 0.0, 'average_score': None}
+        return {'rows': 0, 'play_strong': 0, 'play_small': 0, 'watch_only': 0, 'no_action': 0, 'review_needed': 0, 'lock_ready_candidates': 0, 'recommended_total_stake_units': 0.0, 'average_score': None, 'draw_candidates': 0}
     decision = decisions['agent_decision'].fillna('').astype(str)
-    return {'rows': int(len(decisions)), 'play_strong': int(decision.eq('play_strong').sum()), 'play_small': int(decision.eq('play_small').sum()), 'watch_only': int(decision.eq('watch_only').sum()), 'no_action': int(decision.eq('no_action').sum()), 'review_needed': int(decision.eq('review_needed').sum()), 'lock_ready_candidates': int(decisions.get('lock_ready', pd.Series(dtype=bool)).fillna(False).astype(bool).sum()), 'recommended_total_stake_units': round(float(pd.to_numeric(decisions.get('recommended_stake_units', pd.Series(dtype=float)), errors='coerce').fillna(0).sum()), 3), 'average_score': round(float(pd.to_numeric(decisions['agent_score'], errors='coerce').fillna(0).mean()), 3)}
+    return {
+        'rows': int(len(decisions)),
+        'play_strong': int(decision.eq('play_strong').sum()),
+        'play_small': int(decision.eq('play_small').sum()),
+        'watch_only': int(decision.eq('watch_only').sum()),
+        'no_action': int(decision.eq('no_action').sum()),
+        'review_needed': int(decision.eq('review_needed').sum()),
+        'lock_ready_candidates': int(decisions.get('lock_ready', pd.Series(dtype=bool)).fillna(False).astype(bool).sum()),
+        'recommended_total_stake_units': round(float(pd.to_numeric(decisions.get('recommended_stake_units', pd.Series(dtype=float)), errors='coerce').fillna(0).sum()), 3),
+        'average_score': round(float(pd.to_numeric(decisions['agent_score'], errors='coerce').fillna(0).mean()), 3),
+        'draw_candidates': int(decisions.get('is_draw_prediction', pd.Series(dtype=bool)).fillna(False).astype(bool).sum()),
+    }
