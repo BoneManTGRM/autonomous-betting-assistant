@@ -9,12 +9,13 @@ from .commercial_platform_tools import load_persistent_ledger, proof_audit_summa
 
 APP_NAME = 'ABA Signal Pro'
 APP_TAGLINE = 'Powered by Reparodynamics'
+PREDICTOR_TOOL_NAME = 'Pro Predictor'
 
 WORKFLOW = [
     'Start Here',
     'Deployment Health',
     'Scanner Pro',
-    APP_NAME,
+    PREDICTOR_TOOL_NAME,
     'Ultra 70 Profit Mode',
     'What Are the Odds',
     'Odds Lock Pro',
@@ -35,16 +36,16 @@ PAGE_GUIDES: dict[str, dict[str, dict[str, Any]]] = {
         'es': {'name': 'Salud del Despliegue', 'purpose': 'Revisa APIs, páginas, ledger y calidad de prueba.', 'use_when': 'Úsala antes de cada corrida seria o demo.', 'inputs': 'Secretos de Streamlit y ledger actual.', 'outputs': 'Puntaje, acciones, estado de páginas y APIs.', 'next': 'Scanner Pro o Buyer Demo Mode.', 'avoid': 'No corras escaneos si falta la Odds API real.'},
     },
     'scanner_pro': {
-        'en': {'name': 'Scanner Pro', 'purpose': 'Finds live markets and ranks market coverage/price quality.', 'use_when': 'Start here when you need fresh odds from APIs.', 'inputs': 'Odds API key, sport keys, markets, regions, max events.', 'outputs': 'Scanner-ranked live market rows saved to session.', 'next': f'{APP_NAME}.', 'avoid': 'Do not treat scanner-only rows as official picks.'},
-        'es': {'name': 'Scanner Pro', 'purpose': 'Encuentra mercados en vivo y califica cobertura/precio.', 'use_when': 'Empieza aquí cuando necesitas cuotas frescas de APIs.', 'inputs': 'Odds API, sport keys, mercados, regiones, eventos.', 'outputs': 'Filas de mercado guardadas en sesión.', 'next': 'ABA Signal Pro.', 'avoid': 'No trates filas de scanner como picks oficiales.'},
+        'en': {'name': 'Scanner Pro', 'purpose': 'Finds live markets and ranks market coverage/price quality.', 'use_when': 'Start here when you need fresh odds from APIs.', 'inputs': 'Odds API key, sport keys, markets, regions, max events.', 'outputs': 'Scanner-ranked live market rows saved to session.', 'next': 'Pro Predictor.', 'avoid': 'Do not treat scanner-only rows as official picks.'},
+        'es': {'name': 'Scanner Pro', 'purpose': 'Encuentra mercados en vivo y califica cobertura/precio.', 'use_when': 'Empieza aquí cuando necesitas cuotas frescas de APIs.', 'inputs': 'Odds API, sport keys, mercados, regiones, eventos.', 'outputs': 'Filas de mercado guardadas en sesión.', 'next': 'Pro Predictor.', 'avoid': 'No trates filas de scanner como picks oficiales.'},
     },
     'pro_predictor': {
-        'en': {'name': APP_NAME, 'purpose': 'Builds probabilities and highest-confidence prediction rows.', 'use_when': 'Use after scanning or when you want a filtered prediction board.', 'inputs': 'Live odds rows plus SportsDataIO/WeatherAPI context when available.', 'outputs': 'Full board and high-confidence handoff for Ultra 70 and Odds Lock Pro.', 'next': 'Ultra 70 Profit Mode, then Odds Lock Pro.', 'avoid': 'Do not send a huge unfiltered list directly to clients.'},
-        'es': {'name': 'ABA Signal Pro', 'purpose': 'Crea probabilidades y filas de máxima confianza.', 'use_when': 'Úsalo después del scanner o para filtrar predicciones.', 'inputs': 'Cuotas en vivo y contexto SportsDataIO/WeatherAPI.', 'outputs': 'Tablero completo y handoff de máxima confianza para Ultra 70 y Odds Lock Pro.', 'next': 'Ultra 70 Profit Mode, luego Odds Lock Pro.', 'avoid': 'No envíes una lista enorme sin filtrar a clientes.'},
+        'en': {'name': PREDICTOR_TOOL_NAME, 'purpose': 'Builds probabilities and highest-confidence prediction rows.', 'use_when': 'Use after scanning or when you want a filtered prediction board.', 'inputs': 'Live odds rows plus SportsDataIO/WeatherAPI context when available.', 'outputs': 'Full board and high-confidence handoff for Ultra 70 and Odds Lock Pro.', 'next': 'Ultra 70 Profit Mode, then Odds Lock Pro.', 'avoid': 'Do not send a huge unfiltered list directly to clients.'},
+        'es': {'name': 'Pro Predictor', 'purpose': 'Crea probabilidades y filas de máxima confianza.', 'use_when': 'Úsalo después del scanner o para filtrar predicciones.', 'inputs': 'Cuotas en vivo y contexto SportsDataIO/WeatherAPI.', 'outputs': 'Tablero completo y handoff de máxima confianza para Ultra 70 y Odds Lock Pro.', 'next': 'Ultra 70 Profit Mode, luego Odds Lock Pro.', 'avoid': 'No envíes una lista enorme sin filtrar a clientes.'},
     },
     'ultra80_profit_mode': {
-        'en': {'name': 'Ultra 70 Profit Mode', 'purpose': 'Builds the 70%+ lockable handoff list while keeping strict 80% proof separate.', 'use_when': 'Use after ABA Signal Pro when you want 70%+ rows sent to Odds Lock Pro.', 'inputs': 'Latest Pro Predictor session rows or uploaded prediction CSV.', 'outputs': 'A strict 80 proof tier, B Ultra 70 lockable tier, and C reserve/watch tier.', 'next': 'Odds Lock Pro.', 'avoid': 'Do not call Ultra 70 rows strict 80 proof; track the tiers separately.'},
-        'es': {'name': 'Ultra 70 Profit Mode', 'purpose': 'Crea la lista bloqueable 70%+ y mantiene la prueba estricta 80% separada.', 'use_when': 'Úsalo después de ABA Signal Pro cuando quieres enviar filas 70%+ a Odds Lock Pro.', 'inputs': 'Última sesión de Predictor o CSV de predicciones.', 'outputs': 'Nivel A prueba 80 estricta, nivel B Ultra 70 bloqueable y nivel C reserva/vigilar.', 'next': 'Odds Lock Pro.', 'avoid': 'No llames filas Ultra 70 prueba estricta 80; rastrea los niveles separados.'},
+        'en': {'name': 'Ultra 70 Profit Mode', 'purpose': 'Builds the 70%+ lockable handoff list while keeping strict 80% proof separate.', 'use_when': 'Use after Pro Predictor when you want 70%+ rows sent to Odds Lock Pro.', 'inputs': 'Latest Pro Predictor session rows or uploaded prediction CSV.', 'outputs': 'A strict 80 proof tier, B Ultra 70 lockable tier, and C reserve/watch tier.', 'next': 'Odds Lock Pro.', 'avoid': 'Do not call Ultra 70 rows strict 80 proof; track the tiers separately.'},
+        'es': {'name': 'Ultra 70 Profit Mode', 'purpose': 'Crea la lista bloqueable 70%+ y mantiene la prueba estricta 80% separada.', 'use_when': 'Úsalo después de Pro Predictor cuando quieres enviar filas 70%+ a Odds Lock Pro.', 'inputs': 'Última sesión de Predictor o CSV de predicciones.', 'outputs': 'Nivel A prueba 80 estricta, nivel B Ultra 70 bloqueable y nivel C reserva/vigilar.', 'next': 'Odds Lock Pro.', 'avoid': 'No llames filas Ultra 70 prueba estricta 80; rastrea los niveles separados.'},
     },
     'what_are_the_odds': {
         'en': {'name': 'What Are the Odds', 'purpose': 'Market/value command board with EV, odds quality, manual context, CLV, and decision scoring.', 'use_when': 'Use before locking to verify value and add missing expert context.', 'inputs': 'Predictor/scanner rows, optional manual context CSV.', 'outputs': 'Best Board, lock-ready rows, odds accuracy export.', 'next': 'Odds Lock Pro.', 'avoid': 'Do not apply manual probability changes without notes.'},
