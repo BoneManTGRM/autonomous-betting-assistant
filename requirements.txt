@@ -3,4 +3,4 @@ pandas
 python-dateutil
 requests
 pyyaml
-streamlit
+streamlit>=1.37
