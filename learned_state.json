@@ -1,18 +1,18 @@
 {
-  "accuracy_after": 0.7142857142857143,
-  "accuracy_before": 0.7142857142857143,
-  "brier_after": 0.20408167663586307,
-  "brier_before": 0.20604285714285714,
-  "events_trained": 14,
-  "intercept": 0.1762646985866189,
-  "log_loss_after": 0.5982696963115052,
-  "log_loss_before": 0.6028161545755498,
+  "accuracy_after": 0.75,
+  "accuracy_before": 0.75,
+  "brier_after": 0.18750015573920997,
+  "brier_before": 0.1939,
+  "events_trained": 16,
+  "intercept": 0.3304511010911534,
+  "log_loss_after": 0.5623355596324013,
+  "log_loss_before": 0.5775238310782468,
   "notes": [
     "Learns probability calibration from graded historical predictions.",
     "This does not prove betting profitability; use untouched forward tests before making performance claims.",
-    "Mode=replace. Existing rows used=0. Uploaded usable rows=14. Duplicates removed=0. Trained on 14 rows."
+    "Mode=replace. Existing rows used=0. Uploaded usable rows=16. Duplicates removed=0. Trained on 16 rows."
   ],
-  "slope": 1.043510618292651,
-  "source": "High_confidence_2_checked_new_finished_updated_win_loss.csv",
-  "trained_at_utc": "2026-06-16T00:52:55+00:00"
+  "slope": 1.0817194583918932,
+  "source": "High_confidence_2_checked_new_finished_updated_win_loss_new_finished_marked.csv",
+  "trained_at_utc": "2026-06-16T02:30:27+00:00"
 }
