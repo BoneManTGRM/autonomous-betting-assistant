@@ -12,6 +12,7 @@ import requests
 from .learning import ProbabilityCalibrator
 
 API_HOST = "https://api.the-odds-api.com"
+PLACEHOLDER_KEY_PARTS = ("your_", "placeholder", "example", "test_key", "demo_key", "real_odds_api_key", "api_key_here")
 
 
 @dataclass(frozen=True)
@@ -74,16 +75,39 @@ MARKET_LABELS = {
 }
 
 
-def get_api_key(explicit_key: Optional[str] = None) -> str:
-    key = explicit_key or os.getenv("THE_ODDS_API_KEY") or ""
+def looks_like_placeholder_key(value: Any) -> bool:
+    key = str(value or "").strip().lower()
     if not key:
-        raise RuntimeError("Missing THE_ODDS_API_KEY. Add it to Streamlit secrets or environment variables.")
+        return True
+    if len(key) < 16:
+        return True
+    return any(part in key for part in PLACEHOLDER_KEY_PARTS)
+
+
+def validate_api_key(api_key: str) -> str:
+    key = str(api_key or "").strip()
+    if looks_like_placeholder_key(key):
+        raise RuntimeError("Invalid or placeholder Odds API key. Replace it with a real key in Streamlit secrets or the page input before scanning live odds.")
     return key
 
 
+def get_api_key(explicit_key: Optional[str] = None) -> str:
+    key = explicit_key or os.getenv("THE_ODDS_API_KEY") or os.getenv("ODDS_API_KEY") or ""
+    return validate_api_key(key)
+
+
 def _get_json(path: str, params: Dict[str, Any]) -> Any:
+    params = dict(params)
+    params["apiKey"] = validate_api_key(str(params.get("apiKey", "")))
     response = requests.get(f"{API_HOST}{path}", params=params, timeout=20)
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        if response.status_code == 401:
+            raise RuntimeError("Odds API rejected the key with 401 Unauthorized. Replace the placeholder/invalid key with a real active key.") from exc
+        if response.status_code == 429:
+            raise RuntimeError("Odds API quota/rate limit reached. Wait for quota reset or reduce scan size.") from exc
+        raise
     return response.json()
 
 
