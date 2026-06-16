@@ -4,6 +4,8 @@ import csv
 import io
 import json
 import math
+import re
+import unicodedata
 from datetime import datetime, timezone
 from typing import Any
 
@@ -12,34 +14,49 @@ from .learning_strength import learning_memory_health
 
 PROBABILITY_COLUMNS = (
     'final_probability_value',
+    'valor_probabilidad_final',
+    'prob_final',
+    'probabilidad_final',
+    'final_probability',
     'calibrated_probability',
+    'probabilidad_calibrada',
     'model_probability_clean',
     'model_probability',
+    'probabilidad_modelo',
     'predicted_probability',
+    'probabilidad_pronosticada',
     'pick_probability',
     'favorite_probability',
     'market_probability_value',
     'market_probability',
+    'probabilidad_mercado',
+    'prob_mercado',
     'market_implied_probability',
     'implied_probability',
     'no_vig_probability',
     'confidence_probability',
     'probability',
+    'probabilidad',
+    'prob',
 )
-RESULT_COLUMNS = ('result_status', 'result', 'outcome', 'win_loss', 'graded_result', 'status', 'final_result')
-PRICE_COLUMNS = ('best_price', 'decimal_price', 'sportsbook_odds', 'decimal_odds', 'average_price', 'avg_price', 'odds', 'price')
-PICK_COLUMNS = ('prediction', 'pick', 'predicted_side', 'predicted_winner', 'favorite', 'selection')
-WINNER_COLUMNS = ('winner', 'actual_winner', 'winning_side', 'final_winner')
-EVENT_COLUMNS = ('event', 'event_name', 'game', 'match', 'fixture')
-SPORT_COLUMNS = ('sport', 'sport_title', 'league', 'competition')
-START_COLUMNS = ('event_start_utc', 'start', 'known_start_utc', 'commence_time', 'event_date', 'date')
-CONFIDENCE_COLUMNS = ('agent_decision', 'confidence', 'confidence_bucket', 'read', 'decision', 'confidence_tier')
-MARKET_COLUMNS = ('market_type', 'market', 'prop_type')
-BOOKMAKER_COLUMNS = ('bookmaker', 'sportsbook', 'book', 'best_bookmaker')
+RESULT_COLUMNS = ('result_status', 'result', 'resultado', 'outcome', 'win_loss', 'ganada_perdida', 'graded_result', 'status', 'estado', 'final_result', 'w_l', 'wl')
+PRICE_COLUMNS = ('best_price', 'mejor_cuota', 'decimal_price', 'sportsbook_odds', 'decimal_odds', 'average_price', 'avg_price', 'odds', 'cuotas', 'price', 'cuota')
+PICK_COLUMNS = ('prediction', 'prediccion', 'pronostico', 'pick', 'predicted_side', 'predicted_winner', 'favorite', 'selection', 'seleccion', 'favorito')
+WINNER_COLUMNS = ('winner', 'ganador', 'actual_winner', 'winning_side', 'final_winner')
+EVENT_COLUMNS = ('event', 'evento', 'event_name', 'game', 'partido', 'match', 'fixture')
+SPORT_COLUMNS = ('sport', 'deporte', 'sport_title', 'league', 'liga', 'competition', 'competicion')
+START_COLUMNS = ('event_start_utc', 'start', 'inicio', 'known_start_utc', 'commence_time', 'event_date', 'date', 'fecha')
+CONFIDENCE_COLUMNS = ('agent_decision', 'confidence', 'confianza', 'confidence_bucket', 'read', 'lectura', 'decision', 'confidence_tier')
+MARKET_COLUMNS = ('market_type', 'tipo_mercado', 'market', 'mercado', 'prop_type')
+BOOKMAKER_COLUMNS = ('bookmaker', 'sportsbook', 'book', 'best_bookmaker', 'casa', 'casa_de_apuestas')
 
 
 def clean_key(value: Any) -> str:
-    return str(value or '').strip().lower().replace(' ', '_').replace('-', '_')
+    text = '' if value is None else str(value)
+    text = unicodedata.normalize('NFKD', text)
+    text = ''.join(ch for ch in text if not unicodedata.combining(ch))
+    text = re.sub(r'[^a-zA-Z0-9]+', '_', text.lower().strip())
+    return re.sub(r'_+', '_', text).strip('_')
 
 
 def parse_float(value: Any) -> float | None:
@@ -66,10 +83,16 @@ def parse_probability(value: Any) -> float | None:
 
 
 def parse_result(value: Any) -> int | None:
-    text = '' if value is None else str(value).strip().lower()
-    if text in {'won', 'win', 'w', 'correct', 'hit', 'true', 'yes', '1', 'ganó', 'gano', 'acierto', 'acertado'}:
+    text = clean_key(value)
+    win_words = {'won', 'win', 'w', 'correct', 'hit', 'true', 'yes', '1', 'gano', 'ganada', 'acierto', 'acertado', 'victoria'}
+    loss_words = {'lost', 'loss', 'l', 'incorrect', 'miss', 'false', 'no', '0', 'perdio', 'perdida', 'fallo', 'fallado', 'derrota'}
+    if text in win_words:
         return 1
-    if text in {'lost', 'loss', 'l', 'incorrect', 'miss', 'false', 'no', '0', 'perdió', 'perdio', 'fallo', 'falló'}:
+    if text in loss_words:
+        return 0
+    if any(token in text for token in ('win', 'won', 'correct', 'ganad', 'acert')):
+        return 1
+    if any(token in text for token in ('loss', 'lost', 'incorrect', 'perdid', 'fall')):
         return 0
     return None
 
@@ -119,10 +142,10 @@ def extract_result(row: dict[str, Any]) -> int | None:
         value = parse_result(row.get(clean_key(name)))
         if value is not None:
             return value
-    pick = first_text(row, PICK_COLUMNS).lower()
-    winner = first_text(row, WINNER_COLUMNS).lower()
+    pick = first_text(row, PICK_COLUMNS)
+    winner = first_text(row, WINNER_COLUMNS)
     if pick and winner:
-        return 1 if pick == winner else 0
+        return 1 if clean_key(pick) == clean_key(winner) else 0
     return None
 
 
@@ -138,8 +161,8 @@ def compact_row(row: dict[str, Any], row_number: int, source: str) -> dict[str, 
     market_type = first_text(row, MARKET_COLUMNS)
     bookmaker = first_text(row, BOOKMAKER_COLUMNS)
     price = first_float(row, PRICE_COLUMNS)
-    books = first_float(row, ('books', 'bookmaker_count', 'source_count', 'bookmakers'))
-    api_coverage = first_float(row, ('api_coverage_score', 'api_coverage'))
+    books = first_float(row, ('books', 'bookmaker_count', 'source_count', 'bookmakers', 'casas'))
+    api_coverage = first_float(row, ('api_coverage_score', 'api_coverage', 'cobertura_api'))
     if api_coverage is not None and api_coverage > 1.0:
         api_coverage /= 100.0
     item = {
@@ -157,9 +180,10 @@ def compact_row(row: dict[str, Any], row_number: int, source: str) -> dict[str, 
         'api_coverage_score': None if api_coverage is None else round(max(0.0, min(1.0, float(api_coverage))), 6),
         'confidence': first_text(row, CONFIDENCE_COLUMNS)[:60],
         'source': source[:120],
+        'last_seen_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
     }
     item['error_abs'] = round(abs(item['probability'] - item['outcome']), 6)
-    item['dedupe_key'] = '|'.join(part for part in (event.lower().strip(), start[:10].lower().strip(), market_type.lower().strip(), prediction.lower().strip(), str(result)) if part)
+    item['dedupe_key'] = '|'.join(part for part in (clean_key(event), clean_key(start[:10]), clean_key(market_type), clean_key(prediction)) if part)
     return item
 
 
@@ -205,6 +229,19 @@ def read_compact_csv_bytes(data: bytes, source: str) -> tuple[list[dict[str, Any
     return rows, stats
 
 
+def dedupe_key_for_row(row: dict[str, Any]) -> str:
+    return '|'.join(
+        part
+        for part in (
+            clean_key(row.get('event')),
+            clean_key(str(row.get('start') or '')[:10]),
+            clean_key(row.get('market_type')),
+            clean_key(row.get('prediction')),
+        )
+        if part
+    )
+
+
 def valid_bank_row(row: Any) -> dict[str, Any] | None:
     if not isinstance(row, dict):
         return None
@@ -216,21 +253,33 @@ def valid_bank_row(row: Any) -> dict[str, Any] | None:
     clean['probability'] = round(probability, 6)
     clean['outcome'] = int(result)
     clean['error_abs'] = round(abs(clean['probability'] - clean['outcome']), 6)
-    clean['dedupe_key'] = str(clean.get('dedupe_key') or f"{clean.get('event','')}|{clean.get('start','')}|{clean.get('market_type','')}|{clean.get('prediction','')}|{clean.get('outcome','')}").lower()
+    clean['dedupe_key'] = str(clean.get('dedupe_key') or dedupe_key_for_row(clean)).lower()
+    if clean['dedupe_key'].endswith('|0') or clean['dedupe_key'].endswith('|1'):
+        clean['dedupe_key'] = dedupe_key_for_row(clean).lower() or clean['dedupe_key']
     return clean
+
+
+def row_quality(row: dict[str, Any]) -> int:
+    useful_keys = ('event', 'start', 'sport', 'market_type', 'bookmaker', 'prediction', 'probability', 'outcome', 'best_price', 'books', 'api_coverage_score', 'confidence')
+    return sum(row.get(key) not in (None, '') for key in useful_keys)
 
 
 def merge_dedupe_rows(existing: list[dict[str, Any]], uploaded: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
     seen: dict[str, dict[str, Any]] = {}
     duplicates = 0
-    for raw in [*existing, *uploaded]:
+    for raw in existing:
+        row = valid_bank_row(raw)
+        if row is not None:
+            seen[row['dedupe_key']] = row
+    for raw in uploaded:
         row = valid_bank_row(raw)
         if row is None:
             continue
         key = row['dedupe_key']
-        if key in seen:
+        old = seen.get(key)
+        if old is not None:
             duplicates += 1
-            if sum(value not in (None, '') for value in row.values()) > sum(value not in (None, '') for value in seen[key].values()):
+            if int(old['outcome']) != int(row['outcome']) or row_quality(row) >= row_quality(old):
                 seen[key] = row
         else:
             seen[key] = row
@@ -240,7 +289,7 @@ def merge_dedupe_rows(existing: list[dict[str, Any]], uploaded: list[dict[str, A
 def prune_rows(rows: list[dict[str, Any]], max_rows: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if len(rows) <= max_rows:
         return rows, {'strategy': 'no_pruning_needed', 'rows_before': len(rows), 'rows_after': len(rows), 'rows_pruned': 0}
-    ordered = sorted(rows, key=lambda row: (str(row.get('start') or ''), float(row.get('error_abs') or 0.0)), reverse=True)
+    ordered = sorted(rows, key=lambda row: (str(row.get('start') or ''), str(row.get('last_seen_utc') or ''), float(row.get('error_abs') or 0.0)), reverse=True)
     recent_keep = int(max_rows * 0.75)
     recent = ordered[:recent_keep]
     recent_keys = {row['dedupe_key'] for row in recent}
@@ -405,9 +454,10 @@ def memory_metrics(rows: list[dict[str, Any]]) -> dict[str, float | int | None]:
 def build_memory_bank(*, compact_rows: list[dict[str, Any]], calibrator: ProbabilityCalibrator, segments: list[dict[str, Any]], parse_stats: dict[str, Any], prune_report: dict[str, Any], mode: str, existing_count: int, uploaded_count: int, duplicates_removed: int) -> dict[str, Any]:
     health = learning_memory_health(compact_rows)
     return {
-        'version': 'learning-memory-bank-v4',
+        'version': 'learning-memory-bank-v5',
         'trained_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
         'training_mode': mode,
+        'dedupe_policy': 'event_start_market_prediction_replaces_corrected_result',
         'summary': {
             'existing_rows_before_upload': existing_count,
             'uploaded_usable_rows': uploaded_count,
