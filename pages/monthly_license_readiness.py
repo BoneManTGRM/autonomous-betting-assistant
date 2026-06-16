@@ -18,9 +18,11 @@ from autonomous_betting_agent.monthly_license_tools import (
     readiness_scores,
 )
 from autonomous_betting_agent.commercial_platform_tools import dashboard_metrics
+from autonomous_betting_agent.tool_sidebar import render_tool_sidebar
 
 st.set_page_config(page_title='Monthly License Readiness', layout='wide')
 LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='monthly_license_readiness_language') == 'Español' else 'en'
+render_tool_sidebar('monthly_license_readiness', 'Español' if LANG == 'es' else 'English')
 
 TEXT = {
     'en': {
