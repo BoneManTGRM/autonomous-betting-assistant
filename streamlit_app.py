@@ -20,6 +20,7 @@ _REAL_ST_SLIDER = st.slider
 _REAL_ST_TEXT_INPUT = st.text_input
 _REAL_ST_TOGGLE = st.toggle
 _REAL_DG_NUMBER_INPUT = DeltaGenerator.number_input
+_REAL_DG_SELECTBOX = DeltaGenerator.selectbox
 _REAL_DG_SLIDER = DeltaGenerator.slider
 _REAL_DG_TEXT_INPUT = DeltaGenerator.text_input
 _REAL_DG_TOGGLE = DeltaGenerator.toggle
@@ -110,17 +111,12 @@ def _apply_toggle_default(label, kwargs):
 
 
 def render_sidebar_brand() -> None:
-    if hasattr(st, "logo") and LOGO_PATH.exists():
-        try:
-            st.logo(str(LOGO_PATH), size="large")
-        except TypeError:
-            st.logo(str(LOGO_PATH))
-    else:
-        st.sidebar.success("ABA")
-        st.sidebar.markdown("### Signal")
-        st.sidebar.error("Pro")
-        st.sidebar.caption(APP_TAGLINE)
-        st.sidebar.divider()
+    st.sidebar.markdown("## ABA Signal Pro")
+    st.sidebar.success("ABA")
+    st.sidebar.markdown("### Signal")
+    st.sidebar.error("Pro")
+    st.sidebar.caption(APP_TAGLINE)
+    st.sidebar.divider()
 
 
 def mobile_safe_file_uploader(label, *args, **kwargs):
@@ -132,6 +128,13 @@ def mobile_safe_file_uploader(label, *args, **kwargs):
             kwargs["key"] = "ara_memory_mobile_safe_upload_v9"
         kwargs["help"] = "Accepts any file type. Choose your CSV file, or use the paste box."
     return _REAL_FILE_UPLOADER(label, *args, **kwargs)
+
+
+def branded_dg_selectbox(self, label, *args, **kwargs):
+    if _label_key(label) == "language / idioma" and not st.session_state.get("aba_sidebar_brand_rendered"):
+        render_sidebar_brand()
+        st.session_state["aba_sidebar_brand_rendered"] = True
+    return _REAL_DG_SELECTBOX(self, label, *args, **kwargs)
 
 
 def defaulted_st_number_input(label, *args, **kwargs):
@@ -195,10 +198,10 @@ st.slider = defaulted_st_slider
 st.text_input = defaulted_st_text_input
 st.toggle = defaulted_st_toggle
 DeltaGenerator.number_input = defaulted_dg_number_input
+DeltaGenerator.selectbox = branded_dg_selectbox
 DeltaGenerator.slider = defaulted_dg_slider
 DeltaGenerator.text_input = defaulted_dg_text_input
 DeltaGenerator.toggle = defaulted_dg_toggle
-render_sidebar_brand()
 
 try:
     current_page = st.navigation(CORE_PAGES, position="sidebar")
