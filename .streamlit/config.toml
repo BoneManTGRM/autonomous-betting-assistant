@@ -5,4 +5,4 @@ headless = true
 gatherUsageStats = false
 
 [client]
-showSidebarNavigation = false
+showSidebarNavigation = true
