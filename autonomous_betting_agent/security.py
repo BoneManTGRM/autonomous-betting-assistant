@@ -101,8 +101,7 @@ def escape_csv_formulas(frame: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame() if frame is None else frame.copy()
     out = frame.copy()
     for col in out.columns:
-        if out[col].dtype == object:
-            out[col] = out[col].map(escape_csv_formula_value)
+        out[col] = out[col].map(escape_csv_formula_value)
     return out
 
 
@@ -131,8 +130,7 @@ def redact_secrets_in_frame(frame: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame() if frame is None else frame.copy()
     out = frame.copy()
     for col in out.columns:
-        if out[col].dtype == object:
-            out[col] = out[col].map(redact_secret_text)
+        out[col] = out[col].map(redact_secret_text)
     return out
 
 
