@@ -7,10 +7,11 @@ from typing import Any
 
 APP_NAME = 'ABA Signal Pro'
 APP_TAGLINE = 'Powered by Reparodynamics'
+PREDICTOR_TOOL_NAME = 'Pro Predictor'
 
 NAV_TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Scanner Pro', 'Scanner Pro', 'pages/scanner_pro.py'),
-    (APP_NAME, 'ABA Signal Pro', 'pages/pro_predictor.py'),
+    (PREDICTOR_TOOL_NAME, PREDICTOR_TOOL_NAME, 'pages/pro_predictor.py'),
     ('Ultra 70 Profit Mode', 'Ultra 70 Profit Mode', 'pages/ultra80_profit_mode.py'),
     ('Simulation Lab', 'Laboratorio de Simulación', 'pages/simulation_lab.py'),
     ('Threshold Optimizer', 'Optimizador de Umbrales', 'pages/threshold_optimizer.py'),
@@ -22,12 +23,12 @@ NAV_TOOLS: tuple[tuple[str, str, str], ...] = (
 )
 
 NAV_NOTES_EN = (
-    'Workflow: Scanner Pro → ABA Signal Pro → Ultra 70 Profit Mode → Odds Lock Pro → Public Proof Dashboard → Threshold Optimizer → Learning Memory.',
+    'Workflow: Scanner Pro → Pro Predictor → Ultra 70 Profit Mode → Odds Lock Pro → Public Proof Dashboard → Threshold Optimizer → Learning Memory.',
     'Use Ultra 70 to send 70%+ lockable rows to Odds Lock Pro, while strict 80 proof remains tracked separately.',
     'Use Reset Lock File to clear one test-window proof ledger without touching other windows.',
 )
 NAV_NOTES_ES = (
-    'Flujo: Scanner Pro → ABA Signal Pro → Ultra 70 Profit Mode → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
+    'Flujo: Scanner Pro → Pro Predictor → Ultra 70 Profit Mode → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
     'Usa Ultra 70 para enviar filas bloqueables 70%+ a Odds Lock Pro, manteniendo la prueba estricta 80 separada.',
     'Usa Reiniciar Archivo de Bloqueo para borrar el ledger de una ventana de prueba sin tocar las demás.',
 )
