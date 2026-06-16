@@ -269,7 +269,7 @@
     ],
     "slope": 1.043510618292651,
     "source": "High_confidence_2_checked_new_finished_updated_win_loss.csv",
-    "trained_at_utc": "2026-06-16T00:25:57+00:00"
+    "trained_at_utc": "2026-06-16T00:52:55+00:00"
   },
   "learning_health": {
     "health_notes": "tiny_sample | good_probability_coverage | class_balance_weak | multi_sport_memory | limited_market_diversity",
@@ -497,7 +497,7 @@
   "summary": {
     "direct_probability_rows": 0,
     "duplicates_removed": 0,
-    "existing_rows_before_upload": 26,
+    "existing_rows_before_upload": 14,
     "fallback_probability_rows": 14,
     "learning_health_score": 48.0,
     "learning_health_tier": "rough_learning_memory",
@@ -507,7 +507,7 @@
     "rows_after_pruning": 14,
     "uploaded_usable_rows": 14
   },
-  "trained_at_utc": "2026-06-16T00:25:57+00:00",
+  "trained_at_utc": "2026-06-16T00:52:55+00:00",
   "training_mode": "replace",
   "version": "learning-memory-bank-v4"
 }
