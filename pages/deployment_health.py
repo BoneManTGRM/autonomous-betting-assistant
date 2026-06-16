@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import streamlit as st
 
 from autonomous_betting_agent.deployment_health_tools import (
@@ -26,7 +28,7 @@ TEXT = {
         'locked': 'Locked rows',
         'quality': 'Proof quality',
         'review': 'Needs review',
-        'note': 'For safety, this page displays only configured/missing status. It never displays private values.',
+        'note': 'This page checks whether runtime configuration exists, but it never displays private values.',
     },
     'es': {
         'title': 'Salud del Despliegue',
@@ -40,7 +42,7 @@ TEXT = {
         'locked': 'Filas bloqueadas',
         'quality': 'Calidad prueba',
         'review': 'Requiere revisión',
-        'note': 'Por seguridad, esta página solo muestra estado configurado/faltante. Nunca muestra valores privados.',
+        'note': 'Esta página revisa si la configuración existe, pero nunca muestra valores privados.',
     },
 }
 
@@ -49,7 +51,20 @@ def t(key: str) -> str:
     return TEXT[LANG].get(key, TEXT['en'].get(key, key))
 
 
-summary = deployment_summary()
+def runtime_config_marker(name: str) -> str:
+    try:
+        value = str(st.secrets.get(name, '')).strip()
+        if value:
+            return 'configured_runtime_value_present_000'
+    except Exception:
+        pass
+    value = os.getenv(name, '').strip()
+    if value:
+        return value
+    return ''
+
+
+summary = deployment_summary(runtime_config_marker)
 ledger = ledger_status()
 
 st.title(t('title'))
@@ -67,7 +82,7 @@ for item in action_items(summary):
     st.write(f'- {item}')
 
 st.subheader(t('api'))
-st.dataframe(api_status_frame(), use_container_width=True, hide_index=True)
+st.dataframe(api_status_frame(runtime_config_marker), use_container_width=True, hide_index=True)
 
 st.subheader(t('pages'))
 st.dataframe(file_status_frame(), use_container_width=True, hide_index=True)
