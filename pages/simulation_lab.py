@@ -16,16 +16,17 @@ TEXT = {
         'source': 'Prediction source', 'session': 'Use latest prediction session', 'survivor_source': 'Use last simulation survivor list', 'upload': 'Upload prediction CSV', 'upload_label': 'Upload CSV',
         'run': 'Run simulations + optimizer', 'no_rows': 'No rows available. Run Pro Predictor/Ultra 80 first or upload a CSV.',
         'settings': 'Simulation settings', 'iterations': 'Iterations', 'stake': 'Flat stake units', 'max_rows': 'Max rows per strategy', 'min_rows': 'Minimum optimizer rows',
-        'change_settings': 'What-If Change Stress Test',
-        'stress_scale': 'Slider guide: 0.00 = ignore that risk, 0.25 = mild stress, 0.50 = serious stress, 0.75+ = extreme stress. These are what-if shocks on top of any weather, injury, altitude, travel, CLV, or price-risk columns already in the CSV.',
-        'rain': 'Weather trouble', 'rain_help': 'Tests rain, wind, heat, cold, or wet-field risk. Higher values hurt outdoor/weather-sensitive sports more than indoor sports.',
-        'injury': 'Injury to our pick', 'injury_help': 'Tests what happens if the side/player we picked loses a key player or has an injury downgrade.',
-        'opp_injury': 'Opponent injury advantage', 'opp_injury_help': 'Tests the opposite: the opponent loses a key player, which can slightly help our pick.',
-        'altitude': 'High-altitude disadvantage', 'altitude_help': 'Tests an away team/player from lower altitude playing at a high-altitude venue.',
-        'travel': 'Away travel / fatigue', 'travel_help': 'Tests long travel, time-zone changes, short rest, or fatigue for the away side.',
-        'chaos': 'Market uncertainty / chaos', 'chaos_help': 'Moves the simulation away from the model and closer to the market when conditions are unstable or unknown.',
-        'summary': 'Simulation summary', 'details': 'Selected rows', 'optimizer': 'Simulation optimizer', 'survivor': 'Simulation survivor handoff', 'risk_report': 'What-if risk report', 'download': 'Download simulation report',
-        'note': 'Best use: compare strategies under model, market, memory, overconfidence, weather, injury, altitude, travel, market-reversal, and combined-change scenarios. A strategy that only works when conditions stay perfect is not robust enough.',
+        'change_settings': 'What-If Change Stress Test', 'preset': 'Stress preset', 'swarm': 'Use Game Scout Swarm',
+        'swarm_help': 'Runs per-game scout agents for weather, injury/news, altitude, travel, market movement, data quality, memory, and price risk.',
+        'stress_scale': 'Use presets first. 0.00 = ignore, 0.25 = mild, 0.50 = serious, 0.75+ = extreme. These sliders are added on top of any risk columns already in the CSV.',
+        'rain': 'Bad weather impact', 'rain_help': 'Rain, wind, heat, cold, or wet-field risk. Hurts outdoor/weather-sensitive sports more than indoor sports.',
+        'injury': 'Bad news for our pick', 'injury_help': 'Use when the team/player we picked may lose a key player, has injury risk, lineup doubt, suspension, illness, or late scratch risk.',
+        'opp_injury': 'Good news for our pick', 'opp_injury_help': 'Use when the opponent may lose a key player. This can slightly help our pick instead of hurting it.',
+        'altitude': 'Altitude disadvantage', 'altitude_help': 'Use for low-altitude away teams/players playing at high-altitude venues.',
+        'travel': 'Away travel / fatigue', 'travel_help': 'Long travel, time-zone changes, short rest, back-to-back games, or fatigue for the away side.',
+        'chaos': 'Market/news uncertainty', 'chaos_help': 'Use when conditions are unclear. It pulls the simulation away from the model and closer to market probability.',
+        'summary': 'Simulation summary', 'details': 'Selected rows', 'optimizer': 'Simulation optimizer', 'survivor': 'Simulation survivor handoff', 'risk_report': 'What-if risk report', 'scout_report': 'Game Scout Swarm report', 'download': 'Download simulation report',
+        'note': 'Best use: compare strategies under model, market, memory, overconfidence, weather, injury/news, altitude, travel, market-reversal, and combined-change scenarios. A strategy that only works when conditions stay perfect is not robust enough.',
         'saved': 'Simulation survivor rows saved for Odds Lock Pro handoff.', 'recommendation': 'Recommendation',
     },
     'es': {
@@ -34,16 +35,17 @@ TEXT = {
         'source': 'Fuente de predicciones', 'session': 'Usar última sesión de predicciones', 'survivor_source': 'Usar última lista sobreviviente de simulación', 'upload': 'Subir CSV de predicciones', 'upload_label': 'Subir CSV',
         'run': 'Ejecutar simulaciones + optimizador', 'no_rows': 'No hay filas. Ejecuta Predictor Pro/Ultra 80 primero o sube un CSV.',
         'settings': 'Configuración de simulación', 'iterations': 'Iteraciones', 'stake': 'Unidades fijas por pick', 'max_rows': 'Máx filas por estrategia', 'min_rows': 'Mínimo de filas del optimizador',
-        'change_settings': 'Prueba Qué Pasaría Si Cambian las Condiciones',
-        'stress_scale': 'Guía: 0.00 = ignorar ese riesgo, 0.25 = estrés leve, 0.50 = estrés serio, 0.75+ = estrés extremo. Estos son choques hipotéticos además de cualquier columna de clima, lesión, altitud, viaje, CLV o riesgo de precio que ya venga en el CSV.',
-        'rain': 'Problemas de clima', 'rain_help': 'Prueba lluvia, viento, calor, frío o cancha mojada. Los valores altos afectan más a deportes al aire libre que a deportes bajo techo.',
-        'injury': 'Lesión en nuestro pick', 'injury_help': 'Prueba qué pasa si el lado/jugador que elegimos pierde una pieza clave o tiene una lesión negativa.',
-        'opp_injury': 'Ventaja por lesión del rival', 'opp_injury_help': 'Prueba lo contrario: el rival pierde una pieza clave, lo cual puede ayudar ligeramente a nuestro pick.',
-        'altitude': 'Desventaja por altitud', 'altitude_help': 'Prueba un equipo/jugador visitante de baja altitud jugando en una sede de alta altitud.',
-        'travel': 'Viaje / fatiga del visitante', 'travel_help': 'Prueba viaje largo, cambio de zona horaria, poco descanso o fatiga del visitante.',
-        'chaos': 'Incertidumbre / caos del mercado', 'chaos_help': 'Mueve la simulación lejos del modelo y más cerca del mercado cuando las condiciones son inestables o desconocidas.',
-        'summary': 'Resumen de simulación', 'details': 'Filas seleccionadas', 'optimizer': 'Optimizador de simulación', 'survivor': 'Traspaso sobreviviente de simulación', 'risk_report': 'Reporte de riesgo qué pasaría si', 'download': 'Descargar reporte de simulación',
-        'note': 'Uso ideal: comparar estrategias con escenarios de modelo, mercado, memoria, sobreconfianza, clima, lesiones, altitud, viaje, reversa de mercado y cambio combinado. Una estrategia que solo funciona cuando las condiciones se mantienen perfectas no es suficientemente robusta.',
+        'change_settings': 'Prueba Qué Pasaría Si Cambian las Condiciones', 'preset': 'Preset de estrés', 'swarm': 'Usar enjambre de scouts por juego',
+        'swarm_help': 'Ejecuta scouts por juego para clima, lesión/noticias, altitud, viaje, movimiento de mercado, calidad de datos, memoria y riesgo de precio.',
+        'stress_scale': 'Usa presets primero. 0.00 = ignorar, 0.25 = leve, 0.50 = serio, 0.75+ = extremo. Estos sliders se suman a cualquier columna de riesgo que ya venga en el CSV.',
+        'rain': 'Impacto de mal clima', 'rain_help': 'Lluvia, viento, calor, frío o cancha mojada. Afecta más deportes al aire libre que deportes bajo techo.',
+        'injury': 'Mala noticia para nuestro pick', 'injury_help': 'Úsalo si el equipo/jugador elegido puede perder una pieza clave, tiene riesgo de lesión, duda de alineación, suspensión, enfermedad o baja tardía.',
+        'opp_injury': 'Buena noticia para nuestro pick', 'opp_injury_help': 'Úsalo si el rival puede perder una pieza clave. Puede ayudar un poco a nuestro pick en vez de dañarlo.',
+        'altitude': 'Desventaja por altitud', 'altitude_help': 'Úsalo para visitantes de baja altitud jugando en sede de alta altitud.',
+        'travel': 'Viaje / fatiga del visitante', 'travel_help': 'Viaje largo, cambio horario, poco descanso, back-to-back o fatiga del visitante.',
+        'chaos': 'Incertidumbre de mercado/noticias', 'chaos_help': 'Úsalo cuando las condiciones no están claras. Acerca la simulación al mercado y la aleja del modelo.',
+        'summary': 'Resumen de simulación', 'details': 'Filas seleccionadas', 'optimizer': 'Optimizador de simulación', 'survivor': 'Traspaso sobreviviente de simulación', 'risk_report': 'Reporte de riesgo qué pasaría si', 'scout_report': 'Reporte de enjambre scout por juego', 'download': 'Descargar reporte de simulación',
+        'note': 'Uso ideal: comparar estrategias con escenarios de modelo, mercado, memoria, sobreconfianza, clima, lesiones/noticias, altitud, viaje, reversa de mercado y cambio combinado. Una estrategia que solo funciona cuando las condiciones se mantienen perfectas no es suficientemente robusta.',
         'saved': 'Filas sobrevivientes de simulación guardadas para traspaso a Odds Lock Pro.', 'recommendation': 'Recomendación',
     },
 }
@@ -55,6 +57,14 @@ SCENARIOS = [
 ]
 CHANGE_SCENARIOS = {'rain_weather_stress', 'injury_to_pick_stress', 'altitude_travel_stress', 'market_reversal_stress', 'unknown_data_shock', 'combined_variable_change'}
 UPSTREAM_SESSION_KEYS = ('pro_predictor_latest_rows', 'ultra80_profit_mode_rows', 'ultra80_max_volume_rows', 'ara_latest_predictions', 'pro_predictor_all_rows')
+STRESS_PRESETS = {
+    'Balanced default': {'rain': 0.25, 'injury': 0.10, 'opponent_injury': 0.00, 'altitude': 0.20, 'travel': 0.15, 'chaos': 0.10},
+    'Bad weather test': {'rain': 0.65, 'injury': 0.10, 'opponent_injury': 0.00, 'altitude': 0.20, 'travel': 0.15, 'chaos': 0.15},
+    'Injury scare test': {'rain': 0.25, 'injury': 0.55, 'opponent_injury': 0.00, 'altitude': 0.20, 'travel': 0.15, 'chaos': 0.20},
+    'Altitude/travel test': {'rain': 0.25, 'injury': 0.10, 'opponent_injury': 0.00, 'altitude': 0.65, 'travel': 0.55, 'chaos': 0.20},
+    'Market chaos test': {'rain': 0.30, 'injury': 0.20, 'opponent_injury': 0.00, 'altitude': 0.25, 'travel': 0.25, 'chaos': 0.45},
+    'Worst-case combo': {'rain': 0.60, 'injury': 0.45, 'opponent_injury': 0.00, 'altitude': 0.55, 'travel': 0.45, 'chaos': 0.50},
+}
 
 
 def t(key: str) -> str:
@@ -120,6 +130,17 @@ def altitude_feet_series(frame: pd.DataFrame, ft_aliases: list[str], m_aliases: 
     feet = num_series(frame, ft_aliases)
     meters = num_series(frame, m_aliases)
     return feet.fillna(meters * 3.28084)
+
+
+def text_risk(frame: pd.DataFrame) -> pd.Series:
+    note = text_series(frame, ['news_summary', 'latest_news', 'injury_news', 'team_news', 'weather_note', 'notes', 'motivo_revisar', 'reason', 'api_context_error'])
+    note = note.str.lower()
+    high = 'out|doubtful|suspended|late scratch|illness|storm|severe|postponed|lineup change|not starting|ruled out'
+    medium = 'questionable|probable|limited|rest|rotation|rain|wind|heat|cold|altitude|travel|fatigue|line move|odds drift|market moved|uncertain'
+    risk = pd.Series(0.0, index=frame.index)
+    risk = risk.mask(note.str.contains(medium, regex=True, na=False), 0.35)
+    risk = risk.mask(note.str.contains(high, regex=True, na=False), 0.75)
+    return risk.fillna(0.0).clip(0.0, 1.0)
 
 
 def normalize(frame: pd.DataFrame) -> pd.DataFrame:
@@ -190,11 +211,13 @@ def normalize(frame: pd.DataFrame) -> pd.DataFrame:
     out['closing_line_value'] = clv
     out['line_movement_risk'] = (-clv.fillna(0.0) * 5.0).clip(0.0, 1.0)
     out['data_quality_risk'] = np.maximum((1.0 - out['api_coverage']).clip(0.0, 1.0) * 0.35, (4.0 - out['books']).clip(lower=0.0) / 10.0).clip(0.0, 1.0)
+    out['news_risk'] = text_risk(frame)
     out['weather_risk'] = np.maximum.reduce([out['rain_risk'].to_numpy(float), out['wind_risk'].to_numpy(float), out['heat_cold_risk'].to_numpy(float)]) * out['weather_sensitivity']
+    out['negative_memory_risk'] = (-out['memory_signal']).clip(lower=0.0, upper=0.08) / 0.08
     out['variable_change_risk'] = np.maximum.reduce([
         out['weather_risk'].to_numpy(float), out['injury_risk'].to_numpy(float), out['altitude_risk'].to_numpy(float),
         out['travel_risk'].to_numpy(float), out['line_movement_risk'].to_numpy(float), out['price_risk'].to_numpy(float),
-        out['data_quality_risk'].to_numpy(float),
+        out['data_quality_risk'].to_numpy(float), out['news_risk'].to_numpy(float), out['negative_memory_risk'].to_numpy(float),
     ])
     return out.dropna(subset=['model_probability', 'decimal_price'])
 
@@ -232,7 +255,7 @@ def scenario_probabilities(data: pd.DataFrame, scenario: str, stress: dict[str, 
         weather = np.maximum(data['weather_risk'].to_numpy(float), np.full(len(data), stress['rain']) * data['weather_sensitivity'].to_numpy(float))
         true = p - weather * 0.08
     elif scenario == 'injury_to_pick_stress':
-        injury = np.maximum(data['injury_risk'].to_numpy(float), np.full(len(data), stress['injury']))
+        injury = np.maximum.reduce([data['injury_risk'].to_numpy(float), data['news_risk'].to_numpy(float), np.full(len(data), stress['injury'])])
         opponent = np.maximum(data['opponent_injury_risk'].to_numpy(float), np.full(len(data), stress['opponent_injury']))
         true = p - injury * 0.12 + opponent * 0.05
     elif scenario == 'altitude_travel_stress':
@@ -243,14 +266,14 @@ def scenario_probabilities(data: pd.DataFrame, scenario: str, stress: dict[str, 
         true = p - data['line_movement_risk'].to_numpy(float) * 0.08 - data['price_risk'].to_numpy(float) * 0.04
         true = true * 0.75 + market * 0.25
     elif scenario == 'unknown_data_shock':
-        true = p - data['data_quality_risk'].to_numpy(float) * 0.06 - np.maximum(data['price_risk'].to_numpy(float), data['line_movement_risk'].to_numpy(float)) * 0.03
+        true = p - data['data_quality_risk'].to_numpy(float) * 0.06 - np.maximum.reduce([data['price_risk'].to_numpy(float), data['line_movement_risk'].to_numpy(float), data['news_risk'].to_numpy(float)]) * 0.03
     elif scenario == 'combined_variable_change':
         weather = np.maximum(data['weather_risk'].to_numpy(float), np.full(len(data), stress['rain']) * data['weather_sensitivity'].to_numpy(float))
-        injury = np.maximum(data['injury_risk'].to_numpy(float), np.full(len(data), stress['injury']))
+        injury = np.maximum.reduce([data['injury_risk'].to_numpy(float), data['news_risk'].to_numpy(float), np.full(len(data), stress['injury'])])
         opponent = np.maximum(data['opponent_injury_risk'].to_numpy(float), np.full(len(data), stress['opponent_injury']))
         altitude = np.maximum(data['altitude_risk'].to_numpy(float), np.full(len(data), stress['altitude']) * data['is_away_pick'].astype(float).to_numpy())
         travel = np.maximum(data['travel_risk'].to_numpy(float), np.full(len(data), stress['travel']) * data['is_away_pick'].astype(float).to_numpy())
-        penalty = weather * 0.05 + injury * 0.10 + altitude * 0.06 + travel * 0.04 + data['line_movement_risk'].to_numpy(float) * 0.06 + data['data_quality_risk'].to_numpy(float) * 0.03 - opponent * 0.03
+        penalty = weather * 0.05 + injury * 0.10 + altitude * 0.06 + travel * 0.04 + data['line_movement_risk'].to_numpy(float) * 0.06 + data['data_quality_risk'].to_numpy(float) * 0.03 + data['negative_memory_risk'].to_numpy(float) * 0.02 - opponent * 0.03
         true = p - penalty
         shrink = np.clip(stress['chaos'], 0.0, 0.75)
         true = true * (1.0 - shrink) + market * shrink
@@ -391,7 +414,7 @@ def survival_grade(row: pd.Series) -> str:
 def risk_report(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return pd.DataFrame()
-    risk_cols = ['variable_change_risk', 'weather_risk', 'injury_risk', 'altitude_risk', 'travel_risk', 'line_movement_risk', 'data_quality_risk', 'price_risk']
+    risk_cols = ['variable_change_risk', 'weather_risk', 'injury_risk', 'news_risk', 'altitude_risk', 'travel_risk', 'line_movement_risk', 'data_quality_risk', 'negative_memory_risk', 'price_risk']
     rows = []
     for col in risk_cols:
         if col not in frame.columns:
@@ -399,6 +422,32 @@ def risk_report(frame: pd.DataFrame) -> pd.DataFrame:
         values = pd.to_numeric(frame[col], errors='coerce').fillna(0.0)
         rows.append({'risk_type': col, 'avg_risk': round(float(values.mean()), 6), 'max_risk': round(float(values.max()), 6), 'rows_over_0_50': int(values.gt(0.50).sum()), 'rows_over_0_75': int(values.gt(0.75).sum())})
     return pd.DataFrame(rows).sort_values(['avg_risk', 'max_risk'], ascending=False).reset_index(drop=True)
+
+
+def game_scout_report(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    risk_cols = ['weather_risk', 'injury_risk', 'news_risk', 'altitude_risk', 'travel_risk', 'line_movement_risk', 'data_quality_risk', 'negative_memory_risk', 'price_risk']
+    for _, row in frame.iterrows():
+        risks = {col: float(pd.to_numeric(pd.Series([row.get(col, 0.0)]), errors='coerce').fillna(0.0).iloc[0]) for col in risk_cols}
+        top = sorted([(col.replace('_risk', '').replace('_', ' '), val) for col, val in risks.items() if val >= 0.20], key=lambda item: item[1], reverse=True)[:4]
+        risk_text = '; '.join(f'{name}: {value:.2f}' for name, value in top) or 'no major risk detected'
+        change = float(row.get('variable_change_risk') or 0.0)
+        ev = float(row.get('robust_ev') if pd.notna(row.get('robust_ev')) else row.get('ev') or 0.0)
+        p = float(row.get('model_probability') or 0.0)
+        if change <= 0.35 and ev > 0 and p >= 0.70:
+            action = 'lock_candidate_after_price_check'
+        elif change <= 0.65 and ev >= 0:
+            action = 'watch_or_reduce_stake'
+        else:
+            action = 'do_not_lock_until_rescanned'
+        rows.append({
+            'event': row.get('event', ''), 'sport': row.get('sport', ''), 'market_type': row.get('market_type', ''), 'prediction': row.get('prediction', ''),
+            'model_probability': round(p, 6), 'decimal_price': row.get('decimal_price', ''), 'robust_ev': round(ev, 6),
+            'scout_risk_score': round(change, 6), 'top_scout_flags': risk_text, 'scout_action': action,
+        })
+    return pd.DataFrame(rows).sort_values(['scout_action', 'scout_risk_score', 'robust_ev'], ascending=[True, True, False]).reset_index(drop=True)
 
 
 def recommendation_table(summary: pd.DataFrame) -> pd.DataFrame:
@@ -452,6 +501,22 @@ def load_input() -> pd.DataFrame:
     return session_frame()
 
 
+def render_meter(label: str, value: float, help_text: str = '', *, good_when_high: bool = False) -> None:
+    value = float(np.clip(value, 0.0, 1.0))
+    if value < 0.25:
+        level = 'Low'
+    elif value < 0.50:
+        level = 'Mild'
+    elif value < 0.75:
+        level = 'Serious'
+    else:
+        level = 'Extreme'
+    if good_when_high:
+        level = {'Low': 'Small boost', 'Mild': 'Useful boost', 'Serious': 'Strong boost', 'Extreme': 'Major boost'}[level]
+    st.caption(f'{label}: {value:.2f} · {level}' + (f' — {help_text}' if help_text else ''))
+    st.progress(value)
+
+
 st.title(t('title'))
 st.caption(t('caption'))
 st.info(t('note'))
@@ -463,15 +528,28 @@ with st.expander(t('settings'), expanded=True):
     max_rows = c3.number_input(t('max_rows'), min_value=1, max_value=5000, value=500, step=25)
     min_optimizer_rows = c4.number_input(t('min_rows'), min_value=1, max_value=100, value=5, step=1)
 with st.expander(t('change_settings'), expanded=False):
+    preset_name = st.selectbox(t('preset'), list(STRESS_PRESETS.keys()), index=0)
+    preset = STRESS_PRESETS[preset_name]
+    use_swarm = st.checkbox(t('swarm'), value=True, help=t('swarm_help'))
     st.caption(t('stress_scale'))
     s1, s2, s3 = st.columns(3)
-    rain = s1.slider(t('rain'), min_value=0.0, max_value=1.0, value=0.35, step=0.05, help=t('rain_help'), format='%.2f')
-    injury = s2.slider(t('injury'), min_value=0.0, max_value=1.0, value=0.15, step=0.05, help=t('injury_help'), format='%.2f')
-    opponent_injury = s3.slider(t('opp_injury'), min_value=0.0, max_value=1.0, value=0.00, step=0.05, help=t('opp_injury_help'), format='%.2f')
+    rain = s1.slider(t('rain'), min_value=0.0, max_value=1.0, value=float(preset['rain']), step=0.05, help=t('rain_help'), format='%.2f')
+    injury = s2.slider(t('injury'), min_value=0.0, max_value=1.0, value=float(preset['injury']), step=0.05, help=t('injury_help'), format='%.2f')
+    opponent_injury = s3.slider(t('opp_injury'), min_value=0.0, max_value=1.0, value=float(preset['opponent_injury']), step=0.05, help=t('opp_injury_help'), format='%.2f')
     s4, s5, s6 = st.columns(3)
-    altitude = s4.slider(t('altitude'), min_value=0.0, max_value=1.0, value=0.25, step=0.05, help=t('altitude_help'), format='%.2f')
-    travel = s5.slider(t('travel'), min_value=0.0, max_value=1.0, value=0.20, step=0.05, help=t('travel_help'), format='%.2f')
-    chaos = s6.slider(t('chaos'), min_value=0.0, max_value=0.75, value=0.15, step=0.05, help=t('chaos_help'), format='%.2f')
+    altitude = s4.slider(t('altitude'), min_value=0.0, max_value=1.0, value=float(preset['altitude']), step=0.05, help=t('altitude_help'), format='%.2f')
+    travel = s5.slider(t('travel'), min_value=0.0, max_value=1.0, value=float(preset['travel']), step=0.05, help=t('travel_help'), format='%.2f')
+    chaos = s6.slider(t('chaos'), min_value=0.0, max_value=0.75, value=float(preset['chaos']), step=0.05, help=t('chaos_help'), format='%.2f')
+    st.markdown('#### Stress meters')
+    m1, m2 = st.columns(2)
+    with m1:
+        render_meter(t('rain'), rain, t('rain_help'))
+        render_meter(t('injury'), injury, t('injury_help'))
+        render_meter(t('altitude'), altitude, t('altitude_help'))
+    with m2:
+        render_meter(t('opp_injury'), opponent_injury, t('opp_injury_help'), good_when_high=True)
+        render_meter(t('travel'), travel, t('travel_help'))
+        render_meter(t('chaos'), chaos, t('chaos_help'))
 stress_profile = {'rain': float(rain), 'injury': float(injury), 'opponent_injury': float(opponent_injury), 'altitude': float(altitude), 'travel': float(travel), 'chaos': float(chaos)}
 
 if st.button(t('run'), type='primary', use_container_width=True):
@@ -512,8 +590,11 @@ if st.button(t('run'), type='primary', use_container_width=True):
     recommendations = recommendation_table(summary)
     selected_all = pd.concat(selected_frames, ignore_index=True, sort=False) if selected_frames else pd.DataFrame()
     risks = risk_report(selected_all)
+    scouts = game_scout_report(frame if use_swarm else selected_all)
     st.subheader(t('recommendation'))
     st.dataframe(recommendations, use_container_width=True, hide_index=True)
+    st.subheader(t('scout_report'))
+    st.dataframe(scouts, use_container_width=True, hide_index=True)
     st.subheader(t('summary'))
     st.dataframe(summary, use_container_width=True, hide_index=True)
     st.subheader(t('optimizer'))
@@ -522,13 +603,17 @@ if st.button(t('run'), type='primary', use_container_width=True):
     st.dataframe(risks, use_container_width=True, hide_index=True)
     st.subheader(t('details'))
     if not selected_all.empty:
-        cols = [col for col in ['strategy', 'event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'edge', 'ev', 'robust_ev', 'robust_profit80', 'variable_change_risk', 'weather_risk', 'injury_risk', 'altitude_risk', 'travel_risk', 'line_movement_risk', 'data_quality_risk', 'books', 'api_coverage', 'memory_signal'] if col in selected_all.columns]
+        cols = [col for col in ['strategy', 'event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'edge', 'ev', 'robust_ev', 'robust_profit80', 'variable_change_risk', 'weather_risk', 'injury_risk', 'news_risk', 'altitude_risk', 'travel_risk', 'line_movement_risk', 'data_quality_risk', 'negative_memory_risk', 'books', 'api_coverage', 'memory_signal'] if col in selected_all.columns]
         st.dataframe(selected_all[cols], use_container_width=True, hide_index=True)
     report_parts = [summary]
     if not recommendations.empty:
         rec = recommendations.copy()
         rec.insert(0, 'report_section', 'recommendations')
         report_parts.append(rec)
+    if not scouts.empty:
+        scout_export = scouts.copy()
+        scout_export.insert(0, 'report_section', 'game_scout_swarm')
+        report_parts.append(scout_export)
     if not optimizer_table.empty:
         opt = optimizer_table.copy()
         opt.insert(0, 'report_section', 'optimizer_thresholds')
