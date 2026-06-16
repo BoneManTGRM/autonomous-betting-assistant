@@ -32,6 +32,15 @@ KEY_GROUPS = {
 }
 
 
+def secret_status(value: Any) -> str:
+    text = str(value or '').strip()
+    if not text:
+        return 'missing'
+    if looks_like_placeholder_key(text):
+        return 'placeholder_or_invalid'
+    return 'configured'
+
+
 def _configured(names: list[str], getter: Callable[[str], Any] | None = None) -> tuple[str, str]:
     for name in names:
         value = ''
@@ -42,10 +51,9 @@ def _configured(names: list[str], getter: Callable[[str], Any] | None = None) ->
                 value = ''
         if not value:
             value = os.getenv(name, '').strip()
-        if value:
-            if looks_like_placeholder_key(value):
-                return name, 'placeholder_or_invalid'
-            return name, 'configured'
+        status = secret_status(value)
+        if status != 'missing':
+            return name, status
     return names[0], 'missing'
 
 
