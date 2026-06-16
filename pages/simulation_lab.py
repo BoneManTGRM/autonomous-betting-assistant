@@ -13,26 +13,27 @@ TEXT = {
     'en': {
         'title': 'Simulation Lab',
         'caption': 'Monte Carlo stress test for hit rate, ROI, drawdown, and profit risk. This does not prove the model; it tests whether a strategy survives reasonable probability error.',
-        'source': 'Prediction source', 'session': 'Use latest session rows', 'upload': 'Upload prediction CSV', 'upload_label': 'Upload CSV',
+        'source': 'Prediction source', 'session': 'Use latest prediction session', 'survivor_source': 'Use last simulation survivor list', 'upload': 'Upload prediction CSV', 'upload_label': 'Upload CSV',
         'run': 'Run simulations + optimizer', 'no_rows': 'No rows available. Run Pro Predictor/Ultra 80 first or upload a CSV.',
-        'settings': 'Simulation settings', 'iterations': 'Iterations', 'stake': 'Flat stake units', 'max_rows': 'Max rows per strategy',
+        'settings': 'Simulation settings', 'iterations': 'Iterations', 'stake': 'Flat stake units', 'max_rows': 'Max rows per strategy', 'min_rows': 'Minimum optimizer rows',
         'summary': 'Simulation summary', 'details': 'Selected rows', 'optimizer': 'Simulation optimizer', 'survivor': 'Simulation survivor handoff', 'download': 'Download simulation report',
         'note': 'Best use: compare strategies under model, blended-market, memory-penalty, and overconfidence scenarios. A strategy that only works when the model is perfectly calibrated is not robust enough.',
-        'saved': 'Simulation survivor rows saved for Odds Lock Pro handoff.',
+        'saved': 'Simulation survivor rows saved for Odds Lock Pro handoff.', 'recommendation': 'Recommendation',
     },
     'es': {
         'title': 'Laboratorio de Simulación',
         'caption': 'Prueba Monte Carlo para acierto, ROI, drawdown y riesgo de pérdida. No prueba el modelo; prueba si la estrategia sobrevive errores razonables de probabilidad.',
-        'source': 'Fuente de predicciones', 'session': 'Usar últimas filas de la sesión', 'upload': 'Subir CSV de predicciones', 'upload_label': 'Subir CSV',
+        'source': 'Fuente de predicciones', 'session': 'Usar última sesión de predicciones', 'survivor_source': 'Usar última lista sobreviviente de simulación', 'upload': 'Subir CSV de predicciones', 'upload_label': 'Subir CSV',
         'run': 'Ejecutar simulaciones + optimizador', 'no_rows': 'No hay filas. Ejecuta Predictor Pro/Ultra 80 primero o sube un CSV.',
-        'settings': 'Configuración de simulación', 'iterations': 'Iteraciones', 'stake': 'Unidades fijas por pick', 'max_rows': 'Máx filas por estrategia',
+        'settings': 'Configuración de simulación', 'iterations': 'Iteraciones', 'stake': 'Unidades fijas por pick', 'max_rows': 'Máx filas por estrategia', 'min_rows': 'Mínimo de filas del optimizador',
         'summary': 'Resumen de simulación', 'details': 'Filas seleccionadas', 'optimizer': 'Optimizador de simulación', 'survivor': 'Traspaso sobreviviente de simulación', 'download': 'Descargar reporte de simulación',
         'note': 'Uso ideal: comparar estrategias con escenarios de modelo, mezcla de mercado, penalización de memoria y sobreconfianza. Una estrategia que solo funciona cuando el modelo está perfectamente calibrado no es suficientemente robusta.',
-        'saved': 'Filas sobrevivientes de simulación guardadas para traspaso a Odds Lock Pro.',
+        'saved': 'Filas sobrevivientes de simulación guardadas para traspaso a Odds Lock Pro.', 'recommendation': 'Recomendación',
     },
 }
 
 SCENARIOS = ['model', 'market_blend', 'memory_penalty', 'overconfident_5pct', 'overconfident_10pct', 'conservative_blend']
+UPSTREAM_SESSION_KEYS = ('pro_predictor_latest_rows', 'ultra80_profit_mode_rows', 'ultra80_max_volume_rows', 'ara_latest_predictions', 'pro_predictor_all_rows')
 
 
 def t(key: str) -> str:
@@ -40,10 +41,17 @@ def t(key: str) -> str:
 
 
 def session_frame() -> pd.DataFrame:
-    for key in ('simulation_survivor_rows', 'ultra80_profit_mode_rows', 'ultra80_max_volume_rows', 'pro_predictor_latest_rows', 'ara_latest_predictions', 'pro_predictor_all_rows'):
+    for key in UPSTREAM_SESSION_KEYS:
         rows = st.session_state.get(key)
         if isinstance(rows, list) and rows:
             return pd.DataFrame(rows)
+    return pd.DataFrame()
+
+
+def survivor_frame() -> pd.DataFrame:
+    rows = st.session_state.get('simulation_survivor_rows')
+    if isinstance(rows, list) and rows:
+        return pd.DataFrame(rows)
     return pd.DataFrame()
 
 
@@ -248,8 +256,56 @@ def simulation_optimizer(frame: pd.DataFrame, *, min_rows: int = 5) -> tuple[pd.
     return table, survivor
 
 
+def survival_grade(row: pd.Series) -> str:
+    scenario = str(row.get('scenario', ''))
+    if scenario not in {'market_blend', 'memory_penalty', 'overconfident_5pct', 'conservative_blend'}:
+        return 'reference'
+    roi = float(row.get('mean_roi') or 0.0)
+    profit_probability = float(row.get('profit_probability') or 0.0)
+    hit80 = float(row.get('prob_hit_80_plus') or 0.0)
+    if roi > 0.02 and profit_probability >= 0.60:
+        return 'survives'
+    if roi >= 0.0 and profit_probability >= 0.52:
+        return 'borderline_survives'
+    if hit80 >= 0.40 and roi >= -0.02:
+        return 'accuracy_only_not_profit_safe'
+    return 'fragile'
+
+
+def recommendation_table(summary: pd.DataFrame) -> pd.DataFrame:
+    if summary.empty or 'strategy' not in summary.columns:
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    for strategy, group in summary.groupby('strategy'):
+        real = group[group['scenario'].isin(['market_blend', 'memory_penalty', 'overconfident_5pct', 'conservative_blend'])].copy()
+        if real.empty:
+            continue
+        roi_values = pd.to_numeric(real['mean_roi'], errors='coerce').dropna()
+        profit_probs = pd.to_numeric(real['profit_probability'], errors='coerce').dropna()
+        hit80 = pd.to_numeric(real['prob_hit_80_plus'], errors='coerce').dropna()
+        fragile = int(real['survival_grade'].eq('fragile').sum()) if 'survival_grade' in real.columns else 0
+        rows.append({
+            'strategy': strategy,
+            'rows': int(pd.to_numeric(real['rows'], errors='coerce').max() or 0),
+            'worst_mean_roi': None if roi_values.empty else round(float(roi_values.min()), 6),
+            'avg_mean_roi': None if roi_values.empty else round(float(roi_values.mean()), 6),
+            'worst_profit_probability': None if profit_probs.empty else round(float(profit_probs.min()), 6),
+            'best_prob_hit_80_plus': None if hit80.empty else round(float(hit80.max()), 6),
+            'fragile_scenarios': fragile,
+        })
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    out['recommendation'] = np.where(
+        (out['fragile_scenarios'].eq(0)) & (out['worst_mean_roi'].fillna(-1).ge(0.0)),
+        'lock_candidate_after_human_review',
+        np.where(out['avg_mean_roi'].fillna(-1).ge(0.0), 'watch_or_reduce_stake', 'do_not_lock')
+    )
+    return out.sort_values(['recommendation', 'worst_mean_roi', 'avg_mean_roi', 'rows'], ascending=[True, False, False, False]).reset_index(drop=True)
+
+
 def load_input() -> pd.DataFrame:
-    choice = st.radio(t('source'), [t('session'), t('upload')], horizontal=True)
+    choice = st.radio(t('source'), [t('session'), t('survivor_source'), t('upload')], horizontal=True)
     if choice == t('upload'):
         upload = st.file_uploader(t('upload_label'), type=['csv'])
         if upload is None:
@@ -259,6 +315,8 @@ def load_input() -> pd.DataFrame:
         except Exception as exc:
             st.error(str(exc))
             return pd.DataFrame()
+    if choice == t('survivor_source'):
+        return survivor_frame()
     return session_frame()
 
 
@@ -267,10 +325,11 @@ st.caption(t('caption'))
 st.info(t('note'))
 raw = load_input()
 with st.expander(t('settings'), expanded=True):
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     iterations = c1.number_input(t('iterations'), min_value=1000, max_value=100000, value=20000, step=1000)
     stake = c2.number_input(t('stake'), min_value=0.05, max_value=5.0, value=1.0, step=0.05)
     max_rows = c3.number_input(t('max_rows'), min_value=1, max_value=5000, value=500, step=25)
+    min_optimizer_rows = c4.number_input(t('min_rows'), min_value=1, max_value=100, value=5, step=1)
 
 if st.button(t('run'), type='primary', use_container_width=True):
     if raw.empty:
@@ -280,7 +339,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
     if frame.empty:
         st.warning(t('no_rows'))
         st.stop()
-    optimizer_table, survivor = simulation_optimizer(frame)
+    optimizer_table, survivor = simulation_optimizer(frame, min_rows=int(min_optimizer_rows))
     masks = strategy_masks(frame)
     scenarios = SCENARIOS
     rows: list[dict[str, Any]] = []
@@ -305,6 +364,11 @@ if st.button(t('run'), type='primary', use_container_width=True):
             rows.append({'strategy': 'Simulation optimized', **simulate(survivor, scenario, int(iterations), float(stake), seed=20260616 + len(rows))})
         st.success(t('saved'))
     summary = pd.DataFrame(rows)
+    if not summary.empty:
+        summary['survival_grade'] = summary.apply(survival_grade, axis=1)
+    recommendations = recommendation_table(summary)
+    st.subheader(t('recommendation'))
+    st.dataframe(recommendations, use_container_width=True, hide_index=True)
     st.subheader(t('summary'))
     st.dataframe(summary, use_container_width=True, hide_index=True)
     st.subheader(t('optimizer'))
@@ -315,9 +379,13 @@ if st.button(t('run'), type='primary', use_container_width=True):
         cols = [col for col in ['strategy', 'event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'edge', 'ev', 'robust_ev', 'robust_profit80', 'books', 'api_coverage', 'memory_signal'] if col in selected_all.columns]
         st.dataframe(selected_all[cols], use_container_width=True, hide_index=True)
     report_parts = [summary]
+    if not recommendations.empty:
+        rec = recommendations.copy()
+        rec.insert(0, 'report_section', 'recommendations')
+        report_parts.append(rec)
     if not optimizer_table.empty:
         opt = optimizer_table.copy()
-        opt.insert(0, 'strategy', 'Simulation optimizer thresholds')
+        opt.insert(0, 'report_section', 'optimizer_thresholds')
         report_parts.append(opt)
     report = pd.concat(report_parts, ignore_index=True, sort=False)
     st.download_button(t('download'), report.to_csv(index=False), file_name='simulation_lab_report.csv', mime='text/csv')
