@@ -26,17 +26,20 @@ PAGE_LANGUAGE_KEYS = [
     'private_beta_sales_dashboard_language',
     'reset_data_language',
 ]
+ALL_LANGUAGE_KEYS = [SESSION_KEY, 'global_language', *PAGE_LANGUAGE_KEYS]
 
 
 def _code(value: object) -> str:
-    text = str(value or 'English').strip().lower()
+    text = str(value or '').strip().lower()
     if text.startswith('es') or 'español' in text or 'espanol' in text:
         return 'es'
-    return 'en'
+    if text.startswith('en') or 'english' in text:
+        return 'en'
+    return ''
 
 
 def label(value: object = None) -> str:
-    return 'Español' if _code(value if value is not None else st.session_state.get(SESSION_KEY, 'English')) == 'es' else 'English'
+    return 'Español' if _code(value) == 'es' else 'English'
 
 
 def query_param_language() -> str | None:
@@ -46,23 +49,20 @@ def query_param_language() -> str | None:
         return None
     if not raw:
         return None
-    return label(raw)
+    code = _code(raw)
+    return label(raw) if code else None
 
 
 def _safe_set_session(key: str, value: str) -> None:
     try:
         st.session_state[key] = value
     except Exception:
-        # Streamlit blocks mutating a widget's own key after that widget is instantiated.
-        # The widget already contains the selected value, so skipping that key is safe.
         pass
 
 
 def set_global_language(selected: object) -> str:
     normalized = label(selected)
-    _safe_set_session(SESSION_KEY, normalized)
-    _safe_set_session('global_language', normalized)
-    for key in PAGE_LANGUAGE_KEYS:
+    for key in ALL_LANGUAGE_KEYS:
         _safe_set_session(key, normalized)
     try:
         st.query_params['lang'] = 'es' if normalized == 'Español' else 'en'
@@ -71,17 +71,31 @@ def set_global_language(selected: object) -> str:
     return normalized
 
 
+def _session_language() -> str | None:
+    values = [_code(st.session_state.get(key)) for key in ALL_LANGUAGE_KEYS]
+    if 'es' in values:
+        return 'Español'
+    if 'en' in values:
+        return 'English'
+    return None
+
+
 def current_language_label(default: object = 'Español') -> str:
-    return label(query_param_language() or st.session_state.get('global_language') or st.session_state.get(SESSION_KEY) or default)
+    session = _session_language()
+    if session:
+        return session
+    query = query_param_language()
+    if query == 'Español':
+        return query
+    return label(default)
 
 
 def render_language_selector(*, key: str) -> str:
     current = current_language_label()
-    _safe_set_session(key, current)
 
     def _sync_language() -> None:
-        set_global_language(st.session_state.get(key) or st.session_state.get('global_language') or current)
+        set_global_language(st.session_state.get(key) or current)
 
     selected = st.sidebar.selectbox('Language / Idioma', OPTIONS, index=OPTIONS.index(current), key=key, on_change=_sync_language)
     set_global_language(selected)
-    return _code(selected)
+    return _code(selected) or 'es'
