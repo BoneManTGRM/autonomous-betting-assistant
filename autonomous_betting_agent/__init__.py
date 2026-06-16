@@ -32,9 +32,9 @@ def _install_streamlit_helpers() -> None:
     except Exception:
         return
 
-    if getattr(st, '_aba_streamlit_helpers_v12_installed', False):
+    if getattr(st, '_aba_streamlit_helpers_v13_installed', False):
         return
-    st._aba_streamlit_helpers_v12_installed = True
+    st._aba_streamlit_helpers_v13_installed = True
 
     page_language_keys = [
         'global_language', 'app_language', 'language_settings_language', 'start_here_language',
@@ -202,7 +202,7 @@ def _install_streamlit_helpers() -> None:
         return called_from_page('pro_predictor.py')
 
     def label_key(label: Any) -> str:
-        return ' '.join(str(label or '').lower().replace('-', ' ').replace('_', ' ').split())
+        return ' '.join(str(label or '').lower().replace('-', ' ').replace('_', ' ').replace('%', '').replace('±', '').split())
 
     def looks_like_predictor_table(data: Any) -> bool:
         if not isinstance(data, pd.DataFrame) or data.empty:
@@ -227,6 +227,10 @@ def _install_streamlit_helpers() -> None:
         filename = f'pro_predictor_export_{len(data)}_rows.csv'
         st.download_button(label, data.to_csv(index=False), file_name=filename, mime='text/csv', key=f'pro_predictor_visible_csv_{signature}')
 
+    def slider_should_use_number_input(label: Any) -> bool:
+        key = label_key(label)
+        return 'agent score' in key or 'puntaje agente' in key
+
     def render_nav(lang: str) -> None:
         with st.sidebar:
             st.markdown('### :green[ABA] Signal :red[Pro]')
@@ -249,6 +253,8 @@ def _install_streamlit_helpers() -> None:
     real_dg_selectbox = DeltaGenerator.selectbox
     real_st_number_input = st.number_input
     real_dg_number_input = DeltaGenerator.number_input
+    real_st_slider = st.slider
+    real_dg_slider = DeltaGenerator.slider
     real_st_dataframe = st.dataframe
     real_dg_dataframe = DeltaGenerator.dataframe
     real_st_table = st.table
@@ -285,7 +291,7 @@ def _install_streamlit_helpers() -> None:
         return selected
 
     def number_input_with_pro_caps(label: Any, args: tuple[Any, ...], kwargs: dict[str, Any], original: Any, target: Any = None) -> Any:
-        if called_from_pro_predictor() and label_key(label) in {'max sports', 'max events per sport', 'max high confidence rows'}:
+        if called_from_pro_predictor() and label_key(label) in {'max sports', 'max events per sport', 'max high confidence rows', 'máximo de filas de máxima confianza'}:
             kwargs = dict(kwargs)
             kwargs['max_value'] = 500
             if kwargs.get('value', 0) and kwargs['value'] > 500:
@@ -293,6 +299,15 @@ def _install_streamlit_helpers() -> None:
         if target is None:
             return original(label, *args, **kwargs)
         return original(target, label, *args, **kwargs)
+
+    def slider_with_agent_score_number(label: Any, args: tuple[Any, ...], kwargs: dict[str, Any], original_slider: Any, original_number: Any, target: Any = None) -> Any:
+        if called_from_pro_predictor() and slider_should_use_number_input(label):
+            if target is None:
+                return original_number(label, *args, **kwargs)
+            return original_number(target, label, *args, **kwargs)
+        if target is None:
+            return original_slider(label, *args, **kwargs)
+        return original_slider(target, label, *args, **kwargs)
 
     def patched_st_selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
         return language_selectbox(label, options, args, kwargs, real_st_selectbox)
@@ -305,6 +320,12 @@ def _install_streamlit_helpers() -> None:
 
     def patched_dg_number_input(self: Any, label: Any, *args: Any, **kwargs: Any) -> Any:
         return number_input_with_pro_caps(label, args, kwargs, real_dg_number_input, target=self)
+
+    def patched_st_slider(label: Any, *args: Any, **kwargs: Any) -> Any:
+        return slider_with_agent_score_number(label, args, kwargs, real_st_slider, real_st_number_input)
+
+    def patched_dg_slider(self: Any, label: Any, *args: Any, **kwargs: Any) -> Any:
+        return slider_with_agent_score_number(label, args, kwargs, real_dg_slider, real_dg_number_input, target=self)
 
     def patched_st_dataframe(data: Any = None, *args: Any, **kwargs: Any) -> Any:
         render_pro_predictor_download(data)
@@ -331,6 +352,8 @@ def _install_streamlit_helpers() -> None:
     DeltaGenerator.selectbox = patched_dg_selectbox
     st.number_input = patched_st_number_input
     DeltaGenerator.number_input = patched_dg_number_input
+    st.slider = patched_st_slider
+    DeltaGenerator.slider = patched_dg_slider
     st.dataframe = patched_st_dataframe
     DeltaGenerator.dataframe = patched_dg_dataframe
     st.table = patched_st_table
