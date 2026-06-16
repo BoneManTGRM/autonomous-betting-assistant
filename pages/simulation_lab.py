@@ -16,8 +16,15 @@ TEXT = {
         'source': 'Prediction source', 'session': 'Use latest prediction session', 'survivor_source': 'Use last simulation survivor list', 'upload': 'Upload prediction CSV', 'upload_label': 'Upload CSV',
         'run': 'Run simulations + optimizer', 'no_rows': 'No rows available. Run Pro Predictor/Ultra 80 first or upload a CSV.',
         'settings': 'Simulation settings', 'iterations': 'Iterations', 'stake': 'Flat stake units', 'max_rows': 'Max rows per strategy', 'min_rows': 'Minimum optimizer rows',
-        'change_settings': 'Law of Variable Change stress settings', 'rain': 'Rain/wet-field stress', 'injury': 'Key injury to picked side', 'opp_injury': 'Opponent injury boost', 'altitude': 'Altitude mismatch stress', 'travel': 'Travel/fatigue stress', 'chaos': 'General uncertainty shrink',
-        'summary': 'Simulation summary', 'details': 'Selected rows', 'optimizer': 'Simulation optimizer', 'survivor': 'Simulation survivor handoff', 'risk_report': 'Change-risk report', 'download': 'Download simulation report',
+        'change_settings': 'What-If Change Stress Test',
+        'stress_scale': 'Slider guide: 0.00 = ignore that risk, 0.25 = mild stress, 0.50 = serious stress, 0.75+ = extreme stress. These are what-if shocks on top of any weather, injury, altitude, travel, CLV, or price-risk columns already in the CSV.',
+        'rain': 'Weather trouble', 'rain_help': 'Tests rain, wind, heat, cold, or wet-field risk. Higher values hurt outdoor/weather-sensitive sports more than indoor sports.',
+        'injury': 'Injury to our pick', 'injury_help': 'Tests what happens if the side/player we picked loses a key player or has an injury downgrade.',
+        'opp_injury': 'Opponent injury advantage', 'opp_injury_help': 'Tests the opposite: the opponent loses a key player, which can slightly help our pick.',
+        'altitude': 'High-altitude disadvantage', 'altitude_help': 'Tests an away team/player from lower altitude playing at a high-altitude venue.',
+        'travel': 'Away travel / fatigue', 'travel_help': 'Tests long travel, time-zone changes, short rest, or fatigue for the away side.',
+        'chaos': 'Market uncertainty / chaos', 'chaos_help': 'Moves the simulation away from the model and closer to the market when conditions are unstable or unknown.',
+        'summary': 'Simulation summary', 'details': 'Selected rows', 'optimizer': 'Simulation optimizer', 'survivor': 'Simulation survivor handoff', 'risk_report': 'What-if risk report', 'download': 'Download simulation report',
         'note': 'Best use: compare strategies under model, market, memory, overconfidence, weather, injury, altitude, travel, market-reversal, and combined-change scenarios. A strategy that only works when conditions stay perfect is not robust enough.',
         'saved': 'Simulation survivor rows saved for Odds Lock Pro handoff.', 'recommendation': 'Recommendation',
     },
@@ -27,8 +34,15 @@ TEXT = {
         'source': 'Fuente de predicciones', 'session': 'Usar última sesión de predicciones', 'survivor_source': 'Usar última lista sobreviviente de simulación', 'upload': 'Subir CSV de predicciones', 'upload_label': 'Subir CSV',
         'run': 'Ejecutar simulaciones + optimizador', 'no_rows': 'No hay filas. Ejecuta Predictor Pro/Ultra 80 primero o sube un CSV.',
         'settings': 'Configuración de simulación', 'iterations': 'Iteraciones', 'stake': 'Unidades fijas por pick', 'max_rows': 'Máx filas por estrategia', 'min_rows': 'Mínimo de filas del optimizador',
-        'change_settings': 'Ajustes de estrés por Ley de Cambio Variable', 'rain': 'Estrés por lluvia/cancha mojada', 'injury': 'Lesión clave del lado elegido', 'opp_injury': 'Impulso por lesión del rival', 'altitude': 'Estrés por diferencia de altitud', 'travel': 'Estrés por viaje/fatiga', 'chaos': 'Reducción por incertidumbre general',
-        'summary': 'Resumen de simulación', 'details': 'Filas seleccionadas', 'optimizer': 'Optimizador de simulación', 'survivor': 'Traspaso sobreviviente de simulación', 'risk_report': 'Reporte de riesgo de cambio', 'download': 'Descargar reporte de simulación',
+        'change_settings': 'Prueba Qué Pasaría Si Cambian las Condiciones',
+        'stress_scale': 'Guía: 0.00 = ignorar ese riesgo, 0.25 = estrés leve, 0.50 = estrés serio, 0.75+ = estrés extremo. Estos son choques hipotéticos además de cualquier columna de clima, lesión, altitud, viaje, CLV o riesgo de precio que ya venga en el CSV.',
+        'rain': 'Problemas de clima', 'rain_help': 'Prueba lluvia, viento, calor, frío o cancha mojada. Los valores altos afectan más a deportes al aire libre que a deportes bajo techo.',
+        'injury': 'Lesión en nuestro pick', 'injury_help': 'Prueba qué pasa si el lado/jugador que elegimos pierde una pieza clave o tiene una lesión negativa.',
+        'opp_injury': 'Ventaja por lesión del rival', 'opp_injury_help': 'Prueba lo contrario: el rival pierde una pieza clave, lo cual puede ayudar ligeramente a nuestro pick.',
+        'altitude': 'Desventaja por altitud', 'altitude_help': 'Prueba un equipo/jugador visitante de baja altitud jugando en una sede de alta altitud.',
+        'travel': 'Viaje / fatiga del visitante', 'travel_help': 'Prueba viaje largo, cambio de zona horaria, poco descanso o fatiga del visitante.',
+        'chaos': 'Incertidumbre / caos del mercado', 'chaos_help': 'Mueve la simulación lejos del modelo y más cerca del mercado cuando las condiciones son inestables o desconocidas.',
+        'summary': 'Resumen de simulación', 'details': 'Filas seleccionadas', 'optimizer': 'Optimizador de simulación', 'survivor': 'Traspaso sobreviviente de simulación', 'risk_report': 'Reporte de riesgo qué pasaría si', 'download': 'Descargar reporte de simulación',
         'note': 'Uso ideal: comparar estrategias con escenarios de modelo, mercado, memoria, sobreconfianza, clima, lesiones, altitud, viaje, reversa de mercado y cambio combinado. Una estrategia que solo funciona cuando las condiciones se mantienen perfectas no es suficientemente robusta.',
         'saved': 'Filas sobrevivientes de simulación guardadas para traspaso a Odds Lock Pro.', 'recommendation': 'Recomendación',
     },
@@ -449,14 +463,15 @@ with st.expander(t('settings'), expanded=True):
     max_rows = c3.number_input(t('max_rows'), min_value=1, max_value=5000, value=500, step=25)
     min_optimizer_rows = c4.number_input(t('min_rows'), min_value=1, max_value=100, value=5, step=1)
 with st.expander(t('change_settings'), expanded=False):
+    st.caption(t('stress_scale'))
     s1, s2, s3 = st.columns(3)
-    rain = s1.slider(t('rain'), min_value=0.0, max_value=1.0, value=0.35, step=0.05)
-    injury = s2.slider(t('injury'), min_value=0.0, max_value=1.0, value=0.15, step=0.05)
-    opponent_injury = s3.slider(t('opp_injury'), min_value=0.0, max_value=1.0, value=0.00, step=0.05)
+    rain = s1.slider(t('rain'), min_value=0.0, max_value=1.0, value=0.35, step=0.05, help=t('rain_help'), format='%.2f')
+    injury = s2.slider(t('injury'), min_value=0.0, max_value=1.0, value=0.15, step=0.05, help=t('injury_help'), format='%.2f')
+    opponent_injury = s3.slider(t('opp_injury'), min_value=0.0, max_value=1.0, value=0.00, step=0.05, help=t('opp_injury_help'), format='%.2f')
     s4, s5, s6 = st.columns(3)
-    altitude = s4.slider(t('altitude'), min_value=0.0, max_value=1.0, value=0.25, step=0.05)
-    travel = s5.slider(t('travel'), min_value=0.0, max_value=1.0, value=0.20, step=0.05)
-    chaos = s6.slider(t('chaos'), min_value=0.0, max_value=0.75, value=0.15, step=0.05)
+    altitude = s4.slider(t('altitude'), min_value=0.0, max_value=1.0, value=0.25, step=0.05, help=t('altitude_help'), format='%.2f')
+    travel = s5.slider(t('travel'), min_value=0.0, max_value=1.0, value=0.20, step=0.05, help=t('travel_help'), format='%.2f')
+    chaos = s6.slider(t('chaos'), min_value=0.0, max_value=0.75, value=0.15, step=0.05, help=t('chaos_help'), format='%.2f')
 stress_profile = {'rain': float(rain), 'injury': float(injury), 'opponent_injury': float(opponent_injury), 'altitude': float(altitude), 'travel': float(travel), 'chaos': float(chaos)}
 
 if st.button(t('run'), type='primary', use_container_width=True):
