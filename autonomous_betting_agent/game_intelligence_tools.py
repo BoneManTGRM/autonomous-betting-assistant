@@ -70,6 +70,26 @@ def _future(row: dict[str, Any]) -> bool:
     return bool(parsed and parsed > datetime.now(timezone.utc))
 
 
+def _fill_value_metrics(row: dict[str, Any]) -> None:
+    probability = _prob(row)
+    price = _price(row.get('decimal_price'))
+    if probability is None or price is None or price <= 1.0:
+        return
+    implied = round(1.0 / price, 6)
+    edge = round(probability - implied, 6)
+    ev = round(probability * price - 1.0, 6)
+    if _num(row.get('market_implied_probability')) is None:
+        row['market_implied_probability'] = implied
+    if _num(row.get('edge_probability')) is None:
+        row['edge_probability'] = edge
+    if _num(row.get('edge_percent')) is None:
+        row['edge_percent'] = round(edge * 100.0, 3)
+    if _num(row.get('expected_value_per_unit')) is None:
+        row['expected_value_per_unit'] = ev
+    if _num(row.get('expected_value_percent')) is None:
+        row['expected_value_percent'] = round(ev * 100.0, 3)
+
+
 def playable_odds_targets(model_probability: float | None, min_edge: float = 0.03, great_edge: float = 0.075) -> dict[str, Any]:
     if model_probability is None or not (0.0 < model_probability < 1.0):
         return {'fair_decimal_price': None, 'minimum_playable_decimal': None, 'great_value_decimal': None}
@@ -322,6 +342,7 @@ def enrich_game_intelligence(frame: pd.DataFrame | list[dict[str, Any]]) -> pd.D
             item['decimal_price'] = round(best, 6)
             item['bookmaker'] = item.get('best_available_book') or item.get('bookmaker')
         item.update(playable_odds_targets(_prob(item)))
+        _fill_value_metrics(item)
         item['minimum_line_value_status'] = safe_text(item.get('minimum_line_value_status')) or line_value_status(item)
         item.update(information_confidence(item))
         item.update(market_disagreement(item))
