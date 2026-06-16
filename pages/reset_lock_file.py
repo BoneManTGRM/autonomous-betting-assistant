@@ -88,6 +88,7 @@ def clear_lock_file(ledger_path, *, clear_session: bool, workspace_id: str) -> N
         if isinstance(source, str) and ('Odds Lock Pro' in source or 'Simulation Lab survivor' in source):
             st.session_state.pop('ara_latest_predictions', None)
             st.session_state.pop('ara_latest_predictions_source', None)
+    st.session_state['public_proof_use_demo'] = False
     st.session_state['reset_lock_file_done_message'] = f"{t('done')} {workspace_id}"
     st.session_state['reset_lock_file_confirm_open'] = False
 
