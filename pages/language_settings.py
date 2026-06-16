@@ -3,25 +3,50 @@ from __future__ import annotations
 import streamlit as st
 
 PAGE_LANGUAGE_KEYS = [
+    'language_settings_language',
+    'tool_command_center_language',
+    'command_center_language',
+    'game_intelligence_language',
     'deployment_health_language',
     'scanner_pro_language',
     'pro_predictor_language',
+    'what_are_the_odds_language',
     'what_are_the_odds_pro_language',
     'odds_lock_pro_language',
     'public_proof_dashboard_language',
     'auto_result_grading_language',
     'daily_workflow_language',
     'learning_memory_language',
+    'learn_memory_language',
     'monthly_license_readiness_language',
     'buyer_demo_mode_language',
+    'daily_operator_checklist_language',
+    'private_beta_sales_dashboard_language',
     'reset_data_language',
 ]
 
 st.set_page_config(page_title='Language Settings', layout='wide')
 
 
-def save_language(value: str) -> str:
-    selected = 'Español' if str(value).lower().startswith('es') else 'English'
+def normalize_language(value: object) -> str:
+    text = str(value or '').strip().lower()
+    if text.startswith('es') or 'español' in text or 'espanol' in text:
+        return 'Español'
+    return 'English'
+
+
+def query_language() -> str | None:
+    try:
+        raw = st.query_params.get('lang')
+    except Exception:
+        return None
+    if not raw:
+        return None
+    return normalize_language(raw)
+
+
+def save_language(value: object) -> str:
+    selected = normalize_language(value)
     st.session_state['global_language'] = selected
     st.session_state['app_language'] = selected
     for key in PAGE_LANGUAGE_KEYS:
@@ -32,8 +57,10 @@ def save_language(value: str) -> str:
         pass
     return selected
 
-current = st.session_state.get('global_language') or st.session_state.get('app_language') or 'English'
-current = 'Español' if str(current).lower().startswith('es') else 'English'
+
+current = query_language() or st.session_state.get('global_language') or st.session_state.get('app_language') or 'English'
+current = normalize_language(current)
+save_language(current)
 
 st.title('Language Settings / Ajustes de Idioma')
 st.caption('Choose once here. The app will keep this language across pages unless you change it again.')
@@ -47,6 +74,6 @@ if st.button('Save language / Guardar idioma', type='primary', use_container_wid
     else:
         st.success('Language saved. Change pages and it should remain in English.')
 
-st.info(f'Current language / Idioma actual: {current}')
+st.info(f'Current language / Idioma actual: {normalize_language(st.session_state.get("global_language"))}')
 st.write('Stored keys / Claves guardadas:')
 st.json({key: st.session_state.get(key) for key in ['global_language', 'app_language', *PAGE_LANGUAGE_KEYS]})
