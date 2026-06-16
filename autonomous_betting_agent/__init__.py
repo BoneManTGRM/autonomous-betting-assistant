@@ -40,7 +40,7 @@ def _install_streamlit_helpers() -> None:
         'public_proof_dashboard_language', 'auto_result_grading_language', 'daily_workflow_language',
         'learning_memory_language', 'learn_memory_language', 'monthly_license_readiness_language',
         'buyer_demo_mode_language', 'daily_operator_checklist_language', 'private_beta_sales_dashboard_language',
-        'reset_data_language',
+        'reset_data_language', 'reset_lock_file_language',
     ]
 
     tools: tuple[tuple[str, str, str], ...] = (
@@ -52,6 +52,7 @@ def _install_streamlit_helpers() -> None:
         ('What Are the Odds', 'Cuotas y Valor', 'pages/what_are_the_odds.py'),
         ('Odds Lock Pro', 'Bloqueo de Cuotas Pro', 'pages/odds_lock_pro.py'),
         ('Public Proof Dashboard', 'Dashboard Público de Prueba', 'pages/public_proof_dashboard.py'),
+        ('Reset Lock File', 'Reiniciar Archivo de Bloqueo', 'pages/reset_lock_file.py'),
         ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory.py'),
     )
     notes_en = (
@@ -62,6 +63,7 @@ def _install_streamlit_helpers() -> None:
         'Use Simulation Lab to stress-test ROI, hit rate, drawdown, and overconfidence risk before locking.',
         'Use Odds Lock Pro to create timestamped proof rows before results are known.',
         'Use Public Proof Dashboard for client-safe metrics, result uploads, persistent ledger storage, and report cards.',
+        'Use Reset Lock File to clear one test-window proof ledger without touching other test windows.',
         'Use Threshold Optimizer after results finish to learn the best cutoffs and false-positive patterns.',
         'Use Learning Memory for durable training and saved model memory.',
     )
@@ -73,6 +75,7 @@ def _install_streamlit_helpers() -> None:
         'Usa Laboratorio de Simulación para probar ROI, acierto, drawdown y riesgo de sobreconfianza antes de bloquear.',
         'Usa Bloqueo de Cuotas Pro para crear filas de prueba con timestamp antes de conocer resultados.',
         'Usa Dashboard Público de Prueba para métricas seguras para clientes, resultados, ledger persistente y tarjetas de reporte.',
+        'Usa Reiniciar Archivo de Bloqueo para borrar el ledger de una ventana de prueba sin tocar las demás.',
         'Usa Optimizador de Umbrales después de los resultados para aprender mejores cortes y falsos positivos.',
         'Usa Memoria de Aprendizaje para entrenamiento duradero y memoria guardada del modelo.',
     )
@@ -245,57 +248,29 @@ def _install_streamlit_helpers() -> None:
         return real_st_table(translate_frame(data), *args, **kwargs)
 
     def patched_dg_table(self: Any, data: Any = None, *args: Any, **kwargs: Any) -> Any:
-        return real_dg_table(self, data=translate_frame(data), *args, **kwargs)
+        return real_dg_table(self, translate_frame(data), *args, **kwargs)
 
-    def _translate_download_payload(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
-        kwargs = dict(kwargs)
-        file_name = str(kwargs.get('file_name', ''))
-        mime = str(kwargs.get('mime', ''))
-        if language_value() != 'Español' or not (file_name.endswith('.csv') or mime == 'text/csv'):
-            return args, kwargs
-        if 'data' in kwargs:
-            kwargs['data'] = translate_csv_text(kwargs['data'])
-            return args, kwargs
-        if args:
-            mutable = list(args)
-            mutable[0] = translate_csv_text(mutable[0])
-            return tuple(mutable), kwargs
-        return args, kwargs
+    def patched_st_download_button(label: Any, data: Any = None, *args: Any, **kwargs: Any) -> Any:
+        return real_st_download_button(label, translate_csv_text(data), *args, **kwargs)
 
-    def patched_st_download_button(label: Any, *args: Any, **kwargs: Any) -> Any:
-        args, kwargs = _translate_download_payload(args, kwargs)
-        return real_st_download_button(label, *args, **kwargs)
-
-    def patched_dg_download_button(self: Any, label: Any, *args: Any, **kwargs: Any) -> Any:
-        args, kwargs = _translate_download_payload(args, kwargs)
-        return real_dg_download_button(self, label, *args, **kwargs)
+    def patched_dg_download_button(self: Any, label: Any, data: Any = None, *args: Any, **kwargs: Any) -> Any:
+        return real_dg_download_button(self, label, translate_csv_text(data), *args, **kwargs)
 
     st.selectbox = patched_st_selectbox
-    st.dataframe = patched_st_dataframe
-    st.table = patched_st_table
-    st.download_button = patched_st_download_button
     DeltaGenerator.selectbox = patched_dg_selectbox
+    st.dataframe = patched_st_dataframe
     DeltaGenerator.dataframe = patched_dg_dataframe
+    st.table = patched_st_table
     DeltaGenerator.table = patched_dg_table
+    st.download_button = patched_st_download_button
     DeltaGenerator.download_button = patched_dg_download_button
 
 
 _install_streamlit_helpers()
 
 __all__ = [
-    'AutonomousBettingAgent',
-    'EventResearchInput',
-    'GradedPrediction',
-    'PredictionLedgerRow',
-    'PredictionResult',
-    'ProbabilityCalibrator',
-    'SelectionDecision',
-    'SelectionPolicy',
-    'TeamSnapshot',
-    'TGRMLoop',
-    'TrackingReport',
-    'choose_decision',
-    'fit_probability_calibrator',
-    'parse_graded_csv',
-    'summarize_tracking',
+    'AutonomousBettingAgent', 'EventResearchInput', 'GradedPrediction', 'PredictionLedgerRow',
+    'PredictionResult', 'ProbabilityCalibrator', 'SelectionDecision', 'SelectionPolicy',
+    'TeamSnapshot', 'TGRMLoop', 'TrackingReport', 'choose_decision', 'fit_probability_calibrator',
+    'parse_graded_csv', 'summarize_tracking',
 ]
