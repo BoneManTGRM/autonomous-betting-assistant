@@ -5,6 +5,7 @@ import pandas as pd
 from autonomous_betting_agent.odds_lock_tools import (
     client_view,
     daily_report,
+    lock_blockers,
     lock_rows,
     prepare_lock_candidates,
     summarize_locked_picks,
@@ -44,6 +45,27 @@ class OddsLockToolsTests(unittest.TestCase):
         candidates = prepare_lock_candidates(frame)
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates.iloc[0]['event'], 'C at D')
+
+    def test_strict_future_lock_blocks_started_or_incomplete_rows(self):
+        frame = pd.DataFrame([
+            {'event': 'Started at Team', 'prediction': 'Team', 'model_probability': 0.64, 'decimal_price': 2.0, 'bookmaker': 'Book', 'agent_decision': 'play_small', 'event_start_utc': '2000-01-01T00:00:00Z'},
+            {'event': 'Future at Team', 'prediction': 'Team', 'model_probability': 0.64, 'decimal_price': 2.0, 'agent_decision': 'play_small', 'event_start_utc': '2099-01-01T00:00:00Z'},
+        ])
+        strict = lock_rows(frame, strict=True, require_future=True)
+        self.assertTrue(strict.empty)
+        blockers = lock_blockers(frame.iloc[0].to_dict(), require_future=True)
+        self.assertIn('invalid_after_start', blockers)
+        blockers_missing_book = lock_blockers(frame.iloc[1].to_dict(), require_future=True)
+        self.assertIn('missing_bookmaker', blockers_missing_book)
+
+    def test_strict_future_lock_accepts_complete_future_row(self):
+        frame = pd.DataFrame([
+            {'event': 'A at B', 'prediction': 'B', 'model_probability': 0.64, 'decimal_price': 2.0, 'bookmaker': 'Book', 'agent_decision': 'play_small', 'event_start_utc': '2099-01-01T00:00:00Z'}
+        ])
+        strict = lock_rows(frame, strict=True, require_future=True)
+        self.assertEqual(len(strict), 1)
+        self.assertTrue(bool(strict.iloc[0]['official_lock_ready']))
+        self.assertEqual(strict.iloc[0]['lock_blockers'], '')
 
     def test_summary_counts_units_and_roi(self):
         frame = lock_rows(pd.DataFrame([
