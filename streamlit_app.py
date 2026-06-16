@@ -34,6 +34,19 @@ DEFAULT_TOGGLE_VALUES = {
     "require all configured apis": False,
 }
 
+CORE_PAGES = [
+    st.Page("pages/scanner_pro.py", title="Scanner Pro"),
+    st.Page("pages/pro_predictor.py", title="Pro Predictor"),
+    st.Page("pages/ultra80_profit_mode.py", title="Ultra 80 Profit Mode"),
+    st.Page("pages/simulation_lab.py", title="Simulation Lab"),
+    st.Page("pages/threshold_optimizer.py", title="Threshold Optimizer"),
+    st.Page("pages/what_are_the_odds.py", title="What Are the Odds"),
+    st.Page("pages/odds_lock_pro.py", title="Odds Lock Pro"),
+    st.Page("pages/public_proof_dashboard.py", title="Public Proof Dashboard"),
+    st.Page("pages/reset_lock_file.py", title="Reset Lock File"),
+    st.Page("pages/learn_memory.py", title="Learning Memory"),
+]
+
 
 def _label_key(label) -> str:
     return " ".join(str(label or "").lower().replace("%", "").replace("±", "").split())
@@ -104,4 +117,10 @@ DeltaGenerator.number_input = defaulted_dg_number_input
 DeltaGenerator.slider = defaulted_dg_slider
 DeltaGenerator.toggle = defaulted_dg_toggle
 
-import pages.pro_predictor  # noqa: F401,E402
+try:
+    current_page = st.navigation(CORE_PAGES, position="sidebar")
+    current_page.run()
+except AttributeError:
+    # Fallback for very old Streamlit versions. requirements.txt pins Streamlit
+    # high enough for st.navigation, but this keeps local older installs usable.
+    import pages.pro_predictor  # noqa: F401,E402
