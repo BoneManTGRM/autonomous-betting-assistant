@@ -35,17 +35,19 @@ def _install_streamlit_helpers() -> None:
         'global_language', 'app_language', 'language_settings_language', 'start_here_language',
         'tool_command_center_language', 'command_center_language', 'game_intelligence_language',
         'deployment_health_language', 'scanner_pro_language', 'pro_predictor_language',
-        'ultra80_profit_mode_language', 'threshold_optimizer_language', 'what_are_the_odds_language',
-        'what_are_the_odds_pro_language', 'odds_lock_pro_language', 'public_proof_dashboard_language',
-        'auto_result_grading_language', 'daily_workflow_language', 'learning_memory_language',
-        'learn_memory_language', 'monthly_license_readiness_language', 'buyer_demo_mode_language',
-        'daily_operator_checklist_language', 'private_beta_sales_dashboard_language', 'reset_data_language',
+        'ultra80_profit_mode_language', 'simulation_lab_language', 'threshold_optimizer_language',
+        'what_are_the_odds_language', 'what_are_the_odds_pro_language', 'odds_lock_pro_language',
+        'public_proof_dashboard_language', 'auto_result_grading_language', 'daily_workflow_language',
+        'learning_memory_language', 'learn_memory_language', 'monthly_license_readiness_language',
+        'buyer_demo_mode_language', 'daily_operator_checklist_language', 'private_beta_sales_dashboard_language',
+        'reset_data_language',
     ]
 
     tools: tuple[tuple[str, str, str], ...] = (
         ('Scanner Pro', 'Scanner Pro', 'pages/scanner_pro.py'),
         ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor.py'),
         ('Ultra 80 Profit Mode', 'Modo Ultra 80 Rentable', 'pages/ultra80_profit_mode.py'),
+        ('Simulation Lab', 'Laboratorio de Simulación', 'pages/simulation_lab.py'),
         ('Threshold Optimizer', 'Optimizador de Umbrales', 'pages/threshold_optimizer.py'),
         ('What Are the Odds', 'Cuotas y Valor', 'pages/what_are_the_odds.py'),
         ('Odds Lock Pro', 'Bloqueo de Cuotas Pro', 'pages/odds_lock_pro.py'),
@@ -53,20 +55,22 @@ def _install_streamlit_helpers() -> None:
         ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory.py'),
     )
     notes_en = (
-        'Commercial workflow: Scanner Pro → Pro Predictor → Ultra 80 Profit Mode → Odds Lock Pro → Public Proof Dashboard → Threshold Optimizer → Learning Memory.',
+        'Commercial workflow: Scanner Pro → Pro Predictor → Ultra 80 Profit Mode → Simulation Lab → Odds Lock Pro → Public Proof Dashboard → Threshold Optimizer → Learning Memory.',
         'Use Scanner Pro for live market discovery.',
         'Use Pro Predictor for final all-sports prediction scoring.',
         'Use Ultra 80 Profit Mode for the strict 80%+ and positive-profit shortlist.',
+        'Use Simulation Lab to stress-test ROI, hit rate, drawdown, and overconfidence risk before locking.',
         'Use Odds Lock Pro to create timestamped proof rows before results are known.',
         'Use Public Proof Dashboard for client-safe metrics, result uploads, persistent ledger storage, and report cards.',
         'Use Threshold Optimizer after results finish to learn the best cutoffs and false-positive patterns.',
         'Use Learning Memory for durable training and saved model memory.',
     )
     notes_es = (
-        'Flujo comercial: Scanner Pro → Predictor Pro → Modo Ultra 80 Rentable → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
+        'Flujo comercial: Scanner Pro → Predictor Pro → Modo Ultra 80 Rentable → Laboratorio de Simulación → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
         'Usa Scanner Pro para descubrir mercados en vivo.',
         'Usa Predictor Pro para la calificación final de predicciones en todos los deportes.',
         'Usa Modo Ultra 80 Rentable para la lista estricta de 80%+ y ganancia positiva.',
+        'Usa Laboratorio de Simulación para probar ROI, acierto, drawdown y riesgo de sobreconfianza antes de bloquear.',
         'Usa Bloqueo de Cuotas Pro para crear filas de prueba con timestamp antes de conocer resultados.',
         'Usa Dashboard Público de Prueba para métricas seguras para clientes, resultados, ledger persistente y tarjetas de reporte.',
         'Usa Optimizador de Umbrales después de los resultados para aprender mejores cortes y falsos positivos.',
@@ -88,6 +92,7 @@ def _install_streamlit_helpers() -> None:
         'volume_tier': 'nivel_volumen', 'min_probability': 'probabilidad_minima', 'min_edge': 'ventaja_minima',
         'min_ev': 'ev_minimo', 'min_books': 'casas_minimas', 'min_api_coverage': 'cobertura_api_minima',
         'min_agent_score': 'puntaje_agente_minimo', 'false_positive': 'falso_positivo',
+        'mean_roi': 'roi_promedio', 'profit_probability': 'probabilidad_ganancia', 'prob_hit_80_plus': 'prob_acierto_80_mas',
     }
     es_values = {
         'win': 'victoria', 'loss': 'derrota', 'void': 'nulo', 'pending': 'pendiente', 'unknown': 'pendiente',
@@ -240,7 +245,7 @@ def _install_streamlit_helpers() -> None:
         return real_st_table(translate_frame(data), *args, **kwargs)
 
     def patched_dg_table(self: Any, data: Any = None, *args: Any, **kwargs: Any) -> Any:
-        return real_dg_table(self, translate_frame(data), *args, **kwargs)
+        return real_dg_table(self, data=translate_frame(data), *args, **kwargs)
 
     def _translate_download_payload(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
         kwargs = dict(kwargs)
