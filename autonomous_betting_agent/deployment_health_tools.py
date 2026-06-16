@@ -19,6 +19,7 @@ CORE_PAGES = [
     'pages/learn_memory.py',
 ]
 OPTIONAL_PAGES = [
+    'pages/00_start_here.py',
     'pages/deployment_health.py',
     'pages/auto_result_grading.py',
     'pages/daily_workflow.py',
