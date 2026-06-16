@@ -18,7 +18,7 @@ from .tracking import PredictionLedgerRow, SelectionDecision, SelectionPolicy, T
 
 
 def _install_streamlit_helpers() -> None:
-    """Install one global language selector, translated navigation, and light table translation."""
+    """Install global Spanish/English navigation and light table translation."""
     try:
         import io
         import pandas as pd
@@ -27,9 +27,9 @@ def _install_streamlit_helpers() -> None:
     except Exception:
         return
 
-    if getattr(st, '_aba_streamlit_helpers_v4_installed', False):
+    if getattr(st, '_aba_streamlit_helpers_v5_installed', False):
         return
-    st._aba_streamlit_helpers_v4_installed = True
+    st._aba_streamlit_helpers_v5_installed = True
 
     page_language_keys = [
         'global_language', 'app_language', 'language_settings_language', 'start_here_language',
@@ -111,8 +111,6 @@ def _install_streamlit_helpers() -> None:
         try:
             st.session_state[key] = value
         except Exception:
-            # Streamlit blocks mutating a widget key after that widget is created.
-            # The active widget already stores the selected value, so this can be skipped.
             pass
 
     def save_language(value: object) -> str:
@@ -126,14 +124,14 @@ def _install_streamlit_helpers() -> None:
         return selected
 
     def language_value() -> str:
-        query = query_language()
-        if query:
-            return save_language(query)
         values = [normalize_language(st.session_state.get(key)) for key in page_language_keys if normalize_language(st.session_state.get(key))]
         if 'Español' in values:
             return save_language('Español')
         if 'English' in values:
             return save_language('English')
+        query = query_language()
+        if query == 'Español':
+            return save_language('Español')
         try:
             default = normalize_language(st.secrets.get('DEFAULT_LANGUAGE', ''))
         except Exception:
@@ -203,9 +201,10 @@ def _install_streamlit_helpers() -> None:
             if target is None:
                 return original(label, options, *args, **kwargs)
             return original(target, label, options, *args, **kwargs)
-        current = language_value()
         kwargs = dict(kwargs)
-        kwargs['key'] = 'global_language'
+        widget_key = kwargs.get('key') or 'global_language'
+        kwargs['key'] = widget_key
+        current = normalize_language(st.session_state.get(widget_key)) or language_value()
         kwargs['index'] = opts.index(current) if current in opts else opts.index('Español')
         selector_label = 'Idioma' if current == 'Español' else 'Language'
         if target is None:
