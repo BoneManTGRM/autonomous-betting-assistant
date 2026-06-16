@@ -10,10 +10,10 @@ It is designed for sports analysts, market researchers, prediction reviewers, pr
 
 ## Current product structure
 
-The app is organized around a five-stage workflow:
+The app is organized around a commercial no-password workflow:
 
 ```text
-Scanner Pro -> Pro Predictor -> What Are the Odds -> Odds Lock Pro -> Learning Memory
+Scanner Pro -> Pro Predictor -> What Are the Odds -> Odds Lock Pro -> Public Proof Dashboard -> Learning Memory
 ```
 
 | Tool | Main job |
@@ -21,10 +21,22 @@ Scanner Pro -> Pro Predictor -> What Are the Odds -> Odds Lock Pro -> Learning M
 | **Scanner Pro** | Scans live odds feeds, normalizes markets, ranks market quality, and sends clean rows forward. |
 | **Pro Predictor** | Builds model probabilities, applies learned memory, scores agent decisions, and produces prediction-ready rows. |
 | **What Are the Odds** | Runs the market/value command board: edge, agent decision, scanner strength, CLV, loss review, sport routing, and lock-ready review. |
-| **Odds Lock Pro** | Creates timestamped proof ledgers, public/private dashboards, client-safe reports, bankroll controls, and audit-ready proof IDs. |
+| **Odds Lock Pro** | Creates timestamped proof ledgers, client-safe reports, bankroll controls, and audit-ready proof IDs. |
+| **Public Proof Dashboard** | Displays no-login proof metrics, applies finished-result updates, saves/loads the persistent CSV ledger, and creates report cards. |
 | **Learning Memory** | Trains durable calibration and pattern memory from finished, graded results. |
 
 Older duplicate scanner, market-finder, league-specific, and legacy self-learning pages were removed or consolidated.
+
+## No-password commercial mode
+
+The app now includes the most valuable platform upgrades without requiring users to log in every time:
+
+1. **Persistent ledger storage** through a local CSV database at `data/odds_lock_pro_ledger.csv`.
+2. **Auto-grading from finished-result uploads** by `proof_id` or event/pick matching.
+3. **Public proof dashboard** for record, ROI, units, pending picks, sport breakdowns, market breakdowns, and client-safe ledgers.
+4. **Report-card generator** for Markdown, HTML, and daily copy/paste reports.
+
+This is not a full password-protected client portal yet. Login, paid accounts, Stripe, and client roles can be added later.
 
 ## Influencer and private-group workflow
 
@@ -36,14 +48,15 @@ The recommended operating path is:
 2. **Pro Predictor** builds probability and decision rows.
 3. **What Are the Odds** reviews value, edge, CLV, risk, and lock readiness.
 4. **Odds Lock Pro** locks qualified future picks into a timestamped proof ledger.
-5. Finished results are graded.
-6. **Learning Memory** retrains calibration from finished results with usable probabilities or prices.
+5. **Public Proof Dashboard** publishes client-safe performance and report cards.
+6. Finished results are graded manually or through result-upload matching.
+7. **Learning Memory** retrains calibration from finished results with usable probabilities or prices.
 
 This structure helps separate live research, official locked picks, public-facing reports, and learning data.
 
 ## Odds Lock Pro
 
-Odds Lock Pro is the monetization and trust layer.
+Odds Lock Pro is the trust/proof layer.
 
 It adds:
 
@@ -65,24 +78,30 @@ It adds:
 
 The public/client view hides internal fields such as full model probability, proof hash, private scoring, and internal diagnostics while keeping useful proof fields such as event, pick, price, confidence, result, units, and proof ID.
 
+## Public Proof Dashboard
+
+The Public Proof Dashboard does **not** call sports APIs. It uses locked rows from session, uploaded ledgers, or the persistent CSV ledger.
+
+It supports:
+
+- loading the persistent ledger
+- loading Odds Lock Pro session rows
+- uploading locked ledger CSVs
+- uploading finished-result CSVs
+- applying result updates by `proof_id`
+- applying result updates by event/pick fallback matching
+- saving the merged ledger back to `data/odds_lock_pro_ledger.csv`
+- exporting public proof CSVs
+- exporting private audit CSVs
+- generating Markdown report cards
+- generating HTML report cards
+- generating daily copy/paste reports
+
 ## Four-tool handoff health
 
 A shared orchestration layer in `autonomous_betting_agent/four_tool_orchestrator.py` checks whether rows are ready to move from one tool to the next.
 
-It reports:
-
-- `status`
-- `next_action`
-- `handoff_score`
-- scanner handoff coverage
-- predictor handoff coverage
-- value-review handoff coverage
-- learning handoff coverage
-- playable rows
-- lock-ready rows
-- resolved rows
-- resolved rows with usable probabilities
-- missing blockers
+It reports status, next action, handoff score, scanner coverage, predictor coverage, value-review coverage, learning coverage, playable rows, lock-ready rows, resolved rows, resolved rows with usable probabilities, and missing blockers.
 
 The readiness checks understand common aliases. For example, Learning Memory accepts `result_status`, `result`, `outcome`, `win_loss`, or `graded_result` for final results, and accepts `model_probability`, `model_probability_clean`, `probability`, `predicted_probability`, or `confidence_probability` for probability fields.
 
@@ -99,6 +118,8 @@ The current system includes:
 - agent decision scoring
 - lock-ready candidate detection
 - timestamped proof ledger generation
+- persistent no-password ledger storage
+- finished-result upload grading
 - public/private client reporting
 - no-vig and implied-probability review
 - model-vs-market edge review
@@ -112,118 +133,11 @@ The current system includes:
 - probability calibration from graded results
 - Spanish/English UI support
 
-## Scanner Pro
-
-Scanner Pro is the consolidated market scanner.
-
-It ranks each scanned market using:
-
-- bookmaker depth
-- best price availability
-- best price vs average price
-- price range
-- market overround / hold
-- market type quality
-
-It outputs fields such as:
-
-- `scanner_strength_score`
-- `scanner_strength_tier`
-- `scanner_recommendation`
-- `scanner_reasons`
-- `scanner_book_count_clean`
-
-Scanner Pro saves its latest rows into the app session so Pro Predictor and What Are the Odds can use them without another upload.
-
-## Pro Predictor
-
-Pro Predictor is the main all-sports prediction engine.
-
-It:
-
-- scans selected sports or manual sport keys
-- supports team/player filtering
-- uses Odds API prices
-- adds optional SportsDataIO and WeatherAPI context
-- applies built-in learning-memory signals
-- builds fused model probabilities
-- computes agent decisions
-- ranks prediction candidates
-- exports a CSV
-- saves prediction rows for What Are the Odds
-
-It does not mark a prediction as strong proof unless the proper timestamp and proof fields are present.
-
-## What Are the Odds
-
-What Are the Odds is the market/value command board.
-
-It combines:
-
-- Scanner Pro strength
-- Pro Predictor probabilities
-- Agent Decision Engine output
-- CLV intelligence
-- loss review
-- walk-forward validation
-- sport-specific model routing
-- API snapshots
-- lock-ready review
-
-The **Best Board** prioritizes rows by:
-
-1. lock-ready status
-2. agent score
-3. scanner strength
-4. model-vs-market edge
-5. model probability
-
-## Learning Memory
-
-Learning Memory is the durable training page.
-
-It reviews and trains from graded CSVs with finished results. It separates:
-
-- direct probability rows
-- price-implied probability rows
-- fallback probability rows
-- rows missing results
-- rows missing usable probabilities
-
-It writes or updates:
-
-```text
-learned_state.json
-data/learning_memory_bank.json
-data/ara_learning_memory.csv
-```
-
-Learning Memory now shows both learning-health and training-handoff readiness. Rows with results but no usable probabilities are flagged as needing probability or price data before serious training.
-
 ## Data proof rules
 
-The system distinguishes between:
+The system distinguishes between historical backfill, learning-only rows, result-only rows, future lock-ready rows, and official forward-proof rows.
 
-- historical backfill
-- learning-only rows
-- result-only rows
-- future lock-ready rows
-- official forward-proof rows
-
-A future prediction is strongest when it has:
-
-- event name
-- sport
-- market type
-- prediction
-- model probability
-- decimal price
-- bookmaker / odds source
-- event start time
-- lock timestamp before event start
-- proof ID
-- proof hash
-- final result added later
+A future prediction is strongest when it has event name, sport, market type, prediction, model probability, decimal price, bookmaker/odds source, event start time, lock timestamp before event start, proof ID, proof hash, and final result added later.
 
 A high hit rate alone is not enough. ROI, average price, CLV, book coverage, sample size, duplicate control, and prospective timestamped proof matter more than headline accuracy.
 
@@ -285,49 +199,9 @@ python -m unittest discover -s tests
 
 The repository also includes a GitHub Actions workflow for tests, but a green badge or workflow run should be checked directly in GitHub before claiming that a deployment passed.
 
-## CLI examples
-
-Run the sample agent workflow:
-
-```bash
-python run_agent.py examples/sample_event.json
-```
-
-Write JSON output:
-
-```bash
-python run_agent.py examples/sample_event.json --json-output result.json
-```
-
-Run with a learned calibration state:
-
-```bash
-python run_agent.py examples/sample_event.json --learned-state learned_state.json
-```
-
-Train from a graded CSV:
-
-```bash
-python learn_from_results.py pro_predictor_updated_win_loss.csv --output learned_state.json
-```
-
-Track graded predictions:
-
-```bash
-python track_predictions.py pro_predictor_updated_win_loss.csv --ledger-output prediction_ledger_enriched.csv --report-output prediction_report.json
-```
-
 ## Commercial positioning
 
-This project is intended to become a licensable product, not a free open-source prediction bot. It can support:
-
-- private sports-analysis dashboards
-- paid research tools
-- white-label prediction-review systems
-- client-facing sports analytics reports
-- internal research workflows
-- custom integrations with odds, weather, injury, lineup, statistics, and player-prop providers
-- private deployment, support, and model-tuning packages
+This project is intended to become a licensable product, not a free open-source prediction bot. It can support private sports-analysis dashboards, paid research tools, white-label prediction-review systems, client-facing sports analytics reports, internal research workflows, custom API integrations, private deployment, support, and model-tuning packages.
 
 The repository is public for limited review and evaluation, but the code is governed by a proprietary evaluation license. Commercial use, resale, sublicensing, hosting, paid access, SaaS deployment, API access, white-label use, competing-product use, model-training use, or monetized derivative use requires written permission from Reparodynamics.
 
