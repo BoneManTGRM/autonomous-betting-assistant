@@ -3,53 +3,25 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Any, Iterable, Mapping
+from typing import Any, Mapping
 
 import pandas as pd
 
 from .row_normalizer import normalize_frame, probability_value, result_status, safe_text
 
-
 PUBLIC_COLUMNS = [
-    'proof_id',
-    'locked_at_utc',
-    'event_start_utc',
-    'event',
-    'sport',
-    'market_type',
-    'prediction',
-    'decimal_price',
-    'bookmaker',
-    'stake_units',
-    'public_confidence',
-    'public_reason',
-    'result_status',
-    'profit_units',
+    'proof_id', 'locked_at_utc', 'event_start_utc', 'event', 'sport', 'market_type',
+    'prediction', 'decimal_price', 'bookmaker', 'stake_units', 'public_confidence',
+    'public_reason', 'result_status', 'profit_units',
 ]
 PRIVATE_COLUMNS = [
-    'proof_id',
-    'locked_at_utc',
-    'event_start_utc',
-    'event',
-    'sport',
-    'sport_key',
-    'market_type',
-    'prediction',
-    'model_probability',
-    'decimal_price',
-    'implied_probability',
-    'model_edge',
-    'bookmaker',
-    'agent_decision',
-    'agent_score',
-    'scanner_strength_score',
-    'stake_units',
-    'kelly_fraction',
-    'proof_hash',
-    'proof_status',
-    'result_status',
+    'proof_id', 'locked_at_utc', 'event_start_utc', 'event', 'sport', 'sport_key',
+    'market_type', 'prediction', 'model_probability', 'decimal_price', 'implied_probability',
+    'model_edge', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score',
+    'stake_units', 'kelly_fraction', 'proof_hash', 'proof_status', 'result_status',
     'profit_units',
 ]
+REQUIRED_OFFICIAL_LOCK_FIELDS = ['event', 'prediction', 'model_probability', 'decimal_price', 'bookmaker']
 
 
 def now_utc() -> str:
@@ -98,12 +70,19 @@ def kelly_fraction(probability: float | None, decimal_price: float | None) -> fl
     return round(max(0.0, fraction), 6)
 
 
+def _safe_float(value: Any) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(parsed):
+        return None
+    return parsed
+
+
 def recommended_stake_units(row: Mapping[str, Any], *, max_units: float = 2.0, risk_multiplier: float = 0.25) -> float:
     probability = probability_value(row, 'model_probability')
-    try:
-        price = float(row.get('decimal_price'))
-    except (TypeError, ValueError):
-        price = None
+    price = _safe_float(row.get('decimal_price'))
     fraction = kelly_fraction(probability, price)
     agent_decision = safe_text(row.get('agent_decision') or row.get('decision')).lower()
     agent_score = _safe_float(row.get('agent_score')) or 0.0
@@ -124,29 +103,11 @@ def recommended_stake_units(row: Mapping[str, Any], *, max_units: float = 2.0, r
     return round(max(0.0, min(float(max_units), base_units)), 2)
 
 
-def _safe_float(value: Any) -> float | None:
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return None
-    if pd.isna(parsed):
-        return None
-    return parsed
-
-
 def proof_payload(row: Mapping[str, Any]) -> dict[str, Any]:
     fields = [
-        'locked_at_utc',
-        'event_start_utc',
-        'event',
-        'sport',
-        'market_type',
-        'prediction',
-        'model_probability',
-        'decimal_price',
-        'bookmaker',
-        'agent_decision',
-        'stake_units',
+        'locked_at_utc', 'event_start_utc', 'event', 'sport', 'market_type',
+        'prediction', 'model_probability', 'decimal_price', 'bookmaker',
+        'agent_decision', 'stake_units',
     ]
     return {field: safe_text(row.get(field)) for field in fields}
 
@@ -173,30 +134,71 @@ def lock_status(row: Mapping[str, Any], locked_at: datetime | None = None) -> st
     return 'invalid_after_start'
 
 
-def prepare_lock_candidates(frame: pd.DataFrame | list[dict[str, Any]], *, include_watch: bool = False) -> pd.DataFrame:
+def lock_blockers(row: Mapping[str, Any], *, require_future: bool = False, locked_at: datetime | None = None) -> list[str]:
+    blockers: list[str] = []
+    for field in REQUIRED_OFFICIAL_LOCK_FIELDS:
+        if not safe_text(row.get(field)):
+            blockers.append(f'missing_{field}')
+    if probability_value(row, 'model_probability') is None:
+        blockers.append('invalid_model_probability')
+    if decimal_to_implied(row.get('decimal_price')) is None:
+        blockers.append('invalid_decimal_price')
+    status = lock_status(row, locked_at=locked_at)
+    if require_future and status != 'locked_before_start':
+        blockers.append(status)
+    return sorted(set(blockers))
+
+
+def _decision_candidate(row: Mapping[str, Any], *, include_watch: bool) -> bool:
+    decision = safe_text(row.get('agent_decision') or row.get('decision')).lower()
+    lock_ready = safe_text(row.get('lock_ready')).lower() in {'true', '1', 'yes', 'y'}
+    if include_watch:
+        return lock_ready or decision in {'play_strong', 'play_small', 'watch_only', 'watch'}
+    return lock_ready or decision in {'play_strong', 'play_small'}
+
+
+def prepare_lock_candidates(
+    frame: pd.DataFrame | list[dict[str, Any]],
+    *,
+    include_watch: bool = False,
+    strict: bool = False,
+    require_future: bool = False,
+) -> pd.DataFrame:
     raw = pd.DataFrame(frame) if isinstance(frame, list) else frame
     normalized = normalize_frame(raw) if raw is not None and not raw.empty else pd.DataFrame()
     if normalized.empty:
         return pd.DataFrame()
+    now = datetime.now(timezone.utc)
     rows = []
     for row in normalized.to_dict(orient='records'):
-        decision = safe_text(row.get('agent_decision') or row.get('decision')).lower()
-        lock_ready = safe_text(row.get('lock_ready')).lower() in {'true', '1', 'yes', 'y'}
-        if not include_watch and not (lock_ready or decision in {'play_strong', 'play_small'}):
+        if not _decision_candidate(row, include_watch=include_watch):
             continue
         item = dict(row)
         item['implied_probability'] = decimal_to_implied(item.get('decimal_price'))
         item['model_edge'] = model_edge(item)
         item['stake_units'] = recommended_stake_units(item)
-        item['prelock_status'] = lock_status(item, locked_at=datetime.now(timezone.utc))
+        item['prelock_status'] = lock_status(item, locked_at=now)
+        blockers = lock_blockers(item, require_future=require_future, locked_at=now)
+        item['lock_blockers'] = '; '.join(blockers)
+        item['official_lock_ready'] = not blockers
         item['public_confidence'] = public_confidence(item)
         item['public_reason'] = public_reason(item)
+        if strict and blockers:
+            continue
         rows.append(item)
     return pd.DataFrame(rows)
 
 
-def lock_rows(frame: pd.DataFrame | list[dict[str, Any]], *, analyst: str = '', max_units: float = 2.0, include_watch: bool = False) -> pd.DataFrame:
-    candidates = prepare_lock_candidates(frame, include_watch=include_watch)
+def lock_rows(
+    frame: pd.DataFrame | list[dict[str, Any]],
+    *,
+    analyst: str = '',
+    max_units: float = 2.0,
+    include_watch: bool = False,
+    strict: bool = False,
+    require_future: bool = False,
+) -> pd.DataFrame:
+    candidates = prepare_lock_candidates(frame, include_watch=include_watch, strict=strict, require_future=require_future)
     if candidates.empty:
         return pd.DataFrame()
     locked_time = now_utc()
@@ -204,17 +206,20 @@ def lock_rows(frame: pd.DataFrame | list[dict[str, Any]], *, analyst: str = '', 
     rows = []
     for row in candidates.to_dict(orient='records'):
         item = dict(row)
+        if strict:
+            blockers = lock_blockers(item, require_future=require_future, locked_at=locked_dt)
+            if blockers:
+                continue
         item['locked_at_utc'] = locked_time
         item['analyst'] = analyst or 'private_analyst'
         item['stake_units'] = recommended_stake_units(item, max_units=max_units)
         item['implied_probability'] = decimal_to_implied(item.get('decimal_price'))
         item['model_edge'] = model_edge(item)
-        try:
-            price = float(item.get('decimal_price'))
-        except (TypeError, ValueError):
-            price = None
+        price = _safe_float(item.get('decimal_price'))
         item['kelly_fraction'] = kelly_fraction(probability_value(item, 'model_probability'), price)
         item['proof_status'] = lock_status(item, locked_at=locked_dt)
+        item['lock_blockers'] = ''
+        item['official_lock_ready'] = True
         item['public_confidence'] = public_confidence(item)
         item['public_reason'] = public_reason(item)
         item['result_status'] = result_status(item)
@@ -260,19 +265,10 @@ def summarize_locked_picks(frame: pd.DataFrame | list[dict[str, Any]]) -> dict[s
     enriched = update_profit_columns(frame)
     if enriched.empty:
         return {
-            'locked_picks': 0,
-            'resolved_picks': 0,
-            'wins': 0,
-            'losses': 0,
-            'pushes': 0,
-            'hit_rate': None,
-            'total_staked_units': 0.0,
-            'profit_units': 0.0,
-            'roi': None,
-            'avg_decimal_price': None,
-            'avg_model_probability': None,
-            'avg_edge': None,
-            'valid_before_start': 0,
+            'locked_picks': 0, 'resolved_picks': 0, 'wins': 0, 'losses': 0,
+            'pushes': 0, 'hit_rate': None, 'total_staked_units': 0.0,
+            'profit_units': 0.0, 'roi': None, 'avg_decimal_price': None,
+            'avg_model_probability': None, 'avg_edge': None, 'valid_before_start': 0,
         }
     status = enriched['result_status'].astype(str).str.lower() if 'result_status' in enriched else pd.Series(dtype=str)
     resolved_mask = status.isin(['win', 'loss'])
@@ -342,6 +338,9 @@ def public_reason(row: Mapping[str, Any]) -> str:
     decision = safe_text(row.get('agent_decision') or row.get('decision'))
     if decision:
         parts.append(decision.replace('_', ' '))
+    blockers = safe_text(row.get('lock_blockers'))
+    if blockers:
+        parts.append(f'blocked: {blockers}')
     return '; '.join(parts) or 'qualified by model review'
 
 
