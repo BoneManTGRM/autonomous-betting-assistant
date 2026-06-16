@@ -14,21 +14,25 @@ TEXT = {
         'title': 'Simulation Lab',
         'caption': 'Monte Carlo stress test for hit rate, ROI, drawdown, and profit risk. This does not prove the model; it tests whether a strategy survives reasonable probability error.',
         'source': 'Prediction source', 'session': 'Use latest session rows', 'upload': 'Upload prediction CSV', 'upload_label': 'Upload CSV',
-        'run': 'Run simulations', 'no_rows': 'No rows available. Run Pro Predictor/Ultra 80 first or upload a CSV.',
+        'run': 'Run simulations + optimizer', 'no_rows': 'No rows available. Run Pro Predictor/Ultra 80 first or upload a CSV.',
         'settings': 'Simulation settings', 'iterations': 'Iterations', 'stake': 'Flat stake units', 'max_rows': 'Max rows per strategy',
-        'summary': 'Simulation summary', 'details': 'Selected rows', 'download': 'Download simulation report',
+        'summary': 'Simulation summary', 'details': 'Selected rows', 'optimizer': 'Simulation optimizer', 'survivor': 'Simulation survivor handoff', 'download': 'Download simulation report',
         'note': 'Best use: compare strategies under model, blended-market, memory-penalty, and overconfidence scenarios. A strategy that only works when the model is perfectly calibrated is not robust enough.',
+        'saved': 'Simulation survivor rows saved for Odds Lock Pro handoff.',
     },
     'es': {
         'title': 'Laboratorio de Simulación',
         'caption': 'Prueba Monte Carlo para acierto, ROI, drawdown y riesgo de pérdida. No prueba el modelo; prueba si la estrategia sobrevive errores razonables de probabilidad.',
         'source': 'Fuente de predicciones', 'session': 'Usar últimas filas de la sesión', 'upload': 'Subir CSV de predicciones', 'upload_label': 'Subir CSV',
-        'run': 'Ejecutar simulaciones', 'no_rows': 'No hay filas. Ejecuta Predictor Pro/Ultra 80 primero o sube un CSV.',
+        'run': 'Ejecutar simulaciones + optimizador', 'no_rows': 'No hay filas. Ejecuta Predictor Pro/Ultra 80 primero o sube un CSV.',
         'settings': 'Configuración de simulación', 'iterations': 'Iteraciones', 'stake': 'Unidades fijas por pick', 'max_rows': 'Máx filas por estrategia',
-        'summary': 'Resumen de simulación', 'details': 'Filas seleccionadas', 'download': 'Descargar reporte de simulación',
+        'summary': 'Resumen de simulación', 'details': 'Filas seleccionadas', 'optimizer': 'Optimizador de simulación', 'survivor': 'Traspaso sobreviviente de simulación', 'download': 'Descargar reporte de simulación',
         'note': 'Uso ideal: comparar estrategias con escenarios de modelo, mezcla de mercado, penalización de memoria y sobreconfianza. Una estrategia que solo funciona cuando el modelo está perfectamente calibrado no es suficientemente robusta.',
+        'saved': 'Filas sobrevivientes de simulación guardadas para traspaso a Odds Lock Pro.',
     },
 }
+
+SCENARIOS = ['model', 'market_blend', 'memory_penalty', 'overconfident_5pct', 'overconfident_10pct', 'conservative_blend']
 
 
 def t(key: str) -> str:
@@ -36,7 +40,7 @@ def t(key: str) -> str:
 
 
 def session_frame() -> pd.DataFrame:
-    for key in ('ultra80_profit_mode_rows', 'ultra80_max_volume_rows', 'pro_predictor_latest_rows', 'ara_latest_predictions', 'pro_predictor_all_rows'):
+    for key in ('simulation_survivor_rows', 'ultra80_profit_mode_rows', 'ultra80_max_volume_rows', 'pro_predictor_latest_rows', 'ara_latest_predictions', 'pro_predictor_all_rows'):
         rows = st.session_state.get(key)
         if isinstance(rows, list) and rows:
             return pd.DataFrame(rows)
@@ -65,7 +69,8 @@ def num_series(frame: pd.DataFrame, aliases: list[str], *, probability: bool = F
         return pd.Series(float('nan'), index=frame.index, dtype=float)
     raw = frame[col].astype(str).str.strip()
     values = pd.to_numeric(raw.str.replace('%', '', regex=False).str.replace(',', '', regex=False), errors='coerce')
-    values.loc[raw.str.contains('%', regex=False, na=False)] = values.loc[raw.str.contains('%', regex=False, na=False)] / 100.0
+    percent_mask = raw.str.contains('%', regex=False, na=False)
+    values.loc[percent_mask] = values.loc[percent_mask] / 100.0
     if probability:
         values = values.where(values <= 1.0, values / 100.0)
     elif percent_like and any(token in str(col).lower() for token in ['percent', 'pct']):
@@ -135,9 +140,19 @@ def scenario_probabilities(data: pd.DataFrame, scenario: str) -> np.ndarray:
         true = p - 0.05
     elif scenario == 'overconfident_10pct':
         true = p - 0.10
+    elif scenario == 'conservative_blend':
+        true = 0.5 * p + 0.5 * market + np.minimum(memory, 0.0) - 0.02
     else:
         true = p
     return np.clip(true, 0.01, 0.99)
+
+
+def expected_roi(data: pd.DataFrame, scenario: str) -> float | None:
+    if data.empty:
+        return None
+    probs = scenario_probabilities(data, scenario)
+    odds = data['decimal_price'].to_numpy(float)
+    return float(np.mean(probs * odds - 1.0))
 
 
 def max_drawdown(profit_paths: np.ndarray) -> np.ndarray:
@@ -177,6 +192,62 @@ def simulate(data: pd.DataFrame, scenario: str, iterations: int, stake: float, s
     }
 
 
+def optimizer_mask(frame: pd.DataFrame, params: dict[str, Any]) -> pd.Series:
+    return (
+        frame['model_probability'].between(params['min_probability'], params['max_probability'], inclusive='both')
+        & frame['ev'].ge(params['min_ev']).fillna(False)
+        & frame['robust_ev'].ge(params['min_robust_ev']).fillna(False)
+        & frame['edge'].ge(params['min_edge']).fillna(False)
+        & frame['books'].ge(params['min_books']).fillna(False)
+        & frame['api_coverage'].ge(params['min_api_coverage']).fillna(False)
+        & frame['decimal_price'].between(params['min_odds'], params['max_odds'], inclusive='both')
+        & frame['memory_signal'].ge(params['min_memory_signal']).fillna(False)
+        & frame['robust_profit80'].gt(0).fillna(False)
+        & frame['price_risk'].le(params['max_price_risk']).fillna(True)
+    )
+
+
+def simulation_optimizer(frame: pd.DataFrame, *, min_rows: int = 5) -> tuple[pd.DataFrame, pd.DataFrame]:
+    rows: list[dict[str, Any]] = []
+    p_grid = [0.62, 0.65, 0.67, 0.69, 0.70, 0.72, 0.74, 0.76, 0.78, 0.80]
+    ev_grid = [0.0, 0.005, 0.01, 0.02, 0.03, 0.04, 0.05]
+    edge_grid = [-0.005, 0.0, 0.01, 0.02, 0.03, 0.04]
+    books_grid = [0, 4, 10, 20, 50, 60]
+    odds_grid = [(1.20, 2.20), (1.25, 2.20), (1.27, 1.75), (1.30, 2.00), (1.35, 2.20), (1.40, 2.50)]
+    for pmin in p_grid:
+        for pmax in [1.00, 0.82, 0.78]:
+            if pmin > pmax:
+                continue
+            for evmin in ev_grid:
+                for edgemin in edge_grid:
+                    for booksmin in books_grid:
+                        for oddsmin, oddsmax in odds_grid:
+                            params = {
+                                'min_probability': pmin, 'max_probability': pmax, 'min_ev': evmin,
+                                'min_robust_ev': max(-0.005, evmin - 0.015), 'min_edge': edgemin,
+                                'min_books': booksmin, 'min_api_coverage': 0.50, 'min_odds': oddsmin,
+                                'max_odds': oddsmax, 'min_memory_signal': -0.02, 'max_price_risk': 0.35,
+                            }
+                            selected = frame[optimizer_mask(frame, params)]
+                            if len(selected) < int(min_rows):
+                                continue
+                            rois = {scenario: expected_roi(selected, scenario) for scenario in SCENARIOS}
+                            worst_roi = min(value for value in rois.values() if value is not None)
+                            score = (rois['conservative_blend'] or -1) * 90 + (rois['market_blend'] or -1) * 35 + (rois['overconfident_5pct'] or -1) * 20 + min(len(selected), 50) / 20
+                            if (rois['overconfident_5pct'] or -1) < 0:
+                                score -= 10
+                            if (rois['conservative_blend'] or -1) < -0.03:
+                                score -= 10
+                            rows.append({**params, 'rows': int(len(selected)), 'score': round(float(score), 6), 'worst_roi': round(float(worst_roi), 6), **{f'expected_roi_{k}': round(float(v), 6) for k, v in rois.items() if v is not None}})
+    if not rows:
+        return pd.DataFrame(), pd.DataFrame()
+    table = pd.DataFrame(rows).sort_values(['score', 'expected_roi_conservative_blend', 'expected_roi_market_blend', 'rows'], ascending=False).head(50).reset_index(drop=True)
+    best = table.iloc[0].to_dict()
+    survivor = frame[optimizer_mask(frame, best)].sort_values(['robust_ev', 'ev', 'model_probability', 'edge'], ascending=False).reset_index(drop=True)
+    survivor.insert(0, 'strategy', 'Simulation optimized')
+    return table, survivor
+
+
 def load_input() -> pd.DataFrame:
     choice = st.radio(t('source'), [t('session'), t('upload')], horizontal=True)
     if choice == t('upload'):
@@ -209,8 +280,9 @@ if st.button(t('run'), type='primary', use_container_width=True):
     if frame.empty:
         st.warning(t('no_rows'))
         st.stop()
+    optimizer_table, survivor = simulation_optimizer(frame)
     masks = strategy_masks(frame)
-    scenarios = ['model', 'market_blend', 'memory_penalty', 'overconfident_5pct', 'overconfident_10pct']
+    scenarios = SCENARIOS
     rows: list[dict[str, Any]] = []
     selected_frames: list[pd.DataFrame] = []
     for strategy, mask in masks.items():
@@ -224,13 +296,28 @@ if st.button(t('run'), type='primary', use_container_width=True):
         selected_frames.append(temp)
         for scenario in scenarios:
             rows.append({'strategy': strategy, **simulate(selected, scenario, int(iterations), float(stake), seed=20260616 + len(rows))})
+    if not survivor.empty:
+        st.session_state['simulation_survivor_rows'] = survivor.drop(columns=['strategy'], errors='ignore').to_dict('records')
+        st.session_state['ara_latest_predictions'] = survivor.drop(columns=['strategy'], errors='ignore').to_dict('records')
+        st.session_state['ara_latest_predictions_source'] = 'Simulation Lab survivor'
+        selected_frames.append(survivor)
+        for scenario in scenarios:
+            rows.append({'strategy': 'Simulation optimized', **simulate(survivor, scenario, int(iterations), float(stake), seed=20260616 + len(rows))})
+        st.success(t('saved'))
     summary = pd.DataFrame(rows)
     st.subheader(t('summary'))
     st.dataframe(summary, use_container_width=True, hide_index=True)
+    st.subheader(t('optimizer'))
+    st.dataframe(optimizer_table, use_container_width=True, hide_index=True)
     selected_all = pd.concat(selected_frames, ignore_index=True, sort=False) if selected_frames else pd.DataFrame()
     st.subheader(t('details'))
     if not selected_all.empty:
         cols = [col for col in ['strategy', 'event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'edge', 'ev', 'robust_ev', 'robust_profit80', 'books', 'api_coverage', 'memory_signal'] if col in selected_all.columns]
         st.dataframe(selected_all[cols], use_container_width=True, hide_index=True)
-    report = summary.copy()
+    report_parts = [summary]
+    if not optimizer_table.empty:
+        opt = optimizer_table.copy()
+        opt.insert(0, 'strategy', 'Simulation optimizer thresholds')
+        report_parts.append(opt)
+    report = pd.concat(report_parts, ignore_index=True, sort=False)
     st.download_button(t('download'), report.to_csv(index=False), file_name='simulation_lab_report.csv', mime='text/csv')
