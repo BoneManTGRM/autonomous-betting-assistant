@@ -11,17 +11,17 @@ from .row_normalizer import normalize_frame, probability_value, result_status, s
 
 PUBLIC_COLUMNS = [
     'proof_id', 'locked_at_utc', 'event_start_utc', 'event', 'sport', 'market_type',
-    'prediction', 'decimal_price', 'bookmaker', 'stake_units', 'public_confidence',
+    'prediction', 'decimal_price', 'bookmaker', 'odds_source', 'stake_units', 'public_confidence',
     'public_reason', 'result_status', 'profit_units',
 ]
 PRIVATE_COLUMNS = [
     'proof_id', 'locked_at_utc', 'event_start_utc', 'event', 'sport', 'sport_key',
     'market_type', 'prediction', 'model_probability', 'decimal_price', 'implied_probability',
-    'model_edge', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score',
+    'model_edge', 'bookmaker', 'odds_source', 'agent_decision', 'agent_score', 'scanner_strength_score',
     'stake_units', 'kelly_fraction', 'proof_hash', 'proof_status', 'result_status',
     'profit_units',
 ]
-REQUIRED_OFFICIAL_LOCK_FIELDS = ['event', 'prediction', 'model_probability', 'decimal_price', 'bookmaker']
+REQUIRED_OFFICIAL_LOCK_FIELDS = ['event', 'prediction', 'model_probability', 'decimal_price']
 
 
 def now_utc() -> str:
@@ -51,6 +51,10 @@ def decimal_to_implied(decimal_price: Any) -> float | None:
     if price <= 1.0:
         return None
     return round(1.0 / price, 6)
+
+
+def bookmaker_or_source(row: Mapping[str, Any]) -> str:
+    return safe_text(row.get('bookmaker')) or safe_text(row.get('odds_source')) or safe_text(row.get('source'))
 
 
 def model_edge(row: Mapping[str, Any]) -> float | None:
@@ -104,12 +108,21 @@ def recommended_stake_units(row: Mapping[str, Any], *, max_units: float = 2.0, r
 
 
 def proof_payload(row: Mapping[str, Any]) -> dict[str, Any]:
-    fields = [
-        'locked_at_utc', 'event_start_utc', 'event', 'sport', 'market_type',
-        'prediction', 'model_probability', 'decimal_price', 'bookmaker',
-        'agent_decision', 'stake_units',
-    ]
-    return {field: safe_text(row.get(field)) for field in fields}
+    payload = {
+        'locked_at_utc': safe_text(row.get('locked_at_utc')),
+        'event_start_utc': safe_text(row.get('event_start_utc')),
+        'event': safe_text(row.get('event')),
+        'sport': safe_text(row.get('sport')),
+        'market_type': safe_text(row.get('market_type')),
+        'prediction': safe_text(row.get('prediction')),
+        'model_probability': safe_text(row.get('model_probability')),
+        'decimal_price': safe_text(row.get('decimal_price')),
+        'bookmaker': bookmaker_or_source(row),
+        'odds_source': safe_text(row.get('odds_source')),
+        'agent_decision': safe_text(row.get('agent_decision') or row.get('decision')),
+        'stake_units': safe_text(row.get('stake_units')),
+    }
+    return payload
 
 
 def proof_hash(row: Mapping[str, Any]) -> str:
@@ -139,6 +152,8 @@ def lock_blockers(row: Mapping[str, Any], *, require_future: bool = False, locke
     for field in REQUIRED_OFFICIAL_LOCK_FIELDS:
         if not safe_text(row.get(field)):
             blockers.append(f'missing_{field}')
+    if not bookmaker_or_source(row):
+        blockers.append('missing_bookmaker_or_odds_source')
     if probability_value(row, 'model_probability') is None:
         blockers.append('invalid_model_probability')
     if decimal_to_implied(row.get('decimal_price')) is None:
@@ -152,9 +167,13 @@ def lock_blockers(row: Mapping[str, Any], *, require_future: bool = False, locke
 def _decision_candidate(row: Mapping[str, Any], *, include_watch: bool) -> bool:
     decision = safe_text(row.get('agent_decision') or row.get('decision')).lower()
     lock_ready = safe_text(row.get('lock_ready')).lower() in {'true', '1', 'yes', 'y'}
+    if lock_ready or decision in {'play_strong', 'play_small'}:
+        return True
     if include_watch:
-        return lock_ready or decision in {'play_strong', 'play_small', 'watch_only', 'watch'}
-    return lock_ready or decision in {'play_strong', 'play_small'}
+        if decision in {'watch_only', 'watch'}:
+            return True
+        return bool(safe_text(row.get('event')) and safe_text(row.get('prediction')))
+    return False
 
 
 def prepare_lock_candidates(
@@ -174,6 +193,10 @@ def prepare_lock_candidates(
         if not _decision_candidate(row, include_watch=include_watch):
             continue
         item = dict(row)
+        if not safe_text(item.get('agent_decision') or item.get('decision')) and include_watch:
+            item['agent_decision'] = 'watch_only'
+        if not safe_text(item.get('bookmaker')) and bookmaker_or_source(item):
+            item['bookmaker'] = bookmaker_or_source(item)
         item['implied_probability'] = decimal_to_implied(item.get('decimal_price'))
         item['model_edge'] = model_edge(item)
         item['stake_units'] = recommended_stake_units(item)
@@ -206,6 +229,8 @@ def lock_rows(
     rows = []
     for row in candidates.to_dict(orient='records'):
         item = dict(row)
+        if not safe_text(item.get('bookmaker')) and bookmaker_or_source(item):
+            item['bookmaker'] = bookmaker_or_source(item)
         if strict:
             blockers = lock_blockers(item, require_future=require_future, locked_at=locked_dt)
             if blockers:
@@ -253,6 +278,8 @@ def update_profit_columns(frame: pd.DataFrame | list[dict[str, Any]]) -> pd.Data
     rows = []
     for row in normalized.to_dict(orient='records'):
         item = dict(row)
+        if not safe_text(item.get('bookmaker')) and bookmaker_or_source(item):
+            item['bookmaker'] = bookmaker_or_source(item)
         item['result_status'] = result_status(item)
         item['profit_units'] = profit_units(item)
         item['implied_probability'] = decimal_to_implied(item.get('decimal_price'))
@@ -332,9 +359,9 @@ def public_reason(row: Mapping[str, Any]) -> str:
     edge = model_edge(row)
     if edge is not None:
         parts.append(f'model edge {edge * 100:.1f}%')
-    book = safe_text(row.get('bookmaker'))
+    book = bookmaker_or_source(row)
     if book:
-        parts.append(f'best price at {book}')
+        parts.append(f'price/source: {book}')
     decision = safe_text(row.get('agent_decision') or row.get('decision'))
     if decision:
         parts.append(decision.replace('_', ' '))
@@ -391,20 +418,4 @@ def daily_report(frame: pd.DataFrame | list[dict[str, Any]], *, language: str = 
             proof = safe_text(row.get('proof_id'))
             if proof:
                 lines.append(f"  Proof ID: {proof}")
-    lines.append('')
-    lines.append('Research only. No guaranteed outcomes.') if not spanish else lines.append('Solo investigación. No hay resultados garantizados.')
     return '\n'.join(lines)
-
-
-def exposure_summary(frame: pd.DataFrame | list[dict[str, Any]], *, daily_limit_units: float = 5.0, sport_limit_units: float = 3.0) -> pd.DataFrame:
-    raw = update_profit_columns(frame)
-    if raw.empty:
-        return pd.DataFrame([{'scope': 'all', 'stake_units': 0.0, 'limit_units': daily_limit_units, 'status': 'empty'}])
-    stake = pd.to_numeric(raw.get('stake_units', pd.Series(dtype=float)), errors='coerce').fillna(0.0)
-    rows = [{'scope': 'all', 'stake_units': round(float(stake.sum()), 4), 'limit_units': daily_limit_units, 'status': 'over_limit' if float(stake.sum()) > daily_limit_units else 'ok'}]
-    if 'sport' in raw.columns:
-        for sport, group in raw.groupby('sport', dropna=False):
-            group_stake = pd.to_numeric(group.get('stake_units', pd.Series(dtype=float)), errors='coerce').fillna(0.0)
-            total = float(group_stake.sum())
-            rows.append({'scope': f'sport:{sport}', 'stake_units': round(total, 4), 'limit_units': sport_limit_units, 'status': 'over_limit' if total > sport_limit_units else 'ok'})
-    return pd.DataFrame(rows)
