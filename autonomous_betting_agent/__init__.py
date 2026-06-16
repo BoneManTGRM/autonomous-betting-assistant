@@ -21,7 +21,7 @@ APP_TAGLINE = 'Powered by Reparodynamics'
 
 
 def _install_streamlit_helpers() -> None:
-    """Install global Spanish/English navigation, explainers, and light table translation."""
+    """Install global Spanish/English navigation, explainers, CSV downloads, and light table translation."""
     try:
         import inspect
         import io
@@ -31,9 +31,9 @@ def _install_streamlit_helpers() -> None:
     except Exception:
         return
 
-    if getattr(st, '_aba_streamlit_helpers_v10_installed', False):
+    if getattr(st, '_aba_streamlit_helpers_v11_installed', False):
         return
-    st._aba_streamlit_helpers_v10_installed = True
+    st._aba_streamlit_helpers_v11_installed = True
 
     page_language_keys = [
         'global_language', 'app_language', 'language_settings_language', 'start_here_language',
@@ -191,14 +191,40 @@ def _install_streamlit_helpers() -> None:
         except Exception:
             return data
 
-    def called_from_pro_predictor() -> bool:
+    def called_from_page(page_name: str) -> bool:
         try:
-            return any(str(frame.filename).replace('\\', '/').endswith('pages/pro_predictor.py') for frame in inspect.stack())
+            return any(str(frame.filename).replace('\\', '/').endswith(f'pages/{page_name}') for frame in inspect.stack())
         except Exception:
             return False
 
+    def called_from_pro_predictor() -> bool:
+        return called_from_page('pro_predictor.py')
+
     def label_key(label: Any) -> str:
         return ' '.join(str(label or '').lower().replace('-', ' ').replace('_', ' ').split())
+
+    def looks_like_predictor_table(data: Any) -> bool:
+        if not isinstance(data, pd.DataFrame) or data.empty:
+            return False
+        keys = {str(col).strip().lower().replace(' ', '_') for col in data.columns}
+        return 'event' in keys and 'prediction' in keys and bool({'model_probability_clean', 'model_probability', 'market_probability'} & keys)
+
+    def simple_signature(data: pd.DataFrame) -> str:
+        columns = ','.join(str(col) for col in data.columns[:18])
+        raw = f'{len(data)}:{columns}'
+        return str(sum(ord(char) for char in raw) % 1000000)
+
+    def render_pro_predictor_download(data: Any) -> None:
+        if not called_from_pro_predictor() or not looks_like_predictor_table(data):
+            return
+        signature = simple_signature(data)
+        rendered = st.session_state.setdefault('_aba_pro_predictor_visible_csv_buttons', set())
+        if signature in rendered:
+            return
+        rendered.add(signature)
+        label = 'Download this Pro Predictor CSV' if language_value() == 'English' else 'Descargar este CSV de Predictor Pro'
+        filename = f'pro_predictor_export_{len(data)}_rows.csv'
+        st.download_button(label, data.to_csv(index=False), file_name=filename, mime='text/csv', key=f'pro_predictor_visible_csv_{signature}')
 
     def render_nav(lang: str) -> None:
         with st.sidebar:
@@ -280,9 +306,11 @@ def _install_streamlit_helpers() -> None:
         return number_input_with_pro_caps(label, args, kwargs, real_dg_number_input, target=self)
 
     def patched_st_dataframe(data: Any = None, *args: Any, **kwargs: Any) -> Any:
+        render_pro_predictor_download(data)
         return real_st_dataframe(translate_frame(data), *args, **kwargs)
 
     def patched_dg_dataframe(self: Any, data: Any = None, *args: Any, **kwargs: Any) -> Any:
+        render_pro_predictor_download(data)
         return real_dg_dataframe(self, translate_frame(data), *args, **kwargs)
 
     def patched_st_table(data: Any = None, *args: Any, **kwargs: Any) -> Any:
