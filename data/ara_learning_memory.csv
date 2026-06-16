@@ -1,19 +1,13 @@
 area,area_type,group_value,records,avg_predicted,actual_hit_rate,actual_minus_predicted,smoothed_hit_rate,smoothed_edge,reliability,brier,memory_type,importance,action
-Sport: FIFA World Cup,sport,FIFA World Cup,5,0.676,0.0,-0.676,0.416,-0.26,0.296209,0.45712,sport,0.138231,lower_trust
-FIFA World Cup / 60-70%,sport_probability_bucket,FIFA World Cup|60-70%,4,0.67,0.0,-0.67,0.446667,-0.223333,0.266068,0.4489,sport_probability_bucket,0.103607,lower_trust
-Sport: ATP Queen's Club Championships,sport,ATP Queen's Club Championships,6,0.685,1.0,0.315,0.82,0.135,0.584674,0.09945,sport,0.080176,raise_trust
+Sport: FIFA World Cup,sport,FIFA World Cup,3,0.67,0.0,-0.67,0.487273,-0.182727,0.229179,0.4489,sport,0.070869,lower_trust
+FIFA World Cup / 60-70%,sport_probability_bucket,FIFA World Cup|60-70%,3,0.67,0.0,-0.67,0.487273,-0.182727,0.229179,0.4489,sport_probability_bucket,0.070869,lower_trust
 FIFA World Cup / estimated_score,sport_market,FIFA World Cup|estimated_score,3,0.67,0.0,-0.67,0.487273,-0.182727,0.229179,0.4489,sport_market,0.070869,lower_trust
-Probability source: fallback_high_confidence,probability_source,fallback_high_confidence,26,0.681538,0.730769,0.049231,0.719186,0.037647,0.721798,0.197785,probability_source,0.058907,raise_trust
-Sport: NCAA Baseball,sport,NCAA Baseball,4,0.6775,1.0,0.3225,0.785,0.1075,0.524915,0.104175,sport,0.049871,raise_trust
-Sport: ATP Halle Open,sport,ATP Halle Open,4,0.685,1.0,0.315,0.79,0.105,0.52905,0.09945,sport,0.048711,raise_trust
-Probability bucket: 70-80%,probability_bucket,70-80%,10,0.7,0.8,0.1,0.755556,0.055556,0.597664,0.17,probability_bucket,0.045175,raise_trust
-NCAA Baseball / 60-70%,sport_probability_bucket,NCAA Baseball|60-70%,3,0.67,1.0,0.33,0.76,0.09,0.483891,0.1089,sport_probability_bucket,0.034906,raise_trust
+Sport: ATP Queen's Club Championships,sport,ATP Queen's Club Championships,3,0.67,1.0,0.33,0.76,0.09,0.483891,0.1089,sport,0.034906,raise_trust
 ATP Queen's Club Championships / 60-70%,sport_probability_bucket,ATP Queen's Club Championships|60-70%,3,0.67,1.0,0.33,0.76,0.09,0.483891,0.1089,sport_probability_bucket,0.034906,raise_trust
 ATP Queen's Club Championships / estimated_score,sport_market,ATP Queen's Club Championships|estimated_score,3,0.67,1.0,0.33,0.76,0.09,0.483891,0.1089,sport_market,0.034906,raise_trust
-ATP Queen's Club Championships / 70-80%,sport_probability_bucket,ATP Queen's Club Championships|70-80%,3,0.7,1.0,0.3,0.781818,0.081818,0.500429,0.09,sport_probability_bucket,0.031732,raise_trust
+Probability bucket: 60-70%,probability_bucket,60-70%,14,0.67,0.714286,0.044286,0.698182,0.028182,0.617401,0.206043,probability_bucket,0.028468,watch
+Probability source: fallback_high_confidence,probability_source,fallback_high_confidence,14,0.67,0.714286,0.044286,0.698182,0.028182,0.617401,0.206043,probability_source,0.028468,watch
 Market: estimated_score,market_type,estimated_score,14,0.67,0.714286,0.044286,0.698182,0.028182,0.617401,0.206043,market_type,0.028468,watch
-Probability bucket: 60-70%,probability_bucket,60-70%,16,0.67,0.6875,0.0175,0.681667,0.011667,0.630124,0.21515,probability_bucket,0.01289,watch
-Sport: WTA German Open,sport,WTA German Open,6,0.685,0.666667,-0.018333,0.677143,-0.007857,0.476758,0.222783,sport,0.004666,watch
-WTA German Open / 70-80%,sport_probability_bucket,WTA German Open|70-80%,3,0.7,0.666667,-0.033333,0.690909,-0.009091,0.383762,0.223333,sport_probability_bucket,0.003526,watch
+Sport: WTA German Open,sport,WTA German Open,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport,0.000353,watch
 WTA German Open / 60-70%,sport_probability_bucket,WTA German Open|60-70%,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport_probability_bucket,0.000353,watch
 WTA German Open / estimated_score,sport_market,WTA German Open|estimated_score,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport_market,0.000353,watch
