@@ -19,7 +19,6 @@ from autonomous_betting_agent.odds_lock_tools import (
     performance_by_group,
     prepare_lock_candidates,
     summarize_locked_picks,
-    update_profit_columns,
 )
 from autonomous_betting_agent.row_normalizer import normalize_frame
 
@@ -28,9 +27,85 @@ LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español']
 
 TEXT = {
     'en': {
-        'title': 'Odds Lock Pro','caption': 'Timestamped proof ledger, performance dashboard, reports, bankroll controls, and client-ready views.','info': 'Use this after What Are the Odds. Lock only future picks with usable probability, price, bookmaker, event start, and decision fields.','use_session': 'Use latest rows from session','upload': 'Upload prediction or locked-ledger CSV','source': 'Input source','analyst': 'Analyst / brand name','max_units': 'Max stake units per pick','daily_limit': 'Daily exposure limit','sport_limit': 'Per-sport exposure limit','include_watch': 'Include watch-only rows','lock': 'Create locked proof ledger','save_persistent': 'Save locked rows to persistent proof ledger','saved_persistent': 'Saved to persistent proof ledger','candidates': 'Lock candidates','locked': 'Locked proof ledger','dashboard': 'Proof dashboard','reports': 'Report generator','bankroll': 'Bankroll / exposure','client': 'Client view','rows': 'Rows','resolved': 'Resolved','record': 'Record','hit_rate': 'Hit rate','units': 'Units','roi': 'ROI','valid': 'Valid pre-start locks','proof_quality': 'Proof quality','download_locked': 'Download locked proof CSV','download_client': 'Download client-view CSV','download_private': 'Download private audit CSV','no_rows': 'No rows found. Run What Are the Odds first or upload a CSV.','no_locked': 'No locked proof rows yet. Create a locked proof ledger or upload a ledger with proof_id and locked_at_utc.','no_candidates': 'No lock candidates found. Use play_strong/play_small or lock_ready rows.','public_only': 'Public/client-safe view','report_language': 'Report language','report': 'Copy/paste report','handoff': 'Four-tool handoff health'},
+        'title': 'Odds Lock Pro',
+        'caption': 'Timestamped proof ledger, performance dashboard, reports, bankroll controls, and client-ready views.',
+        'info': 'Official locks require a future event start, usable model probability, decimal price, bookmaker, event, and prediction. Already-started rows are blocked from official locking.',
+        'use_session': 'Use latest rows from session',
+        'upload': 'Upload prediction or locked-ledger CSV',
+        'source': 'Input source',
+        'analyst': 'Analyst / brand name',
+        'max_units': 'Max stake units per pick',
+        'daily_limit': 'Daily exposure limit',
+        'sport_limit': 'Per-sport exposure limit',
+        'include_watch': 'Include watch-only rows',
+        'lock': 'Create official future-only proof ledger',
+        'save_persistent': 'Save locked rows to persistent proof ledger',
+        'saved_persistent': 'Saved to persistent proof ledger',
+        'candidates': 'Official lock candidates',
+        'locked': 'Locked proof ledger',
+        'dashboard': 'Proof dashboard',
+        'reports': 'Report generator',
+        'bankroll': 'Bankroll / exposure',
+        'client': 'Client view',
+        'rows': 'Rows',
+        'resolved': 'Resolved',
+        'record': 'Record',
+        'hit_rate': 'Hit rate',
+        'units': 'Units',
+        'roi': 'ROI',
+        'valid': 'Valid pre-start locks',
+        'proof_quality': 'Proof quality',
+        'download_locked': 'Download locked proof CSV',
+        'download_client': 'Download client-view CSV',
+        'download_private': 'Download private audit CSV',
+        'no_rows': 'No rows found. Run What Are the Odds first or upload a CSV.',
+        'no_locked': 'No locked proof rows yet. Create a locked proof ledger or upload a ledger with proof_id and locked_at_utc.',
+        'no_candidates': 'No official lock candidates found. Rows must be future events with event, prediction, probability, decimal price, and bookmaker.',
+        'public_only': 'Public/client-safe view',
+        'report_language': 'Report language',
+        'report': 'Copy/paste report',
+        'handoff': 'Four-tool handoff health',
+    },
     'es': {
-        'title': 'Odds Lock Pro','caption': 'Ledger con prueba por timestamp, dashboard de rendimiento, reportes, control de unidades y vista para clientes.','info': 'Úsalo después de What Are the Odds. Bloquea solo picks futuros con probabilidad, cuota, casa, inicio del evento y decisión utilizables.','use_session': 'Usar últimas filas de la sesión','upload': 'Subir CSV de predicciones o ledger bloqueado','source': 'Fuente de entrada','analyst': 'Analista / marca','max_units': 'Máximo de unidades por pick','daily_limit': 'Límite diario de exposición','sport_limit': 'Límite de exposición por deporte','include_watch': 'Incluir filas solo vigilar','lock': 'Crear ledger de prueba bloqueada','save_persistent': 'Guardar filas bloqueadas en ledger persistente','saved_persistent': 'Guardado en ledger persistente','candidates': 'Candidatos para bloquear','locked': 'Ledger bloqueado','dashboard': 'Dashboard de prueba','reports': 'Generador de reportes','bankroll': 'Bankroll / exposición','client': 'Vista para clientes','rows': 'Filas','resolved': 'Resueltos','record': 'Récord','hit_rate': 'Tasa de acierto','units': 'Unidades','roi': 'ROI','valid': 'Bloqueos válidos antes del inicio','proof_quality': 'Calidad prueba','download_locked': 'Descargar CSV de prueba bloqueada','download_client': 'Descargar CSV para clientes','download_private': 'Descargar CSV privado de auditoría','no_rows': 'No se encontraron filas. Ejecuta What Are the Odds primero o sube un CSV.','no_locked': 'Aún no hay filas bloqueadas con prueba. Crea un ledger bloqueado o sube uno con proof_id y locked_at_utc.','no_candidates': 'No se encontraron candidatos. Usa filas play_strong/play_small o lock_ready.','public_only': 'Vista segura para público/clientes','report_language': 'Idioma del reporte','report': 'Reporte para copiar/pegar','handoff': 'Salud del traspaso entre herramientas'},
+        'title': 'Odds Lock Pro',
+        'caption': 'Ledger con prueba por timestamp, dashboard de rendimiento, reportes, control de unidades y vista para clientes.',
+        'info': 'Los bloqueos oficiales requieren evento futuro, probabilidad utilizable, cuota decimal, casa, evento y pronóstico. Las filas ya iniciadas se bloquean para prueba oficial.',
+        'use_session': 'Usar últimas filas de la sesión',
+        'upload': 'Subir CSV de predicciones o ledger bloqueado',
+        'source': 'Fuente de entrada',
+        'analyst': 'Analista / marca',
+        'max_units': 'Máximo de unidades por pick',
+        'daily_limit': 'Límite diario de exposición',
+        'sport_limit': 'Límite de exposición por deporte',
+        'include_watch': 'Incluir filas solo vigilar',
+        'lock': 'Crear ledger oficial solo de eventos futuros',
+        'save_persistent': 'Guardar filas bloqueadas en ledger persistente',
+        'saved_persistent': 'Guardado en ledger persistente',
+        'candidates': 'Candidatos oficiales para bloquear',
+        'locked': 'Ledger bloqueado',
+        'dashboard': 'Dashboard de prueba',
+        'reports': 'Generador de reportes',
+        'bankroll': 'Bankroll / exposición',
+        'client': 'Vista para clientes',
+        'rows': 'Filas',
+        'resolved': 'Resueltos',
+        'record': 'Récord',
+        'hit_rate': 'Tasa de acierto',
+        'units': 'Unidades',
+        'roi': 'ROI',
+        'valid': 'Bloqueos válidos antes del inicio',
+        'proof_quality': 'Calidad prueba',
+        'download_locked': 'Descargar CSV de prueba bloqueada',
+        'download_client': 'Descargar CSV para clientes',
+        'download_private': 'Descargar CSV privado de auditoría',
+        'no_rows': 'No se encontraron filas. Ejecuta What Are the Odds primero o sube un CSV.',
+        'no_locked': 'Aún no hay filas bloqueadas con prueba. Crea un ledger bloqueado o sube uno con proof_id y locked_at_utc.',
+        'no_candidates': 'No hay candidatos oficiales para bloquear. Las filas deben ser eventos futuros con evento, pronóstico, probabilidad, cuota decimal y casa.',
+        'public_only': 'Vista segura para público/clientes',
+        'report_language': 'Idioma del reporte',
+        'report': 'Reporte para copiar/pegar',
+        'handoff': 'Salud del traspaso entre herramientas',
+    },
 }
 
 
@@ -101,18 +176,18 @@ max_units = st.number_input(t('max_units'), min_value=0.25, max_value=10.0, valu
 daily_limit = st.number_input(t('daily_limit'), min_value=0.25, max_value=100.0, value=5.0, step=0.25)
 sport_limit = st.number_input(t('sport_limit'), min_value=0.25, max_value=100.0, value=3.0, step=0.25)
 
-candidates = prepare_lock_candidates(normalized, include_watch=include_watch)
+candidates = prepare_lock_candidates(normalized, include_watch=include_watch, strict=True, require_future=True)
 existing_locked = filter_locked_proof_rows(pd.DataFrame(st.session_state.get('odds_lock_pro_locked_rows', [])))
 uploaded_locked = filter_locked_proof_rows(normalized) if has_proof_fields(normalized) else pd.DataFrame()
 
 if st.button(t('lock'), type='primary', use_container_width=True):
-    locked = lock_rows(normalized, analyst=analyst, max_units=float(max_units), include_watch=include_watch)
+    locked = lock_rows(normalized, analyst=analyst, max_units=float(max_units), include_watch=include_watch, strict=True, require_future=True)
     st.session_state['odds_lock_pro_locked_rows'] = locked.to_dict('records')
     st.session_state['ara_latest_predictions'] = locked.to_dict('records')
     st.session_state['ara_latest_predictions_source'] = 'Odds Lock Pro'
     existing_locked = filter_locked_proof_rows(locked)
 
-active_locked = existing_locked if not existing_locked.empty else uploaded_locked
+active_locked = merge_ledgers(existing_locked, uploaded_locked)
 summary = summarize_locked_picks(active_locked)
 audit = proof_audit_summary(active_locked)
 health_frame_source = active_locked if not active_locked.empty else candidates
@@ -136,7 +211,7 @@ with tabs[0]:
     if candidates.empty:
         st.warning(t('no_candidates'))
     else:
-        show_cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score', 'model_edge', 'stake_units', 'prelock_status', 'public_confidence', 'public_reason'] if col in candidates.columns]
+        show_cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score', 'model_edge', 'stake_units', 'prelock_status', 'official_lock_ready', 'public_confidence', 'public_reason'] if col in candidates.columns]
         st.dataframe(candidates[show_cols] if show_cols else candidates, use_container_width=True, hide_index=True)
 
 with tabs[1]:
