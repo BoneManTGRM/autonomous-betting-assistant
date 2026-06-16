@@ -10,14 +10,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
     name: Python tests and syntax checks
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
 
     steps:
       - name: Check out repository
@@ -32,11 +35,18 @@ jobs:
             requirements.txt
             requirements-dev.txt
 
+      - name: Show environment
+        run: |
+          python --version
+          python -m pip --version
+          pwd
+          find . -maxdepth 2 -type f | sort | sed 's#^./##' | head -200
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; else pip install pytest; fi
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then python -m pip install -r requirements-dev.txt; else python -m pip install pytest; fi
 
       - name: Compile Python files
         run: |
@@ -44,4 +54,4 @@ jobs:
 
       - name: Run unit tests
         run: |
-          python -m pytest tests -q
+          python -m pytest tests -q --maxfail=1
