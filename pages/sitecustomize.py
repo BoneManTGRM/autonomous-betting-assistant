@@ -1,15 +1,11 @@
-"""Direct-page Streamlit branding patch.
-
-This file is intentionally duplicated inside pages/ so it is picked up even when
-Streamlit Cloud runs a page file directly instead of the repository root app.
-"""
+"""Direct-page Streamlit branding patch."""
 
 from __future__ import annotations
 
 try:
     import streamlit as st
     from streamlit.delta_generator import DeltaGenerator
-except Exception:  # pragma: no cover
+except Exception:
     st = None
     DeltaGenerator = None
 
@@ -31,10 +27,7 @@ if st is not None and DeltaGenerator is not None:
             return
         st.session_state["aba_direct_sidebar_brand_rendered"] = True
         with st.sidebar:
-            st.markdown("## ABA Signal Pro")
-            st.success("ABA")
-            st.markdown("### Signal")
-            st.error("Pro")
+            st.markdown("### ABA Signal Pro")
             st.caption(APP_TAGLINE)
             st.markdown("---")
 
