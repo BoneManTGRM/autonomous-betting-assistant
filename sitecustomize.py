@@ -11,7 +11,7 @@ APP_TAGLINE = 'Powered by Reparodynamics'
 NAV_TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Scanner Pro', 'Scanner Pro', 'pages/scanner_pro.py'),
     (APP_NAME, 'ABA Signal Pro', 'pages/pro_predictor.py'),
-    ('Ultra 80 Profit Mode', 'Modo Ultra 80 Rentable', 'pages/ultra80_profit_mode.py'),
+    ('Ultra 70 Profit Mode', 'Ultra 70 Profit Mode', 'pages/ultra80_profit_mode.py'),
     ('Simulation Lab', 'Laboratorio de Simulación', 'pages/simulation_lab.py'),
     ('Threshold Optimizer', 'Optimizador de Umbrales', 'pages/threshold_optimizer.py'),
     ('What Are the Odds', 'Cuotas y Valor', 'pages/what_are_the_odds.py'),
@@ -22,11 +22,13 @@ NAV_TOOLS: tuple[tuple[str, str, str], ...] = (
 )
 
 NAV_NOTES_EN = (
-    'Workflow: Scanner Pro → ABA Signal Pro → Ultra 80 Profit Mode → Simulation Lab → Odds Lock Pro → Public Proof Dashboard → Threshold Optimizer → Learning Memory.',
+    'Workflow: Scanner Pro → ABA Signal Pro → Ultra 70 Profit Mode → Odds Lock Pro → Public Proof Dashboard → Threshold Optimizer → Learning Memory.',
+    'Use Ultra 70 to send 70%+ lockable rows to Odds Lock Pro, while strict 80 proof remains tracked separately.',
     'Use Reset Lock File to clear one test-window proof ledger without touching other windows.',
 )
 NAV_NOTES_ES = (
-    'Flujo: Scanner Pro → ABA Signal Pro → Modo Ultra 80 Rentable → Laboratorio de Simulación → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
+    'Flujo: Scanner Pro → ABA Signal Pro → Ultra 70 Profit Mode → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
+    'Usa Ultra 70 para enviar filas bloqueables 70%+ a Odds Lock Pro, manteniendo la prueba estricta 80 separada.',
     'Usa Reiniciar Archivo de Bloqueo para borrar el ledger de una ventana de prueba sin tocar las demás.',
 )
 
@@ -75,9 +77,9 @@ def _sidebar_language() -> str:
         import streamlit as st
         for key in (
             'global_language', 'app_language', 'simulation_lab_language', 'pro_predictor_language',
-            'odds_lock_pro_language', 'public_proof_dashboard_language', 'reset_lock_file_language',
-            'learn_memory_language', 'learning_memory_language', 'threshold_optimizer_language',
-            'what_are_the_odds_language',
+            'ultra80_profit_mode_language', 'odds_lock_pro_language', 'public_proof_dashboard_language',
+            'reset_lock_file_language', 'learn_memory_language', 'learning_memory_language',
+            'threshold_optimizer_language', 'what_are_the_odds_language',
         ):
             value = st.session_state.get(key)
             if value:
