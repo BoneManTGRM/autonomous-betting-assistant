@@ -18,6 +18,7 @@ from .tracking import PredictionLedgerRow, SelectionDecision, SelectionPolicy, T
 
 APP_NAME = 'ABA Signal Pro'
 APP_TAGLINE = 'Powered by Reparodynamics'
+PREDICTOR_TOOL_NAME = 'Pro Predictor'
 
 
 def _install_streamlit_helpers() -> None:
@@ -31,9 +32,9 @@ def _install_streamlit_helpers() -> None:
     except Exception:
         return
 
-    if getattr(st, '_aba_streamlit_helpers_v11_installed', False):
+    if getattr(st, '_aba_streamlit_helpers_v12_installed', False):
         return
-    st._aba_streamlit_helpers_v11_installed = True
+    st._aba_streamlit_helpers_v12_installed = True
 
     page_language_keys = [
         'global_language', 'app_language', 'language_settings_language', 'start_here_language',
@@ -49,7 +50,7 @@ def _install_streamlit_helpers() -> None:
 
     tools: tuple[tuple[str, str, str], ...] = (
         ('Scanner Pro', 'Scanner Pro', 'pages/scanner_pro.py'),
-        (APP_NAME, APP_NAME, 'pages/pro_predictor.py'),
+        (PREDICTOR_TOOL_NAME, PREDICTOR_TOOL_NAME, 'pages/pro_predictor.py'),
         ('Ultra 70 Profit Mode', 'Ultra 70 Profit Mode', 'pages/ultra80_profit_mode.py'),
         ('Simulation Lab', 'Laboratorio de Simulación', 'pages/simulation_lab.py'),
         ('Threshold Optimizer', 'Optimizador de Umbrales', 'pages/threshold_optimizer.py'),
@@ -60,9 +61,9 @@ def _install_streamlit_helpers() -> None:
         ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory.py'),
     )
     notes_en = (
-        'Commercial workflow: Scanner Pro → ABA Signal Pro → Ultra 70 Profit Mode → Odds Lock Pro → Public Proof Dashboard → Threshold Optimizer → Learning Memory.',
+        'Commercial workflow: Scanner Pro → Pro Predictor → Ultra 70 Profit Mode → Odds Lock Pro → Public Proof Dashboard → Threshold Optimizer → Learning Memory.',
         'Use Scanner Pro for live market discovery.',
-        'Use ABA Signal Pro for final all-sports prediction scoring.',
+        'Use Pro Predictor for final all-sports prediction scoring.',
         'Use Ultra 70 Profit Mode to send 70%+ lockable rows to Odds Lock Pro while keeping strict 80 proof separate.',
         'Use Simulation Lab to stress-test ROI, hit rate, drawdown, and overconfidence risk before locking.',
         'Use Odds Lock Pro to create timestamped proof rows before results are known.',
@@ -72,9 +73,9 @@ def _install_streamlit_helpers() -> None:
         'Use Learning Memory for durable training and saved model memory.',
     )
     notes_es = (
-        'Flujo comercial: Scanner Pro → ABA Signal Pro → Ultra 70 Profit Mode → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
+        'Flujo comercial: Scanner Pro → Pro Predictor → Ultra 70 Profit Mode → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
         'Usa Scanner Pro para descubrir mercados en vivo.',
-        'Usa ABA Signal Pro para la calificación final de predicciones en todos los deportes.',
+        'Usa Pro Predictor para la calificación final de predicciones en todos los deportes.',
         'Usa Ultra 70 Profit Mode para enviar filas bloqueables 70%+ a Odds Lock Pro y mantener la prueba estricta 80 separada.',
         'Usa Laboratorio de Simulación para probar ROI, acierto, drawdown y riesgo de sobreconfianza antes de bloquear.',
         'Usa Bloqueo de Cuotas Pro para crear filas de prueba con timestamp antes de conocer resultados.',
@@ -222,7 +223,7 @@ def _install_streamlit_helpers() -> None:
         if signature in rendered:
             return
         rendered.add(signature)
-        label = 'Download this Pro Predictor CSV' if language_value() == 'English' else 'Descargar este CSV de Predictor Pro'
+        label = 'Download this Pro Predictor CSV' if language_value() == 'English' else 'Descargar este CSV de Pro Predictor'
         filename = f'pro_predictor_export_{len(data)}_rows.csv'
         st.download_button(label, data.to_csv(index=False), file_name=filename, mime='text/csv', key=f'pro_predictor_visible_csv_{signature}')
 
