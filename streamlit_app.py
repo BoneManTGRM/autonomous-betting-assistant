@@ -10,13 +10,11 @@ from autonomous_betting_agent.memory_read_patch import install_memory_read_merge
 APP_NAME = "ABA Signal Pro"
 APP_TAGLINE = "Powered by Reparodynamics"
 BRANDED_REPORT_PREFIX = f"{APP_NAME}\n{APP_TAGLINE}"
-BRANDED_TITLES = {"pro predictor", "predictor pro", "autonomous betting agent", "agente autonomo de pronosticos", "agente autónomo de pronósticos"}
 
 _REAL_FILE_UPLOADER = st.file_uploader
 _REAL_ST_NUMBER_INPUT = st.number_input
 _REAL_ST_SLIDER = st.slider
 _REAL_ST_TEXT_INPUT = st.text_input
-_REAL_ST_TITLE = st.title
 _REAL_ST_TOGGLE = st.toggle
 _REAL_DG_NUMBER_INPUT = DeltaGenerator.number_input
 _REAL_DG_SLIDER = DeltaGenerator.slider
@@ -97,19 +95,6 @@ def _apply_toggle_default(label, kwargs):
     return kwargs
 
 
-def render_brand_header() -> None:
-    st.caption("Sports Market Intelligence")
-    name_cols = st.columns(3)
-    name_cols[0].success("ABA")
-    name_cols[1].info("Signal")
-    name_cols[2].warning("Pro")
-    st.success(APP_TAGLINE)
-    c1, c2, c3 = st.columns(3)
-    c1.info("Odds Signals")
-    c2.warning("Proof Tracking")
-    c3.success("High Confidence")
-
-
 def render_sidebar_brand() -> None:
     st.sidebar.success("ABA")
     st.sidebar.markdown("### Signal")
@@ -127,13 +112,6 @@ def mobile_safe_file_uploader(label, *args, **kwargs):
             kwargs["key"] = "ara_memory_mobile_safe_upload_v9"
         kwargs["help"] = "Accepts any file type. Choose your CSV file, or use the paste box."
     return _REAL_FILE_UPLOADER(label, *args, **kwargs)
-
-
-def branded_st_title(body, *args, **kwargs):
-    if _label_key(body) in BRANDED_TITLES:
-        render_brand_header()
-        return None
-    return _REAL_ST_TITLE(body, *args, **kwargs)
 
 
 def defaulted_st_number_input(label, *args, **kwargs):
@@ -194,7 +172,6 @@ st.file_uploader = mobile_safe_file_uploader
 st.number_input = defaulted_st_number_input
 st.slider = defaulted_st_slider
 st.text_input = defaulted_st_text_input
-st.title = branded_st_title
 st.toggle = defaulted_st_toggle
 DeltaGenerator.number_input = defaulted_dg_number_input
 DeltaGenerator.slider = defaulted_dg_slider
