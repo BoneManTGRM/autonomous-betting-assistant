@@ -1,11 +1,30 @@
 from __future__ import annotations
 
+from difflib import SequenceMatcher
 from typing import Any, Mapping
 
 import pandas as pd
 
 from .commercial_platform_tools import apply_result_updates, filter_locked_proof_rows, load_persistent_ledger, save_persistent_ledger
 from .row_normalizer import safe_text
+
+
+def _clean(value: Any) -> str:
+    return ' '.join(str(value or '').lower().replace('-', ' ').replace('_', ' ').replace('@', ' at ').split())
+
+
+def _similarity(left: Any, right: Any) -> float:
+    a, b = _clean(left), _clean(right)
+    if not a or not b:
+        return 0.0
+    if a == b or a in b or b in a:
+        return 1.0
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def _date_prefix(value: Any) -> str:
+    text = safe_text(value)
+    return text[:10] if len(text) >= 10 else ''
 
 
 def normalize_result_feed(frame: pd.DataFrame | list[dict[str, Any]]) -> pd.DataFrame:
@@ -29,8 +48,10 @@ def normalize_result_feed(frame: pd.DataFrame | list[dict[str, Any]]) -> pd.Data
                 item['result_status'] = 'void'
         if winner:
             item['winner'] = winner
+        if home and away and not safe_text(item.get('event')):
+            item['event'] = f'{away} at {home}'
         if home_score is not None and away_score is not None and not safe_text(item.get('final_score')):
-            item['final_score'] = f'{home_score}-{away_score}'
+            item['final_score'] = f'{home} {home_score} - {away_score} {away}'
         rows.append(item)
     return pd.DataFrame(rows)
 
@@ -88,10 +109,58 @@ def odds_scores_to_result_frame(payload: list[dict[str, Any]]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def fuzzy_match_results(ledger: pd.DataFrame | list[dict[str, Any]], results: pd.DataFrame | list[dict[str, Any]], *, threshold: float = 0.86) -> pd.DataFrame:
+    locked = filter_locked_proof_rows(ledger)
+    result_frame = normalize_result_feed(results)
+    if locked.empty or result_frame.empty:
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    for lrow in locked.to_dict(orient='records'):
+        best: dict[str, Any] | None = None
+        best_score = 0.0
+        for rrow in result_frame.to_dict(orient='records'):
+            event_score = _similarity(lrow.get('event'), rrow.get('event'))
+            sport_score = max(_similarity(lrow.get('sport'), rrow.get('sport')), _similarity(lrow.get('sport_key'), rrow.get('sport_key')))
+            date_match = bool(_date_prefix(lrow.get('event_start_utc')) and _date_prefix(lrow.get('event_start_utc')) == _date_prefix(rrow.get('event_start_utc')))
+            pick_score = max(_similarity(lrow.get('prediction'), rrow.get('winner')), _similarity(lrow.get('prediction'), rrow.get('home_team')), _similarity(lrow.get('prediction'), rrow.get('away_team')))
+            score = event_score * 0.55 + sport_score * 0.15 + (0.15 if date_match else 0.0) + pick_score * 0.15
+            if score > best_score:
+                best_score = score
+                best = rrow
+        status = 'matched' if best is not None and best_score >= threshold else 'needs_review'
+        rows.append({
+            'proof_id': safe_text(lrow.get('proof_id')),
+            'ledger_event': safe_text(lrow.get('event')),
+            'ledger_prediction': safe_text(lrow.get('prediction')),
+            'matched_event': safe_text((best or {}).get('event')),
+            'matched_winner': safe_text((best or {}).get('winner')),
+            'matched_final_score': safe_text((best or {}).get('final_score')),
+            'match_confidence': round(best_score, 4),
+            'match_status': status,
+        })
+    return pd.DataFrame(rows)
+
+
+def result_match_summary(matches: pd.DataFrame | list[dict[str, Any]]) -> dict[str, Any]:
+    frame = pd.DataFrame(matches) if isinstance(matches, list) else matches
+    if frame is None or frame.empty:
+        return {'rows': 0, 'matched': 0, 'needs_review': 0, 'avg_confidence': None}
+    status = frame.get('match_status', pd.Series(dtype=str)).astype(str)
+    conf = pd.to_numeric(frame.get('match_confidence', pd.Series(dtype=float)), errors='coerce')
+    return {
+        'rows': int(len(frame)),
+        'matched': int(status.eq('matched').sum()),
+        'needs_review': int(status.eq('needs_review').sum()),
+        'avg_confidence': None if conf.dropna().empty else round(float(conf.mean()), 4),
+    }
+
+
 def grade_persistent_ledger_with_results(results: pd.DataFrame | list[dict[str, Any]]) -> tuple[pd.DataFrame, dict[str, Any]]:
     ledger = load_persistent_ledger()
     result_frame = normalize_result_feed(results)
+    matches = fuzzy_match_results(ledger, result_frame)
     updated, stats = apply_result_updates(ledger, result_frame)
+    stats['match_summary'] = result_match_summary(matches)
     if not updated.empty:
         save_persistent_ledger(updated)
     return updated, stats
