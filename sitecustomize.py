@@ -93,22 +93,19 @@ def _install_sidebar_nav_fallback() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_sidebar_nav_fallback_installed_v3', False):
+    if getattr(st, '_aba_sidebar_nav_fallback_installed_v4', False):
         return
-    st._aba_sidebar_nav_fallback_installed_v3 = True
+    st._aba_sidebar_nav_fallback_installed_v4 = True
     real_st_selectbox = st.selectbox
     real_dg_selectbox = DeltaGenerator.selectbox
     real_set_page_config = st.set_page_config
 
     def render_brand_once() -> None:
-        if st.session_state.get('_aba_sidebar_brand_rendered_v3'):
+        if st.session_state.get('_aba_sidebar_brand_rendered_v4'):
             return
-        st.session_state['_aba_sidebar_brand_rendered_v3'] = True
+        st.session_state['_aba_sidebar_brand_rendered_v4'] = True
         with st.sidebar:
-            st.markdown('## ABA Signal Pro')
-            st.success('ABA')
-            st.markdown('### Signal')
-            st.error('Pro')
+            st.markdown('### :green[ABA] Signal :red[Pro]')
             st.caption(APP_TAGLINE)
             st.markdown('---')
 
