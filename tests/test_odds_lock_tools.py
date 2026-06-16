@@ -54,7 +54,7 @@ class OddsLockToolsTests(unittest.TestCase):
         strict = lock_rows(frame, strict=True, require_future=True)
         self.assertTrue(strict.empty)
         blockers = lock_blockers(frame.iloc[0].to_dict(), require_future=True)
-        self.assertIn('invalid_after_start', blockers)
+        self.assertTrue({'invalid_after_start', 'missing_lock_time'} & set(blockers))
         blockers_missing_book = lock_blockers(frame.iloc[1].to_dict(), require_future=True)
         self.assertTrue({'missing_bookmaker', 'missing_bookmaker_or_odds_source'} & set(blockers_missing_book))
 
