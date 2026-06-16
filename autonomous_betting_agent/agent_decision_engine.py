@@ -40,6 +40,13 @@ def clean_probability(value: Any) -> float | None:
     return None
 
 
+def clean_number(value: Any) -> float | None:
+    parsed = parse_float(value)
+    if parsed is None:
+        return None
+    return float(parsed)
+
+
 def parse_datetime_utc(value: Any) -> datetime | None:
     text = safe_text(value)
     if not text:
@@ -109,6 +116,25 @@ def stake_guidance(decision: str, score: float, locked: bool) -> float:
     return round(base, 3)
 
 
+def odds_quality_context(row: dict[str, Any]) -> dict[str, Any]:
+    quality = clean_number(row.get('odds_accuracy_score'))
+    ev = clean_number(row.get('expected_value_per_unit'))
+    edge_override = clean_number(row.get('edge_probability'))
+    action = safe_text(row.get('recommended_action')).lower()
+    rating = safe_text(row.get('value_rating')).lower()
+    trust_grade = safe_text(row.get('odds_trust_grade'))
+    flags = safe_text(row.get('odds_quality_flags'))
+    return {
+        'odds_accuracy_score': quality,
+        'expected_value_per_unit': ev,
+        'edge_probability': edge_override,
+        'recommended_action': action,
+        'value_rating': rating,
+        'odds_trust_grade': trust_grade,
+        'odds_quality_flags': flags,
+    }
+
+
 def evaluate_row(
     row: dict[str, Any],
     *,
@@ -124,6 +150,12 @@ def evaluate_row(
     has_lock_time = bool(safe_text(row.get('prediction_timestamp')))
     result_status = safe_text(row.get('result_status')).lower()
     lock_ready = can_lock_candidate(row)
+    odds_ctx = odds_quality_context(row)
+    odds_quality = odds_ctx['odds_accuracy_score']
+    expected_ev = odds_ctx['expected_value_per_unit']
+    odds_action = odds_ctx['recommended_action']
+    value_rating = odds_ctx['value_rating']
+    trust_grade = odds_ctx['odds_trust_grade']
 
     reasons: list[str] = []
     signals: list[str] = []
@@ -162,6 +194,9 @@ def evaluate_row(
         reasons.append('low_field_coverage')
 
     edge = None if model_prob is None or market_prob is None else round(model_prob - market_prob, 6)
+    if odds_ctx['edge_probability'] is not None:
+        edge = round(float(odds_ctx['edge_probability']), 6)
+        signals.append('odds_accuracy_edge_used')
     edge_percent = None if edge is None else round(edge * 100.0, 3)
     if edge is not None:
         signals.append(f'edge={edge:.3f}')
@@ -173,6 +208,30 @@ def evaluate_row(
             signals.append('strong_edge')
         else:
             signals.append('positive_edge')
+
+    if expected_ev is not None:
+        signals.append(f'ev={expected_ev:.3f}')
+        if expected_ev <= -0.02:
+            reasons.append('negative_expected_value')
+        elif expected_ev > 0:
+            signals.append('positive_expected_value')
+
+    if odds_quality is not None:
+        signals.append(f'odds_quality={odds_quality:.0f}')
+        if odds_quality < 50:
+            reasons.append('weak_odds_quality')
+        elif odds_quality >= 80:
+            signals.append('strong_odds_quality')
+    if odds_action in {'needs_more_info', 'rescan_prices'}:
+        reasons.append(odds_action)
+    elif odds_action == 'lock_candidate':
+        signals.append('odds_lock_candidate')
+    if value_rating:
+        signals.append(f'value_rating={value_rating}')
+    if trust_grade:
+        signals.append(f'odds_grade={trust_grade}')
+    if 'manual-review' in trust_grade.lower() or value_rating == 'manual_review_needed':
+        reasons.append('manual_review_needed')
 
     line_signal = line.get('line_value_signal', 'unknown')
     if line_signal == 'positive':
@@ -194,15 +253,21 @@ def evaluate_row(
         decision = 'review_needed'
     elif any(reason in reasons for reason in hard_no_action):
         decision = 'no_action'
-    elif 'negative_edge' in reasons or 'low_field_coverage' in reasons:
+    elif any(reason in reasons for reason in {'negative_edge', 'negative_expected_value', 'weak_odds_quality'}):
+        decision = 'no_action'
+    elif any(reason in reasons for reason in {'needs_more_info', 'rescan_prices', 'manual_review_needed'}):
+        decision = 'watch_only'
+    elif 'low_field_coverage' in reasons:
         decision = 'no_action'
     elif any(reason in reasons for reason in source_missing):
         decision = 'watch_only'
     elif 'edge_below_minimum' in reasons or 'negative_line_movement' in reasons:
         decision = 'watch_only'
+    elif odds_action == 'lock_candidate' and edge is not None and edge >= strong_edge and model_prob is not None and model_prob >= HIGH_PROBABILITY:
+        decision = 'play_strong'
     elif edge is not None and edge >= strong_edge and model_prob is not None and model_prob >= HIGH_PROBABILITY:
         decision = 'play_strong'
-    elif edge is not None and edge >= min_edge:
+    elif edge is not None and edge >= min_edge and (expected_ev is None or expected_ev > -0.02):
         decision = 'play_small'
     else:
         decision = 'watch_only'
@@ -212,7 +277,11 @@ def evaluate_row(
         score += model_prob * 40.0
     if edge is not None:
         score += max(-0.10, min(0.15, edge)) * 250.0
+    if expected_ev is not None:
+        score += max(-0.10, min(0.15, expected_ev)) * 80.0
     score += coverage * 20.0
+    if odds_quality is not None:
+        score += max(-10.0, min(10.0, (odds_quality - 60.0) / 4.0))
     if line_signal == 'positive':
         score += 7.5
     elif line_signal == 'negative':
@@ -243,7 +312,7 @@ def evaluate_row(
         'model_market_edge_percent': edge_percent,
         'field_coverage_score': coverage,
         'line_value_signal': line_signal,
-        'decision_reasons': ' | '.join(reasons),
+        'decision_reasons': ' | '.join(sorted(set(reasons))),
         'decision_signals': ' | '.join(signals),
     }
 
