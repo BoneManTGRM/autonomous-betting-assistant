@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from typing import Any
 
 import numpy as np
@@ -14,7 +16,7 @@ TEXT = {
         'title': 'Simulation Lab',
         'caption': 'Monte Carlo stress testing, game-by-game scout risk, automatic what-if selection, optimizer, drawdown, ROI, and proof handoff.',
         'source': 'Prediction source', 'session': 'Use latest prediction session', 'survivor_source': 'Use last simulation survivor list', 'upload': 'Upload prediction CSV', 'upload_label': 'Upload CSV',
-        'run': 'Run simulations + optimizer', 'no_rows': 'No rows available. Run Pro Predictor/Ultra 80 first or upload a CSV.',
+        'run': 'Run simulations + optimizer', 'no_rows': 'No usable simulation rows found. The file loaded, but the simulator could not find usable probability + odds columns.',
         'settings': 'Simulation settings', 'iterations': 'Iterations', 'stake': 'Flat stake units', 'max_rows': 'Max rows per strategy', 'min_rows': 'Minimum optimizer rows',
         'change_settings': 'Game Scout Auto-Select', 'preset': 'Fallback stress preset', 'swarm': 'Use Game Scout Swarm', 'auto_select': 'Auto-select each game\'s weather/news/altitude/travel/market risk',
         'swarm_help': 'Runs per-game scout agents for weather, injury/news, altitude, travel, market movement, data quality, memory, and price risk.',
@@ -26,7 +28,7 @@ TEXT = {
         'altitude': 'Altitude fallback', 'altitude_help': 'Fallback for low-altitude away teams/players playing at high-altitude venues.',
         'travel': 'Travel/fatigue fallback', 'travel_help': 'Fallback for long travel, time-zone changes, short rest, back-to-back games, or fatigue.',
         'chaos': 'Market/news uncertainty fallback', 'chaos_help': 'Fallback when conditions are unclear; pulls simulation toward market probability.',
-        'summary': 'Simulation summary', 'details': 'Selected rows', 'optimizer': 'Simulation optimizer', 'survivor': 'Simulation survivor handoff', 'risk_report': 'What-if risk report', 'scout_report': 'Game Scout Swarm report', 'download': 'Download simulation report',
+        'summary': 'Simulation summary', 'details': 'Selected rows', 'optimizer': 'Simulation optimizer', 'survivor': 'Simulation survivor handoff', 'risk_report': 'What-if risk report', 'scout_report': 'Game Scout Swarm report', 'diagnostics': 'Input diagnostics', 'download': 'Download simulation report',
         'note': 'Best use: run Auto-Select so the simulator chooses risk settings game by game from the data. Manual sliders should be fallback stress tests, not guesses for every game.',
         'saved': 'Simulation survivor rows saved for Odds Lock Pro handoff.', 'recommendation': 'Recommendation', 'meters': 'Fallback stress meters',
     },
@@ -34,7 +36,7 @@ TEXT = {
         'title': 'Laboratorio de Simulación',
         'caption': 'Prueba Monte Carlo, riesgo por juego, selección automática de escenarios, optimizador, drawdown, ROI y traspaso a proof.',
         'source': 'Fuente de predicciones', 'session': 'Usar última sesión de predicciones', 'survivor_source': 'Usar última lista sobreviviente de simulación', 'upload': 'Subir CSV de predicciones', 'upload_label': 'Subir CSV',
-        'run': 'Ejecutar simulaciones + optimizador', 'no_rows': 'No hay filas. Ejecuta Predictor Pro/Ultra 80 primero o sube un CSV.',
+        'run': 'Ejecutar simulaciones + optimizador', 'no_rows': 'No se encontraron filas útiles. El archivo cargó, pero el simulador no pudo encontrar probabilidad + cuotas utilizables.',
         'settings': 'Configuración de simulación', 'iterations': 'Iteraciones', 'stake': 'Unidades fijas por pick', 'max_rows': 'Máx filas por estrategia', 'min_rows': 'Mínimo de filas del optimizador',
         'change_settings': 'Auto-Selección Scout por Juego', 'preset': 'Preset de estrés de respaldo', 'swarm': 'Usar enjambre scout por juego', 'auto_select': 'Auto-seleccionar clima/noticias/altitud/viaje/mercado por juego',
         'swarm_help': 'Ejecuta scouts por juego para clima, lesión/noticias, altitud, viaje, movimiento de mercado, calidad de datos, memoria y riesgo de precio.',
@@ -46,7 +48,7 @@ TEXT = {
         'altitude': 'Respaldo altitud', 'altitude_help': 'Respaldo para visitantes de baja altitud jugando en sede de alta altitud.',
         'travel': 'Respaldo viaje/fatiga', 'travel_help': 'Respaldo para viaje largo, cambio horario, poco descanso, back-to-back o fatiga.',
         'chaos': 'Respaldo incertidumbre', 'chaos_help': 'Respaldo cuando las condiciones no están claras; acerca la simulación al mercado.',
-        'summary': 'Resumen de simulación', 'details': 'Filas seleccionadas', 'optimizer': 'Optimizador de simulación', 'survivor': 'Traspaso sobreviviente', 'risk_report': 'Reporte de riesgo qué pasaría si', 'scout_report': 'Reporte de enjambre scout', 'download': 'Descargar reporte',
+        'summary': 'Resumen de simulación', 'details': 'Filas seleccionadas', 'optimizer': 'Optimizador de simulación', 'survivor': 'Traspaso sobreviviente', 'risk_report': 'Reporte de riesgo qué pasaría si', 'scout_report': 'Reporte de enjambre scout', 'diagnostics': 'Diagnóstico de entrada', 'download': 'Descargar reporte',
         'note': 'Uso ideal: ejecuta Auto-Selección para que el simulador elija riesgos juego por juego desde los datos. Los sliders deben ser respaldos, no adivinanzas para todos los juegos.',
         'saved': 'Filas sobrevivientes guardadas para Odds Lock Pro.', 'recommendation': 'Recomendación', 'meters': 'Medidores de respaldo',
     },
@@ -69,9 +71,26 @@ STRESS_PRESETS = {
 }
 RISK_COLS = ['weather_risk', 'injury_risk', 'news_risk', 'altitude_risk', 'travel_risk', 'line_movement_risk', 'data_quality_risk', 'negative_memory_risk', 'price_risk']
 
+EVENT_ALIASES = ['event', 'game', 'match', 'partido', 'fixture', 'fixture_name', 'game_name', 'event_name', 'evento']
+PICK_ALIASES = ['prediction', 'pick', 'selection', 'prediccion', 'predicción', 'pronostico', 'pronóstico', 'predicted_winner', 'team_pick', 'side', 'seleccion']
+PROB_ALIASES = ['model_probability_clean', 'model_probability', 'final_probability_value', 'final_probability', 'probability', 'probabilidad', 'prob_final', 'prob final', 'prob. final', 'confidence_probability', 'predicted_probability', 'win_probability', 'win_prob', 'projected_probability', 'prob_modelo', 'confianza']
+MARKET_PROB_ALIASES = ['market_probability', 'market_implied_probability', 'implied_probability', 'no_vig_probability', 'prob_mercado', 'prob mercado', 'prob. mercado']
+DECIMAL_ALIASES = ['decimal_price', 'decimal_odds', 'best_price', 'average_price', 'best_odds', 'market_odds', 'book_odds', 'odds', 'price', 'cuota', 'mejor_cuota', 'mejor cuota', 'cuota_decimal']
+AMERICAN_ALIASES = ['american_odds', 'american_price', 'moneyline', 'ml', 'american']
+EDGE_ALIASES = ['model_market_edge', 'model_edge', 'edge_probability', 'edge', 'edge_percent', 'model_minus_no_vig', 'ventaja']
+EV_ALIASES = ['expected_value_per_unit', 'estimated_ev_decimal', 'computed_ev_decimal', 'estimated_ev', 'ev', 'expected_value', 'valor_esperado']
+BOOK_ALIASES = ['bookmaker_count', 'books', 'source_count', 'bookmakers', 'casas', 'num_books', 'sportsbooks_count']
+API_ALIASES = ['api_coverage_score', 'api_coverage', 'cobertura_api', 'cobertura api']
+
 
 def t(key: str) -> str:
     return TEXT[LANG].get(key, TEXT['en'].get(key, key))
+
+
+def column_key(value: Any) -> str:
+    text = unicodedata.normalize('NFKD', str(value or '')).encode('ascii', 'ignore').decode('ascii').lower()
+    text = re.sub(r'[^a-z0-9]+', '_', text)
+    return text.strip('_')
 
 
 def session_frame() -> pd.DataFrame:
@@ -90,9 +109,9 @@ def survivor_frame() -> pd.DataFrame:
 
 
 def first_col(frame: pd.DataFrame, aliases: list[str]) -> str | None:
-    lookup = {str(col).strip().lower().replace(' ', '_').replace('-', '_'): col for col in frame.columns}
+    lookup = {column_key(col): col for col in frame.columns}
     for alias in aliases:
-        key = alias.strip().lower().replace(' ', '_').replace('-', '_')
+        key = column_key(alias)
         if key in lookup:
             return lookup[key]
     return None
@@ -110,12 +129,17 @@ def num_series(frame: pd.DataFrame, aliases: list[str], *, probability: bool = F
     if col is None:
         return pd.Series(float('nan'), index=frame.index, dtype=float)
     raw = frame[col].astype(str).str.strip()
-    values = pd.to_numeric(raw.str.replace('%', '', regex=False).str.replace(',', '', regex=False), errors='coerce')
+    cleaned = raw.str.replace('%', '', regex=False).str.replace(',', '', regex=False).str.replace('−', '-', regex=False)
+    values = pd.to_numeric(cleaned, errors='coerce')
+    missing = values.isna()
+    if missing.any():
+        extracted = raw[missing].str.extract(r'([+-]?\d+(?:\.\d+)?)')[0]
+        values.loc[missing] = pd.to_numeric(extracted, errors='coerce')
     percent_mask = raw.str.contains('%', regex=False, na=False)
     values.loc[percent_mask] = values.loc[percent_mask] / 100.0
     if probability:
         values = values.where(values <= 1.0, values / 100.0)
-    elif percent_like and any(token in str(col).lower() for token in ['percent', 'pct']):
+    elif percent_like and (percent_mask.any() or any(token in column_key(col) for token in ['percent', 'pct'])):
         values = values.where(values.abs() <= 1.0, values / 100.0)
     return values
 
@@ -133,8 +157,8 @@ def altitude_feet_series(frame: pd.DataFrame, ft_aliases: list[str], m_aliases: 
 
 def text_risk(frame: pd.DataFrame) -> pd.Series:
     note = text_series(frame, ['news_summary', 'latest_news', 'injury_news', 'team_news', 'weather_note', 'notes', 'motivo_revisar', 'reason', 'api_context_error']).str.lower()
-    high = 'out|doubtful|suspended|late scratch|illness|storm|severe|postponed|lineup change|not starting|ruled out'
-    medium = 'questionable|probable|limited|rest|rotation|rain|wind|heat|cold|altitude|travel|fatigue|line move|odds drift|market moved|uncertain'
+    high = 'out|doubtful|suspended|late scratch|illness|storm|severe|postponed|lineup change|not starting|ruled out|descartado|suspendido|lesionado'
+    medium = 'questionable|probable|limited|rest|rotation|rain|wind|heat|cold|altitude|travel|fatigue|line move|odds drift|market moved|uncertain|duda|lluvia|viento|viaje|fatiga|altitud'
     risk = pd.Series(0.0, index=frame.index)
     risk = risk.mask(note.str.contains(medium, regex=True, na=False), 0.35)
     risk = risk.mask(note.str.contains(high, regex=True, na=False), 0.75)
@@ -143,23 +167,25 @@ def text_risk(frame: pd.DataFrame) -> pd.Series:
 
 def normalize(frame: pd.DataFrame) -> pd.DataFrame:
     out = pd.DataFrame(index=frame.index)
-    out['event'] = text_series(frame, ['event', 'game', 'match', 'partido'])
+    out['event'] = text_series(frame, EVENT_ALIASES)
     out['sport'] = text_series(frame, ['sport', 'sport_key', 'league', 'competition', 'deporte'])
-    out['market_type'] = text_series(frame, ['market_type', 'market', 'bet_type', 'prop_type', 'tipo_mercado']).str.lower()
-    out['prediction'] = text_series(frame, ['prediction', 'pick', 'selection', 'prediccion', 'pronostico'])
-    out['home_team'] = text_series(frame, ['home_team', 'home', 'local'])
-    out['away_team'] = text_series(frame, ['away_team', 'away', 'visitor', 'visitante'])
+    out['market_type'] = text_series(frame, ['market_type', 'market', 'bet_type', 'prop_type', 'tipo_mercado', 'mercado']).str.lower()
+    out['prediction'] = text_series(frame, PICK_ALIASES)
+    out['home_team'] = text_series(frame, ['home_team', 'home', 'local', 'equipo_local'])
+    out['away_team'] = text_series(frame, ['away_team', 'away', 'visitor', 'visitante', 'equipo_visitante'])
     out['volume_tier'] = text_series(frame, ['volume_tier', 'tier', 'ultra80_tier'], 'unknown')
-    out['model_probability'] = num_series(frame, ['model_probability_clean', 'model_probability', 'final_probability_value', 'final_probability', 'probability', 'probabilidad', 'prob_final'], probability=True)
-    decimal = num_series(frame, ['decimal_price', 'best_price', 'average_price', 'odds', 'price', 'cuota', 'mejor_cuota'])
-    american = num_series(frame, ['american_odds', 'american_price', 'moneyline'])
-    out['decimal_price'] = decimal.fillna(american_to_decimal(american))
+    out['model_probability'] = num_series(frame, PROB_ALIASES, probability=True)
+    out['market_probability'] = num_series(frame, MARKET_PROB_ALIASES, probability=True)
+    decimal = num_series(frame, DECIMAL_ALIASES)
+    american = num_series(frame, AMERICAN_ALIASES)
+    implied_decimal = (1.0 / out['market_probability']).replace([np.inf, -np.inf], np.nan)
+    out['decimal_price'] = decimal.fillna(american_to_decimal(american)).fillna(implied_decimal)
     implied = 1.0 / out['decimal_price']
-    out['edge'] = num_series(frame, ['model_market_edge', 'model_edge', 'edge_probability', 'edge', 'model_minus_no_vig'], percent_like=True).fillna(out['model_probability'] - implied)
-    out['ev'] = num_series(frame, ['expected_value_per_unit', 'estimated_ev_decimal', 'computed_ev_decimal', 'estimated_ev', 'ev'], percent_like=True).fillna(out['model_probability'] * out['decimal_price'] - 1.0)
-    out['books'] = num_series(frame, ['bookmaker_count', 'books', 'source_count', 'bookmakers']).fillna(0.0)
-    out['api_coverage'] = num_series(frame, ['api_coverage_score', 'api_coverage'], probability=True).fillna(0.0)
-    out['agent_score'] = num_series(frame, ['agent_score', 'scanner_strength_score', 'target_70_quality_score']).fillna(0.0)
+    out['edge'] = num_series(frame, EDGE_ALIASES, percent_like=True).fillna(out['model_probability'] - implied)
+    out['ev'] = num_series(frame, EV_ALIASES, percent_like=True).fillna(out['model_probability'] * out['decimal_price'] - 1.0)
+    out['books'] = num_series(frame, BOOK_ALIASES).fillna(0.0)
+    out['api_coverage'] = num_series(frame, API_ALIASES, probability=True).fillna(0.0)
+    out['agent_score'] = num_series(frame, ['agent_score', 'scanner_strength_score', 'target_70_quality_score', 'score']).fillna(0.0)
     out['memory_signal'] = num_series(frame, ['pattern_ara_memory_signal', 'ara_memory_signal', 'memory_signal'], percent_like=True).fillna(0.0)
     out['robust_ev'] = num_series(frame, ['_robust_expected_value', 'robust_expected_value'], percent_like=True).fillna(out['ev'])
     out['robust_profit80'] = num_series(frame, ['_robust_profit_at_80_percent', 'robust_profit_at_80_percent'], percent_like=True).fillna(0.80 * out['decimal_price'] - 1.0)
@@ -210,6 +236,22 @@ def normalize(frame: pd.DataFrame) -> pd.DataFrame:
     return out.dropna(subset=['model_probability', 'decimal_price'])
 
 
+def input_diagnostics(raw: pd.DataFrame, frame: pd.DataFrame) -> pd.DataFrame:
+    def matched(aliases: list[str]) -> str:
+        return first_col(raw, aliases) or ''
+    return pd.DataFrame([
+        {'check': 'raw rows loaded', 'value': int(len(raw)), 'matched_column': ''},
+        {'check': 'raw columns loaded', 'value': int(len(raw.columns)), 'matched_column': ', '.join(map(str, raw.columns[:20]))},
+        {'check': 'event column', 'value': 'found' if matched(EVENT_ALIASES) else 'missing', 'matched_column': matched(EVENT_ALIASES)},
+        {'check': 'pick/prediction column', 'value': 'found' if matched(PICK_ALIASES) else 'missing', 'matched_column': matched(PICK_ALIASES)},
+        {'check': 'model probability column', 'value': 'found' if matched(PROB_ALIASES) else 'missing', 'matched_column': matched(PROB_ALIASES)},
+        {'check': 'decimal odds column', 'value': 'found' if matched(DECIMAL_ALIASES) else 'missing', 'matched_column': matched(DECIMAL_ALIASES)},
+        {'check': 'american odds column', 'value': 'found' if matched(AMERICAN_ALIASES) else 'missing', 'matched_column': matched(AMERICAN_ALIASES)},
+        {'check': 'market probability fallback', 'value': 'found' if matched(MARKET_PROB_ALIASES) else 'missing', 'matched_column': matched(MARKET_PROB_ALIASES)},
+        {'check': 'usable simulation rows', 'value': int(len(frame)), 'matched_column': 'needs model probability + decimal/american odds or market probability'},
+    ])
+
+
 def auto_game_profile(frame: pd.DataFrame, fallback: dict[str, float], *, auto_select: bool = True) -> pd.DataFrame:
     out = frame.copy()
     if not auto_select:
@@ -226,12 +268,11 @@ def auto_game_profile(frame: pd.DataFrame, fallback: dict[str, float], *, auto_s
         out['auto_altitude_stress'] = out['altitude_risk'].fillna(0.0)
         out['auto_travel_stress'] = out['travel_risk'].fillna(0.0)
         out['auto_chaos_stress'] = np.maximum.reduce([out['data_quality_risk'].to_numpy(float), out['line_movement_risk'].to_numpy(float), out['price_risk'].to_numpy(float), out['negative_memory_risk'].to_numpy(float) * 0.50])
-        # Fallback only applies when there is no detected signal for that game.
         for col, fallback_key in [('auto_weather_stress', 'rain'), ('auto_injury_stress', 'injury'), ('auto_altitude_stress', 'altitude'), ('auto_travel_stress', 'travel'), ('auto_chaos_stress', 'chaos')]:
             values = pd.to_numeric(out[col], errors='coerce').fillna(0.0)
             no_signal = values.le(0.0)
-            fallback_values = float(fallback[fallback_key])
-            if fallback_key in {'rain'}:
+            fallback_values: Any = float(fallback[fallback_key])
+            if fallback_key == 'rain':
                 fallback_values = fallback_values * out['weather_sensitivity']
             if fallback_key in {'altitude', 'travel'}:
                 fallback_values = fallback_values * out['is_away_pick'].astype(float)
@@ -538,6 +579,8 @@ if st.button(t('run'), type='primary', use_container_width=True):
     frame = normalize(raw)
     if frame.empty:
         st.warning(t('no_rows'))
+        st.subheader(t('diagnostics'))
+        st.dataframe(input_diagnostics(raw, frame), use_container_width=True, hide_index=True)
         st.stop()
     frame = auto_game_profile(frame, stress_profile, auto_select=bool(auto_select and use_swarm))
     optimizer_table, survivor = simulation_optimizer(frame, min_rows=int(min_optimizer_rows))
@@ -580,9 +623,11 @@ if st.button(t('run'), type='primary', use_container_width=True):
     st.dataframe(optimizer_table, use_container_width=True, hide_index=True)
     st.subheader(t('risk_report'))
     st.dataframe(risks, use_container_width=True, hide_index=True)
+    st.subheader(t('diagnostics'))
+    st.dataframe(input_diagnostics(raw, frame), use_container_width=True, hide_index=True)
     st.subheader(t('details'))
     if not selected_all.empty:
-        cols = [col for col in ['strategy', 'event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'edge', 'ev', 'robust_ev', 'robust_profit80', 'auto_total_stress', 'auto_weather_stress', 'auto_injury_stress', 'auto_altitude_stress', 'auto_travel_stress', 'auto_chaos_stress', 'line_movement_risk', 'data_quality_risk', 'negative_memory_risk', 'books', 'api_coverage', 'memory_signal'] if col in selected_all.columns]
+        cols = [col for col in ['strategy', 'event', 'sport', 'market_type', 'prediction', 'model_probability', 'market_probability', 'decimal_price', 'edge', 'ev', 'robust_ev', 'robust_profit80', 'auto_total_stress', 'auto_weather_stress', 'auto_injury_stress', 'auto_altitude_stress', 'auto_travel_stress', 'auto_chaos_stress', 'line_movement_risk', 'data_quality_risk', 'negative_memory_risk', 'books', 'api_coverage', 'memory_signal'] if col in selected_all.columns]
         st.dataframe(selected_all[cols], use_container_width=True, hide_index=True)
     report_parts = [summary]
     if not recommendations.empty:
@@ -593,5 +638,8 @@ if st.button(t('run'), type='primary', use_container_width=True):
         opt = optimizer_table.copy(); opt.insert(0, 'report_section', 'optimizer_thresholds'); report_parts.append(opt)
     if not risks.empty:
         risk_export = risks.copy(); risk_export.insert(0, 'report_section', 'change_risk_report'); report_parts.append(risk_export)
+    diagnostics = input_diagnostics(raw, frame)
+    if not diagnostics.empty:
+        diag = diagnostics.copy(); diag.insert(0, 'report_section', 'input_diagnostics'); report_parts.append(diag)
     report = pd.concat(report_parts, ignore_index=True, sort=False)
     st.download_button(t('download'), report.to_csv(index=False), file_name='simulation_lab_report.csv', mime='text/csv')
