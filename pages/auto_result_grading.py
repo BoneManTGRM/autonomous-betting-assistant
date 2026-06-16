@@ -14,9 +14,11 @@ from autonomous_betting_agent.auto_result_grading_tools import (
 )
 from autonomous_betting_agent.commercial_platform_tools import load_persistent_ledger, save_persistent_ledger
 from autonomous_betting_agent.live_odds import _get_json, validate_api_key
+from autonomous_betting_agent.tool_sidebar import render_tool_sidebar
 
 st.set_page_config(page_title='Auto Result Grading', layout='wide')
 LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='auto_result_grading_language') == 'Español' else 'en'
+render_tool_sidebar('auto_result_grading', 'Español' if LANG == 'es' else 'English')
 
 TEXT = {
     'en': {
