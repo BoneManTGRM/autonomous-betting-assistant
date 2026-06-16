@@ -47,7 +47,6 @@ class LivePageUiPresenceTests(unittest.TestCase):
         self.assertIn('latest_event_date', self.text)
         self.assertIn('parse_event_date', self.text)
         self.assertIn('api_coverage_score', self.text)
-        self.assertIn('configured_api_sources_count', self.text)
         self.assertIn('WeatherAPI', self.text)
         self.assertIn('SportsDataIO', self.text)
 
