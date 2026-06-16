@@ -19,12 +19,21 @@ BOOK_COLUMNS = {
 
 DISPLAY_COLUMNS = [
     'event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price',
-    'best_available_price', 'best_available_book', 'fair_decimal_price', 'minimum_playable_decimal',
-    'great_value_decimal', 'edge_percent', 'expected_value_percent', 'information_confidence_score',
-    'market_disagreement_flag', 'market_disagreement_percent', 'data_quality_wall_pass',
-    'data_quality_blockers', 'data_quality_warnings', 'shadow_proof_ready', 'game_intelligence_grade',
-    'agent_decision', 'recommended_action', 'what_would_change_my_mind', 'game_intelligence_card',
+    'best_available_price', 'best_available_book', 'minimum_line_value_status', 'fair_decimal_price',
+    'minimum_playable_decimal', 'great_value_decimal', 'edge_percent', 'expected_value_percent',
+    'information_confidence_score', 'market_disagreement_flag', 'market_disagreement_percent',
+    'data_quality_wall_pass', 'data_quality_blockers', 'data_quality_warnings', 'shadow_proof_ready',
+    'operator_next_step', 'game_intelligence_grade', 'agent_decision', 'recommended_action',
+    'what_would_change_my_mind', 'game_intelligence_card',
 ]
+
+GRADE_RANK = {
+    'operator_grade_A+': 5,
+    'operator_grade_A': 4,
+    'operator_grade_B_review': 3,
+    'operator_grade_C_extreme_review': 2,
+    'operator_grade_D_skip': 1,
+}
 
 
 def _num(value: Any) -> float | None:
@@ -59,6 +68,27 @@ def _future(row: dict[str, Any]) -> bool:
     return bool(parsed and parsed > datetime.now(timezone.utc))
 
 
+def _edge_ev(probability: float | None, decimal_price: float | None) -> dict[str, Any]:
+    if probability is None or decimal_price is None or decimal_price <= 1.0:
+        return {
+            'market_implied_probability': None,
+            'edge_probability': None,
+            'edge_percent': None,
+            'expected_value_per_unit': None,
+            'expected_value_percent': None,
+        }
+    implied = 1.0 / decimal_price
+    edge = probability - implied
+    ev = probability * decimal_price - 1.0
+    return {
+        'market_implied_probability': round(implied, 6),
+        'edge_probability': round(edge, 6),
+        'edge_percent': round(edge * 100.0, 3),
+        'expected_value_per_unit': round(ev, 6),
+        'expected_value_percent': round(ev * 100.0, 3),
+    }
+
+
 def playable_odds_targets(model_probability: float | None, min_edge: float = 0.03, great_edge: float = 0.075) -> dict[str, Any]:
     if model_probability is None or not (0.0 < model_probability < 1.0):
         return {'fair_decimal_price': None, 'minimum_playable_decimal': None, 'great_value_decimal': None}
@@ -67,6 +97,22 @@ def playable_odds_targets(model_probability: float | None, min_edge: float = 0.0
         'minimum_playable_decimal': round(1.0 / max(0.01, model_probability - min_edge), 4),
         'great_value_decimal': round(1.0 / max(0.01, model_probability - great_edge), 4),
     }
+
+
+def line_value_status(row: dict[str, Any]) -> str:
+    price = _price(row.get('decimal_price'))
+    minimum = _price(row.get('minimum_playable_decimal'))
+    great = _price(row.get('great_value_decimal'))
+    fair = _price(row.get('fair_decimal_price'))
+    if price is None or fair is None:
+        return 'missing_price_or_probability'
+    if great is not None and price >= great:
+        return 'great_value_price'
+    if minimum is not None and price >= minimum:
+        return 'playable_value_price'
+    if price >= fair:
+        return 'above_fair_but_edge_thin'
+    return 'below_fair_skip'
 
 
 def line_shop_table(row: dict[str, Any]) -> pd.DataFrame:
@@ -108,11 +154,21 @@ def best_line(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def information_confidence(row: dict[str, Any]) -> dict[str, Any]:
-    quality = _num(row.get('odds_accuracy_score')) or 0.0
+    quality = _num(row.get('odds_accuracy_score'))
+    if quality is None:
+        quality = 55.0 if _price(row.get('decimal_price')) and _prob(row) else 0.0
     books = _num(row.get('book_count_normalized') or row.get('bookmaker_count') or row.get('books')) or 0.0
     notes = safe_text(row.get('manual_context_notes'))
     context = 90.0 if any(word in notes.lower() for word in ['confirmed', 'official', 'lineup', 'starter']) else 75.0 if notes else 35.0
-    score = round(quality * 0.35 + min(100.0, books * 20.0) * 0.20 + context * 0.15 + (100.0 if _future(row) else 20.0) * 0.10 + (100.0 if _price(row.get('decimal_price')) else 0.0) * 0.10 + (100.0 if _prob(row) else 0.0) * 0.10, 2)
+    score = round(
+        quality * 0.35
+        + min(100.0, books * 20.0) * 0.20
+        + context * 0.15
+        + (100.0 if _future(row) else 20.0) * 0.10
+        + (100.0 if _price(row.get('decimal_price')) else 0.0) * 0.10
+        + (100.0 if _prob(row) else 0.0) * 0.10,
+        2,
+    )
     return {'information_confidence_score': score, 'context_info_score': context, 'market_depth_score': round(min(100.0, books * 20.0), 2)}
 
 
@@ -185,15 +241,30 @@ def intelligence_grade(row: dict[str, Any]) -> str:
     info = _num(row.get('information_confidence_score')) or 0.0
     ev = _num(row.get('expected_value_per_unit')) or 0.0
     disagreement = safe_text(row.get('market_disagreement_flag'))
-    if row.get('data_quality_wall_pass') and info >= 82 and ev >= 0.08 and disagreement != 'extreme_review_required':
+    line_status = safe_text(row.get('minimum_line_value_status'))
+    if row.get('data_quality_wall_pass') and info >= 82 and ev >= 0.08 and disagreement != 'extreme_review_required' and line_status in {'great_value_price', 'playable_value_price'}:
         return 'operator_grade_A+'
-    if info >= 72 and ev > 0 and disagreement != 'extreme_review_required':
+    if info >= 72 and ev > 0 and disagreement != 'extreme_review_required' and line_status != 'below_fair_skip':
         return 'operator_grade_A'
     if info >= 60 and ev > -0.02:
         return 'operator_grade_B_review'
     if disagreement == 'extreme_review_required':
         return 'operator_grade_C_extreme_review'
     return 'operator_grade_D_skip'
+
+
+def operator_next_step(row: dict[str, Any]) -> str:
+    if row.get('shadow_proof_ready') and safe_text(row.get('game_intelligence_grade')) in {'operator_grade_A+', 'operator_grade_A'}:
+        return 'send_to_odds_lock_or_shadow_log'
+    if safe_text(row.get('market_disagreement_flag')) == 'extreme_review_required':
+        return 'review_model_vs_market_disagreement'
+    if safe_text(row.get('data_quality_blockers')):
+        return 'fix_missing_required_fields'
+    if safe_text(row.get('data_quality_warnings')):
+        return 'review_warnings_before_lock'
+    if safe_text(row.get('minimum_line_value_status')) == 'below_fair_skip':
+        return 'skip_unless_price_improves'
+    return 'watch_or_compare_more_books'
 
 
 def card_markdown(row: dict[str, Any]) -> str:
@@ -209,9 +280,11 @@ def card_markdown(row: dict[str, Any]) -> str:
             lines.append(f'**{label}:** {value:.2f}{suffix}')
     lines.append(f'**Minimum playable odds:** {row.get("minimum_playable_decimal") or "N/A"}')
     lines.append(f'**Great value odds:** {row.get("great_value_decimal") or "N/A"}')
+    lines.append(f'**Line value status:** {safe_text(row.get("minimum_line_value_status")) or "N/A"}')
     lines.append(f'**Market disagreement:** {safe_text(row.get("market_disagreement_flag")) or "N/A"}')
     lines.append(f'**Data quality wall:** {"PASS" if row.get("data_quality_wall_pass") else "REVIEW"}')
     lines.append(f'**Recommended action:** {safe_text(row.get("recommended_action")) or safe_text(row.get("agent_decision")) or "review"}')
+    lines.append(f'**Operator next step:** {safe_text(row.get("operator_next_step")) or "review"}')
     change = safe_text(row.get('what_would_change_my_mind'))
     if change:
         lines.append(f'**What would change my mind:** {change}')
@@ -232,7 +305,21 @@ def agent_answer(row: dict[str, Any], question: str) -> str:
         return safe_text(row.get('what_would_change_my_mind')) or 'No change-my-mind rules generated.'
     if 'ev' in q or 'value' in q:
         return f"EV: {row.get('expected_value_percent') or 'N/A'}%. Edge: {row.get('edge_percent') or 'N/A'} percentage points. Rating: {safe_text(row.get('value_rating')) or 'N/A'}."
+    if 'next' in q or 'do' in q:
+        return f"Next step: {safe_text(row.get('operator_next_step')) or 'review'}"
     return safe_text(row.get('game_intelligence_card')) or 'No game card available.'
+
+
+def _sort_board(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    out = frame.copy()
+    out['_shadow_sort'] = out.get('shadow_proof_ready', pd.Series(dtype=bool)).fillna(False).astype(bool).astype(int)
+    out['_grade_sort'] = out.get('game_intelligence_grade', pd.Series(dtype=str)).map(GRADE_RANK).fillna(0)
+    out['_info_sort'] = pd.to_numeric(out.get('information_confidence_score', pd.Series(dtype=float)), errors='coerce').fillna(0)
+    out['_ev_sort'] = pd.to_numeric(out.get('expected_value_per_unit', pd.Series(dtype=float)), errors='coerce').fillna(0)
+    out = out.sort_values(['_shadow_sort', '_grade_sort', '_info_sort', '_ev_sort'], ascending=False)
+    return out.drop(columns=['_shadow_sort', '_grade_sort', '_info_sort', '_ev_sort'], errors='ignore').reset_index(drop=True)
 
 
 def enrich_game_intelligence(frame: pd.DataFrame | list[dict[str, Any]]) -> pd.DataFrame:
@@ -252,16 +339,19 @@ def enrich_game_intelligence(frame: pd.DataFrame | list[dict[str, Any]]) -> pd.D
             item['decimal_price'] = round(best, 6)
             item['bookmaker'] = item.get('best_available_book') or item.get('bookmaker')
         item.update(playable_odds_targets(_prob(item)))
+        item.update(_edge_ev(_prob(item), _price(item.get('decimal_price'))))
+        item['minimum_line_value_status'] = line_value_status(item)
         item.update(information_confidence(item))
         item.update(market_disagreement(item))
         item['what_would_change_my_mind'] = change_mind_rules(item)
         item.update(data_quality_wall(item))
-        item['shadow_proof_ready'] = bool(_future(item) and not item.get('data_quality_blockers') and _prob(item) is not None and _price(item.get('decimal_price')) is not None)
+        item['shadow_proof_ready'] = bool(_future(item) and item.get('data_quality_wall_pass') and _prob(item) is not None and _price(item.get('decimal_price')) is not None)
         item['shadow_proof_label'] = 'internal_shadow_only' if item['shadow_proof_ready'] else ''
         item['game_intelligence_grade'] = intelligence_grade(item)
+        item['operator_next_step'] = operator_next_step(item)
         item['game_intelligence_card'] = card_markdown(item)
         rows.append(item)
-    return pd.DataFrame(rows)
+    return _sort_board(pd.DataFrame(rows))
 
 
 def display_columns(frame: pd.DataFrame) -> list[str]:
@@ -288,6 +378,6 @@ def operator_daily_report(frame: pd.DataFrame | list[dict[str, Any]]) -> str:
     review = int(enriched.get('data_quality_wall_pass', pd.Series(dtype=bool)).fillna(False).astype(bool).eq(False).sum())
     lines = ['# Daily Operator Report', '', f'Total rows reviewed: {len(enriched)}', f'Internal shadow candidates: {candidates}', f'Rows needing review: {review}', '', '## Top board']
     for index, row in enumerate(enriched.head(10).to_dict(orient='records'), start=1):
-        lines.append(f"{index}. {safe_text(row.get('prediction')) or 'Pick'} — {safe_text(row.get('event')) or 'Event'} | Grade: {safe_text(row.get('game_intelligence_grade')) or 'N/A'} | Action: {safe_text(row.get('recommended_action')) or safe_text(row.get('agent_decision')) or 'review'}")
+        lines.append(f"{index}. {safe_text(row.get('prediction')) or 'Pick'} — {safe_text(row.get('event')) or 'Event'} | Grade: {safe_text(row.get('game_intelligence_grade')) or 'N/A'} | Action: {safe_text(row.get('operator_next_step')) or safe_text(row.get('recommended_action')) or safe_text(row.get('agent_decision')) or 'review'}")
     lines.extend(['', '## Reminder', 'This is internal analytics output. Public proof still requires official lock rows created before event start.'])
     return '\n'.join(lines)
