@@ -203,12 +203,12 @@ existing_rows = [row for row in (valid_bank_row(row) for row in bank.get('compac
 existing_metrics = memory_metrics(existing_rows)
 existing_segments = build_segments(existing_rows, 3, 200) if existing_rows else []
 
-st.subheader(t('source_truth'))
-truth = st.columns(4)
-truth[0].metric('learned_state.json', 'Loaded' if current is not None else 'Missing')
-truth[1].metric('learning_memory_bank.json', f'{len(existing_rows)} rows')
-truth[2].metric('ara_learning_memory.csv', 'Ready' if existing_segments else 'No patterns')
-truth[3].metric('Bank version', str(bank.get('version', 'unknown')))
+with st.expander(t('source_truth'), expanded=False):
+    truth = st.columns(4)
+    truth[0].metric('learned_state.json', 'Loaded' if current is not None else 'Missing')
+    truth[1].metric('learning_memory_bank.json', f'{len(existing_rows)} rows')
+    truth[2].metric('ara_learning_memory.csv', 'Ready' if existing_segments else 'No patterns')
+    truth[3].metric('Bank version', str(bank.get('version', 'unknown')))
 
 st.subheader(t('saved_calibration'))
 cal = st.columns(4)
