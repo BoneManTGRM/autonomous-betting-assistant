@@ -1,26 +1,28 @@
-# Autonomous Sports Analytics Agent
+# ABA Signal Pro
+
+**Powered by Reparodynamics**
 
 [![CI](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/ci.yml)
 
-Autonomous Sports Analytics Agent is a proprietary, source-available sports research and prediction-analysis platform built from the ARA/TGRM workflow: test available evidence, detect weak signals, repair the analysis, verify uncertainty, and produce auditable probability reports.
+ABA Signal Pro is a proprietary, source-available sports betting analytics and prediction-analysis platform built from the ARA/TGRM workflow: test available evidence, detect weak signals, repair the analysis, verify uncertainty, and produce auditable probability reports.
 
-It is designed for sports analysts, market researchers, prediction reviewers, private research groups, influencers, and commercial operators that need a repeatable decision layer instead of manual guesswork.
+It is designed for sports analysts, betting-market researchers, prediction reviewers, private research groups, influencers, and commercial operators that need a repeatable decision layer instead of manual guesswork.
 
-**Important:** this software does not execute transactions, does not guarantee winners, and does not guarantee returns. It is an analytics and research system. Any real-world decision remains the responsibility of the user.
+**Important:** this software does not execute transactions, does not guarantee winners, and does not guarantee returns. It is an analytics and research system. Any real-world betting or financial decision remains the responsibility of the user.
 
 ## Current product structure
 
 The app is organized around a no-password commercial workflow:
 
 ```text
-Deployment Health -> Scanner Pro -> Pro Predictor -> What Are the Odds -> Odds Lock Pro -> Daily Workflow -> Auto Result Grading -> Public Proof Dashboard -> Monthly License Readiness -> Learning Memory
+Deployment Health -> Scanner Pro -> ABA Signal Pro -> What Are the Odds -> Odds Lock Pro -> Daily Workflow -> Auto Result Grading -> Public Proof Dashboard -> Monthly License Readiness -> Learning Memory
 ```
 
 | Tool | Main job |
 | --- | --- |
 | **Deployment Health** | Checks integration status, page/file presence, persistent ledger health, proof quality, monthly-license readiness, and action items. |
 | **Scanner Pro** | Scans live odds feeds, normalizes markets, ranks market quality, and sends clean rows forward. |
-| **Pro Predictor** | Builds model probabilities, applies learned memory, scores agent decisions, and produces prediction-ready rows. |
+| **ABA Signal Pro** | Builds model probabilities, applies learned memory, scores agent decisions, and produces prediction-ready rows. |
 | **What Are the Odds** | Runs the market/value command board: edge, agent decision, scanner strength, CLV, loss review, sport routing, and lock-ready review. |
 | **Odds Lock Pro** | Creates timestamped proof ledgers, client-safe reports, bankroll controls, persistent-ledger saves, and audit-ready proof IDs. |
 | **One-Click Daily Workflow** | Takes current/session/uploaded rows, locks qualified rows, optionally saves them, and generates report output in one guided flow. |
@@ -55,7 +57,7 @@ This is not a full password-protected client portal yet. Login, paid accounts, S
 ## Recommended daily workflow
 
 1. Open **Deployment Health** and confirm the deployment is usable.
-2. Use **Scanner Pro** and/or **Pro Predictor** to create rows.
+2. Use **Scanner Pro** and/or **ABA Signal Pro** to create rows.
 3. Use **What Are the Odds** for market/value review.
 4. Use **One-Click Daily Workflow** to lock qualified rows and generate reports.
 5. Save locked rows into the persistent proof ledger.
@@ -76,7 +78,7 @@ A high hit rate alone is not enough. ROI, average price, CLV, book coverage, sam
 
 ## Monthly license readiness
 
-The product should be sold as a monthly sports analytics and proof-tracking license, not as guaranteed betting income and not as a one-time code dump.
+The product should be sold as a monthly sports betting analytics and proof-tracking license, not as guaranteed betting income and not as a one-time code dump.
 
 Minimum readiness for a private beta license:
 
@@ -173,7 +175,7 @@ A green badge or workflow run should be checked directly in GitHub before claimi
 
 ## Commercial positioning
 
-This project is intended to become a licensable product, not a free open-source prediction bot. It can support private sports-analysis dashboards, paid research tools, white-label prediction-review systems, client-facing sports analytics reports, internal research workflows, custom API integrations, private deployment, support, and model-tuning packages.
+This project is intended to become a licensable product, not a free open-source prediction bot. It can support private sports-betting analysis dashboards, paid research tools, white-label prediction-review systems, client-facing sports analytics reports, internal research workflows, custom API integrations, private deployment, support, and model-tuning packages.
 
 The repository is public for limited review and evaluation, but the code is governed by a proprietary evaluation license. Commercial use, resale, sublicensing, hosting, paid access, SaaS deployment, API access, white-label use, competing-product use, model-training use, or monetized derivative use requires written permission from Reparodynamics.
 
