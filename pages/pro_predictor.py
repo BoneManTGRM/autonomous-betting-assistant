@@ -389,8 +389,9 @@ if st.button(t('run'), type='primary', use_container_width=True):
     health = page_health(handoff, page='pro_predictor')
     lock_ready = lock_ready_candidates(decisions, min_edge=float(min_edge), strong_edge=float(strong_edge))
     playable = int(summary['play_strong'] + summary['play_small'])
-    st.session_state['pro_predictor_latest_rows'] = decisions.to_dict('records')
+    st.session_state['pro_predictor_all_rows'] = decisions.to_dict('records')
     st.session_state['pro_predictor_high_confidence_rows'] = high_conf.to_dict('records')
+    st.session_state['pro_predictor_latest_rows'] = handoff.to_dict('records')
     st.session_state['ara_latest_predictions'] = handoff.to_dict('records')
     st.session_state['ara_latest_predictions_source'] = 'Pro Predictor high-confidence' if use_high_conf else 'Pro Predictor all rows'
     st.session_state['ara_latest_predictions_saved_at'] = pd.Timestamp.utcnow().isoformat()
