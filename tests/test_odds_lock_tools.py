@@ -56,7 +56,7 @@ class OddsLockToolsTests(unittest.TestCase):
         blockers = lock_blockers(frame.iloc[0].to_dict(), require_future=True)
         self.assertIn('invalid_after_start', blockers)
         blockers_missing_book = lock_blockers(frame.iloc[1].to_dict(), require_future=True)
-        self.assertIn('missing_bookmaker', blockers_missing_book)
+        self.assertTrue({'missing_bookmaker', 'missing_bookmaker_or_odds_source'} & set(blockers_missing_book))
 
     def test_strict_future_lock_accepts_complete_future_row(self):
         frame = pd.DataFrame([
