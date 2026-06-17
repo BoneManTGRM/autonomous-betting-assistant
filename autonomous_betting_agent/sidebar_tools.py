@@ -5,7 +5,6 @@ from typing import Any
 APP_TAGLINE = 'Powered by Reparodynamics'
 PAGES = (
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor.py'),
-    ('Ultra 70 Profit Mode', 'Ultra 70 Profit Mode', 'pages/ultra80_profit_mode.py'),
     ('Simulation Lab', 'Laboratorio de Simulación', 'pages/simulation_lab.py'),
     ('Threshold Optimizer', 'Optimizador de Umbrales', 'pages/threshold_optimizer.py'),
     ('What Are the Odds', 'Cuotas y Valor', 'pages/what_are_the_odds.py'),
@@ -15,9 +14,9 @@ PAGES = (
     ('Reset Lock File', 'Reiniciar Archivo de Bloqueo', 'pages/reset_lock_file.py'),
 )
 LANG_KEYS = ('global_language','app_language','pro_predictor_language','ultra80_profit_mode_language','simulation_lab_language','threshold_optimizer_language','what_are_the_odds_language','what_are_the_odds_pro_language','odds_lock_pro_language','public_proof_dashboard_language','reset_lock_file_language','learn_memory_language','learning_memory_language')
-BRAND_RENDERED_KEY = '_aba_sidebar_brand_once_v23'
-PAGES_RENDERED_KEY = '_aba_sidebar_pages_once_v23'
-SIDEBAR_CALL_ACTIVE_KEY = '_aba_sidebar_language_active_v23'
+BRAND_RENDERED_KEY = '_aba_sidebar_brand_once_v24'
+PAGES_RENDERED_KEY = '_aba_sidebar_pages_once_v24'
+SIDEBAR_CALL_ACTIVE_KEY = '_aba_sidebar_language_active_v24'
 CSS = '''
 <style>
 [data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
@@ -124,9 +123,9 @@ def install_sidebar_tools() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_sidebar_tools_installed_v23', False):
+    if getattr(st, '_aba_sidebar_tools_installed_v24', False):
         return
-    st._aba_sidebar_tools_installed_v23 = True
+    st._aba_sidebar_tools_installed_v24 = True
     real_config = st.set_page_config
     real_md = st.markdown
     real_side_radio = st.sidebar.radio
