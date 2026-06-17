@@ -30,16 +30,8 @@ builtins.get_secret = get_secret
 
 def _install_all_runtime_hooks() -> None:
     try:
-        import streamlit as st
-        from autonomous_betting_agent.sidebar_tools import install_sidebar_tools, render_curated_sidebar, normal_language
+        from autonomous_betting_agent.sidebar_tools import install_sidebar_tools
         install_sidebar_tools()
-        try:
-            language = normal_language(st.session_state.get('global_language', 'English'))
-            if not st.session_state.get('_ara_startup_sidebar_drawn'):
-                st.session_state['_ara_startup_sidebar_drawn'] = True
-                render_curated_sidebar(st, language)
-        except Exception:
-            pass
     except Exception:
         pass
     try:
