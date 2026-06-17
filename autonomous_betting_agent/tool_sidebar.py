@@ -17,6 +17,7 @@ WORKFLOW = [
     'Scanner Pro',
     PREDICTOR_TOOL_NAME,
     'Ultra 70 Profit Mode',
+    'Simulation Lab',
     'What Are the Odds',
     'Odds Lock Pro',
     'Public Proof Dashboard',
@@ -44,8 +45,12 @@ PAGE_GUIDES: dict[str, dict[str, dict[str, Any]]] = {
         'es': {'name': 'Pro Predictor', 'purpose': 'Crea probabilidades y filas de máxima confianza.', 'use_when': 'Úsalo después del scanner o para filtrar predicciones.', 'inputs': 'Cuotas en vivo y contexto SportsDataIO/WeatherAPI.', 'outputs': 'Tablero completo y handoff de máxima confianza para Ultra 70 y Odds Lock Pro.', 'next': 'Ultra 70 Profit Mode, luego Odds Lock Pro.', 'avoid': 'No envíes una lista enorme sin filtrar a clientes.'},
     },
     'ultra80_profit_mode': {
-        'en': {'name': 'Ultra 70 Profit Mode', 'purpose': 'Builds the 70%+ lockable handoff list while keeping strict 80% proof separate.', 'use_when': 'Use after Pro Predictor when you want 70%+ rows sent to Odds Lock Pro.', 'inputs': 'Latest Pro Predictor session rows or uploaded prediction CSV.', 'outputs': 'A strict 80 proof tier, B Ultra 70 lockable tier, and C reserve/watch tier.', 'next': 'Odds Lock Pro.', 'avoid': 'Do not call Ultra 70 rows strict 80 proof; track the tiers separately.'},
-        'es': {'name': 'Ultra 70 Profit Mode', 'purpose': 'Crea la lista bloqueable 70%+ y mantiene la prueba estricta 80% separada.', 'use_when': 'Úsalo después de Pro Predictor cuando quieres enviar filas 70%+ a Odds Lock Pro.', 'inputs': 'Última sesión de Predictor o CSV de predicciones.', 'outputs': 'Nivel A prueba 80 estricta, nivel B Ultra 70 bloqueable y nivel C reserva/vigilar.', 'next': 'Odds Lock Pro.', 'avoid': 'No llames filas Ultra 70 prueba estricta 80; rastrea los niveles separados.'},
+        'en': {'name': 'Ultra 70 Profit Mode', 'purpose': 'Builds adaptive 70%+ lock tiers while keeping strict 80% proof separate.', 'use_when': 'Use after Pro Predictor to separate B+ positive-value locks, B adaptive pattern locks, and C watch rows.', 'inputs': 'Latest Pro Predictor session rows or uploaded prediction CSV.', 'outputs': 'A strict 80 proof tier, B/B+ Ultra 70 adaptive lock tier, and C value-watch/review tier.', 'next': 'Simulation Lab for stress testing, then Odds Lock Pro.', 'avoid': 'Do not call Ultra 70 rows strict 80 proof; track the tiers separately.'},
+        'es': {'name': 'Ultra 70 Profit Mode', 'purpose': 'Crea niveles adaptativos 70%+ y mantiene la prueba estricta 80% separada.', 'use_when': 'Úsalo después de Pro Predictor para separar B+ con valor, B adaptativo por patrón y C revisión.', 'inputs': 'Última sesión de Predictor o CSV de predicciones.', 'outputs': 'Nivel A prueba 80 estricta, nivel B/B+ Ultra 70 adaptativo y nivel C vigilancia/revisión.', 'next': 'Simulation Lab para estrés, luego Odds Lock Pro.', 'avoid': 'No llames filas Ultra 70 prueba estricta 80; rastrea los niveles separados.'},
+    },
+    'simulation_lab': {
+        'en': {'name': 'Simulation Lab', 'purpose': 'Fast Monte Carlo stress test for Ultra 70 and Pro Predictor rows.', 'use_when': 'Use after Ultra 70 when you want to check downside, ROI stress, and confidence before locking.', 'inputs': 'Latest Ultra 70 / Pro Predictor session rows or uploaded prediction CSV.', 'outputs': 'Simulation summary, scout actions, risk report, diagnostics, and survivor rows saved for handoff.', 'next': 'Odds Lock Pro for future-only proof rows.', 'avoid': 'Do not use Simulation Lab as the only gate; treat it as a warning/stress-test tool.'},
+        'es': {'name': 'Simulation Lab', 'purpose': 'Prueba rápida Monte Carlo para filas Ultra 70 y Pro Predictor.', 'use_when': 'Úsalo después de Ultra 70 para revisar downside, ROI bajo estrés y confianza antes de bloquear.', 'inputs': 'Filas de sesión Ultra 70 / Pro Predictor o CSV de predicciones.', 'outputs': 'Resumen de simulación, acciones scout, reporte de riesgo, diagnóstico y filas sobrevivientes guardadas.', 'next': 'Odds Lock Pro para prueba futura oficial.', 'avoid': 'No uses Simulation Lab como único filtro; úsalo como herramienta de advertencia/estrés.'},
     },
     'what_are_the_odds': {
         'en': {'name': 'What Are the Odds', 'purpose': 'Market/value command board with EV, odds quality, manual context, CLV, and decision scoring.', 'use_when': 'Use before locking to verify value and add missing expert context.', 'inputs': 'Predictor/scanner rows, optional manual context CSV.', 'outputs': 'Best Board, lock-ready rows, odds accuracy export.', 'next': 'Odds Lock Pro.', 'avoid': 'Do not apply manual probability changes without notes.'},
@@ -100,6 +105,7 @@ def session_state_summary() -> pd.DataFrame:
         {'stage': 'Pro Predictor handoff', 'session_key': 'pro_predictor_latest_rows', 'rows': _count_session_rows('pro_predictor_latest_rows')},
         {'stage': 'High-confidence rows', 'session_key': 'pro_predictor_high_confidence_rows', 'rows': _count_session_rows('pro_predictor_high_confidence_rows')},
         {'stage': 'Ultra 70 rows', 'session_key': 'ultra80_max_volume_rows', 'rows': _count_session_rows('ultra80_max_volume_rows')},
+        {'stage': 'Simulation survivors', 'session_key': 'simulation_survivor_rows', 'rows': _count_session_rows('simulation_survivor_rows')},
         {'stage': 'Odds/value rows', 'session_key': 'what_are_the_odds_latest_rows', 'rows': _count_session_rows('what_are_the_odds_latest_rows')},
         {'stage': 'Locked proof rows', 'session_key': 'odds_lock_pro_locked_rows', 'rows': _count_session_rows('odds_lock_pro_locked_rows')},
     ]
