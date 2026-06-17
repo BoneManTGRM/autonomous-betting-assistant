@@ -19,7 +19,7 @@ CSS = '''
 <style>
 [data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
 [data-testid="collapsedControl"]{z-index:999999!important;}
-section[data-testid="stSidebar"] h3:first-of-type,section[data-testid="stSidebar"] h3:first-of-type *{color:#D4AF37!important;-webkit-text-fill-color:#D4AF37!important;text-shadow:0 0 10px rgba(212,175,55,.20)!important;}
+section[data-testid="stSidebar"] h3:first-of-type,section[data-testid="stSidebar"] h3:first-of-type *{color:#D4AF37!important;-webkit-text-fill-color:#D4AF37!important;font-size:1.16em!important;line-height:1.18!important;font-weight:800!important;text-shadow:0 0 10px rgba(212,175,55,.20)!important;}
 @media(max-width:900px){section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{padding:.75rem .9rem!important;overflow-x:hidden!important}.block-container{padding-left:.85rem!important;padding-right:.85rem!important;max-width:100vw!important}}
 </style>
 '''
