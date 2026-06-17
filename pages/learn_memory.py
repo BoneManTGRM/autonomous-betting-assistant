@@ -42,7 +42,7 @@ TEXT = {
     'en': {
         'title': 'Learning Memory',
         'caption': 'Durable training page. It reviews usable finished rows, audits memory health, trains calibration, saves cumulative memory, and exports ARA pattern memory.',
-        'workflow': 'Clean path: Scanner Pro → Pro Predictor → What Are the Odds → Learning Memory.',
+        'workflow': 'Clean path: Pro Predictor → What Are the Odds → Learning Memory.',
         'source_truth': 'Learning source of truth',
         'saved_calibration': 'Saved calibration',
         'cumulative': 'Cumulative memory',
@@ -98,7 +98,7 @@ TEXT = {
     'es': {
         'title': 'Memoria de Aprendizaje',
         'caption': 'Página de entrenamiento duradero. Revisa filas finalizadas útiles, audita salud de memoria, entrena calibración, guarda memoria acumulativa y exporta patrones ARA.',
-        'workflow': 'Ruta limpia: Scanner Pro → Predictor Pro → ¿Cuáles Son las Cuotas? → Memoria de Aprendizaje.',
+        'workflow': 'Ruta limpia: Predictor Pro → ¿Cuáles Son las Cuotas? → Memoria de Aprendizaje.',
         'source_truth': 'Fuente única de aprendizaje',
         'saved_calibration': 'Calibración guardada',
         'cumulative': 'Memoria acumulativa',
