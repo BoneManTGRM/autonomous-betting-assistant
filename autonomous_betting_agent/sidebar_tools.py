@@ -16,14 +16,15 @@ PAGES = (
     ('Reset Lock File', 'Reiniciar Archivo de Bloqueo', 'pages/reset_lock_file.py'),
 )
 LANG_KEYS = ('global_language','app_language','pro_predictor_language','ultra80_profit_mode_language','simulation_lab_language','threshold_optimizer_language','what_are_the_odds_language','what_are_the_odds_pro_language','odds_lock_pro_language','public_proof_dashboard_language','reset_lock_file_language','learn_memory_language','learning_memory_language')
-CSS = '''
+BRIGHT_GOLD = '#FFD54A'
+CSS = f'''
 <style>
-[data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
-[data-testid="collapsedControl"]{z-index:999999!important;}
-.aba-sidebar-brand{color:#D4AF37!important;-webkit-text-fill-color:#D4AF37!important;font-size:1.66rem!important;line-height:1.18!important;font-weight:850!important;letter-spacing:-.02em!important;text-shadow:0 0 10px rgba(212,175,55,.20)!important;margin:.25rem 0 .55rem 0!important;}
-.aba-sidebar-tagline{color:rgba(250,250,250,.62)!important;font-size:1.02rem!important;margin:0 0 1.35rem 0!important;}
-section[data-testid="stSidebar"] h3:has(span[style*="color"]),section[data-testid="stSidebar"] h3:has(span[style*="color"]) *,section[data-testid="stSidebar"] h3:has(span[class*="green"]),section[data-testid="stSidebar"] h3:has(span[class*="green"]) *,section[data-testid="stSidebar"] h3:has(span[class*="red"]),section[data-testid="stSidebar"] h3:has(span[class*="red"]) *{color:#D4AF37!important;-webkit-text-fill-color:#D4AF37!important;font-size:1.16em!important;line-height:1.18!important;font-weight:800!important;text-shadow:0 0 10px rgba(212,175,55,.20)!important;}
-@media(max-width:900px){section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{padding:.75rem .9rem!important;overflow-x:hidden!important}.block-container{padding-left:.85rem!important;padding-right:.85rem!important;max-width:100vw!important}}
+[data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}}
+[data-testid="collapsedControl"]{{z-index:999999!important;}}
+.aba-sidebar-brand{{color:{BRIGHT_GOLD}!important;-webkit-text-fill-color:{BRIGHT_GOLD}!important;font-size:1.66rem!important;line-height:1.18!important;font-weight:850!important;letter-spacing:-.02em!important;text-shadow:0 0 14px rgba(255,213,74,.38)!important;margin:.25rem 0 .55rem 0!important;}}
+.aba-sidebar-tagline{{color:rgba(250,250,250,.62)!important;font-size:1.02rem!important;margin:0 0 1.35rem 0!important;}}
+section[data-testid="stSidebar"] h3:has(span[style*="color"]),section[data-testid="stSidebar"] h3:has(span[style*="color"]) *,section[data-testid="stSidebar"] h3:has(span[class*="green"]),section[data-testid="stSidebar"] h3:has(span[class*="green"]) *,section[data-testid="stSidebar"] h3:has(span[class*="red"]),section[data-testid="stSidebar"] h3:has(span[class*="red"]) *{{color:{BRIGHT_GOLD}!important;-webkit-text-fill-color:{BRIGHT_GOLD}!important;font-size:1.16em!important;line-height:1.18!important;font-weight:800!important;text-shadow:0 0 14px rgba(255,213,74,.38)!important;}}
+@media(max-width:900px){{section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{{padding:.75rem .9rem!important;overflow-x:hidden!important}}.block-container{{padding-left:.85rem!important;padding-right:.85rem!important;max-width:100vw!important}}}}
 </style>
 '''
 
@@ -96,9 +97,9 @@ def install_sidebar_tools() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_ara_sidebar_safety_v16', False):
+    if getattr(st, '_ara_sidebar_safety_v17', False):
         return
-    st._ara_sidebar_safety_v16 = True
+    st._ara_sidebar_safety_v17 = True
     real_config = st.set_page_config
     real_md = st.markdown
     real_side_radio = st.sidebar.radio
