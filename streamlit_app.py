@@ -18,12 +18,12 @@ except Exception:
 
 APP_NAME = 'ARA Signal Pro'
 APP_TAGLINE = 'Powered by Reparodynamics'
-APP_BUILD = 'stable-sidebar-shell-v1'
+APP_BUILD = 'stable-sidebar-shell-v2-native-width'
 REPO_ROOT = Path(__file__).resolve().parent
 REPO_MEMORY_PATH = REPO_ROOT / 'data' / 'ara_permanent_learning_memory.csv'
 
 _REAL_SET_PAGE_CONFIG = st.set_page_config
-_REAL_SET_PAGE_CONFIG(page_title=APP_NAME, layout='wide', initial_sidebar_state='expanded')
+_REAL_SET_PAGE_CONFIG(page_title=APP_NAME, layout='wide', initial_sidebar_state='collapsed')
 
 # Child pages call set_page_config. The shell owns the page config to prevent conflicts.
 st.set_page_config = lambda *args, **kwargs: None
