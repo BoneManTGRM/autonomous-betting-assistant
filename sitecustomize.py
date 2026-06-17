@@ -205,6 +205,10 @@ def _called_from_pro_predictor() -> bool:
     return _called_from_page('pro_predictor.py')
 
 
+def _called_from_simulation_lab() -> bool:
+    return _called_from_page('simulation_lab.py')
+
+
 def _called_from_learning_memory() -> bool:
     return _called_from_page('learn_memory.py')
 
@@ -242,15 +246,33 @@ def _slider_should_use_number_input(label: Any) -> bool:
     return 'agent score' in key or 'puntaje agente' in key
 
 
+def _simulation_number_defaults(label: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+    key = _label_key(label)
+    out = dict(kwargs)
+    if key in {'iterations', 'iteraciones'}:
+        out['value'] = min(float(out.get('value', 1000)), 1000)
+        out['max_value'] = min(float(out.get('max_value', 5000)), 5000)
+        out['step'] = 500
+    elif 'max rows per strategy' in key or 'max filas por estrategia' in key or 'maximo filas por estrategia' in key or 'max filas' in key or 'máx filas' in key:
+        out['value'] = min(int(out.get('value', 50)), 50)
+        out['max_value'] = min(int(out.get('max_value', 250)), 250)
+        out['step'] = 25
+    elif 'minimum optimizer rows' in key or 'minimo de filas del optimizador' in key or 'mínimo de filas del optimizador' in key:
+        out['value'] = min(int(out.get('value', 3)), 3)
+        out['max_value'] = min(int(out.get('max_value', 50)), 50)
+        out['step'] = 1
+    return out
+
+
 def _install_page_helpers() -> None:
     try:
         import streamlit as st
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_page_helpers_installed_v2', False):
+    if getattr(st, '_aba_page_helpers_installed_v3', False):
         return
-    st._aba_page_helpers_installed_v2 = True
+    st._aba_page_helpers_installed_v3 = True
     real_st_dataframe = st.dataframe
     real_dg_dataframe = DeltaGenerator.dataframe
     real_subheader = st.subheader
@@ -291,6 +313,16 @@ def _install_page_helpers() -> None:
         capture(data)
         return real_dg_dataframe(self, data, *args, **kwargs)
 
+    def patched_st_number_input(label: Any, *args: Any, **kwargs: Any) -> Any:
+        if _called_from_simulation_lab():
+            kwargs = _simulation_number_defaults(label, kwargs)
+        return real_st_number_input(label, *args, **kwargs)
+
+    def patched_dg_number_input(self: Any, label: Any, *args: Any, **kwargs: Any) -> Any:
+        if _called_from_simulation_lab():
+            kwargs = _simulation_number_defaults(label, kwargs)
+        return real_dg_number_input(self, label, *args, **kwargs)
+
     def patched_st_slider(label: Any, *args: Any, **kwargs: Any) -> Any:
         if _called_from_pro_predictor() and _slider_should_use_number_input(label):
             return real_st_number_input(label, *args, **kwargs)
@@ -321,6 +353,8 @@ def _install_page_helpers() -> None:
 
     st.dataframe = patched_st_dataframe
     DeltaGenerator.dataframe = patched_dg_dataframe
+    st.number_input = patched_st_number_input
+    DeltaGenerator.number_input = patched_dg_number_input
     st.slider = patched_st_slider
     DeltaGenerator.slider = patched_dg_slider
     st.subheader = patched_subheader
