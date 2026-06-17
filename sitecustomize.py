@@ -270,9 +270,9 @@ def _install_page_helpers() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_page_helpers_installed_v3', False):
+    if getattr(st, '_aba_page_helpers_installed_v4', False):
         return
-    st._aba_page_helpers_installed_v3 = True
+    st._aba_page_helpers_installed_v4 = True
     real_st_dataframe = st.dataframe
     real_dg_dataframe = DeltaGenerator.dataframe
     real_subheader = st.subheader
@@ -280,6 +280,8 @@ def _install_page_helpers() -> None:
     real_dg_slider = DeltaGenerator.slider
     real_st_number_input = st.number_input
     real_dg_number_input = DeltaGenerator.number_input
+    real_st_download_button = st.download_button
+    real_dg_download_button = getattr(DeltaGenerator, 'download_button', None)
 
     def capture(data: Any) -> Any:
         if _called_from_pro_predictor() and _looks_like_predictor_report(data):
@@ -303,6 +305,12 @@ def _install_page_helpers() -> None:
         rendered.add(signature)
         return True
 
+    def pro_predictor_download_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+        out = dict(kwargs)
+        if _called_from_pro_predictor():
+            out.setdefault('on_click', 'ignore')
+        return out
+
     def patched_st_dataframe(data: Any = None, *args: Any, **kwargs: Any) -> Any:
         captured = capture(data)
         if render_mobile_predictor_report is not None and should_render_mobile(captured):
@@ -312,6 +320,30 @@ def _install_page_helpers() -> None:
     def patched_dg_dataframe(self: Any, data: Any = None, *args: Any, **kwargs: Any) -> Any:
         capture(data)
         return real_dg_dataframe(self, data, *args, **kwargs)
+
+    def patched_st_download_button(label: Any, data: Any = None, *args: Any, **kwargs: Any) -> Any:
+        kwargs = pro_predictor_download_kwargs(kwargs)
+        try:
+            return real_st_download_button(label, data, *args, **kwargs)
+        except TypeError:
+            if kwargs.get('on_click') == 'ignore':
+                fallback = dict(kwargs)
+                fallback.pop('on_click', None)
+                return real_st_download_button(label, data, *args, **fallback)
+            raise
+
+    def patched_dg_download_button(self: Any, label: Any, data: Any = None, *args: Any, **kwargs: Any) -> Any:
+        if real_dg_download_button is None:
+            return patched_st_download_button(label, data, *args, **kwargs)
+        kwargs = pro_predictor_download_kwargs(kwargs)
+        try:
+            return real_dg_download_button(self, label, data, *args, **kwargs)
+        except TypeError:
+            if kwargs.get('on_click') == 'ignore':
+                fallback = dict(kwargs)
+                fallback.pop('on_click', None)
+                return real_dg_download_button(self, label, data, *args, **fallback)
+            raise
 
     def patched_st_number_input(label: Any, *args: Any, **kwargs: Any) -> Any:
         if _called_from_simulation_lab():
@@ -353,6 +385,9 @@ def _install_page_helpers() -> None:
 
     st.dataframe = patched_st_dataframe
     DeltaGenerator.dataframe = patched_dg_dataframe
+    st.download_button = patched_st_download_button
+    if real_dg_download_button is not None:
+        DeltaGenerator.download_button = patched_dg_download_button
     st.number_input = patched_st_number_input
     DeltaGenerator.number_input = patched_dg_number_input
     st.slider = patched_st_slider
