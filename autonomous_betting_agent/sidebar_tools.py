@@ -14,7 +14,7 @@ PAGES = (
     ('Learning Memory', 'Memoria', 'pages/learn_memory.py'),
 )
 KEYS = ('global_language', 'pro_predictor_language', 'odds_lock_pro_language', 'public_proof_dashboard_language', 'learn_memory_language')
-CSS = '<style>@media(max-width:900px){section[data-testid="stSidebar"]{width:min(86vw,360px)!important;min-width:min(86vw,360px)!important;max-width:min(86vw,360px)!important}.block-container{padding-left:.85rem!important;padding-right:.85rem!important}}</style>'
+CSS = '<style>@media(max-width:900px){section[data-testid="stSidebar"]{width:min(88vw,380px)!important;min-width:min(88vw,380px)!important;max-width:min(88vw,380px)!important}.block-container{padding-left:.85rem!important;padding-right:.85rem!important}}</style>'
 
 
 def lang(value: object) -> str:
