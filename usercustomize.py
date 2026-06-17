@@ -4,87 +4,31 @@ from typing import Any
 
 try:
     from autonomous_betting_agent.odds_input_normalizer import install_odds_breakdown_normalizer
-
     install_odds_breakdown_normalizer()
 except Exception:
     pass
 
 try:
     from autonomous_betting_agent.local_users import install_streamlit_local_user_selector
-
     install_streamlit_local_user_selector()
 except Exception:
     pass
 
-
-LANGUAGE_KEYS: tuple[str, ...] = (
-    'global_language', 'app_language', 'simulation_lab_language', 'pro_predictor_language',
-    'ultra80_profit_mode_language', 'odds_lock_pro_language', 'public_proof_dashboard_language',
-    'reset_lock_file_language', 'learn_memory_language', 'learning_memory_language',
-    'threshold_optimizer_language', 'what_are_the_odds_language',
+LANGUAGE_KEYS = (
+    'global_language', 'app_language', 'pro_predictor_language', 'ultra80_profit_mode_language',
+    'simulation_lab_language', 'what_are_the_odds_language', 'odds_lock_pro_language',
+    'public_proof_dashboard_language', 'reset_lock_file_language', 'learn_memory_language',
+    'learning_memory_language', 'threshold_optimizer_language',
 )
 
-PREDICTOR_FIRST_NAV_TOOLS: tuple[tuple[str, str, str], ...] = (
-    ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor.py'),
-    ('Ultra 70 Profit Mode', 'Ultra 70 Profit Mode', 'pages/ultra80_profit_mode.py'),
-    ('Simulation Lab', 'Laboratorio de Simulación', 'pages/simulation_lab.py'),
-    ('Odds Lock Pro', 'Bloqueo de Cuotas Pro', 'pages/odds_lock_pro.py'),
-    ('Public Proof Dashboard', 'Dashboard Público de Prueba', 'pages/public_proof_dashboard.py'),
-    ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory.py'),
-    ('What Are the Odds', 'Cuotas y Valor', 'pages/what_are_the_odds.py'),
-    ('Threshold Optimizer', 'Optimizador de Umbrales', 'pages/threshold_optimizer.py'),
-    ('Reset Lock File', 'Reiniciar Archivo de Bloqueo', 'pages/reset_lock_file.py'),
+TOOLS_EN = (
+    'Pro Predictor', 'Ultra 70 Profit Mode', 'Simulation Lab', 'Threshold Optimizer',
+    'What Are the Odds', 'Odds Lock Pro', 'Public Proof Dashboard', 'Reset Lock File', 'Learning Memory',
 )
-
-NAV_NOTES_EN = (
-    'Workflow: Pro Predictor → Ultra 70 Profit Mode → Simulation Lab → Odds Lock Pro → Public Proof Dashboard → Learning Memory.',
-    'Start in Pro Predictor for live searches and high-confidence rows.',
-    'Use Reset Lock File only when clearing one test-window proof ledger without touching other windows.',
+TOOLS_ES = (
+    'Predictor Pro', 'Ultra 70 Profit Mode', 'Laboratorio de Simulación', 'Optimizador de Umbrales',
+    'Cuotas y Valor', 'Bloqueo de Cuotas Pro', 'Dashboard Público de Prueba', 'Reiniciar Archivo de Bloqueo', 'Memoria de Aprendizaje',
 )
-NAV_NOTES_ES = (
-    'Flujo: Predictor Pro → Ultra 70 Profit Mode → Laboratorio de Simulación → Bloqueo de Cuotas Pro → Dashboard Público → Memoria.',
-    'Empieza en Predictor Pro para búsquedas en vivo y filas de máxima confianza.',
-    'Usa Reiniciar Archivo de Bloqueo solo para borrar un ledger de prueba sin tocar otros.',
-)
-
-FLAT_GUIDES: dict[str, dict[str, dict[str, str]]] = {
-    'pro_predictor': {
-        'en': {'name': 'Pro Predictor', 'purpose': 'Primary live prediction search and scoring page.', 'next': 'Ultra 70 Profit Mode → Simulation Lab → Odds Lock Pro'},
-        'es': {'name': 'Predictor Pro', 'purpose': 'Página principal para búsqueda y calificación en vivo.', 'next': 'Ultra 70 Profit Mode → Simulation Lab → Odds Lock Pro'},
-    },
-    'ultra80_profit_mode': {
-        'en': {'name': 'Ultra 70 Profit Mode', 'purpose': 'Review and tier the strongest Pro Predictor rows.', 'next': 'Simulation Lab → Odds Lock Pro'},
-        'es': {'name': 'Ultra 70 Profit Mode', 'purpose': 'Revisa y clasifica las filas más fuertes de Predictor Pro.', 'next': 'Simulation Lab → Odds Lock Pro'},
-    },
-    'simulation_lab': {
-        'en': {'name': 'Simulation Lab', 'purpose': 'Stress-test selected rows before final use.', 'next': 'Odds Lock Pro'},
-        'es': {'name': 'Simulation Lab', 'purpose': 'Prueba de estrés para filas seleccionadas antes del uso final.', 'next': 'Odds Lock Pro'},
-    },
-    'what_are_the_odds': {
-        'en': {'name': 'What Are the Odds', 'purpose': 'Review odds quality, value, manual context, and decision scoring.', 'next': 'Odds Lock Pro'},
-        'es': {'name': 'What Are the Odds', 'purpose': 'Revisa calidad de cuotas, valor, contexto manual y decisión.', 'next': 'Odds Lock Pro'},
-    },
-    'odds_lock_pro': {
-        'en': {'name': 'Odds Lock Pro', 'purpose': 'Create timestamped final rows before events start.', 'next': 'Public Proof Dashboard'},
-        'es': {'name': 'Odds Lock Pro', 'purpose': 'Crea filas finales con timestamp antes de que empiecen eventos.', 'next': 'Dashboard Público'},
-    },
-    'public_proof_dashboard': {
-        'en': {'name': 'Public Proof Dashboard', 'purpose': 'Review locked rows, metrics, results, and reports.', 'next': 'Learning Memory'},
-        'es': {'name': 'Dashboard Público', 'purpose': 'Revisa filas bloqueadas, métricas, resultados y reportes.', 'next': 'Learning Memory'},
-    },
-    'learning_memory': {
-        'en': {'name': 'Learning Memory', 'purpose': 'Update calibration and long-term memory after grading.', 'next': 'Future Pro Predictor runs'},
-        'es': {'name': 'Learning Memory', 'purpose': 'Actualiza calibración y memoria después de calificar.', 'next': 'Futuras corridas de Predictor Pro'},
-    },
-    'threshold_optimizer': {
-        'en': {'name': 'Threshold Optimizer', 'purpose': 'Learn better cutoffs after enough graded results.', 'next': 'Future Pro Predictor runs'},
-        'es': {'name': 'Threshold Optimizer', 'purpose': 'Aprende mejores cortes después de suficientes resultados.', 'next': 'Futuras corridas de Predictor Pro'},
-    },
-    'reset_lock_file': {
-        'en': {'name': 'Reset Lock File', 'purpose': 'Reset one test-window ledger intentionally.', 'next': 'Odds Lock Pro'},
-        'es': {'name': 'Reset Lock File', 'purpose': 'Reinicia una ventana de prueba intencionalmente.', 'next': 'Odds Lock Pro'},
-    },
-}
 
 
 def _normal_language(value: object) -> str:
@@ -94,17 +38,17 @@ def _normal_language(value: object) -> str:
     return 'English'
 
 
-def _lang_key(value: object) -> str:
-    return 'es' if _normal_language(value) == 'Español' else 'en'
+def _sync_language(st: Any, value: object) -> str:
+    normalized = _normal_language(value)
+    for key in LANGUAGE_KEYS:
+        try:
+            st.session_state[key] = normalized
+        except Exception:
+            pass
+    return normalized
 
 
-def _clean_ui_text(value: Any) -> Any:
-    if not isinstance(value, str):
-        return value
-    return value.replace('Scanner Pro / ', '').replace(' / Scanner Pro', '').replace('Scanner Pro → ', '').replace('Scanner Pro', 'Pro Predictor')
-
-
-def _is_language_selector(label: Any, options: Any) -> bool:
+def _is_language_widget(label: Any, options: Any) -> bool:
     try:
         opts = list(options)
     except Exception:
@@ -113,151 +57,106 @@ def _is_language_selector(label: Any, options: Any) -> bool:
     return ('language' in text or 'idioma' in text) and 'English' in opts and 'Español' in opts
 
 
-def _sync_language_keys(st: Any, value: str, *, include_global: bool = False) -> None:
-    for key in LANGUAGE_KEYS:
-        if key == 'global_language' and not include_global:
-            continue
-        try:
-            st.session_state[key] = value
-        except Exception:
-            pass
+def _clean_text(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    return (
+        value.replace('Scanner Pro', 'Pro Predictor')
+        .replace('scanner strength', 'signal strength')
+        .replace('Scanner strength', 'Signal strength')
+        .replace('escáner', 'señal')
+        .replace('Escáner', 'Señal')
+    )
 
 
-def _install_flat_sidebar_override() -> None:
-    try:
-        import streamlit as st
-        import autonomous_betting_agent.tool_sidebar as sidebar
-    except Exception:
+def _render_clean_sidebar(st: Any, language: object) -> None:
+    lang = _normal_language(language)
+    key = '_aba_clean_sidebar_plain_rendered_v1'
+    if st.session_state.get(key):
         return
+    st.session_state[key] = True
+    if lang == 'Español':
+        tools_title = 'Herramientas'
+        workflow_title = 'Flujo'
+        tools = TOOLS_ES
+        workflow = 'Predictor Pro → Máxima Confianza → Odds Lock Pro → Dashboard Público → Memoria.'
+    else:
+        tools_title = 'Tools'
+        workflow_title = 'Workflow'
+        tools = TOOLS_EN
+        workflow = 'Pro Predictor → Highest Confidence → Odds Lock Pro → Public Proof Dashboard → Learning Memory.'
+    with st.sidebar:
+        st.markdown('### :green[ABA] Signal :red[Pro]')
+        st.caption('Powered by Reparodynamics')
+        st.markdown('---')
+        st.markdown(f'### {tools_title}')
+        for tool in tools:
+            st.caption(tool)
+        st.markdown('---')
+        st.markdown(f'### {workflow_title}')
+        st.caption(workflow)
 
-    sidebar.WORKFLOW = [item[0] for item in PREDICTOR_FIRST_NAV_TOOLS]
 
-    def flat_render_tool_sidebar(page_key: str, language: str = 'English') -> None:
-        lang = _lang_key(language)
-        guide = FLAT_GUIDES.get(page_key, FLAT_GUIDES['pro_predictor']).get(lang, FLAT_GUIDES['pro_predictor']['en'])
-        labels = {
-            'en': {'guide': 'Tool guide', 'purpose': 'Purpose', 'next': 'Next', 'workflow': 'Workflow'},
-            'es': {'guide': 'Guía de herramienta', 'purpose': 'Propósito', 'next': 'Siguiente', 'workflow': 'Flujo'},
-        }[lang]
-        st.sidebar.markdown('### :green[ABA] Signal :red[Pro]')
-        st.sidebar.caption('Powered by Reparodynamics')
-        st.sidebar.divider()
-        st.sidebar.subheader(labels['guide'])
-        st.sidebar.markdown(f"**{guide['name']}**")
-        st.sidebar.caption(f"{labels['purpose']}: {guide['purpose']}")
-        st.sidebar.caption(f"{labels['next']}: {guide['next']}")
-        st.sidebar.caption(f"{labels['workflow']}: {' → '.join(sidebar.WORKFLOW[:6])}")
-
-    sidebar.render_tool_sidebar = flat_render_tool_sidebar
-
-
-def _install_language_and_workflow_guard() -> None:
+def _install_clean_sidebar_patch() -> None:
     try:
         import streamlit as st
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-
-    if getattr(st, '_aba_language_and_workflow_guard_v3', False):
+    if getattr(st, '_aba_clean_sidebar_plain_installed_v1', False):
         return
-    st._aba_language_and_workflow_guard_v3 = True
+    st._aba_clean_sidebar_plain_installed_v1 = True
 
-    try:
-        import sitecustomize as sc
-
-        sc.NAV_TOOLS = PREDICTOR_FIRST_NAV_TOOLS
-        sc.NAV_NOTES_EN = NAV_NOTES_EN
-        sc.NAV_NOTES_ES = NAV_NOTES_ES
-    except Exception:
-        pass
-
-    _install_flat_sidebar_override()
-
-    try:
-        if not st.session_state.get('_aba_language_guard_initialized_v1'):
-            st.session_state['global_language'] = 'English'
-            _sync_language_keys(st, 'English', include_global=False)
-            st.session_state['_aba_language_guard_initialized_v1'] = True
-    except Exception:
-        pass
-
+    real_st_radio = st.radio
+    real_dg_radio = getattr(DeltaGenerator, 'radio', None)
     real_st_selectbox = st.selectbox
     real_dg_selectbox = DeltaGenerator.selectbox
     real_caption = st.caption
     real_markdown = st.markdown
-    real_write = st.write
     real_info = st.info
+    real_write = st.write
     real_dg_caption = DeltaGenerator.caption
     real_dg_markdown = DeltaGenerator.markdown
-    real_dg_write = DeltaGenerator.write
     real_dg_info = DeltaGenerator.info
+    real_dg_write = DeltaGenerator.write
 
-    def preferred_index(options: Any) -> int:
-        opts = list(options)
-        preferred = _normal_language(st.session_state.get('global_language', 'English'))
-        return opts.index(preferred) if preferred in opts else 0
+    def st_radio(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+        value = real_st_radio(label, options, *args, **kwargs)
+        if _is_language_widget(label, options):
+            _render_clean_sidebar(st, _sync_language(st, value))
+        return value
 
-    def force_language_kwargs(options: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
-        out = dict(kwargs)
-        out['key'] = 'global_language'
-        out['index'] = preferred_index(options)
-        return out
+    def dg_radio(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+        value = real_dg_radio(self, label, options, *args, **kwargs) if real_dg_radio is not None else real_st_radio(label, options, *args, **kwargs)
+        if _is_language_widget(label, options):
+            _render_clean_sidebar(st, _sync_language(st, value))
+        return value
 
-    def remember(value: Any) -> str:
-        normalized = _normal_language(value)
-        _sync_language_keys(st, normalized, include_global=False)
-        return normalized
+    def st_selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+        value = real_st_selectbox(label, options, *args, **kwargs)
+        if _is_language_widget(label, options):
+            _render_clean_sidebar(st, _sync_language(st, value))
+        return value
 
-    def patched_st_selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        if _is_language_selector(label, options):
-            kwargs = force_language_kwargs(options, kwargs)
-            value = real_st_selectbox(label, options, *args, **kwargs)
-            remember(value)
-            return value
-        return real_st_selectbox(label, options, *args, **kwargs)
+    def dg_selectbox(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+        value = real_dg_selectbox(self, label, options, *args, **kwargs)
+        if _is_language_widget(label, options):
+            _render_clean_sidebar(st, _sync_language(st, value))
+        return value
 
-    def patched_dg_selectbox(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        if _is_language_selector(label, options):
-            kwargs = force_language_kwargs(options, kwargs)
-            value = real_dg_selectbox(self, label, options, *args, **kwargs)
-            remember(value)
-            return value
-        return real_dg_selectbox(self, label, options, *args, **kwargs)
-
-    def patched_caption(body: Any, *args: Any, **kwargs: Any) -> Any:
-        return real_caption(_clean_ui_text(body), *args, **kwargs)
-
-    def patched_markdown(body: Any, *args: Any, **kwargs: Any) -> Any:
-        return real_markdown(_clean_ui_text(body), *args, **kwargs)
-
-    def patched_write(*args: Any, **kwargs: Any) -> Any:
-        return real_write(*[_clean_ui_text(arg) for arg in args], **kwargs)
-
-    def patched_info(body: Any, *args: Any, **kwargs: Any) -> Any:
-        return real_info(_clean_ui_text(body), *args, **kwargs)
-
-    def patched_dg_caption(self: Any, body: Any, *args: Any, **kwargs: Any) -> Any:
-        return real_dg_caption(self, _clean_ui_text(body), *args, **kwargs)
-
-    def patched_dg_markdown(self: Any, body: Any, *args: Any, **kwargs: Any) -> Any:
-        return real_dg_markdown(self, _clean_ui_text(body), *args, **kwargs)
-
-    def patched_dg_write(self: Any, *args: Any, **kwargs: Any) -> Any:
-        return real_dg_write(self, *[_clean_ui_text(arg) for arg in args], **kwargs)
-
-    def patched_dg_info(self: Any, body: Any, *args: Any, **kwargs: Any) -> Any:
-        return real_dg_info(self, _clean_ui_text(body), *args, **kwargs)
-
-    st.selectbox = patched_st_selectbox
-    DeltaGenerator.selectbox = patched_dg_selectbox
-    st.caption = patched_caption
-    st.markdown = patched_markdown
-    st.write = patched_write
-    st.info = patched_info
-    DeltaGenerator.caption = patched_dg_caption
-    DeltaGenerator.markdown = patched_dg_markdown
-    DeltaGenerator.write = patched_dg_write
-    DeltaGenerator.info = patched_dg_info
+    st.radio = st_radio
+    st.selectbox = st_selectbox
+    DeltaGenerator.selectbox = dg_selectbox
+    if real_dg_radio is not None:
+        DeltaGenerator.radio = dg_radio
+    st.caption = lambda body, *a, **k: real_caption(_clean_text(body), *a, **k)
+    st.markdown = lambda body, *a, **k: real_markdown(_clean_text(body), *a, **k)
+    st.info = lambda body, *a, **k: real_info(_clean_text(body), *a, **k)
+    st.write = lambda *a, **k: real_write(*[_clean_text(x) for x in a], **k)
+    DeltaGenerator.caption = lambda self, body, *a, **k: real_dg_caption(self, _clean_text(body), *a, **k)
+    DeltaGenerator.markdown = lambda self, body, *a, **k: real_dg_markdown(self, _clean_text(body), *a, **k)
+    DeltaGenerator.info = lambda self, body, *a, **k: real_dg_info(self, _clean_text(body), *a, **k)
+    DeltaGenerator.write = lambda self, *a, **k: real_dg_write(self, *[_clean_text(x) for x in a], **k)
 
 
-_install_language_and_workflow_guard()
+_install_clean_sidebar_patch()
