@@ -16,19 +16,21 @@ PAGES = (
     ('Reset Lock File', 'Reiniciar Archivo de Bloqueo', 'pages/reset_lock_file.py'),
 )
 LANG_KEYS = ('global_language','app_language','pro_predictor_language','ultra80_profit_mode_language','simulation_lab_language','threshold_optimizer_language','what_are_the_odds_language','what_are_the_odds_pro_language','odds_lock_pro_language','public_proof_dashboard_language','reset_lock_file_language','learn_memory_language','learning_memory_language')
-BRIGHT_GOLD = '#FFD54A'
 BRAND_RENDERED_KEY = '_aba_sidebar_brand_rendered_current_call'
 PAGES_RENDERED_KEY = '_aba_sidebar_pages_rendered_current_call'
 SIDEBAR_CALL_ACTIVE_KEY = '_aba_sidebar_language_call_active'
-CSS = f'''
+CSS = '''
 <style>
-[data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}}
-[data-testid="collapsedControl"]{{z-index:999999!important;}}
-.aba-sidebar-brand{{display:inline-block!important;color:{BRIGHT_GOLD}!important;-webkit-text-fill-color:{BRIGHT_GOLD}!important;font-size:1.66rem!important;line-height:1.18!important;font-weight:850!important;letter-spacing:-.02em!important;text-shadow:0 1px 0 rgba(255,255,255,.20),1px 2px 0 rgba(103,66,0,.72),2px 3px 0 rgba(70,44,0,.52),3px 4px 4px rgba(0,0,0,.42),0 0 8px rgba(255,213,74,.28)!important;filter:none!important;margin:.25rem 0 .55rem 0!important;}}
-.aba-sidebar-tagline{{color:rgba(250,250,250,.62)!important;font-size:1.02rem!important;margin:0 0 1.35rem 0!important;}}
-.aba-sidebar-brand ~ .aba-sidebar-brand,.aba-sidebar-tagline ~ .aba-sidebar-tagline{{display:none!important;}}
-section[data-testid="stSidebar"] h3:has(span[style*="color"]),section[data-testid="stSidebar"] h3:has(span[style*="color"]) *,section[data-testid="stSidebar"] h3:has(span[class*="green"]),section[data-testid="stSidebar"] h3:has(span[class*="green"]) *,section[data-testid="stSidebar"] h3:has(span[class*="red"]),section[data-testid="stSidebar"] h3:has(span[class*="red"]) *{{color:{BRIGHT_GOLD}!important;-webkit-text-fill-color:{BRIGHT_GOLD}!important;font-size:1.16em!important;line-height:1.18!important;font-weight:800!important;text-shadow:0 1px 0 rgba(255,255,255,.20),1px 2px 0 rgba(103,66,0,.72),2px 3px 0 rgba(70,44,0,.52),3px 4px 4px rgba(0,0,0,.42),0 0 8px rgba(255,213,74,.28)!important;filter:none!important;}}
-@media(max-width:900px){{section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{{padding:.75rem .9rem!important;overflow-x:hidden!important}}.block-container{{padding-left:.85rem!important;padding-right:.85rem!important;max-width:100vw!important}}}}
+[data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
+[data-testid="collapsedControl"]{z-index:999999!important;}
+.aba-sidebar-brand{display:inline-block!important;font-size:1.66rem!important;line-height:1.18!important;font-weight:850!important;letter-spacing:-.02em!important;margin:.25rem 0 .55rem 0!important;text-shadow:0 1px 0 rgba(0,0,0,.72),0 2px 3px rgba(0,0,0,.45)!important;filter:none!important;}
+.aba-brand-green{color:#00A85A!important;-webkit-text-fill-color:#00A85A!important;}
+.aba-brand-white{color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;}
+.aba-brand-red{color:#FF3B3B!important;-webkit-text-fill-color:#FF3B3B!important;}
+.aba-sidebar-tagline{color:rgba(250,250,250,.62)!important;font-size:1.02rem!important;margin:0 0 1.35rem 0!important;}
+.aba-sidebar-brand ~ .aba-sidebar-brand,.aba-sidebar-tagline ~ .aba-sidebar-tagline{display:none!important;}
+section[data-testid="stSidebar"] h3:has(span[style*="color"]),section[data-testid="stSidebar"] h3:has(span[style*="color"]) *,section[data-testid="stSidebar"] h3:has(span[class*="green"]),section[data-testid="stSidebar"] h3:has(span[class*="green"]) *,section[data-testid="stSidebar"] h3:has(span[class*="red"]),section[data-testid="stSidebar"] h3:has(span[class*="red"]) *{text-shadow:0 1px 0 rgba(0,0,0,.72),0 2px 3px rgba(0,0,0,.45)!important;filter:none!important;}
+@media(max-width:900px){section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{padding:.75rem .9rem!important;overflow-x:hidden!important}.block-container{padding-left:.85rem!important;padding-right:.85rem!important;max-width:100vw!important}}
 </style>
 '''
 
@@ -87,7 +89,10 @@ def render_sidebar_brand(st: Any) -> None:
         return
     inject_sidebar_css(st)
     with st.sidebar:
-        st.markdown(f'<div class="aba-sidebar-brand">{APP_NAME}</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="aba-sidebar-brand"><span class="aba-brand-green">ABA</span> <span class="aba-brand-white">Signal</span> <span class="aba-brand-red">Pro</span></div>',
+            unsafe_allow_html=True,
+        )
         st.markdown(f'<div class="aba-sidebar-tagline">{APP_TAGLINE}</div>', unsafe_allow_html=True)
 
 
