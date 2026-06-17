@@ -17,27 +17,26 @@ LANGUAGE_KEYS: tuple[str, ...] = (
 )
 
 NAV_TOOLS: tuple[tuple[str, str, str], ...] = (
-    ('Scanner Pro', 'Scanner Pro', 'pages/scanner_pro.py'),
-    (PREDICTOR_TOOL_NAME, PREDICTOR_TOOL_NAME, 'pages/pro_predictor.py'),
+    (PREDICTOR_TOOL_NAME, 'Predictor Pro', 'pages/pro_predictor.py'),
     ('Ultra 70 Profit Mode', 'Ultra 70 Profit Mode', 'pages/ultra80_profit_mode.py'),
     ('Simulation Lab', 'Laboratorio de Simulación', 'pages/simulation_lab.py'),
-    ('Threshold Optimizer', 'Optimizador de Umbrales', 'pages/threshold_optimizer.py'),
-    ('What Are the Odds', 'Cuotas y Valor', 'pages/what_are_the_odds.py'),
     ('Odds Lock Pro', 'Bloqueo de Cuotas Pro', 'pages/odds_lock_pro.py'),
     ('Public Proof Dashboard', 'Dashboard Público de Prueba', 'pages/public_proof_dashboard.py'),
-    ('Reset Lock File', 'Reiniciar Archivo de Bloqueo', 'pages/reset_lock_file.py'),
     ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory.py'),
+    ('What Are the Odds', 'Cuotas y Valor', 'pages/what_are_the_odds.py'),
+    ('Threshold Optimizer', 'Optimizador de Umbrales', 'pages/threshold_optimizer.py'),
+    ('Reset Lock File', 'Reiniciar Archivo de Bloqueo', 'pages/reset_lock_file.py'),
 )
 
 NAV_NOTES_EN = (
-    'Workflow: Scanner Pro → Pro Predictor → Ultra 70 Profit Mode → Odds Lock Pro → Public Proof Dashboard → Threshold Optimizer → Learning Memory.',
-    'Use Ultra 70 to send 70%+ lockable rows to Odds Lock Pro, while strict 80 proof remains tracked separately.',
-    'Use Reset Lock File to clear one test-window proof ledger without touching other windows.',
+    'Workflow: Pro Predictor → Ultra 70 Profit Mode → Simulation Lab → Odds Lock Pro → Public Proof Dashboard → Learning Memory.',
+    'Start in Pro Predictor for live searches and high-confidence rows.',
+    'Use Reset Lock File only when clearing one test-window proof ledger without touching other windows.',
 )
 NAV_NOTES_ES = (
-    'Flujo: Scanner Pro → Predictor Pro → Ultra 70 Profit Mode → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
-    'Usa Ultra 70 para enviar filas bloqueables 70%+ a Odds Lock Pro, manteniendo la prueba estricta 80 separada.',
-    'Usa Reiniciar Archivo de Bloqueo para borrar el ledger de una ventana de prueba sin tocar las demás.',
+    'Flujo: Predictor Pro → Ultra 70 Profit Mode → Laboratorio de Simulación → Bloqueo de Cuotas Pro → Dashboard Público → Memoria.',
+    'Empieza en Predictor Pro para búsquedas en vivo y filas de máxima confianza.',
+    'Usa Reiniciar Archivo de Bloqueo solo para borrar el ledger de una ventana de prueba sin tocar las demás.',
 )
 
 
@@ -86,10 +85,7 @@ def _sidebar_language() -> str:
         value = st.session_state.get('global_language')
         if value:
             return _normal_language(value)
-        for key in LANGUAGE_KEYS:
-            value = st.session_state.get(key)
-            if value:
-                return _normal_language(value)
+        return 'English'
     except Exception:
         pass
     return 'English'
@@ -127,17 +123,17 @@ def _install_sidebar_nav_fallback() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_sidebar_nav_fallback_installed_v5', False):
+    if getattr(st, '_aba_sidebar_nav_fallback_installed_v6', False):
         return
-    st._aba_sidebar_nav_fallback_installed_v5 = True
+    st._aba_sidebar_nav_fallback_installed_v6 = True
     real_st_selectbox = st.selectbox
     real_dg_selectbox = DeltaGenerator.selectbox
     real_set_page_config = st.set_page_config
 
     def render_brand_once() -> None:
-        if st.session_state.get('_aba_sidebar_brand_rendered_v5'):
+        if st.session_state.get('_aba_sidebar_brand_rendered_v6'):
             return
-        st.session_state['_aba_sidebar_brand_rendered_v5'] = True
+        st.session_state['_aba_sidebar_brand_rendered_v6'] = True
         with st.sidebar:
             st.markdown('### :green[ABA] Signal :red[Pro]')
             st.caption(APP_TAGLINE)
@@ -188,9 +184,8 @@ def _install_sidebar_nav_fallback() -> None:
                 pass
         value = real_st_selectbox(label, options, *args, **kwargs)
         if language_selector:
-            lang = _store_global_language(value)
             try:
-                render_nav(lang)
+                render_nav(_store_global_language(value))
             except Exception:
                 pass
         return value
@@ -205,9 +200,8 @@ def _install_sidebar_nav_fallback() -> None:
                 pass
         value = real_dg_selectbox(self, label, options, *args, **kwargs)
         if language_selector:
-            lang = _store_global_language(value)
             try:
-                render_nav(lang)
+                render_nav(_store_global_language(value))
             except Exception:
                 pass
         return value
@@ -236,11 +230,6 @@ def _is_tennis_text(*values: Any) -> bool:
 
 
 def _install_tennis_sportsdataio_skip() -> None:
-    """Treat tennis as SportsDataIO-not-applicable while preserving odds scans.
-
-    SportsDataIO enrichment is useful for team sports in this app. Tennis should keep Odds API
-    odds/probability data, but it should not be marked as failed SportsDataIO coverage.
-    """
     try:
         builder = LiveAPIContextBuilder  # type: ignore[name-defined]
     except Exception:
@@ -331,11 +320,6 @@ def _slider_should_use_number_input(label: Any) -> bool:
 
 
 def _pro_predictor_number_defaults(label: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Make Pro Predictor default to a controlled 500-event workflow.
-
-    The page source still defines conservative caps. This wrapper lifts the input caps at
-    runtime without changing model logic. Target scan: 5 sports × 100 events = ~500 events.
-    """
     key = _label_key(label)
     out = dict(kwargs)
     if key in {'max sports', 'máximo de deportes', 'maximo de deportes'}:
@@ -391,9 +375,9 @@ def _install_page_helpers() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_page_helpers_installed_v5', False):
+    if getattr(st, '_aba_page_helpers_installed_v6', False):
         return
-    st._aba_page_helpers_installed_v5 = True
+    st._aba_page_helpers_installed_v6 = True
     real_st_dataframe = st.dataframe
     real_dg_dataframe = DeltaGenerator.dataframe
     real_subheader = st.subheader
