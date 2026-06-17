@@ -29,18 +29,20 @@ LANGUAGE_KEYS = (
 
 MOBILE_SIDEBAR_CSS = """
 <style>
+[data-testid="collapsedControl"] {
+    z-index: 999999 !important;
+}
 @media (max-width: 900px) {
     section[data-testid="stSidebar"] {
-        display: none !important;
-        visibility: hidden !important;
-        width: 0 !important;
-        min-width: 0 !important;
-        max-width: 0 !important;
-        transform: translateX(-120vw) !important;
+        width: min(78vw, 300px) !important;
+        min-width: min(78vw, 300px) !important;
+        max-width: min(78vw, 300px) !important;
+        box-shadow: 0 0 0 9999px rgba(0,0,0,.32) !important;
     }
-    [data-testid="collapsedControl"] {
-        display: none !important;
-        visibility: hidden !important;
+    section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+        padding-top: .5rem !important;
+        padding-left: .85rem !important;
+        padding-right: .85rem !important;
     }
     .block-container {
         padding-left: .85rem !important;
@@ -99,9 +101,9 @@ def _install_mobile_sidebar_fix() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_mobile_sidebar_fix_v3', False):
+    if getattr(st, '_aba_mobile_sidebar_fix_v4', False):
         return
-    st._aba_mobile_sidebar_fix_v3 = True
+    st._aba_mobile_sidebar_fix_v4 = True
 
     real_set_page_config = st.set_page_config
     real_st_radio = st.radio
