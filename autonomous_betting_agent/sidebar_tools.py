@@ -24,10 +24,12 @@ CSS = f'''
 <style>
 [data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}}
 [data-testid="collapsedControl"]{{z-index:999999!important;}}
-.aba-sidebar-brand{{color:{BRIGHT_GOLD}!important;-webkit-text-fill-color:{BRIGHT_GOLD}!important;font-size:1.66rem!important;line-height:1.18!important;font-weight:850!important;letter-spacing:-.02em!important;text-shadow:0 1px 0 rgba(139,92,0,.95),0 2px 0 rgba(99,66,0,.85),0 3px 0 rgba(67,43,0,.70),0 4px 8px rgba(0,0,0,.72),0 0 16px rgba(255,213,74,.55),0 0 28px rgba(255,213,74,.22)!important;filter:drop-shadow(0 3px 3px rgba(0,0,0,.55))!important;margin:.25rem 0 .55rem 0!important;}}
+.aba-sidebar-brand-wrap{{position:relative!important;display:inline-block!important;margin:.25rem 0 .58rem 0!important;}}
+.aba-sidebar-brand-depth{{position:absolute!important;left:5px!important;top:6px!important;color:#5f3a00!important;-webkit-text-fill-color:#5f3a00!important;font-size:1.66rem!important;line-height:1.18!important;font-weight:900!important;letter-spacing:-.02em!important;filter:blur(.15px)!important;opacity:.92!important;z-index:0!important;}}
+.aba-sidebar-brand{{position:relative!important;z-index:1!important;display:inline-block!important;color:{BRIGHT_GOLD}!important;background:linear-gradient(180deg,#fff6b8 0%,#ffe26a 34%,#ffd54a 58%,#c98700 100%)!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent!important;font-size:1.66rem!important;line-height:1.18!important;font-weight:900!important;letter-spacing:-.02em!important;text-shadow:0 -1px 0 rgba(255,255,255,.35),1px 1px 0 #b77900,2px 2px 0 #8f5b00,3px 3px 0 #6e4300,4px 4px 0 #4d2f00,6px 7px 8px rgba(0,0,0,.82),0 0 18px rgba(255,213,74,.62),0 0 34px rgba(255,213,74,.24)!important;filter:drop-shadow(0 4px 4px rgba(0,0,0,.68))!important;}}
 .aba-sidebar-tagline{{color:rgba(250,250,250,.62)!important;font-size:1.02rem!important;margin:0 0 1.35rem 0!important;}}
-.aba-sidebar-brand ~ .aba-sidebar-brand,.aba-sidebar-tagline ~ .aba-sidebar-tagline{{display:none!important;}}
-section[data-testid="stSidebar"] h3:has(span[style*="color"]),section[data-testid="stSidebar"] h3:has(span[style*="color"]) *,section[data-testid="stSidebar"] h3:has(span[class*="green"]),section[data-testid="stSidebar"] h3:has(span[class*="green"]) *,section[data-testid="stSidebar"] h3:has(span[class*="red"]),section[data-testid="stSidebar"] h3:has(span[class*="red"]) *{{color:{BRIGHT_GOLD}!important;-webkit-text-fill-color:{BRIGHT_GOLD}!important;font-size:1.16em!important;line-height:1.18!important;font-weight:800!important;text-shadow:0 1px 0 rgba(139,92,0,.95),0 2px 0 rgba(99,66,0,.85),0 3px 0 rgba(67,43,0,.70),0 4px 8px rgba(0,0,0,.72),0 0 16px rgba(255,213,74,.55),0 0 28px rgba(255,213,74,.22)!important;filter:drop-shadow(0 3px 3px rgba(0,0,0,.55))!important;}}
+.aba-sidebar-brand-wrap ~ .aba-sidebar-brand-wrap,.aba-sidebar-tagline ~ .aba-sidebar-tagline{{display:none!important;}}
+section[data-testid="stSidebar"] h3:has(span[style*="color"]),section[data-testid="stSidebar"] h3:has(span[style*="color"]) *,section[data-testid="stSidebar"] h3:has(span[class*="green"]),section[data-testid="stSidebar"] h3:has(span[class*="green"]) *,section[data-testid="stSidebar"] h3:has(span[class*="red"]),section[data-testid="stSidebar"] h3:has(span[class*="red"]) *{{color:{BRIGHT_GOLD}!important;-webkit-text-fill-color:{BRIGHT_GOLD}!important;font-size:1.16em!important;line-height:1.18!important;font-weight:800!important;text-shadow:0 -1px 0 rgba(255,255,255,.35),1px 1px 0 #b77900,2px 2px 0 #8f5b00,3px 3px 0 #6e4300,4px 4px 0 #4d2f00,6px 7px 8px rgba(0,0,0,.82),0 0 18px rgba(255,213,74,.62)!important;filter:drop-shadow(0 4px 4px rgba(0,0,0,.68))!important;}}
 @media(max-width:900px){{section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{{padding:.75rem .9rem!important;overflow-x:hidden!important}}.block-container{{padding-left:.85rem!important;padding-right:.85rem!important;max-width:100vw!important}}}}
 </style>
 '''
@@ -87,7 +89,10 @@ def render_sidebar_brand(st: Any) -> None:
         return
     inject_sidebar_css(st)
     with st.sidebar:
-        st.markdown(f'<div class="aba-sidebar-brand">{APP_NAME}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="aba-sidebar-brand-wrap"><span class="aba-sidebar-brand-depth">{APP_NAME}</span><span class="aba-sidebar-brand">{APP_NAME}</span></div>',
+            unsafe_allow_html=True,
+        )
         st.markdown(f'<div class="aba-sidebar-tagline">{APP_TAGLINE}</div>', unsafe_allow_html=True)
 
 
