@@ -30,7 +30,12 @@ builtins.get_secret = get_secret
 
 
 def _install_all_runtime_hooks() -> None:
-    """Install non-sidebar runtime patches before any Streamlit page renders."""
+    """Install app-wide runtime patches before any Streamlit page renders."""
+    try:
+        from autonomous_betting_agent.sidebar_tools import install_sidebar_tools
+        install_sidebar_tools()
+    except Exception:
+        pass
     try:
         from autonomous_betting_agent.odds_input_normalizer import install_odds_breakdown_normalizer
         install_odds_breakdown_normalizer()
