@@ -17,13 +17,13 @@ from autonomous_betting_agent.live_odds import list_sports, scan_market
 from autonomous_betting_agent.multi_source_fusion import fuse_row
 from autonomous_betting_agent.scanner_strength import score_scanner_frame, scanner_strength_summary
 
-APP_VERSION = 'pro-predictor-clean-v1-profit-ready'
+APP_VERSION = 'pro-predictor-clean-v2-no-legacy-sidebar-hook'
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LEARNED_STATE_PATH = REPO_ROOT / 'learned_state.json'
 DEFAULT_SPORT_KEYS = ['basketball_nba', 'baseball_mlb', 'soccer_epl']
 
 st.set_page_config(page_title='Pro Predictor', layout='wide')
-LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='pro_predictor_language') == 'Español' else 'en'
+LANG = 'es' if st.sidebar.radio('Language', ['English', 'Español'], key='pro_predictor_language', horizontal=True) == 'Español' else 'en'
 
 TEXT = {
     'en': {
