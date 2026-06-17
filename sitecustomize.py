@@ -9,6 +9,13 @@ APP_NAME = 'ABA Signal Pro'
 APP_TAGLINE = 'Powered by Reparodynamics'
 PREDICTOR_TOOL_NAME = 'Pro Predictor'
 
+LANGUAGE_KEYS: tuple[str, ...] = (
+    'global_language', 'app_language', 'simulation_lab_language', 'pro_predictor_language',
+    'ultra80_profit_mode_language', 'odds_lock_pro_language', 'public_proof_dashboard_language',
+    'reset_lock_file_language', 'learn_memory_language', 'learning_memory_language',
+    'threshold_optimizer_language', 'what_are_the_odds_language',
+)
+
 NAV_TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Scanner Pro', 'Scanner Pro', 'pages/scanner_pro.py'),
     (PREDICTOR_TOOL_NAME, PREDICTOR_TOOL_NAME, 'pages/pro_predictor.py'),
@@ -28,7 +35,7 @@ NAV_NOTES_EN = (
     'Use Reset Lock File to clear one test-window proof ledger without touching other windows.',
 )
 NAV_NOTES_ES = (
-    'Flujo: Scanner Pro → Pro Predictor → Ultra 70 Profit Mode → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
+    'Flujo: Scanner Pro → Predictor Pro → Ultra 70 Profit Mode → Bloqueo de Cuotas Pro → Dashboard Público de Prueba → Optimizador de Umbrales → Memoria de Aprendizaje.',
     'Usa Ultra 70 para enviar filas bloqueables 70%+ a Odds Lock Pro, manteniendo la prueba estricta 80 separada.',
     'Usa Reiniciar Archivo de Bloqueo para borrar el ledger de una ventana de prueba sin tocar las demás.',
 )
@@ -76,12 +83,10 @@ def _normal_language(value: object) -> str:
 def _sidebar_language() -> str:
     try:
         import streamlit as st
-        for key in (
-            'global_language', 'app_language', 'simulation_lab_language', 'pro_predictor_language',
-            'ultra80_profit_mode_language', 'odds_lock_pro_language', 'public_proof_dashboard_language',
-            'reset_lock_file_language', 'learn_memory_language', 'learning_memory_language',
-            'threshold_optimizer_language', 'what_are_the_odds_language',
-        ):
+        value = st.session_state.get('global_language')
+        if value:
+            return _normal_language(value)
+        for key in LANGUAGE_KEYS:
             value = st.session_state.get(key)
             if value:
                 return _normal_language(value)
@@ -90,23 +95,49 @@ def _sidebar_language() -> str:
     return 'English'
 
 
+def _force_global_language_widget(label: Any, options: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+    out = dict(kwargs)
+    try:
+        opts = list(options)
+    except Exception:
+        return out
+    preferred = _sidebar_language()
+    if preferred not in opts:
+        preferred = 'English' if 'English' in opts else opts[0]
+    out['key'] = 'global_language'
+    out.setdefault('index', opts.index(preferred))
+    return out
+
+
+def _store_global_language(value: Any) -> str:
+    normalized = _normal_language(value)
+    try:
+        import streamlit as st
+        st.session_state['global_language'] = normalized
+        for key in LANGUAGE_KEYS:
+            st.session_state[key] = normalized
+    except Exception:
+        pass
+    return normalized
+
+
 def _install_sidebar_nav_fallback() -> None:
     try:
         import streamlit as st
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_sidebar_nav_fallback_installed_v4', False):
+    if getattr(st, '_aba_sidebar_nav_fallback_installed_v5', False):
         return
-    st._aba_sidebar_nav_fallback_installed_v4 = True
+    st._aba_sidebar_nav_fallback_installed_v5 = True
     real_st_selectbox = st.selectbox
     real_dg_selectbox = DeltaGenerator.selectbox
     real_set_page_config = st.set_page_config
 
     def render_brand_once() -> None:
-        if st.session_state.get('_aba_sidebar_brand_rendered_v4'):
+        if st.session_state.get('_aba_sidebar_brand_rendered_v5'):
             return
-        st.session_state['_aba_sidebar_brand_rendered_v4'] = True
+        st.session_state['_aba_sidebar_brand_rendered_v5'] = True
         with st.sidebar:
             st.markdown('### :green[ABA] Signal :red[Pro]')
             st.caption(APP_TAGLINE)
@@ -148,29 +179,35 @@ def _install_sidebar_nav_fallback() -> None:
         return result
 
     def patched_st_selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        if is_language_selector(label, options):
+        language_selector = is_language_selector(label, options)
+        if language_selector:
+            kwargs = _force_global_language_widget(label, options, kwargs)
             try:
                 render_brand_once()
             except Exception:
                 pass
         value = real_st_selectbox(label, options, *args, **kwargs)
-        if is_language_selector(label, options):
+        if language_selector:
+            lang = _store_global_language(value)
             try:
-                render_nav(_normal_language(value))
+                render_nav(lang)
             except Exception:
                 pass
         return value
 
     def patched_dg_selectbox(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        if is_language_selector(label, options):
+        language_selector = is_language_selector(label, options)
+        if language_selector:
+            kwargs = _force_global_language_widget(label, options, kwargs)
             try:
                 render_brand_once()
             except Exception:
                 pass
         value = real_dg_selectbox(self, label, options, *args, **kwargs)
-        if is_language_selector(label, options):
+        if language_selector:
+            lang = _store_global_language(value)
             try:
-                render_nav(_normal_language(value))
+                render_nav(lang)
             except Exception:
                 pass
         return value
