@@ -18,7 +18,7 @@ except Exception:
 
 APP_NAME = 'ABA Signal Pro'
 APP_TAGLINE = 'Powered by Reparodynamics'
-APP_BUILD = 'stable-sidebar-shell-v2-native-width'
+APP_BUILD = 'stable-sidebar-shell-v2-no-ultra70'
 REPO_ROOT = Path(__file__).resolve().parent
 REPO_MEMORY_PATH = REPO_ROOT / 'data' / 'ara_permanent_learning_memory.csv'
 
@@ -30,7 +30,6 @@ st.set_page_config = lambda *args, **kwargs: None
 
 CORE_PAGES = [
     st.Page('pages/pro_predictor.py', title='Pro Predictor'),
-    st.Page('pages/ultra80_profit_mode.py', title='Ultra 70 Profit Mode'),
     st.Page('pages/simulation_lab.py', title='Simulation Lab'),
     st.Page('pages/threshold_optimizer.py', title='Threshold Optimizer'),
     st.Page('pages/what_are_the_odds.py', title='What Are the Odds'),
