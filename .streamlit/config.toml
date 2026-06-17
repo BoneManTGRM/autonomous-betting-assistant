@@ -1,4 +1,4 @@
-# deploy trigger: language-brand-pages-workflow-order-v1
+# deploy trigger: restore-sidebar-pages-v2
 [server]
 headless = true
 
@@ -6,5 +6,7 @@ headless = true
 gatherUsageStats = false
 
 [client]
-showSidebarNavigation = false
+# Keep native sidebar page navigation enabled so st.navigation(position="sidebar")
+# remains visible after branding/sidebar edits.
+showSidebarNavigation = true
 toolbarMode = "minimal"
