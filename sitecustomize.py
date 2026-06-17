@@ -193,6 +193,53 @@ except Exception:
     render_mobile_predictor_report = None  # type: ignore[assignment]
 
 
+def _is_tennis_text(*values: Any) -> bool:
+    text = ' '.join(str(value or '').lower().replace('_', ' ').replace('-', ' ') for value in values)
+    return any(token in text for token in ('tennis', ' atp', ' wta', 'tennis atp', 'tennis wta'))
+
+
+def _install_tennis_sportsdataio_skip() -> None:
+    """Treat tennis as SportsDataIO-not-applicable while preserving odds scans.
+
+    SportsDataIO enrichment is useful for team sports in this app. Tennis should keep Odds API
+    odds/probability data, but it should not be marked as failed SportsDataIO coverage.
+    """
+    try:
+        builder = LiveAPIContextBuilder  # type: ignore[name-defined]
+    except Exception:
+        return
+    if getattr(builder, '_aba_tennis_sdio_skip_installed_v1', False):
+        return
+    original = builder.context_for_event
+
+    def patched_context_for_event(self: Any, event: Any, *, pick_name: str) -> dict[str, Any]:
+        context = original(self, event, pick_name=pick_name)
+        sport_key = getattr(event, 'sport_key', '')
+        sport_title = getattr(event, 'sport_title', '')
+        if _is_tennis_text(sport_key, sport_title):
+            context.update(
+                {
+                    'sportsdataio_source_used': 'yes',
+                    'sportsdataio_status': 'skipped_not_applicable_for_tennis',
+                    'sportsdataio_sport': 'tennis_not_applicable',
+                    'sportsdataio_team_metadata_used': 'not_applicable',
+                    'sportsdataio_home_team_matched': 'not_applicable',
+                    'sportsdataio_away_team_matched': 'not_applicable',
+                    'sportsdataio_injuries_status': 'skipped_not_applicable_for_tennis',
+                    'sportsdataio_picked_team_injury_count': 0,
+                    'stats_source_reason': 'SportsDataIO skipped: tennis uses odds-only context in this workflow.',
+                    'injury_source_reason': 'SportsDataIO injuries skipped: tennis is not a supported enrichment target in this workflow.',
+                }
+            )
+        return context
+
+    builder.context_for_event = patched_context_for_event
+    builder._aba_tennis_sdio_skip_installed_v1 = True
+
+
+_install_tennis_sportsdataio_skip()
+
+
 def _called_from_page(page_name: str) -> bool:
     try:
         suffix = f'pages/{page_name}'.replace('\\', '/')
