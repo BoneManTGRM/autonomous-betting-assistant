@@ -29,35 +29,8 @@ def get_secret(*names: str) -> str:
 builtins.get_secret = get_secret
 
 
-def _patch_streamlit_navigation() -> None:
-    try:
-        import streamlit as st
-    except Exception:
-        return
-    if getattr(st, '_aba_force_sidebar_navigation_v1', False):
-        return
-    st._aba_force_sidebar_navigation_v1 = True
-    original_navigation = getattr(st, 'navigation', None)
-    if not callable(original_navigation):
-        return
-
-    def navigation_with_sidebar(pages, *args, **kwargs):
-        if kwargs.get('position') == 'hidden':
-            kwargs['position'] = 'sidebar'
-        kwargs.setdefault('expanded', True)
-        return original_navigation(pages, *args, **kwargs)
-
-    st.navigation = navigation_with_sidebar
-
-
 def _install_all_runtime_hooks() -> None:
-    """Install app-wide runtime patches before any Streamlit page renders."""
-    _patch_streamlit_navigation()
-    try:
-        from autonomous_betting_agent.sidebar_tools import install_sidebar_tools
-        install_sidebar_tools()
-    except Exception:
-        pass
+    """Install non-sidebar runtime patches before any Streamlit page renders."""
     try:
         from autonomous_betting_agent.odds_input_normalizer import install_odds_breakdown_normalizer
         install_odds_breakdown_normalizer()
