@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+APP_NAME = 'ABA Signal Pro'
 APP_TAGLINE = 'Powered by Reparodynamics'
 PAGES = (
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor.py'),
@@ -19,7 +20,9 @@ CSS = '''
 <style>
 [data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
 [data-testid="collapsedControl"]{z-index:999999!important;}
-section[data-testid="stSidebar"] h3:first-of-type,section[data-testid="stSidebar"] h3:first-of-type *,section[data-testid="stSidebar"] h3:has(span[style*="color"]),section[data-testid="stSidebar"] h3:has(span[style*="color"]) *,section[data-testid="stSidebar"] h3:has(span[class*="green"]),section[data-testid="stSidebar"] h3:has(span[class*="green"]) *,section[data-testid="stSidebar"] h3:has(span[class*="red"]),section[data-testid="stSidebar"] h3:has(span[class*="red"]) *{color:#D4AF37!important;-webkit-text-fill-color:#D4AF37!important;font-size:1.16em!important;line-height:1.18!important;font-weight:800!important;text-shadow:0 0 10px rgba(212,175,55,.20)!important;}
+.aba-sidebar-brand{color:#D4AF37!important;-webkit-text-fill-color:#D4AF37!important;font-size:1.66rem!important;line-height:1.18!important;font-weight:850!important;letter-spacing:-.02em!important;text-shadow:0 0 10px rgba(212,175,55,.20)!important;margin:.25rem 0 .55rem 0!important;}
+.aba-sidebar-tagline{color:rgba(250,250,250,.62)!important;font-size:1.02rem!important;margin:0 0 1.35rem 0!important;}
+section[data-testid="stSidebar"] h3:has(span[style*="color"]),section[data-testid="stSidebar"] h3:has(span[style*="color"]) *,section[data-testid="stSidebar"] h3:has(span[class*="green"]),section[data-testid="stSidebar"] h3:has(span[class*="green"]) *,section[data-testid="stSidebar"] h3:has(span[class*="red"]),section[data-testid="stSidebar"] h3:has(span[class*="red"]) *{color:#D4AF37!important;-webkit-text-fill-color:#D4AF37!important;font-size:1.16em!important;line-height:1.18!important;font-weight:800!important;text-shadow:0 0 10px rgba(212,175,55,.20)!important;}
 @media(max-width:900px){section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{padding:.75rem .9rem!important;overflow-x:hidden!important}.block-container{padding-left:.85rem!important;padding-right:.85rem!important;max-width:100vw!important}}
 </style>
 '''
@@ -56,14 +59,15 @@ def inject_sidebar_css(st: Any) -> None:
         pass
 
 
-def render_curated_sidebar(st: Any, language: object = 'English') -> None:
-    """Render only the curated page links.
+def render_sidebar_brand(st: Any) -> None:
+    inject_sidebar_css(st)
+    with st.sidebar:
+        st.markdown(f'<div class="aba-sidebar-brand">{APP_NAME}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="aba-sidebar-tagline">{APP_TAGLINE}</div>', unsafe_allow_html=True)
 
-    Brand and workflow are already drawn elsewhere in the current sidebar. This
-    intentionally does not use a session_state guard, because Streamlit keeps
-    session_state while switching English/Spanish and the guard made the pages
-    disappear after toggling language.
-    """
+
+def render_curated_sidebar(st: Any, language: object = 'English') -> None:
+    """Render only the curated page links below the language selector."""
     lang = normal_language(language)
     with st.sidebar:
         st.divider()
@@ -92,9 +96,9 @@ def install_sidebar_tools() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_ara_sidebar_safety_v15', False):
+    if getattr(st, '_ara_sidebar_safety_v16', False):
         return
-    st._ara_sidebar_safety_v15 = True
+    st._ara_sidebar_safety_v16 = True
     real_config = st.set_page_config
     real_md = st.markdown
     real_side_radio = st.sidebar.radio
@@ -120,12 +124,16 @@ def install_sidebar_tools() -> None:
         return value
 
     def radio(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        value = real_side_radio(label, options, *args, **kwargs)
-        return after(value) if is_language_widget(label, options) else value
+        if is_language_widget(label, options):
+            render_sidebar_brand(st)
+            value = real_side_radio(label, options, *args, **kwargs)
+            return after(value)
+        return real_side_radio(label, options, *args, **kwargs)
 
     def selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
         if not is_language_widget(label, options):
             return real_side_select(label, options, *args, **kwargs)
+        render_sidebar_brand(st)
         opts = list(options)
         key = kwargs.get('key')
         current = normal_language(st.session_state.get(key or 'global_language', 'English'))
@@ -138,8 +146,11 @@ def install_sidebar_tools() -> None:
         return real_dg_select(self, label, options, *args, **kwargs)
 
     def dg_radio(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        value = real_dg_radio(self, label, options, *args, **kwargs) if real_dg_radio else real_side_radio(label, options, *args, **kwargs)
-        return after(value) if is_language_widget(label, options) else value
+        if is_language_widget(label, options):
+            render_sidebar_brand(st)
+            value = real_dg_radio(self, label, options, *args, **kwargs) if real_dg_radio else real_side_radio(label, options, *args, **kwargs)
+            return after(value)
+        return real_dg_radio(self, label, options, *args, **kwargs) if real_dg_radio else real_side_radio(label, options, *args, **kwargs)
 
     st.set_page_config = page_config
     st.sidebar.radio = radio
