@@ -15,6 +15,7 @@ PAGES = (
     ('Reset Lock File', 'Reiniciar Archivo de Bloqueo', 'pages/reset_lock_file.py'),
 )
 LANG_KEYS = ('global_language','app_language','pro_predictor_language','ultra80_profit_mode_language','simulation_lab_language','threshold_optimizer_language','what_are_the_odds_language','what_are_the_odds_pro_language','odds_lock_pro_language','public_proof_dashboard_language','reset_lock_file_language','learn_memory_language','learning_memory_language')
+SIDEBAR_RENDERED_KEY = '_ara_curated_sidebar_rendered_this_script_run'
 CSS = '''
 <style>
 [data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
@@ -55,7 +56,20 @@ def inject_sidebar_css(st: Any) -> None:
         pass
 
 
+def reset_sidebar_render_guard(st: Any) -> None:
+    try:
+        st.session_state[SIDEBAR_RENDERED_KEY] = False
+    except Exception:
+        pass
+
+
 def render_curated_sidebar(st: Any, language: object = 'English') -> None:
+    try:
+        if st.session_state.get(SIDEBAR_RENDERED_KEY):
+            return
+        st.session_state[SIDEBAR_RENDERED_KEY] = True
+    except Exception:
+        pass
     lang = normal_language(language)
     with st.sidebar:
         st.divider()
@@ -80,8 +94,6 @@ def sidebar_language_selector(st: Any, *, key: str, default: str = 'English') ->
     options = ['English', 'Español']
     selected = st.sidebar.radio('Idioma' if current == 'Español' else 'Language', options, index=options.index(current), key=key, horizontal=True)
     lang = sync_language(st, selected)
-    # st.sidebar.radio is patched by install_sidebar_tools and renders the curated sidebar.
-    # Rendering it here too caused duplicate brand/workflow sections.
     return 'es' if lang == 'Español' else 'en'
 
 
@@ -91,9 +103,9 @@ def install_sidebar_tools() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_ara_sidebar_safety_v11', False):
+    if getattr(st, '_ara_sidebar_safety_v12', False):
         return
-    st._ara_sidebar_safety_v11 = True
+    st._ara_sidebar_safety_v12 = True
     real_config = st.set_page_config
     real_md = st.markdown
     real_side_radio = st.sidebar.radio
@@ -109,6 +121,7 @@ def install_sidebar_tools() -> None:
 
     def page_config(*args: Any, **kwargs: Any) -> Any:
         kwargs.setdefault('initial_sidebar_state', 'collapsed')
+        reset_sidebar_render_guard(st)
         out = real_config(*args, **kwargs)
         css()
         return out
