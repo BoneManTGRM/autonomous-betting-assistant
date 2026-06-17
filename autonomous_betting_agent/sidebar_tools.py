@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-APP_NAME = 'ABA Signal Pro'
 APP_TAGLINE = 'Powered by Reparodynamics'
 PAGES = (
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor.py'),
@@ -16,15 +15,14 @@ PAGES = (
     ('Reset Lock File', 'Reiniciar Archivo de Bloqueo', 'pages/reset_lock_file.py'),
 )
 LANG_KEYS = ('global_language','app_language','pro_predictor_language','ultra80_profit_mode_language','simulation_lab_language','threshold_optimizer_language','what_are_the_odds_language','what_are_the_odds_pro_language','odds_lock_pro_language','public_proof_dashboard_language','reset_lock_file_language','learn_memory_language','learning_memory_language')
-BRAND_RENDERED_KEY = '_aba_sidebar_brand_rendered_current_call'
-PAGES_RENDERED_KEY = '_aba_sidebar_pages_rendered_current_call'
-SIDEBAR_CALL_ACTIVE_KEY = '_aba_sidebar_language_call_active'
+BRAND_RENDERED_KEY = '_aba_sidebar_brand_once_v23'
+PAGES_RENDERED_KEY = '_aba_sidebar_pages_once_v23'
+SIDEBAR_CALL_ACTIVE_KEY = '_aba_sidebar_language_active_v23'
 CSS = '''
 <style>
 [data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
 [data-testid="collapsedControl"]{z-index:999999!important;}
-section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]:has(h3 span[style*="color"]),section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]:has(h3 span[class*="green"]),section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]:has(h3 span[class*="red"]){display:none!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
-section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]:has(h3 span[style*="color"]) + div[data-testid="stCaptionContainer"],section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]:has(h3 span[class*="green"]) + div[data-testid="stCaptionContainer"],section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]:has(h3 span[class*="red"]) + div[data-testid="stCaptionContainer"]{display:none!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
+section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]:has(h3 span[style*="color"]),section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]:has(h3 span[class*="green"]),section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]:has(h3 span[class*="red"]){display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
 section[data-testid="stSidebar"] div[data-testid="stCaptionContainer"]:first-of-type{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
 section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"]:has(hr):first-of-type{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
 .aba-sidebar-brand{display:inline-block!important;font-size:1.66rem!important;line-height:1.18!important;font-weight:850!important;letter-spacing:-.02em!important;margin:.25rem 0 .55rem 0!important;text-shadow:0 1px 0 rgba(0,0,0,.72),0 2px 3px rgba(0,0,0,.45)!important;filter:none!important;}
@@ -92,15 +90,11 @@ def render_sidebar_brand(st: Any) -> None:
         return
     inject_sidebar_css(st)
     with st.sidebar:
-        st.markdown(
-            '<div class="aba-sidebar-brand"><span class="aba-brand-green">ABA</span> <span class="aba-brand-white">Signal</span> <span class="aba-brand-red">Pro</span></div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="aba-sidebar-brand"><span class="aba-brand-green">ABA</span> <span class="aba-brand-white">Signal</span> <span class="aba-brand-red">Pro</span></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="aba-sidebar-tagline">{APP_TAGLINE}</div>', unsafe_allow_html=True)
 
 
 def render_curated_sidebar(st: Any, language: object = 'English') -> None:
-    """Render one curated page-link block and one workflow explanation."""
     if _already_rendered(st, PAGES_RENDERED_KEY):
         return
     lang = normal_language(language)
@@ -114,9 +108,6 @@ def render_curated_sidebar(st: Any, language: object = 'English') -> None:
             except Exception:
                 st.caption(label)
         st.divider()
-        st.subheader('Flujo de trabajo' if lang == 'Español' else 'Workflow')
-        st.caption('Predictor Pro → Máxima Confianza → Odds Lock Pro → Dashboard Público → Memoria de Aprendizaje.' if lang == 'Español' else 'Pro Predictor → Highest Confidence → Odds Lock Pro → Public Proof Dashboard → Learning Memory.')
-        st.caption('Odds Lock Pro bloquea picks con timestamp; Dashboard Público muestra ROI y resultados.' if lang == 'Español' else 'Odds Lock Pro timestamps locked picks; Public Proof Dashboard shows ROI and results.')
 
 
 def sidebar_language_selector(st: Any, *, key: str, default: str = 'English') -> str:
@@ -124,8 +115,7 @@ def sidebar_language_selector(st: Any, *, key: str, default: str = 'English') ->
     current = normal_language(st.session_state.get(key, st.session_state.get('global_language', default)))
     options = ['English', 'Español']
     selected = st.sidebar.radio('Idioma' if current == 'Español' else 'Language', options, index=options.index(current), key=key, horizontal=True)
-    lang = sync_language(st, selected)
-    return 'es' if lang == 'Español' else 'en'
+    return 'es' if sync_language(st, selected) == 'Español' else 'en'
 
 
 def install_sidebar_tools() -> None:
@@ -134,9 +124,9 @@ def install_sidebar_tools() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_sidebar_tools_installed_v21', False):
+    if getattr(st, '_aba_sidebar_tools_installed_v23', False):
         return
-    st._aba_sidebar_tools_installed_v21 = True
+    st._aba_sidebar_tools_installed_v23 = True
     real_config = st.set_page_config
     real_md = st.markdown
     real_side_radio = st.sidebar.radio
