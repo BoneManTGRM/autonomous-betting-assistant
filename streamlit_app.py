@@ -9,7 +9,7 @@ from autonomous_betting_agent.memory_read_patch import install_memory_read_merge
 
 APP_NAME = "ABA Signal Pro"
 APP_TAGLINE = "Powered by Reparodynamics"
-APP_BUILD = "predictor-first-clean-sidebar-v3"
+APP_BUILD = "predictor-first-clean-sidebar-v4"
 PREDICTOR_TOOL_NAME = "Pro Predictor"
 BRANDED_REPORT_PREFIX = f"{APP_NAME}\n{APP_TAGLINE}"
 REPO_ROOT = Path(__file__).resolve().parent
@@ -17,10 +17,18 @@ LOGO_PATH = REPO_ROOT / "assets" / "aba_signal_pro_logo.svg"
 
 _REAL_SET_PAGE_CONFIG = st.set_page_config
 _REAL_FILE_UPLOADER = st.file_uploader
+_REAL_ST_CAPTION = st.caption
+_REAL_ST_INFO = st.info
+_REAL_ST_MARKDOWN = st.markdown
+_REAL_ST_WRITE = st.write
 _REAL_ST_NUMBER_INPUT = st.number_input
 _REAL_ST_SLIDER = st.slider
 _REAL_ST_TEXT_INPUT = st.text_input
 _REAL_ST_TOGGLE = st.toggle
+_REAL_DG_CAPTION = DeltaGenerator.caption
+_REAL_DG_INFO = DeltaGenerator.info
+_REAL_DG_MARKDOWN = DeltaGenerator.markdown
+_REAL_DG_WRITE = DeltaGenerator.write
 _REAL_DG_NUMBER_INPUT = DeltaGenerator.number_input
 _REAL_DG_SELECTBOX = DeltaGenerator.selectbox
 _REAL_DG_SLIDER = DeltaGenerator.slider
@@ -137,7 +145,11 @@ def _clean_ui_text(value):
         value.replace("Scanner Pro / ", "")
         .replace(" / Scanner Pro", "")
         .replace("Scanner Pro → ", "")
+        .replace("scanner/scanner", "predictor")
+        .replace("scanner-only", "discovery-only")
         .replace("Scanner Pro", PREDICTOR_TOOL_NAME)
+        .replace("scanner", "predictor")
+        .replace("escáner", "predictor")
     )
 
 
@@ -157,6 +169,38 @@ def render_sidebar_brand() -> None:
     st.sidebar.caption(WORKFLOW_TEXT)
 
 
+def scrubbed_caption(body, *args, **kwargs):
+    return _REAL_ST_CAPTION(_clean_ui_text(body), *args, **kwargs)
+
+
+def scrubbed_info(body, *args, **kwargs):
+    return _REAL_ST_INFO(_clean_ui_text(body), *args, **kwargs)
+
+
+def scrubbed_markdown(body, *args, **kwargs):
+    return _REAL_ST_MARKDOWN(_clean_ui_text(body), *args, **kwargs)
+
+
+def scrubbed_write(*args, **kwargs):
+    return _REAL_ST_WRITE(*[_clean_ui_text(arg) for arg in args], **kwargs)
+
+
+def scrubbed_dg_caption(self, body, *args, **kwargs):
+    return _REAL_DG_CAPTION(self, _clean_ui_text(body), *args, **kwargs)
+
+
+def scrubbed_dg_info(self, body, *args, **kwargs):
+    return _REAL_DG_INFO(self, _clean_ui_text(body), *args, **kwargs)
+
+
+def scrubbed_dg_markdown(self, body, *args, **kwargs):
+    return _REAL_DG_MARKDOWN(self, _clean_ui_text(body), *args, **kwargs)
+
+
+def scrubbed_dg_write(self, *args, **kwargs):
+    return _REAL_DG_WRITE(self, *[_clean_ui_text(arg) for arg in args], **kwargs)
+
+
 def mobile_safe_file_uploader(label, *args, **kwargs):
     label_text = str(label).lower()
     if "memory" in label_text or "ara" in label_text:
@@ -165,7 +209,7 @@ def mobile_safe_file_uploader(label, *args, **kwargs):
         if kwargs.get("key") == "ara_memory_csv_upload":
             kwargs["key"] = "ara_memory_mobile_safe_upload_v9"
         kwargs["help"] = "Accepts any file type. Choose your CSV file, or use the paste box."
-    return _REAL_FILE_UPLOADER(label, *args, **kwargs)
+    return _REAL_FILE_UPLOADER(_clean_ui_text(label), *args, **kwargs)
 
 
 def branded_dg_selectbox(self, label, *args, **kwargs):
@@ -231,11 +275,19 @@ def install_report_branding() -> None:
 install_memory_read_merge(REPO_MEMORY_PATH)
 install_report_branding()
 st.set_page_config = safe_set_page_config
+st.caption = scrubbed_caption
+st.info = scrubbed_info
+st.markdown = scrubbed_markdown
+st.write = scrubbed_write
 st.file_uploader = mobile_safe_file_uploader
 st.number_input = defaulted_st_number_input
 st.slider = defaulted_st_slider
 st.text_input = defaulted_st_text_input
 st.toggle = defaulted_st_toggle
+DeltaGenerator.caption = scrubbed_dg_caption
+DeltaGenerator.info = scrubbed_dg_info
+DeltaGenerator.markdown = scrubbed_dg_markdown
+DeltaGenerator.write = scrubbed_dg_write
 DeltaGenerator.number_input = defaulted_dg_number_input
 DeltaGenerator.selectbox = branded_dg_selectbox
 DeltaGenerator.slider = defaulted_dg_slider
