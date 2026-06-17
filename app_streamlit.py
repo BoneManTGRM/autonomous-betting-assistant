@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-APP_NAME = "ABA Signal Pro"
+APP_NAME = "ARA Signal Pro"
 APP_TAGLINE = "Powered by Reparodynamics"
 
 st.set_page_config(
@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # Brand stays at the top of the sidebar.
-st.sidebar.markdown("### :green[ABA] Signal :red[Pro]")
+st.sidebar.markdown("### :green[ARA] Signal :red[Pro]")
 st.sidebar.caption(APP_TAGLINE)
 st.sidebar.markdown("---")
 
@@ -28,7 +28,8 @@ PAGES = [
     st.Page("pages/reset_lock_file.py", title="Reset Lock File"),
 ]
 
-# Curated navigation replaces Streamlit's automatic huge page list.
+# Curated navigation must stay visible in the sidebar. Do not disable
+# [client].showSidebarNavigation in .streamlit/config.toml.
 current_page = st.navigation(PAGES, position="sidebar", expanded=True)
 
 
