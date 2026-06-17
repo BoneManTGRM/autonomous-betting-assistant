@@ -4,19 +4,24 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
+from streamlit.delta_generator import DeltaGenerator
 
 try:
     from autonomous_betting_agent.memory_read_patch import install_memory_read_merge
 except Exception:
     install_memory_read_merge = None  # type: ignore[assignment]
 
-APP_NAME = "ABA Signal Pro"
+APP_NAME = "ARA Signal Pro"
 APP_TAGLINE = "Powered by Reparodynamics"
-APP_BUILD = "clean-sidebar-order-v1"
+APP_BUILD = "clean-sidebar-order-v2"
 REPO_ROOT = Path(__file__).resolve().parent
 REPO_MEMORY_PATH = REPO_ROOT / "data" / "ara_permanent_learning_memory.csv"
 
 _REAL_SET_PAGE_CONFIG = st.set_page_config
+_REAL_SIDEBAR_RADIO = st.sidebar.radio
+_REAL_SIDEBAR_SELECTBOX = st.sidebar.selectbox
+_REAL_DG_RADIO = getattr(DeltaGenerator, "radio", None)
+_REAL_DG_SELECTBOX = DeltaGenerator.selectbox
 
 _REAL_SET_PAGE_CONFIG(
     page_title=APP_NAME,
@@ -51,6 +56,21 @@ TOOL_LINKS = [
     ("pages/reset_lock_file.py", "Reset Lock File"),
 ]
 
+LANGUAGE_KEYS = (
+    "global_language",
+    "app_language",
+    "simulation_lab_language",
+    "pro_predictor_language",
+    "ultra80_profit_mode_language",
+    "odds_lock_pro_language",
+    "public_proof_dashboard_language",
+    "reset_lock_file_language",
+    "learn_memory_language",
+    "learning_memory_language",
+    "threshold_optimizer_language",
+    "what_are_the_odds_language",
+)
+
 WORKFLOW_TEXT = "Pro Predictor → Highest Confidence → Odds Lock Pro → Public Proof Dashboard → Learning Memory."
 WORKFLOW_DETAIL = "Odds Lock Pro timestamps locked picks; Public Proof Dashboard shows ROI and results."
 
@@ -79,13 +99,37 @@ CSS = """
 """
 
 
+def _normal_language(value: object) -> str:
+    text = str(value or "").strip().lower()
+    return "Español" if text.startswith("es") or "español" in text or "espanol" in text else "English"
+
+
+def _is_language_widget(label: Any, options: Any) -> bool:
+    try:
+        opts = list(options)
+    except Exception:
+        return False
+    label_text = str(label or "").lower()
+    return "English" in opts and "Español" in opts and ("language" in label_text or "idioma" in label_text)
+
+
+def _sync_language(value: object) -> str:
+    language = _normal_language(value)
+    for key in LANGUAGE_KEYS:
+        try:
+            st.session_state[key] = language
+        except Exception:
+            pass
+    return language
+
+
 def install_report_branding() -> None:
     try:
         from autonomous_betting_agent import odds_lock_tools
     except Exception:
         return
     original_daily_report = getattr(odds_lock_tools, "daily_report", None)
-    if not callable(original_daily_report) or getattr(original_daily_report, "_aba_brand_patched", False):
+    if not callable(original_daily_report) or getattr(original_daily_report, "_ara_brand_patched", False):
         return
 
     def branded_daily_report(*args: Any, **kwargs: Any) -> str:
@@ -94,29 +138,88 @@ def install_report_branding() -> None:
             return report
         return f"{APP_NAME}\n{APP_TAGLINE}\n\n{report}"
 
-    branded_daily_report._aba_brand_patched = True  # type: ignore[attr-defined]
+    branded_daily_report._ara_brand_patched = True  # type: ignore[attr-defined]
     odds_lock_tools.daily_report = branded_daily_report
 
 
-def render_sidebar_after_language() -> None:
-    """Render custom sidebar below the page-level language selector."""
-    st.sidebar.divider()
-    st.sidebar.markdown("### :green[ABA] Signal :red[Pro]")
-    st.sidebar.caption(APP_TAGLINE)
-    st.sidebar.divider()
-    st.sidebar.subheader("Pages")
-    for path, label in TOOL_LINKS:
-        try:
-            st.sidebar.page_link(path, label=label)
-        except Exception:
-            st.sidebar.caption(label)
-    st.sidebar.divider()
-    st.sidebar.subheader("Workflow")
-    st.sidebar.caption(WORKFLOW_TEXT)
-    st.sidebar.caption(WORKFLOW_DETAIL)
+def render_sidebar_after_language(language: object = "English") -> None:
+    """Render custom sidebar immediately below the page-level language control."""
+    if st.session_state.get("_ara_sidebar_after_language_rendered_v2"):
+        return
+    st.session_state["_ara_sidebar_after_language_rendered_v2"] = True
+    current_language = _normal_language(language)
+    tools_label = "Herramientas" if current_language == "Español" else "Pages"
+    workflow_label = "Flujo" if current_language == "Español" else "Workflow"
+    with st.sidebar:
+        st.divider()
+        st.markdown("### :green[ARA] Signal :red[Pro]")
+        st.caption(APP_TAGLINE)
+        st.divider()
+        st.subheader(tools_label)
+        for path, label in TOOL_LINKS:
+            try:
+                st.page_link(path, label=label)
+            except Exception:
+                st.caption(label)
+        st.divider()
+        st.subheader(workflow_label)
+        st.caption(WORKFLOW_TEXT)
+        st.caption(WORKFLOW_DETAIL)
+
+
+def _language_radio(label: Any, options: Any, *args: Any, key: str | None = None, **kwargs: Any) -> Any:
+    opts = list(options)
+    current = st.session_state.get(key or "global_language", st.session_state.get("global_language", "English"))
+    current = _normal_language(current)
+    index = opts.index(current) if current in opts else 0
+    value = _REAL_SIDEBAR_RADIO(
+        "Language" if current == "English" else "Idioma",
+        opts,
+        index=index,
+        key=key,
+        horizontal=True,
+    )
+    language = _sync_language(value)
+    render_sidebar_after_language(language)
+    return value
+
+
+def patched_sidebar_selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+    if _is_language_widget(label, options):
+        return _language_radio(label, options, *args, **kwargs)
+    return _REAL_SIDEBAR_SELECTBOX(label, options, *args, **kwargs)
+
+
+def patched_sidebar_radio(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+    if _is_language_widget(label, options):
+        value = _REAL_SIDEBAR_RADIO(label, options, *args, **kwargs)
+        language = _sync_language(value)
+        render_sidebar_after_language(language)
+        return value
+    return _REAL_SIDEBAR_RADIO(label, options, *args, **kwargs)
+
+
+def patched_dg_selectbox(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+    if _is_language_widget(label, options):
+        return _language_radio(label, options, *args, **kwargs)
+    return _REAL_DG_SELECTBOX(self, label, options, *args, **kwargs)
+
+
+def patched_dg_radio(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+    if _is_language_widget(label, options):
+        value = _REAL_DG_RADIO(self, label, options, *args, **kwargs) if _REAL_DG_RADIO else _language_radio(label, options, *args, **kwargs)
+        language = _sync_language(value)
+        render_sidebar_after_language(language)
+        return value
+    return _REAL_DG_RADIO(self, label, options, *args, **kwargs) if _REAL_DG_RADIO else _REAL_SIDEBAR_RADIO(label, options, *args, **kwargs)
 
 
 st.markdown(CSS, unsafe_allow_html=True)
+st.sidebar.selectbox = patched_sidebar_selectbox
+st.sidebar.radio = patched_sidebar_radio
+DeltaGenerator.selectbox = patched_dg_selectbox
+if _REAL_DG_RADIO is not None:
+    DeltaGenerator.radio = patched_dg_radio
 
 if install_memory_read_merge is not None:
     try:
@@ -132,4 +235,5 @@ try:
 except AttributeError:
     import pages.pro_predictor  # noqa: F401,E402
 
-render_sidebar_after_language()
+# Fallback for pages that do not render a language widget.
+render_sidebar_after_language(st.session_state.get("global_language", "English"))
