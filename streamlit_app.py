@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-# Streamlit Cloud entrypoint.
-# App shell and routes are in app_streamlit.py.
-# Test marker: pages/signal_board.py
-from app_streamlit import *  # noqa: F401,F403
+import streamlit as st
+
+from autonomous_betting_agent.sidebar_nav import render_app_sidebar
+
+st.set_page_config(page_title='ABA Signal Pro', layout='wide', initial_sidebar_state='expanded')
+render_app_sidebar('home', language_key='global_language', selector='radio')
+
+st.title('ABA Signal Pro')
+st.caption('Powered by Reparodynamics')
+st.info('Use the Tools menu to move between pages.')

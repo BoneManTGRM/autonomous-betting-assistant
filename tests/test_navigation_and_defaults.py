@@ -7,46 +7,43 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def test_main_navigation_uses_signal_board_and_hides_ultra70() -> None:
+def test_entrypoints_use_centralized_sidebar() -> None:
     app = (repo_root() / 'app_streamlit.py').read_text(encoding='utf-8')
     shell = (repo_root() / 'streamlit_app.py').read_text(encoding='utf-8')
-    assert 'pages/signal_board.py' in app
-    assert 'pages/signal_board.py' in shell
+    assert 'render_app_sidebar' in app
+    assert 'render_app_sidebar' in shell
     assert 'pages/ultra80_profit_mode.py' not in app
     assert 'pages/ultra80_profit_mode.py' not in shell
 
 
-def test_streamlit_config_uses_branded_custom_tools() -> None:
+def test_streamlit_config_uses_custom_sidebar_only() -> None:
     config = (repo_root() / '.streamlit' / 'config.toml').read_text(encoding='utf-8')
     assert 'showSidebarNavigation = false' in config
-    assert 'custom-brand-language-tools' in config
+    assert 'centralized-page-sidebar' in config
 
 
-def test_shell_sidebar_order_is_brand_language_tools_pages() -> None:
-    app = (repo_root() / 'app_streamlit.py').read_text(encoding='utf-8')
-    assert "APP_BUILD = 'clean-shell-sidebar-v8'" in app
-    assert "st.markdown('### :green[ABA] Signal :red[Pro]')" in app
-    assert "st.caption(APP_TAGLINE)" in app
-    assert "st.radio('Language'" in app
-    assert "st.markdown('### ' + ('Herramientas' if _language == 'Español' else 'Tools'))" in app
-    assert "st.page_link(_path, label=_nav_label(_label, _language))" in app
-    assert "st.navigation(PAGES, position='hidden')" in app
+def test_sidebar_nav_has_brand_language_and_tools() -> None:
+    text = (repo_root() / 'autonomous_betting_agent' / 'sidebar_nav.py').read_text(encoding='utf-8')
+    assert "APP_TAGLINE = 'Powered by Reparodynamics'" in text
+    assert 'def render_app_sidebar' in text
+    assert '### :green[ABA] Signal :red[Pro]' in text
+    assert "('Signal Board', 'Signal Board', 'pages/signal_board.py')" in text
+    assert "('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor.py')" in text
+    assert "('What Are the Odds', 'What Are the Odds', 'pages/what_are_the_odds.py')" in text
 
 
-def test_child_page_language_controls_are_suppressed_by_shell() -> None:
-    app = (repo_root() / 'app_streamlit.py').read_text(encoding='utf-8')
-    assert 'def _hidden_language_radio' in app
-    assert 'def _hidden_language_selectbox' in app
-    assert 'st.sidebar.radio = _hidden_language_radio' in app
-    assert 'st.sidebar.selectbox = _hidden_language_selectbox' in app
-
-
-def test_sitecustomize_skips_streamlit_hooks_in_ci() -> None:
-    text = (repo_root() / 'sitecustomize.py').read_text(encoding='utf-8')
-    assert "def _running_in_ci()" in text
-    assert "os.getenv('CI'" in text
-    assert "os.getenv('GITHUB_ACTIONS'" in text
-    assert 'if _running_in_ci()' in text
+def test_main_pages_call_shared_sidebar() -> None:
+    page_names = [
+        'signal_board.py',
+        'pro_predictor.py',
+        'simulation_lab.py',
+        'threshold_optimizer.py',
+        'what_are_the_odds.py',
+        'odds_lock_pro.py',
+    ]
+    for name in page_names:
+        text = (repo_root() / 'pages' / name).read_text(encoding='utf-8')
+        assert 'render_app_sidebar' in text, name
 
 
 def test_pro_predictor_default_patch_values() -> None:
