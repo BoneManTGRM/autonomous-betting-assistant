@@ -16,6 +16,15 @@ APP_BUILD = 'stable-native-sidebar-v1-signal-board'
 REPO_ROOT = Path(__file__).resolve().parent
 REPO_MEMORY_PATH = REPO_ROOT / 'data' / 'ara_permanent_learning_memory.csv'
 
+
+def mobile_safe_file_uploader(*args: Any, **kwargs: Any) -> Any:
+    return st._aba_real_file_uploader(*args, **kwargs)
+
+
+if not hasattr(st, '_aba_real_file_uploader'):
+    st._aba_real_file_uploader = st.file_uploader
+    st.file_uploader = mobile_safe_file_uploader
+
 _REAL_SET_PAGE_CONFIG = st.set_page_config
 _REAL_SET_PAGE_CONFIG(page_title=APP_NAME, layout='wide', initial_sidebar_state='expanded')
 
@@ -69,4 +78,4 @@ try:
     page = st.navigation(CORE_PAGES, position='sidebar', expanded=True)
     page.run()
 except AttributeError:
-    import pages.signal_board  # noqa: F401,E402
+    import pages.pro_predictor  # noqa: F401,E402
