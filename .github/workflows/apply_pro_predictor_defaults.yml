@@ -1,0 +1,58 @@
+name: Apply Pro Predictor Defaults
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-defaults:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Patch Pro Predictor defaults
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('pages/pro_predictor.py')
+          text = p.read_text(encoding='utf-8')
+          replacements = {
+              "APP_VERSION = 'pro-predictor-v16-baseline-accuracy-guard'": "APP_VERSION = 'pro-predictor-v17-score-volume-250'",
+              "'min_edge': -0.08,": "'min_edge': -0.03,",
+              "'min_strength': 35.0,": "'min_strength': 38.0,",
+              "'max_high_conf': 125,": "'max_high_conf': 250,",
+              "'min_high_prob': 0.58,": "'min_high_prob': 0.60,",
+              "'min_high_edge': -0.08,": "'min_high_edge': -0.03,",
+              "'min_high_strength': 35.0,": "'min_high_strength': 40.0,",
+              "'min_high_agent': 35.0,": "'min_high_agent': 40.0,",
+              "default=['us', 'eu']": "default=['us', 'us2', 'eu', 'uk']",
+              "value=5, step=1)": "value=50, step=1)",
+              "value=100, step=25)": "value=500, step=25)",
+          }
+          for old, new in replacements.items():
+              text = text.replace(old, new, 1)
+          marker = "st.sidebar.radio('Language', ['English', 'Español'], key='pro_predictor_language', horizontal=True) == 'Español' else 'en'"
+          nav = """st.sidebar.radio('Language', ['English', 'Español'], key='pro_predictor_language', horizontal=True) == 'Español' else 'en'\nwith st.sidebar:\n    st.markdown('---')\n    st.markdown('### Tools')\n    for _label, _path in [\n        ('Signal Board', 'pages/signal_board.py'),\n        ('Pro Predictor', 'pages/pro_predictor.py'),\n        ('Threshold Optimizer', 'pages/threshold_optimizer.py'),\n        ('What Are the Odds', 'pages/what_are_the_odds.py'),\n        ('Odds Lock Pro', 'pages/odds_lock_pro.py'),\n        ('Public Proof Dashboard', 'pages/public_proof_dashboard.py'),\n        ('Learning Memory', 'pages/learn_memory.py'),\n    ]:\n        try:\n            st.page_link(_path, label=_label)\n        except Exception:\n            st.caption(_label)"""
+          if "### Tools')" not in text[:2500]:
+              text = text.replace(marker, nav, 1)
+          p.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit changes if needed
+        run: |
+          if git diff --quiet; then
+            echo "No Pro Predictor default changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pages/pro_predictor.py
+          git commit -m "Apply Pro Predictor 250-pick defaults"
+          git push
