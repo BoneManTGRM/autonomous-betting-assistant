@@ -1,4 +1,4 @@
-# deploy trigger: custom-bottom-sidebar-links-v3
+# deploy trigger: restore-stable-native-nav-v4
 [server]
 headless = true
 
@@ -6,6 +6,6 @@ headless = true
 gatherUsageStats = false
 
 [client]
-# Keep native Streamlit page list hidden. Pages are rendered below language selector by sitecustomize/page links.
-showSidebarNavigation = false
+# Stable setting: keep Streamlit's native page list visible so navigation never disappears.
+showSidebarNavigation = true
 toolbarMode = "minimal"
