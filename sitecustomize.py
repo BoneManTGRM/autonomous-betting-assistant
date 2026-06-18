@@ -49,9 +49,13 @@ def _is_language_widget(label: Any, options: Any) -> bool:
 
 
 def _render_page_links(st: Any) -> None:
+    if st.session_state.get('_aba_sidebar_page_links_rendered_v4'):
+        return
+    st.session_state['_aba_sidebar_page_links_rendered_v4'] = True
     pages = [
         ('Signal Board', 'pages/signal_board.py'),
         ('Pro Predictor', 'pages/pro_predictor.py'),
+        ('Simulation Lab', 'pages/simulation_lab.py'),
         ('Threshold Optimizer', 'pages/threshold_optimizer.py'),
         ('What Are the Odds', 'pages/what_are_the_odds.py'),
         ('Odds Lock Pro', 'pages/odds_lock_pro.py'),
@@ -77,28 +81,46 @@ def _install_sidebar_page_links() -> None:
         return
     try:
         import streamlit as st
+        from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_sidebar_page_links_patch_v1', False):
+    if getattr(st, '_aba_sidebar_page_links_patch_v4', False):
         return
-    original_radio = st.sidebar.radio
-    original_selectbox = st.sidebar.selectbox
 
-    def radio(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        value = original_radio(label, options, *args, **kwargs)
+    original_sidebar_radio = st.sidebar.radio
+    original_sidebar_selectbox = st.sidebar.selectbox
+    original_dg_radio = DeltaGenerator.radio
+    original_dg_selectbox = DeltaGenerator.selectbox
+
+    def sidebar_radio(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+        value = original_sidebar_radio(label, options, *args, **kwargs)
         if _is_language_widget(label, options):
             _render_page_links(st)
         return value
 
-    def selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        value = original_selectbox(label, options, *args, **kwargs)
+    def sidebar_selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+        value = original_sidebar_selectbox(label, options, *args, **kwargs)
         if _is_language_widget(label, options):
             _render_page_links(st)
         return value
 
-    st.sidebar.radio = radio
-    st.sidebar.selectbox = selectbox
-    st._aba_sidebar_page_links_patch_v1 = True
+    def dg_radio(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+        value = original_dg_radio(self, label, options, *args, **kwargs)
+        if _is_language_widget(label, options):
+            _render_page_links(st)
+        return value
+
+    def dg_selectbox(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+        value = original_dg_selectbox(self, label, options, *args, **kwargs)
+        if _is_language_widget(label, options):
+            _render_page_links(st)
+        return value
+
+    st.sidebar.radio = sidebar_radio
+    st.sidebar.selectbox = sidebar_selectbox
+    DeltaGenerator.radio = dg_radio
+    DeltaGenerator.selectbox = dg_selectbox
+    st._aba_sidebar_page_links_patch_v4 = True
 
 
 def _install_streamlit_content_guards() -> None:
