@@ -39,6 +39,68 @@ def _is_orphan_workflow_heading(body: Any) -> bool:
     return cleaned in {'workflow', 'flujo de trabajo'}
 
 
+def _is_language_widget(label: Any, options: Any) -> bool:
+    try:
+        values = list(options)
+    except Exception:
+        return False
+    text = str(label or '').lower()
+    return 'English' in values and 'Español' in values and ('language' in text or 'idioma' in text)
+
+
+def _render_page_links(st: Any) -> None:
+    pages = [
+        ('Signal Board', 'pages/signal_board.py'),
+        ('Pro Predictor', 'pages/pro_predictor.py'),
+        ('Threshold Optimizer', 'pages/threshold_optimizer.py'),
+        ('What Are the Odds', 'pages/what_are_the_odds.py'),
+        ('Odds Lock Pro', 'pages/odds_lock_pro.py'),
+        ('Public Proof Dashboard', 'pages/public_proof_dashboard.py'),
+        ('Learning Memory', 'pages/learn_memory.py'),
+        ('Reset Lock File', 'pages/reset_lock_file.py'),
+    ]
+    try:
+        with st.sidebar:
+            st.markdown('---')
+            st.markdown('### Tools')
+            for label, path in pages:
+                try:
+                    st.page_link(path, label=label)
+                except Exception:
+                    st.caption(label)
+    except Exception:
+        pass
+
+
+def _install_sidebar_page_links() -> None:
+    if _running_in_ci():
+        return
+    try:
+        import streamlit as st
+    except Exception:
+        return
+    if getattr(st, '_aba_sidebar_page_links_patch_v1', False):
+        return
+    original_radio = st.sidebar.radio
+    original_selectbox = st.sidebar.selectbox
+
+    def radio(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+        value = original_radio(label, options, *args, **kwargs)
+        if _is_language_widget(label, options):
+            _render_page_links(st)
+        return value
+
+    def selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
+        value = original_selectbox(label, options, *args, **kwargs)
+        if _is_language_widget(label, options):
+            _render_page_links(st)
+        return value
+
+    st.sidebar.radio = radio
+    st.sidebar.selectbox = selectbox
+    st._aba_sidebar_page_links_patch_v1 = True
+
+
 def _install_streamlit_content_guards() -> None:
     if _running_in_ci():
         return
@@ -136,6 +198,7 @@ def _install_streamlit_content_guards() -> None:
 
 
 def _install_all_runtime_hooks() -> None:
+    _install_sidebar_page_links()
     _install_streamlit_content_guards()
     try:
         from autonomous_betting_agent.pro_predictor_defaults_patch import install_pro_predictor_defaults_patch
