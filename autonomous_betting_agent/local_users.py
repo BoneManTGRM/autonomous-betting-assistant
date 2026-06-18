@@ -109,23 +109,24 @@ def current_user_from_session(session_state: Any) -> LocalUserProfile:
 
 
 def _install_profile_control_defaults(st: Any) -> None:
-    if st.session_state.get('_profile_control_defaults_applied'):
+    if st.session_state.get('_profile_control_defaults_applied_250_v1'):
         return
-    prefix = 'pro' + 'fit_strict'
+    prefix = 'baseline' + '_accuracy'
     values = {
         prefix + '_min_books': 1,
-        prefix + '_min_model_prob': 0.60,
-        prefix + '_min_edge': -0.015,
+        prefix + '_min_model_prob': 0.58,
+        prefix + '_min_edge': -0.03,
         prefix + '_strong_edge': 0.04,
-        prefix + '_min_strength': 42.0,
-        prefix + '_max_high_conf': 100,
-        prefix + '_min_high_prob': 0.61,
-        prefix + '_min_high_edge': -0.01,
-        prefix + '_min_high_strength': 42.0,
-        prefix + '_min_high_agent': 42.0,
+        prefix + '_min_strength': 38.0,
+        prefix + '_max_high_conf': 250,
+        prefix + '_min_high_prob': 0.60,
+        prefix + '_min_high_edge': -0.03,
+        prefix + '_min_high_strength': 40.0,
+        prefix + '_min_high_agent': 40.0,
     }
     for key, value in values.items():
-        st.session_state.setdefault(key, value)
+        st.session_state[key] = value
+    st.session_state['_profile_control_defaults_applied_250_v1'] = True
     st.session_state['_profile_control_defaults_applied'] = True
 
 
