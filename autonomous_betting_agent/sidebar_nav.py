@@ -9,6 +9,7 @@ LANGUAGE_KEYS = [
     'pro_predictor_language',
     'threshold_optimizer_language',
     'what_are_the_odds_language',
+    'what_are_the_odds_pro_language',
     'odds_lock_pro_language',
     'public_proof_dashboard_language',
     'learning_memory_language',
