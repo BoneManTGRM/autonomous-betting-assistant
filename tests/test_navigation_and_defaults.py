@@ -16,16 +16,17 @@ def test_main_navigation_uses_signal_board_and_hides_ultra70() -> None:
     assert 'pages/ultra80_profit_mode.py' not in shell
 
 
-def test_streamlit_config_uses_custom_tools_only() -> None:
+def test_streamlit_config_uses_branded_custom_tools() -> None:
     config = (repo_root() / '.streamlit' / 'config.toml').read_text(encoding='utf-8')
     assert 'showSidebarNavigation = false' in config
-    assert 'clean-custom-tools-sidebar' in config
+    assert 'custom-brand-language-tools' in config
 
 
-def test_custom_sidebar_has_brand_and_tools() -> None:
+def test_custom_sidebar_has_brand_language_and_tools() -> None:
     text = (repo_root() / 'sitecustomize.py').read_text(encoding='utf-8')
-    assert "APP_NAME = 'ABA Signal Pro'" in text
     assert "APP_TAGLINE = 'Powered by Reparodynamics'" in text
+    assert 'def _render_brand' in text
+    assert 'def _render_page_links' in text
     assert '### :green[ABA] Signal :red[Pro]' in text
     assert "('Signal Board', 'pages/signal_board.py')" in text
     assert "('Pro Predictor', 'pages/pro_predictor.py')" in text
