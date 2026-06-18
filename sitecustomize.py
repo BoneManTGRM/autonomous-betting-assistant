@@ -4,7 +4,6 @@ import builtins
 import os
 from typing import Any
 
-APP_NAME = 'ABA Signal Pro'
 APP_TAGLINE = 'Powered by Reparodynamics'
 LANGUAGE_KEYS = [
     'global_language',
@@ -15,6 +14,17 @@ LANGUAGE_KEYS = [
     'odds_lock_pro_language',
     'public_proof_dashboard_language',
     'learning_memory_language',
+    'simulation_lab_language',
+]
+PAGE_LINKS = [
+    ('Signal Board', 'pages/signal_board.py'),
+    ('Pro Predictor', 'pages/pro_predictor.py'),
+    ('Simulation Lab', 'pages/simulation_lab.py'),
+    ('Threshold Optimizer', 'pages/threshold_optimizer.py'),
+    ('What Are the Odds', 'pages/what_are_the_odds.py'),
+    ('Odds Lock Pro', 'pages/odds_lock_pro.py'),
+    ('Public Proof Dashboard', 'pages/public_proof_dashboard.py'),
+    ('Learning Memory', 'pages/learn_memory.py'),
 ]
 
 
@@ -92,24 +102,22 @@ def _sync_language(st: Any, value: Any) -> None:
             pass
 
 
-def _render_page_links(st: Any) -> None:
-    pages = [
-        ('Signal Board', 'pages/signal_board.py'),
-        ('Pro Predictor', 'pages/pro_predictor.py'),
-        ('Threshold Optimizer', 'pages/threshold_optimizer.py'),
-        ('What Are the Odds', 'pages/what_are_the_odds.py'),
-        ('Odds Lock Pro', 'pages/odds_lock_pro.py'),
-        ('Public Proof Dashboard', 'pages/public_proof_dashboard.py'),
-        ('Learning Memory', 'pages/learn_memory.py'),
-    ]
+def _render_brand(st: Any) -> None:
     try:
         with st.sidebar:
-            st.markdown('---')
             st.markdown('### :green[ABA] Signal :red[Pro]')
             st.caption(APP_TAGLINE)
             st.markdown('---')
+    except Exception:
+        pass
+
+
+def _render_page_links(st: Any) -> None:
+    try:
+        with st.sidebar:
+            st.markdown('---')
             st.markdown('### Tools')
-            for label, path in pages:
+            for label, path in PAGE_LINKS:
                 try:
                     st.page_link(path, label=label)
                 except Exception:
@@ -126,7 +134,7 @@ def _install_sidebar_page_links() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_sidebar_page_links_patch_v6', False):
+    if getattr(st, '_aba_sidebar_page_links_patch_v7', False):
         return
 
     original_sidebar_radio = st.sidebar.radio
@@ -137,6 +145,7 @@ def _install_sidebar_page_links() -> None:
     def sidebar_radio(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
         language_widget = _is_language_widget(label, options)
         if language_widget:
+            _render_brand(st)
             kwargs = _prepare_language_kwargs(st, options, kwargs)
         value = original_sidebar_radio(label, options, *args, **kwargs)
         if language_widget:
@@ -147,6 +156,7 @@ def _install_sidebar_page_links() -> None:
     def sidebar_selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
         language_widget = _is_language_widget(label, options)
         if language_widget:
+            _render_brand(st)
             kwargs = _prepare_language_kwargs(st, options, kwargs)
         value = original_sidebar_selectbox(label, options, *args, **kwargs)
         if language_widget:
@@ -157,6 +167,7 @@ def _install_sidebar_page_links() -> None:
     def dg_radio(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
         language_widget = _is_language_widget(label, options)
         if language_widget:
+            _render_brand(st)
             kwargs = _prepare_language_kwargs(st, options, kwargs)
         value = original_dg_radio(self, label, options, *args, **kwargs)
         if language_widget:
@@ -167,6 +178,7 @@ def _install_sidebar_page_links() -> None:
     def dg_selectbox(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
         language_widget = _is_language_widget(label, options)
         if language_widget:
+            _render_brand(st)
             kwargs = _prepare_language_kwargs(st, options, kwargs)
         value = original_dg_selectbox(self, label, options, *args, **kwargs)
         if language_widget:
@@ -178,7 +190,7 @@ def _install_sidebar_page_links() -> None:
     st.sidebar.selectbox = sidebar_selectbox
     DeltaGenerator.radio = dg_radio
     DeltaGenerator.selectbox = dg_selectbox
-    st._aba_sidebar_page_links_patch_v6 = True
+    st._aba_sidebar_page_links_patch_v7 = True
 
 
 def _install_streamlit_content_guards() -> None:
@@ -187,29 +199,19 @@ def _install_streamlit_content_guards() -> None:
     try:
         import streamlit as st
         from streamlit.delta_generator import DeltaGenerator
-
         real_st_subheader = st.subheader
-        real_sidebar_subheader = st.sidebar.subheader
         real_dg_subheader = DeltaGenerator.subheader
         real_st_header = st.header
-        real_sidebar_header = st.sidebar.header
         real_dg_header = DeltaGenerator.header
         real_st_markdown = st.markdown
-        real_sidebar_markdown = st.sidebar.markdown
         real_dg_markdown = DeltaGenerator.markdown
         real_st_write = st.write
-        real_sidebar_write = st.sidebar.write
         real_dg_write = DeltaGenerator.write
 
         def safe_subheader(body: Any, *args: Any, **kwargs: Any) -> Any:
             if _is_orphan_workflow_heading(body):
                 return st.empty()
             return real_st_subheader(body, *args, **kwargs)
-
-        def safe_sidebar_subheader(body: Any, *args: Any, **kwargs: Any) -> Any:
-            if _is_orphan_workflow_heading(body):
-                return st.sidebar.empty()
-            return real_sidebar_subheader(body, *args, **kwargs)
 
         def safe_dg_subheader(self: Any, body: Any, *args: Any, **kwargs: Any) -> Any:
             if _is_orphan_workflow_heading(body):
@@ -221,11 +223,6 @@ def _install_streamlit_content_guards() -> None:
                 return st.empty()
             return real_st_header(body, *args, **kwargs)
 
-        def safe_sidebar_header(body: Any, *args: Any, **kwargs: Any) -> Any:
-            if _is_orphan_workflow_heading(body):
-                return st.sidebar.empty()
-            return real_sidebar_header(body, *args, **kwargs)
-
         def safe_dg_header(self: Any, body: Any, *args: Any, **kwargs: Any) -> Any:
             if _is_orphan_workflow_heading(body):
                 return self.empty()
@@ -235,11 +232,6 @@ def _install_streamlit_content_guards() -> None:
             if _is_orphan_workflow_heading(body):
                 return st.empty()
             return real_st_markdown(body, *args, **kwargs)
-
-        def safe_sidebar_markdown(body: Any, *args: Any, **kwargs: Any) -> Any:
-            if _is_orphan_workflow_heading(body):
-                return st.sidebar.empty()
-            return real_sidebar_markdown(body, *args, **kwargs)
 
         def safe_dg_markdown(self: Any, body: Any, *args: Any, **kwargs: Any) -> Any:
             if _is_orphan_workflow_heading(body):
@@ -251,27 +243,18 @@ def _install_streamlit_content_guards() -> None:
                 return st.empty()
             return real_st_write(*args, **kwargs)
 
-        def safe_sidebar_write(*args: Any, **kwargs: Any) -> Any:
-            if len(args) == 1 and _is_orphan_workflow_heading(args[0]):
-                return st.sidebar.empty()
-            return real_sidebar_write(*args, **kwargs)
-
         def safe_dg_write(self: Any, *args: Any, **kwargs: Any) -> Any:
             if len(args) == 1 and _is_orphan_workflow_heading(args[0]):
                 return self.empty()
             return real_dg_write(self, *args, **kwargs)
 
         st.subheader = safe_subheader
-        st.sidebar.subheader = safe_sidebar_subheader
         DeltaGenerator.subheader = safe_dg_subheader
         st.header = safe_header
-        st.sidebar.header = safe_sidebar_header
         DeltaGenerator.header = safe_dg_header
         st.markdown = safe_markdown
-        st.sidebar.markdown = safe_sidebar_markdown
         DeltaGenerator.markdown = safe_dg_markdown
         st.write = safe_write
-        st.sidebar.write = safe_sidebar_write
         DeltaGenerator.write = safe_dg_write
     except Exception:
         pass
