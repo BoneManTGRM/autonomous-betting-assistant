@@ -1,4 +1,4 @@
-# deploy trigger: clean-shell-sidebar-v8
+# deploy trigger: clean-shell-sidebar-v8 custom-brand-language-tools
 [server]
 headless = true
 
