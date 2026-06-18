@@ -89,7 +89,7 @@ def render_sidebar_brand(st: Any) -> None:
         return
     inject_sidebar_css(st)
     with st.sidebar:
-        st.markdown('<div class="aba-sidebar-brand"><span class="aba-brand-green">ARA</span> <span class="aba-brand-white">Signal</span> <span class="aba-brand-red">Pro</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="aba-sidebar-brand"><span class="aba-brand-green">ABA</span> <span class="aba-brand-white">Signal</span> <span class="aba-brand-red">Pro</span></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="aba-sidebar-tagline">{APP_TAGLINE}</div>', unsafe_allow_html=True)
 
 
