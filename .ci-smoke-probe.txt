@@ -1,0 +1,1 @@
+CI smoke probe for latest main sidebar/defaults state.
