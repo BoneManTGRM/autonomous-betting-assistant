@@ -1,0 +1,1 @@
+CI probe for current sidebar/tests state.
