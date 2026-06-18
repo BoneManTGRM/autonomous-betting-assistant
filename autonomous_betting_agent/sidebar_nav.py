@@ -27,36 +27,13 @@ TOOLS: tuple[tuple[str, str, str], ...] = (
 )
 SIDEBAR_CSS = '''
 <style>
-section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
-  padding-top: 1.4rem;
-}
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"] { padding-top: 1.4rem; }
 section[data-testid="stSidebar"] a[href*="pages/"] {
-  display: block;
-  padding: .62rem .82rem;
-  border-radius: .75rem;
-  margin: .18rem 0;
-  text-decoration: none !important;
-  font-weight: 650;
+  display: block; padding: .62rem .82rem; border-radius: .75rem; margin: .18rem 0;
+  text-decoration: none !important; font-weight: 650;
 }
-section[data-testid="stSidebar"] a[href*="pages/"]:hover {
-  background: rgba(255,255,255,.10);
-}
-section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 {
-  margin-top: .65rem;
-}
-.aba-big-link a, .aba-big-link button {
-  display: block !important;
-  width: 100% !important;
-  padding: .9rem 1rem !important;
-  border-radius: .85rem !important;
-  font-size: 1.05rem !important;
-  font-weight: 750 !important;
-  text-align: center !important;
-  background: #ef5350 !important;
-  color: white !important;
-  border: 1px solid rgba(255,255,255,.16) !important;
-  text-decoration: none !important;
-}
+section[data-testid="stSidebar"] a[href*="pages/"]:hover { background: rgba(255,255,255,.10); }
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 { margin-top: .65rem; }
 </style>
 '''
 
@@ -88,6 +65,20 @@ def _sync_language(st: Any, value: str, *, current_key: str | None = None) -> No
             pass
 
 
+def _tool_label(english: str, spanish: str, lang: str) -> str:
+    return spanish if lang == 'es' else english
+
+
+def render_tools_only(st: Any, lang: str) -> None:
+    st.markdown('---')
+    st.markdown('### ' + ('Herramientas' if lang == 'es' else 'Tools'))
+    for english, spanish, path in TOOLS:
+        try:
+            st.page_link(path, label=_tool_label(english, spanish, lang))
+        except Exception:
+            st.caption(_tool_label(english, spanish, lang))
+
+
 def render_app_sidebar(page_key: str, *, language_key: str | None = None, selector: str = 'radio') -> str:
     import streamlit as st
 
@@ -95,6 +86,7 @@ def render_app_sidebar(page_key: str, *, language_key: str | None = None, select
     current = _current_language(st)
     index = 1 if current == 'Español' else 0
     with st.sidebar:
+        st.session_state['_aba_sidebar_rendered_v12'] = True
         st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
         st.markdown('### :green[ABA] Signal :red[Pro]')
         st.caption(APP_TAGLINE)
@@ -102,14 +94,7 @@ def render_app_sidebar(page_key: str, *, language_key: str | None = None, select
         value = st.radio('Language', ['English', 'Español'], index=index, key=key, horizontal=True)
         _sync_language(st, value, current_key=key)
         lang = normalize_language(value)
-        st.markdown('---')
-        st.markdown('### ' + ('Herramientas' if lang == 'es' else 'Tools'))
-        for english, spanish, path in TOOLS:
-            label = spanish if lang == 'es' else english
-            try:
-                st.page_link(path, label=label)
-            except Exception:
-                st.caption(label)
+        render_tools_only(st, lang)
     return lang
 
 
@@ -118,11 +103,4 @@ def render_sidebar_nav(language: Any = 'en', *, show_workflow: bool = False) -> 
 
     lang = normalize_language(language)
     st.sidebar.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
-    st.sidebar.markdown('---')
-    st.sidebar.markdown('### ' + ('Herramientas' if lang == 'es' else 'Tools'))
-    for english, spanish, path in TOOLS:
-        label = spanish if lang == 'es' else english
-        try:
-            st.sidebar.page_link(path, label=label)
-        except Exception:
-            st.sidebar.caption(label)
+    render_tools_only(st.sidebar, lang)
