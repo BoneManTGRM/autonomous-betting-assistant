@@ -24,6 +24,13 @@ def test_curated_sidebar_uses_signal_board_and_renders_links() -> None:
     assert 'render_curated_sidebar(st,' in sitecustomize
 
 
+def test_signal_board_has_direct_sidebar_links() -> None:
+    text = (repo_root() / 'pages' / 'signal_board.py').read_text(encoding='utf-8')
+    assert 'def sidebar_nav()' in text
+    assert "st.page_link(path, label=label)" in text
+    assert "st.switch_page('pages/pro_predictor.py')" in text
+
+
 def test_sitecustomize_skips_streamlit_hooks_in_ci() -> None:
     text = (repo_root() / 'sitecustomize.py').read_text(encoding='utf-8')
     assert "def _running_in_ci()" in text
