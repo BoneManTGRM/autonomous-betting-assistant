@@ -42,11 +42,16 @@ def _current_language(st: Any) -> str:
     return 'English'
 
 
-def _sync_language(st: Any, value: str) -> None:
+def _sync_language(st: Any, value: str, *, current_key: str | None = None) -> None:
     if value not in ('English', 'Español'):
         value = 'English'
     for key in LANGUAGE_KEYS:
-        st.session_state[key] = value
+        if key == current_key:
+            continue
+        try:
+            st.session_state[key] = value
+        except Exception:
+            pass
 
 
 def render_app_sidebar(page_key: str, *, language_key: str | None = None, selector: str = 'radio') -> str:
@@ -63,7 +68,7 @@ def render_app_sidebar(page_key: str, *, language_key: str | None = None, select
             value = st.selectbox('Language / Idioma', ['English', 'Español'], index=index, key=key)
         else:
             value = st.radio('Language', ['English', 'Español'], index=index, key=key, horizontal=True)
-        _sync_language(st, value)
+        _sync_language(st, value, current_key=key)
         lang = normalize_language(value)
         st.markdown('---')
         st.markdown('### ' + ('Herramientas' if lang == 'es' else 'Tools'))
