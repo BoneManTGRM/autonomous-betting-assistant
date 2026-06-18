@@ -16,12 +16,13 @@ def test_main_navigation_uses_signal_board_and_hides_ultra70() -> None:
     assert 'pages/ultra80_profit_mode.py' not in shell
 
 
-def test_curated_sidebar_uses_signal_board_and_renders_links() -> None:
-    sidebar = (repo_root() / 'autonomous_betting_agent' / 'sidebar_tools.py').read_text(encoding='utf-8')
+def test_native_sidebar_navigation_is_not_hidden_by_sitecustomize() -> None:
     sitecustomize = (repo_root() / 'sitecustomize.py').read_text(encoding='utf-8')
-    assert "('Signal Board', 'Signal Board', 'pages/signal_board.py')" in sidebar
-    assert "'Ultra 70 Profit Mode'" not in sidebar
-    assert 'render_curated_sidebar(st,' in sitecustomize
+    shell = (repo_root() / 'streamlit_app.py').read_text(encoding='utf-8')
+    assert "position='sidebar'" in shell
+    assert 'sidebar_tools.install_sidebar_tools' not in sitecustomize
+    assert 'render_curated_sidebar(st,' not in sitecustomize
+    assert 'stSidebarNav' not in sitecustomize
 
 
 def test_signal_board_has_direct_sidebar_links() -> None:
