@@ -16,31 +16,18 @@ def test_main_navigation_uses_signal_board_and_hides_ultra70() -> None:
     assert 'pages/ultra80_profit_mode.py' not in shell
 
 
-def test_streamlit_config_uses_custom_sidebar_links() -> None:
+def test_streamlit_config_keeps_stable_native_navigation() -> None:
     config = (repo_root() / '.streamlit' / 'config.toml').read_text(encoding='utf-8')
-    assert 'showSidebarNavigation = false' in config
-    assert 'custom-bottom-sidebar-links' in config
+    assert 'showSidebarNavigation = true' in config
+    assert 'showSidebarNavigation = false' not in config
+    assert 'restore-stable-native-nav' in config
 
 
-def test_shell_uses_custom_page_routing() -> None:
+def test_shell_still_defines_signal_board_pages() -> None:
     shell = (repo_root() / 'streamlit_app.py').read_text(encoding='utf-8')
-    assert "position='hidden'" in shell
-    assert 'hidden-nav-custom-bottom-links' in shell
-
-
-def test_sitecustomize_renders_sidebar_links_after_language() -> None:
-    sitecustomize = (repo_root() / 'sitecustomize.py').read_text(encoding='utf-8')
-    assert 'def _install_sidebar_page_links()' in sitecustomize
-    assert 'st.sidebar.radio = radio' in sitecustomize
-    assert 'st.sidebar.selectbox = selectbox' in sitecustomize
-    assert "('Pro Predictor', 'pages/pro_predictor.py')" in sitecustomize
-
-
-def test_signal_board_has_direct_sidebar_links() -> None:
-    text = (repo_root() / 'pages' / 'signal_board.py').read_text(encoding='utf-8')
-    assert 'def sidebar_nav()' in text
-    assert "st.page_link(path, label=label)" in text
-    assert "st.switch_page('pages/pro_predictor.py')" in text
+    assert 'Signal Board' in shell
+    assert 'Pro Predictor' in shell
+    assert 'pages/pro_predictor.py' in shell
 
 
 def test_sitecustomize_skips_streamlit_hooks_in_ci() -> None:
