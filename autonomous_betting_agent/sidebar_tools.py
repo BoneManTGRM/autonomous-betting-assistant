@@ -4,6 +4,7 @@ from typing import Any
 
 APP_TAGLINE = 'Powered by Reparodynamics'
 PAGES = (
+    ('Signal Board', 'Signal Board', 'pages/signal_board.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor.py'),
     ('Simulation Lab', 'Laboratorio de Simulación', 'pages/simulation_lab.py'),
     ('Threshold Optimizer', 'Optimizador de Umbrales', 'pages/threshold_optimizer.py'),
@@ -14,9 +15,9 @@ PAGES = (
     ('Reset Lock File', 'Reiniciar Archivo de Bloqueo', 'pages/reset_lock_file.py'),
 )
 LANG_KEYS = ('global_language','app_language','pro_predictor_language','ultra80_profit_mode_language','simulation_lab_language','threshold_optimizer_language','what_are_the_odds_language','what_are_the_odds_pro_language','odds_lock_pro_language','public_proof_dashboard_language','reset_lock_file_language','learn_memory_language','learning_memory_language')
-BRAND_RENDERED_KEY = '_aba_sidebar_brand_once_v25'
-PAGES_RENDERED_KEY = '_aba_sidebar_pages_once_v25'
-SIDEBAR_CALL_ACTIVE_KEY = '_aba_sidebar_language_active_v25'
+BRAND_RENDERED_KEY = '_aba_sidebar_brand_once_v26'
+PAGES_RENDERED_KEY = '_aba_sidebar_pages_once_v26'
+SIDEBAR_CALL_ACTIVE_KEY = '_aba_sidebar_language_active_v26'
 CSS = '''
 <style>
 [data-testid="stSidebarNav"],section[data-testid="stSidebar"] [data-testid="stSidebarNav"],section[data-testid="stSidebar"] nav[aria-label="Page navigation"],section[data-testid="stSidebar"] nav[aria-label="pages"],section[data-testid="stSidebar"] nav[aria-label="Pages"]{display:none!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;}
@@ -120,107 +121,12 @@ def sidebar_language_selector(st: Any, *, key: str, default: str = 'English') ->
 def install_sidebar_tools() -> None:
     try:
         import streamlit as st
-        from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_sidebar_tools_installed_v25', False):
+    if st.session_state.get(SIDEBAR_CALL_ACTIVE_KEY):
         return
-    st._aba_sidebar_tools_installed_v25 = True
-    real_config = st.set_page_config
-    real_md = st.markdown
-    real_side_radio = st.sidebar.radio
-    real_side_select = st.sidebar.selectbox
-    real_dg_select = DeltaGenerator.selectbox
-    real_dg_radio = getattr(DeltaGenerator, 'radio', None)
-
-    def css() -> None:
-        try:
-            real_md(CSS, unsafe_allow_html=True)
-        except Exception:
-            pass
-
-    def page_config(*args: Any, **kwargs: Any) -> Any:
-        kwargs.setdefault('initial_sidebar_state', 'collapsed')
-        out = real_config(*args, **kwargs)
-        css()
-        return out
-
-    def begin_language_call() -> bool:
-        try:
-            if st.session_state.get(SIDEBAR_CALL_ACTIVE_KEY):
-                return False
-            st.session_state[SIDEBAR_CALL_ACTIVE_KEY] = True
-            _reset_current_sidebar_call(st)
-        except Exception:
-            pass
-        return True
-
-    def end_language_call() -> None:
-        try:
-            st.session_state[SIDEBAR_CALL_ACTIVE_KEY] = False
-        except Exception:
-            pass
-
-    def radio(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        if not is_language_widget(label, options):
-            return real_side_radio(label, options, *args, **kwargs)
-        outer = begin_language_call()
-        try:
-            if outer:
-                render_sidebar_brand(st)
-            value = real_side_radio(label, options, *args, **kwargs)
-            if outer:
-                css()
-                render_curated_sidebar(st, sync_language(st, value))
-            return value
-        finally:
-            if outer:
-                end_language_call()
-
-    def selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        if not is_language_widget(label, options):
-            return real_side_select(label, options, *args, **kwargs)
-        outer = begin_language_call()
-        try:
-            if outer:
-                render_sidebar_brand(st)
-            opts = list(options)
-            key = kwargs.get('key')
-            current = normal_language(st.session_state.get(key or 'global_language', 'English'))
-            value = real_side_radio('Idioma' if current == 'Español' else 'Language', opts, index=opts.index(current) if current in opts else 0, key=key, horizontal=True)
-            if outer:
-                css()
-                render_curated_sidebar(st, sync_language(st, value))
-            return value
-        finally:
-            if outer:
-                end_language_call()
-
-    def dg_select(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        if is_language_widget(label, options):
-            return selectbox(label, options, *args, **kwargs)
-        return real_dg_select(self, label, options, *args, **kwargs)
-
-    def dg_radio(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        if not is_language_widget(label, options):
-            return real_dg_radio(self, label, options, *args, **kwargs) if real_dg_radio else real_side_radio(label, options, *args, **kwargs)
-        outer = begin_language_call()
-        try:
-            if outer:
-                render_sidebar_brand(st)
-            value = real_dg_radio(self, label, options, *args, **kwargs) if real_dg_radio else real_side_radio(label, options, *args, **kwargs)
-            if outer:
-                css()
-                render_curated_sidebar(st, sync_language(st, value))
-            return value
-        finally:
-            if outer:
-                end_language_call()
-
-    st.set_page_config = page_config
-    st.sidebar.radio = radio
-    st.sidebar.selectbox = selectbox
-    DeltaGenerator.selectbox = dg_select
-    if real_dg_radio is not None:
-        DeltaGenerator.radio = dg_radio
-    css()
+    st.session_state[SIDEBAR_CALL_ACTIVE_KEY] = True
+    try:
+        render_sidebar_brand(st)
+    finally:
+        st.session_state[SIDEBAR_CALL_ACTIVE_KEY] = False
