@@ -23,7 +23,7 @@ class LivePageUiPresenceTests(unittest.TestCase):
         self.assertIn('Send only highest-confidence rows to Odds Lock Pro', self.text)
         self.assertIn('High-confidence min probability', self.text)
         self.assertIn('High-confidence min edge', self.text)
-        self.assertIn('High-confidence min scanner strength', self.text)
+        self.assertIn('High-confidence min signal strength', self.text)
         self.assertIn('High-confidence min agent score', self.text)
         self.assertIn('Download highest-confidence CSV', self.text)
 
@@ -31,7 +31,7 @@ class LivePageUiPresenceTests(unittest.TestCase):
         self.assertIn('Minimum model probability', self.text)
         self.assertIn('Minimum edge', self.text)
         self.assertIn('Strong edge threshold', self.text)
-        self.assertIn('Minimum scanner strength', self.text)
+        self.assertIn('Minimum signal strength', self.text)
         self.assertIn('lock_ready_candidates', self.text)
         self.assertIn('agent_decision_summary', self.text)
         self.assertIn('scanner_strength_summary', self.text)
