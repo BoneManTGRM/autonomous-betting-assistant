@@ -236,6 +236,7 @@ def page_health(frame: pd.DataFrame | list[dict[str, Any]], *, page: str) -> dic
         'resolved_rows': resolved,
         'probability_rows': probabilities,
         'resolved_with_probability_rows': resolved_with_probability,
+        'resolved_probability_rows': resolved_with_probability,
         'avg_agent_score': avg_agent_score,
         'avg_scanner_strength': avg_scanner_strength,
         'missing_or_blocking_fields': blockers,
