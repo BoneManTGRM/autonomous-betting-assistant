@@ -1,0 +1,83 @@
+name: Normalize Sidebar Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/normalize_sidebar_pages.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Normalize page sidebars
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          replacements = {
+              'pages/signal_board.py': (
+                  "LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='signal_board_language') == 'Español' else 'en'",
+                  "LANG = render_app_sidebar('signal_board', language_key='signal_board_language', selector='radio')",
+              ),
+              'pages/pro_predictor.py': (
+                  "LANG = 'es' if st.sidebar.radio('Language', ['English', 'Español'], key='pro_predictor_language', horizontal=True) == 'Español' else 'en'",
+                  "LANG = render_app_sidebar('pro_predictor', language_key='pro_predictor_language', selector='radio')",
+              ),
+              'pages/threshold_optimizer.py': (
+                  "LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='threshold_optimizer_language') == 'Español' else 'en'",
+                  "LANG = render_app_sidebar('threshold_optimizer', language_key='threshold_optimizer_language', selector='radio')",
+              ),
+              'pages/what_are_the_odds.py': (
+                  "LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='what_are_the_odds_pro_language') == 'Español' else 'en'",
+                  "LANG = render_app_sidebar('what_are_the_odds', language_key='what_are_the_odds_pro_language', selector='radio')",
+              ),
+              'pages/odds_lock_pro.py': (
+                  "LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='odds_lock_pro_language') == 'Español' else 'en'",
+                  "LANG = render_app_sidebar('odds_lock_pro', language_key='odds_lock_pro_language', selector='radio')",
+              ),
+          }
+
+          for file_name, (old, new) in replacements.items():
+              path = Path(file_name)
+              if not path.exists():
+                  continue
+              text = path.read_text(encoding='utf-8')
+              if 'from autonomous_betting_agent.sidebar_nav import render_app_sidebar' not in text:
+                  text = text.replace('import streamlit as st\n', "import streamlit as st\n\nfrom autonomous_betting_agent.sidebar_nav import render_app_sidebar\n", 1)
+              text = text.replace(old, new)
+              if file_name == 'pages/pro_predictor.py':
+                  text = re.sub(
+                      r"\nwith st\.sidebar:\n    st\.markdown\('---'\)\n    st\.markdown\('### Tools'\)\n    for _label, _path in \[.*?        except Exception:\n            st\.caption\(_label\)\n",
+                      "\n",
+                      text,
+                      count=1,
+                      flags=re.S,
+                  )
+              if file_name == 'pages/what_are_the_odds.py':
+                  text = text.replace('from autonomous_betting_agent.tool_sidebar import render_tool_sidebar\n', '')
+                  text = text.replace("render_tool_sidebar('what_are_the_odds', 'Español' if LANG == 'es' else 'English')\n", '')
+              path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit changes if needed
+        run: |
+          if git diff --quiet; then
+            echo "Sidebar pages already normalized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pages autonomous_betting_agent/sidebar_nav.py
+          git commit -m "Normalize page sidebars"
+          git push
