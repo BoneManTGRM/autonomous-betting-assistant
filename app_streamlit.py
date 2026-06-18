@@ -108,7 +108,7 @@ except Exception:
 # Use the shared language selector state from the pages. The navigation is built
 # before each page renders, so it must read session state directly to translate
 # sidebar page labels on rerun.
-LANG_VALUE = st.session_state.get("pro_predictor_language", "English")
+LANG_VALUE = st.session_state.get("global_language", st.session_state.get("pro_predictor_language", "English"))
 LANG = "es" if LANG_VALUE == "Español" else "en"
 
 NAV_LABELS = {
@@ -176,6 +176,10 @@ def _ignore_late_page_config(*args, **kwargs):
 # Existing page files still call set_page_config; ignore those after the main app config.
 st.set_page_config = _ignore_late_page_config
 current_page.run()
+
+# Re-read language after the page renders so the bottom workflow text matches the visible selector.
+LANG_VALUE = st.session_state.get("global_language", st.session_state.get("pro_predictor_language", "English"))
+LANG = "es" if LANG_VALUE == "Español" else "en"
 
 # Explainer stays at the bottom of the sidebar after page controls render.
 st.sidebar.markdown("---")
