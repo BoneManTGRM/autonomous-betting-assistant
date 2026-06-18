@@ -198,6 +198,8 @@ def _install_streamlit_content_guards() -> None:
 
 
 def _install_all_runtime_hooks() -> None:
+    if _running_in_ci():
+        return
     _install_sidebar_page_links()
     _install_streamlit_content_guards()
     try:
