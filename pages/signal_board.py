@@ -60,6 +60,13 @@ def t(key: str) -> str:
     return TEXT[LANG].get(key, TEXT['en'].get(key, key))
 
 
+def go_to(path: str) -> None:
+    try:
+        st.switch_page(path)
+    except Exception:
+        st.page_link(path, label=path)
+
+
 def session_source() -> tuple[str, pd.DataFrame]:
     sources = [
         ('pro_predictor_high_confidence_rows', 'Pro Predictor high-confidence'),
@@ -134,7 +141,8 @@ source, raw = session_source()
 
 if raw.empty:
     st.warning(t('no_rows'))
-    st.page_link('pages/pro_predictor.py', label=t('open_predictor'))
+    if st.button(t('open_predictor'), type='primary', use_container_width=True):
+        go_to('pages/pro_predictor.py')
     st.stop()
 
 board = enrich(raw)
@@ -173,7 +181,13 @@ with tabs[4]:
         st.session_state['what_are_the_odds_latest_rows'] = board.to_dict('records')
         st.session_state['ara_latest_predictions'] = board.to_dict('records')
         st.success(t('sent'))
-    st.page_link('pages/pro_predictor.py', label=t('open_predictor'))
-    st.page_link('pages/what_are_the_odds.py', label=t('open_odds'))
-    st.page_link('pages/odds_lock_pro.py', label=t('open_lock'))
-    st.page_link('pages/threshold_optimizer.py', label=t('open_threshold'))
+    col1, col2 = st.columns(2)
+    if col1.button(t('open_predictor'), type='primary', use_container_width=True):
+        go_to('pages/pro_predictor.py')
+    if col2.button(t('open_odds'), use_container_width=True):
+        go_to('pages/what_are_the_odds.py')
+    col3, col4 = st.columns(2)
+    if col3.button(t('open_lock'), use_container_width=True):
+        go_to('pages/odds_lock_pro.py')
+    if col4.button(t('open_threshold'), use_container_width=True):
+        go_to('pages/threshold_optimizer.py')
