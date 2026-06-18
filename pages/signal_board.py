@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-from typing import Any
-
 import pandas as pd
 import streamlit as st
 
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
 st.set_page_config(page_title='ABA Signal Board', layout='wide')
-
 LANG = render_app_sidebar('signal_board', language_key='signal_board_language', selector='radio')
 
 TEXT = {
     'en': {
         'title': 'ABA Signal Board',
-        'caption': 'One-page workflow: review the best Pro Predictor rows, bucket them, send them to odds/value review or proof locking, then track results.',
+        'caption': 'Review Pro Predictor rows, bucket them, send them to odds/value review or proof locking, then track results.',
         'no_rows': 'No prediction rows found yet. Run Pro Predictor first, then come back here.',
         'source': 'Source',
         'rows': 'Rows',
@@ -26,22 +23,17 @@ TEXT = {
         'send_all_lock': 'Send A/B/C to Odds Lock Pro',
         'send_a_lock': 'Send Tier A only to Odds Lock Pro',
         'send_odds': 'Send current board to What Are the Odds',
-        'sent': 'Rows saved in session. Open the target page from the links below.',
+        'sent': 'Rows saved in session. Open the target page from the Tools menu.',
         'open_predictor': 'Open Pro Predictor',
         'open_odds': 'Open What Are the Odds',
         'open_lock': 'Open Odds Lock Pro',
         'open_threshold': 'Open Threshold Optimizer',
         'download': 'Download current signal board CSV',
-        'guide': 'Simple workflow',
         'guide_text': '1) Run Pro Predictor. 2) Review this Signal Board. 3) Send A/B/C to Research/Test locking. 4) Grade results. 5) Use Threshold Optimizer to learn which buckets are winning.',
-        'tools': 'Tools',
-        'open_signal': 'Signal Board',
-        'open_proof': 'Public Proof Dashboard',
-        'open_memory': 'Learning Memory',
     },
     'es': {
         'title': 'ABA Signal Board',
-        'caption': 'Flujo de una página: revisa las mejores filas de Predictor Pro, clasifícalas, envíalas a revisión de cuotas/valor o bloqueo de prueba, y mide resultados.',
+        'caption': 'Revisa filas de Predictor Pro, clasifícalas, envíalas a cuotas/prueba y mide resultados.',
         'no_rows': 'Aún no hay predicciones. Ejecuta Predictor Pro primero y vuelve aquí.',
         'source': 'Fuente',
         'rows': 'Filas',
@@ -53,47 +45,19 @@ TEXT = {
         'send_all_lock': 'Enviar A/B/C a Odds Lock Pro',
         'send_a_lock': 'Enviar solo Tier A a Odds Lock Pro',
         'send_odds': 'Enviar tablero a What Are the Odds',
-        'sent': 'Filas guardadas en la sesión. Abre la página destino con los enlaces abajo.',
+        'sent': 'Filas guardadas en la sesión. Abre la página destino desde el menú Tools.',
         'open_predictor': 'Abrir Predictor Pro',
         'open_odds': 'Abrir What Are the Odds',
         'open_lock': 'Abrir Odds Lock Pro',
         'open_threshold': 'Abrir Optimizador de Umbrales',
         'download': 'Descargar CSV del tablero actual',
-        'guide': 'Flujo simple',
         'guide_text': '1) Ejecuta Predictor Pro. 2) Revisa este Signal Board. 3) Envía A/B/C al bloqueo Investigación/Prueba. 4) Califica resultados. 5) Usa el Optimizador para aprender qué buckets ganan.',
-        'tools': 'Herramientas',
-        'open_signal': 'Signal Board',
-        'open_proof': 'Dashboard Público de Prueba',
-        'open_memory': 'Memoria de Aprendizaje',
     },
 }
 
 
 def t(key: str) -> str:
     return TEXT[LANG].get(key, TEXT['en'].get(key, key))
-
-
-def sidebar_nav() -> None:
-    links = [
-        (t('open_signal'), 'pages/signal_board.py'),
-        (t('open_predictor'), 'pages/pro_predictor.py'),
-        (t('open_threshold'), 'pages/threshold_optimizer.py'),
-        (t('open_odds'), 'pages/what_are_the_odds.py'),
-        (t('open_lock'), 'pages/odds_lock_pro.py'),
-        (t('open_proof'), 'pages/public_proof_dashboard.py'),
-        (t('open_memory'), 'pages/learn_memory.py'),
-    ]
-    with st.sidebar:
-        st.markdown('---')
-        st.markdown(f"### {t('tools')}")
-        for label, path in links:
-            try:
-                st.page_link(path, label=label)
-            except Exception:
-                st.caption(label)
-
-
-sidebar_nav()
 
 
 def session_source() -> tuple[str, pd.DataFrame]:
@@ -170,11 +134,6 @@ source, raw = session_source()
 
 if raw.empty:
     st.warning(t('no_rows'))
-    if st.button(t('open_predictor'), type='primary', use_container_width=True):
-        try:
-            st.switch_page('pages/pro_predictor.py')
-        except Exception:
-            pass
     st.page_link('pages/pro_predictor.py', label=t('open_predictor'))
     st.stop()
 
