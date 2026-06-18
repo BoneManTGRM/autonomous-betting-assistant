@@ -1,0 +1,1 @@
+CI deep check for branded sidebar/defaults state.
