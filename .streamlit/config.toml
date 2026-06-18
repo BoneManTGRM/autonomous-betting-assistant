@@ -1,4 +1,4 @@
-# deploy trigger: emergency-stable-native-nav-v6
+# deploy trigger: custom-brand-language-tools-v7
 [server]
 headless = true
 
@@ -6,6 +6,6 @@ headless = true
 gatherUsageStats = false
 
 [client]
-# Emergency testing mode: keep Streamlit's native sidebar page list visible so navigation cannot disappear.
-showSidebarNavigation = true
+# Hide Streamlit's automatic file-list sidebar. Use the app's branded sidebar instead.
+showSidebarNavigation = false
 toolbarMode = "minimal"
