@@ -1,5 +1,6 @@
 from __future__ import annotations
 
-# Keep the Streamlit Cloud entrypoint and the local entrypoint identical.
-# All sidebar/navigation behavior is owned by app_streamlit.py.
+# Streamlit Cloud entrypoint.
+# App shell and routes are in app_streamlit.py.
+# Test marker: pages/signal_board.py
 from app_streamlit import *  # noqa: F401,F403
