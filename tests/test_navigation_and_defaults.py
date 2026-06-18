@@ -22,15 +22,23 @@ def test_streamlit_config_uses_branded_custom_tools() -> None:
     assert 'custom-brand-language-tools' in config
 
 
-def test_custom_sidebar_has_brand_language_and_tools() -> None:
-    text = (repo_root() / 'sitecustomize.py').read_text(encoding='utf-8')
-    assert "APP_TAGLINE = 'Powered by Reparodynamics'" in text
-    assert 'def _render_brand' in text
-    assert 'def _render_page_links' in text
-    assert '### :green[ABA] Signal :red[Pro]' in text
-    assert "('Signal Board', 'pages/signal_board.py')" in text
-    assert "('Pro Predictor', 'pages/pro_predictor.py')" in text
-    assert "('What Are the Odds', 'pages/what_are_the_odds.py')" in text
+def test_shell_sidebar_order_is_brand_language_tools_pages() -> None:
+    app = (repo_root() / 'app_streamlit.py').read_text(encoding='utf-8')
+    assert "APP_BUILD = 'clean-shell-sidebar-v8'" in app
+    assert "st.markdown('### :green[ABA] Signal :red[Pro]')" in app
+    assert "st.caption(APP_TAGLINE)" in app
+    assert "st.radio('Language'" in app
+    assert "st.markdown('### ' + ('Herramientas' if _language == 'Español' else 'Tools'))" in app
+    assert "st.page_link(_path, label=_nav_label(_label, _language))" in app
+    assert "st.navigation(PAGES, position='hidden')" in app
+
+
+def test_child_page_language_controls_are_suppressed_by_shell() -> None:
+    app = (repo_root() / 'app_streamlit.py').read_text(encoding='utf-8')
+    assert 'def _hidden_language_radio' in app
+    assert 'def _hidden_language_selectbox' in app
+    assert 'st.sidebar.radio = _hidden_language_radio' in app
+    assert 'st.sidebar.selectbox = _hidden_language_selectbox' in app
 
 
 def test_sitecustomize_skips_streamlit_hooks_in_ci() -> None:
