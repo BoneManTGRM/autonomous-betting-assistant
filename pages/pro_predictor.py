@@ -17,7 +17,7 @@ from autonomous_betting_agent.live_odds import list_sports, scan_market
 from autonomous_betting_agent.multi_source_fusion import fuse_row
 from autonomous_betting_agent.scanner_strength import score_scanner_frame, scanner_strength_summary
 
-APP_VERSION = 'pro-predictor-clean-v2-no-legacy-sidebar-hook'
+APP_VERSION = 'pro-predictor-v16-baseline-accuracy-guard'
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LEARNED_STATE_PATH = REPO_ROOT / 'learned_state.json'
 DEFAULT_SPORT_KEYS = ['basketball_nba', 'baseball_mlb', 'soccer_epl']
@@ -40,7 +40,11 @@ TEXT = {
         'rows': 'Rows', 'playable': 'Playable', 'lock_ready_metric': 'Lock ready', 'avg_strength': 'Avg signal', 'premium': 'Premium signals', 'strong': 'Strong plays', 'small': 'Small plays', 'memory_source': 'Memory source', 'next': 'Next', 'handoff': 'Handoff health',
         'high_conf_setup': 'Highest-confidence output', 'use_high_conf': 'Send only highest-confidence rows to Odds Lock Pro', 'max_high_conf': 'Max high-confidence rows', 'min_high_prob': 'High-confidence min probability', 'min_high_edge': 'High-confidence min edge', 'min_high_strength': 'High-confidence min signal strength', 'min_high_agent': 'High-confidence min agent score',
         'high_conf_count': 'High confidence', 'all_count': 'All passed', 'handoff_note': 'Odds Lock Pro will use this high-confidence session list first. The full prediction list remains downloadable in All rows.',
-        'accuracy_mode': 'Accuracy mode', 'no_skipped': 'No skipped feeds.',
+        'accuracy_mode': 'Selection profile', 'no_skipped': 'No skipped feeds.',
+        'baseline_accuracy': 'Baseline accuracy mode — protect the 68% sample',
+        'balanced_confidence': 'Balanced confidence mode',
+        'profit_strict': 'Profit / +EV strict mode',
+        'profile_note': 'Baseline mode backs off EV/profit filters enough to preserve the high-confidence accuracy list, while still requiring probability and signal strength. Use Official +EV later for betting-value proof.',
     },
     'es': {
         'title': 'Predictor Pro',
@@ -56,7 +60,50 @@ TEXT = {
         'rows': 'Filas', 'playable': 'Jugables', 'lock_ready_metric': 'Listas para bloquear', 'avg_strength': 'Señal promedio', 'premium': 'Señales premium', 'strong': 'Jugadas fuertes', 'small': 'Jugadas pequeñas', 'memory_source': 'Fuente de memoria', 'next': 'Siguiente', 'handoff': 'Salud del traspaso',
         'high_conf_setup': 'Salida de máxima confianza', 'use_high_conf': 'Enviar solo filas de máxima confianza a Odds Lock Pro', 'max_high_conf': 'Máximo de filas de máxima confianza', 'min_high_prob': 'Probabilidad mínima de máxima confianza', 'min_high_edge': 'Ventaja mínima de máxima confianza', 'min_high_strength': 'Fuerza mínima de señal', 'min_high_agent': 'Puntaje agente mínimo',
         'high_conf_count': 'Máxima confianza', 'all_count': 'Todas aprobadas', 'handoff_note': 'Odds Lock Pro usará primero esta lista de máxima confianza. La lista completa queda descargable en Todas las filas.',
-        'accuracy_mode': 'Modo precisión', 'no_skipped': 'No hubo feeds omitidos.',
+        'accuracy_mode': 'Perfil de selección', 'no_skipped': 'No hubo feeds omitidos.',
+        'baseline_accuracy': 'Modo base de acierto — proteger muestra 68%',
+        'balanced_confidence': 'Modo confianza balanceada',
+        'profit_strict': 'Modo estricto ganancia / +EV',
+        'profile_note': 'El modo base reduce filtros EV/rentabilidad lo suficiente para preservar la lista de acierto de alta confianza, pero todavía exige probabilidad y fuerza de señal. Usa Oficial +EV después para prueba de valor de apuesta.',
+    },
+}
+
+PROFILE_DEFAULTS = {
+    'baseline_accuracy': {
+        'min_books': 1,
+        'min_model_prob': 0.58,
+        'min_edge': -0.08,
+        'strong_edge': 0.04,
+        'min_strength': 35.0,
+        'max_high_conf': 125,
+        'min_high_prob': 0.58,
+        'min_high_edge': -0.08,
+        'min_high_strength': 35.0,
+        'min_high_agent': 35.0,
+    },
+    'balanced_confidence': {
+        'min_books': 1,
+        'min_model_prob': 0.60,
+        'min_edge': -0.02,
+        'strong_edge': 0.03,
+        'min_strength': 45.0,
+        'max_high_conf': 500,
+        'min_high_prob': 0.62,
+        'min_high_edge': -0.01,
+        'min_high_strength': 50.0,
+        'min_high_agent': 50.0,
+    },
+    'profit_strict': {
+        'min_books': 2,
+        'min_model_prob': 0.62,
+        'min_edge': 0.01,
+        'strong_edge': 0.05,
+        'min_strength': 55.0,
+        'max_high_conf': 75,
+        'min_high_prob': 0.64,
+        'min_high_edge': 0.00,
+        'min_high_strength': 55.0,
+        'min_high_agent': 55.0,
     },
 }
 
@@ -198,7 +245,7 @@ def high_confidence_shortlist(frame: pd.DataFrame, *, max_rows: int, min_probabi
         playable = decision.isin(['play_strong', 'play_small']) | lock_ready
         if playable.any():
             out = out[playable]
-    sort_cols = [col for col in ['agent_score', 'scanner_strength_score', 'model_market_edge', 'model_probability_clean'] if col in out.columns]
+    sort_cols = [col for col in ['agent_score', 'scanner_strength_score', 'model_probability_clean', 'model_market_edge'] if col in out.columns]
     if sort_cols:
         out = out.sort_values(sort_cols, ascending=False, na_position='last')
     if int(max_rows) > 0:
@@ -312,6 +359,14 @@ s2.metric('SportsDataIO', t('enabled') if sports_key else t('missing'))
 s3.metric('WeatherAPI', t('enabled') if weather_key else t('missing'))
 
 st.subheader(t('setup'))
+profile_labels = {
+    'baseline_accuracy': t('baseline_accuracy'),
+    'balanced_confidence': t('balanced_confidence'),
+    'profit_strict': t('profit_strict'),
+}
+selection_profile = st.selectbox(t('accuracy_mode'), list(profile_labels.keys()), index=0, format_func=lambda key: profile_labels[key])
+st.caption(t('profile_note'))
+defaults = PROFILE_DEFAULTS[selection_profile]
 left, right = st.columns(2)
 with left:
     labels = [t('all_sports'), t('one_sport'), t('team_player'), t('manual_sports')]
@@ -327,22 +382,22 @@ with right:
     latest_event_date = st.date_input(t('latest_date'), value=next_sunday())
 
 with st.expander('Filters' if LANG == 'en' else 'Filtros', expanded=True):
-    st.caption(t('accuracy_mode') + ': balanced defaults favor high-confidence volume and quality.')
+    st.caption(f"{profile_labels[selection_profile]}: {t('profile_note')}")
     f1, f2, f3, f4, f5 = st.columns(5)
-    min_books = f1.number_input(t('min_books'), min_value=1, max_value=25, value=1, step=1)
-    min_model_prob = f2.number_input(t('min_model_prob'), min_value=0.0, max_value=0.99, value=0.60, step=0.01)
-    min_edge = f3.number_input(t('min_edge'), min_value=-0.25, max_value=0.50, value=-0.02, step=0.005, format='%.3f')
-    strong_edge = f4.number_input(t('strong_edge'), min_value=0.0, max_value=0.50, value=0.03, step=0.005, format='%.3f')
-    min_strength = f5.number_input(t('min_strength'), min_value=0.0, max_value=100.0, value=45.0, step=1.0)
+    min_books = f1.number_input(t('min_books'), min_value=1, max_value=25, value=int(defaults['min_books']), step=1, key=f'{selection_profile}_min_books')
+    min_model_prob = f2.number_input(t('min_model_prob'), min_value=0.0, max_value=0.99, value=float(defaults['min_model_prob']), step=0.01, key=f'{selection_profile}_min_model_prob')
+    min_edge = f3.number_input(t('min_edge'), min_value=-0.25, max_value=0.50, value=float(defaults['min_edge']), step=0.005, format='%.3f', key=f'{selection_profile}_min_edge')
+    strong_edge = f4.number_input(t('strong_edge'), min_value=0.0, max_value=0.50, value=float(defaults['strong_edge']), step=0.005, format='%.3f', key=f'{selection_profile}_strong_edge')
+    min_strength = f5.number_input(t('min_strength'), min_value=0.0, max_value=100.0, value=float(defaults['min_strength']), step=1.0, key=f'{selection_profile}_min_strength')
 
 with st.expander(t('high_conf_setup'), expanded=True):
     h1, h2, h3, h4, h5 = st.columns(5)
-    use_high_conf = h1.checkbox(t('use_high_conf'), value=True)
-    max_high_conf = h2.number_input(t('max_high_conf'), min_value=1, max_value=500, value=500, step=25)
-    min_high_prob = h3.number_input(t('min_high_prob'), min_value=0.0, max_value=0.99, value=0.62, step=0.01)
-    min_high_edge = h4.number_input(t('min_high_edge'), min_value=-0.25, max_value=0.50, value=-0.01, step=0.005, format='%.3f')
-    min_high_strength = h5.number_input(t('min_high_strength'), min_value=0.0, max_value=100.0, value=50.0, step=1.0)
-    min_high_agent = st.number_input(t('min_high_agent'), min_value=0.0, max_value=100.0, value=50.0, step=1.0)
+    use_high_conf = h1.checkbox(t('use_high_conf'), value=True, key=f'{selection_profile}_use_high_conf')
+    max_high_conf = h2.number_input(t('max_high_conf'), min_value=1, max_value=500, value=int(defaults['max_high_conf']), step=25, key=f'{selection_profile}_max_high_conf')
+    min_high_prob = h3.number_input(t('min_high_prob'), min_value=0.0, max_value=0.99, value=float(defaults['min_high_prob']), step=0.01, key=f'{selection_profile}_min_high_prob')
+    min_high_edge = h4.number_input(t('min_high_edge'), min_value=-0.25, max_value=0.50, value=float(defaults['min_high_edge']), step=0.005, format='%.3f', key=f'{selection_profile}_min_high_edge')
+    min_high_strength = h5.number_input(t('min_high_strength'), min_value=0.0, max_value=100.0, value=float(defaults['min_high_strength']), step=1.0, key=f'{selection_profile}_min_high_strength')
+    min_high_agent = st.number_input(t('min_high_agent'), min_value=0.0, max_value=100.0, value=float(defaults['min_high_agent']), step=1.0, key=f'{selection_profile}_min_high_agent')
 
 if st.button(t('run'), type='primary', use_container_width=True):
     if not odds_key:
@@ -394,11 +449,15 @@ if st.button(t('run'), type='primary', use_container_width=True):
     if decisions.empty:
         st.info(t('no_rows'))
         st.stop()
-    sort_cols = [col for col in ['agent_score', 'scanner_strength_score', 'model_market_edge', 'model_probability_clean'] if col in decisions.columns]
+    sort_cols = [col for col in ['agent_score', 'scanner_strength_score', 'model_probability_clean', 'model_market_edge'] if col in decisions.columns]
     if sort_cols:
         decisions = decisions.sort_values(sort_cols, ascending=False).reset_index(drop=True)
     high_conf = high_confidence_shortlist(decisions, max_rows=int(max_high_conf), min_probability=float(min_high_prob), min_edge=float(min_high_edge), min_strength=float(min_high_strength), min_agent_score=float(min_high_agent))
     handoff = high_conf if use_high_conf and not high_conf.empty else decisions
+    if not handoff.empty:
+        handoff = handoff.copy()
+        handoff['selection_profile'] = selection_profile
+        handoff['selection_profile_label'] = profile_labels[selection_profile]
     summary = agent_decision_summary(decisions, min_edge=float(min_edge), strong_edge=float(strong_edge))
     strength = scanner_strength_summary(decisions)
     health = page_health(handoff, page='pro_predictor')
@@ -408,7 +467,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
     st.session_state['pro_predictor_high_confidence_rows'] = high_conf.to_dict('records')
     st.session_state['pro_predictor_latest_rows'] = handoff.to_dict('records')
     st.session_state['ara_latest_predictions'] = handoff.to_dict('records')
-    st.session_state['ara_latest_predictions_source'] = 'Pro Predictor high-confidence' if use_high_conf else 'Pro Predictor all rows'
+    st.session_state['ara_latest_predictions_source'] = f"Pro Predictor high-confidence — {profile_labels[selection_profile]}" if use_high_conf else f"Pro Predictor all rows — {profile_labels[selection_profile]}"
     st.session_state['ara_latest_predictions_saved_at'] = pd.Timestamp.utcnow().isoformat()
     st.success(t('saved'))
     st.info(t('handoff_note'))
@@ -425,15 +484,17 @@ if st.button(t('run'), type='primary', use_container_width=True):
     st.subheader(t('handoff'))
     st.dataframe(display_frame(page_health_frame(handoff, page='pro_predictor')), use_container_width=True, hide_index=True)
     tabs = st.tabs([t('high_conf'), t('ranked'), t('lock_ready'), t('all_rows'), t('skipped')])
-    display_cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'model_probability_clean', 'market_implied_probability', 'model_market_edge', 'decimal_price', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score', 'scanner_strength_tier', 'lock_ready', 'decision_reasons'] if col in decisions.columns]
+    display_cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'model_probability_clean', 'market_implied_probability', 'model_market_edge', 'decimal_price', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score', 'scanner_strength_tier', 'lock_ready', 'selection_profile_label', 'decision_reasons'] if col in decisions.columns or col in handoff.columns]
     with tabs[0]:
         if high_conf.empty:
             st.info(t('no_rows'))
         else:
-            st.dataframe(display_frame(high_conf[display_cols] if display_cols else high_conf), use_container_width=True, hide_index=True)
+            high_display_cols = [col for col in display_cols if col in high_conf.columns]
+            st.dataframe(display_frame(high_conf[high_display_cols] if high_display_cols else high_conf), use_container_width=True, hide_index=True)
             st.download_button(t('download_high'), display_frame(high_conf).to_csv(index=False), file_name='pro_predictor_high_confidence.csv', mime='text/csv')
     with tabs[1]:
-        st.dataframe(display_frame(decisions[display_cols].head(100) if display_cols else decisions.head(100)), use_container_width=True, hide_index=True)
+        decision_display_cols = [col for col in display_cols if col in decisions.columns]
+        st.dataframe(display_frame(decisions[decision_display_cols].head(100) if decision_display_cols else decisions.head(100)), use_container_width=True, hide_index=True)
     with tabs[2]:
         st.dataframe(display_frame(lock_ready), use_container_width=True, hide_index=True)
     with tabs[3]:
