@@ -147,6 +147,11 @@ def _install_all_runtime_hooks() -> None:
     except Exception:
         pass
     try:
+        from autonomous_betting_agent.pro_predictor_defaults_patch import install_pro_predictor_defaults_patch
+        install_pro_predictor_defaults_patch()
+    except Exception:
+        pass
+    try:
         from autonomous_betting_agent.odds_input_normalizer import install_odds_breakdown_normalizer
         install_odds_breakdown_normalizer()
     except Exception:
