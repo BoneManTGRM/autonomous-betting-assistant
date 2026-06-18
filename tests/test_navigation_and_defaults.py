@@ -13,6 +13,14 @@ def test_main_navigation_uses_signal_board_and_hides_ultra70() -> None:
     assert 'pages/ultra80_profit_mode.py' not in text
 
 
+def test_curated_sidebar_uses_signal_board_and_renders_links() -> None:
+    sidebar = (repo_root() / 'autonomous_betting_agent' / 'sidebar_tools.py').read_text(encoding='utf-8')
+    sitecustomize = (repo_root() / 'sitecustomize.py').read_text(encoding='utf-8')
+    assert "('Signal Board', 'Signal Board', 'pages/signal_board.py')" in sidebar
+    assert "'Ultra 70 Profit Mode'" not in sidebar
+    assert 'render_curated_sidebar(st,' in sitecustomize
+
+
 def test_pro_predictor_default_patch_values() -> None:
     from autonomous_betting_agent.pro_predictor_defaults_patch import MULTI_DEFAULTS, NUMBER_DEFAULTS, PROFILE_VALUES
 
