@@ -37,17 +37,15 @@ TEXT = {
     'en': {
         'title': 'Odds Lock Pro',
         'caption': 'Timestamped proof ledger, performance dashboard, reports, bankroll controls, and client-ready views.',
-        'info': 'Use Research/Test mode to lock future high-confidence predictions for accuracy testing. Use Official +EV mode only for picks that pass betting-value gates.',
+        'info': 'This page now gives both outputs at the same time: Research/Test locks for accuracy testing and Official +EV locks for betting-value proof.',
         'test_window': 'Test Window ID',
         'test_window_help': 'Use a simple ID such as test_01, test_02, etc. Each ID saves to its own persistent proof ledger.',
         'active_test_window': 'Active test ledger',
         'use_session': 'Use latest rows from session',
         'upload': 'Upload prediction, high-confidence tracker, or locked-ledger CSV',
         'source': 'Input source',
-        'ledger_mode': 'Ledger mode',
-        'official_mode': 'Official +EV betting proof ledger',
-        'research_mode': 'Research/Test accuracy ledger',
         'research_help': 'Research/Test locks future predictions for accuracy testing and ignores EV/profitability blockers. It does not label them as official +EV betting picks.',
+        'official_help': 'Official +EV locks only rows that pass the strict betting-value gates.',
         'analyst': 'Analyst / brand name',
         'max_units': 'Max stake units per pick',
         'daily_limit': 'Daily exposure limit',
@@ -59,12 +57,12 @@ TEXT = {
         'min_shortlist_prob': 'Minimum model probability',
         'min_shortlist_score': 'Minimum agent score',
         'shortlisted': 'Shortlisted',
-        'lock': 'Create official future-only proof ledger',
+        'lock': 'Create official +EV future-only ledger',
         'lock_research': 'Create research/test future-only ledger',
         'save_persistent': 'Save locked rows to this test ledger',
         'saved_persistent': 'Saved to persistent test ledger',
-        'candidates': 'Official lock candidates',
-        'research_candidates': 'Research lock candidates',
+        'official_candidates_tab': 'Official +EV candidates',
+        'research_candidates_tab': 'Research/Test candidates',
         'locked': 'Locked proof ledger',
         'dashboard': 'Proof dashboard',
         'reports': 'Report generator',
@@ -73,8 +71,8 @@ TEXT = {
         'rows': 'Rows',
         'input_rows': 'Input rows',
         'reviewed': 'Reviewed',
-        'official_candidates': 'Official candidates',
-        'eligible_candidates': 'Eligible candidates',
+        'official_candidates': 'Official +EV',
+        'research_candidates': 'Research/Test',
         'uploaded_locked': 'Uploaded locked',
         'resolved': 'Resolved',
         'record': 'Record',
@@ -88,14 +86,14 @@ TEXT = {
         'download_private': 'Download private audit CSV',
         'no_rows': 'No rows found. Run What Are the Odds first or upload a CSV.',
         'no_locked': 'No locked proof rows yet. Create a locked proof ledger or upload a ledger with proof_id and locked_at_utc.',
-        'no_candidates': 'No official lock candidates found. Rows must be future events with event, prediction, probability, decimal price, bookmaker/odds source, and event start time.',
+        'no_official_candidates': 'No official +EV candidates found. These rows can still be valid research/test picks, but they did not pass strict betting-value gates.',
         'no_research_candidates': 'No research/test candidates found. Rows must still be future predictions with core event and pick fields.',
         'no_review_rows': 'No rows reached lock-candidate review. Turn on watch/tracker rows for legacy tracker files, or send rows from Pro Predictor/What Are the Odds.',
-        'lock_created': 'Created official locked proof rows',
+        'lock_created': 'Created official +EV locked proof rows',
         'research_lock_created': 'Created research/test locked rows',
-        'lock_not_created': 'No official ledger was created.',
+        'lock_not_created': 'No official +EV ledger was created.',
         'research_lock_not_created': 'No research/test ledger was created.',
-        'lock_not_created_detail': 'The button worked, but every reviewed row was blocked from this ledger mode. The diagnostics below show exactly what is missing.',
+        'lock_not_created_detail': 'The button worked, but every reviewed row was blocked for this ledger type. The diagnostics below show exactly what is missing.',
         'lock_not_created_no_review': 'The button worked, but no rows qualified for lock review. The upload may be a results-only file or may lack event/prediction fields.',
         'blocker_summary': 'Why rows were blocked',
         'blocked_preview': 'Blocked-row diagnostic preview',
@@ -107,17 +105,15 @@ TEXT = {
     'es': {
         'title': 'Odds Lock Pro',
         'caption': 'Ledger con prueba por timestamp, dashboard de rendimiento, reportes, control de unidades y vista para clientes.',
-        'info': 'Usa modo Investigación/Prueba para bloquear predicciones futuras de alta confianza y medir acierto. Usa modo Oficial +EV solo para picks que pasan filtros de valor.',
+        'info': 'Esta página ahora da ambos resultados al mismo tiempo: Investigación/Prueba para medir acierto y Oficial +EV para prueba de valor de apuesta.',
         'test_window': 'ID de ventana de prueba',
         'test_window_help': 'Usa un ID simple como test_01, test_02, etc. Cada ID guarda su propio ledger persistente.',
         'active_test_window': 'Ledger de prueba activo',
         'use_session': 'Usar últimas filas de la sesión',
         'upload': 'Subir CSV de predicciones, tracker de alta confianza o ledger bloqueado',
         'source': 'Fuente de entrada',
-        'ledger_mode': 'Modo de ledger',
-        'official_mode': 'Ledger oficial +EV de apuestas',
-        'research_mode': 'Ledger de investigación/prueba de acierto',
         'research_help': 'Investigación/Prueba bloquea predicciones futuras para medir acierto e ignora bloqueos de EV/rentabilidad. No las etiqueta como picks oficiales +EV.',
+        'official_help': 'Oficial +EV bloquea solamente filas que pasan filtros estrictos de valor de apuesta.',
         'analyst': 'Analista / marca',
         'max_units': 'Máximo de unidades por pick',
         'daily_limit': 'Límite diario de exposición',
@@ -129,12 +125,12 @@ TEXT = {
         'min_shortlist_prob': 'Probabilidad mínima del modelo',
         'min_shortlist_score': 'Puntaje mínimo del agente',
         'shortlisted': 'Lista corta',
-        'lock': 'Crear ledger oficial solo de eventos futuros',
+        'lock': 'Crear ledger oficial +EV solo de eventos futuros',
         'lock_research': 'Crear ledger investigación/prueba solo de eventos futuros',
         'save_persistent': 'Guardar filas bloqueadas en este ledger de prueba',
         'saved_persistent': 'Guardado en ledger persistente de prueba',
-        'candidates': 'Candidatos oficiales para bloquear',
-        'research_candidates': 'Candidatos investigación/prueba',
+        'official_candidates_tab': 'Candidatos oficiales +EV',
+        'research_candidates_tab': 'Candidatos investigación/prueba',
         'locked': 'Ledger bloqueado',
         'dashboard': 'Dashboard de prueba',
         'reports': 'Generador de reportes',
@@ -143,8 +139,8 @@ TEXT = {
         'rows': 'Filas',
         'input_rows': 'Filas cargadas',
         'reviewed': 'Revisadas',
-        'official_candidates': 'Candidatos oficiales',
-        'eligible_candidates': 'Candidatos elegibles',
+        'official_candidates': 'Oficial +EV',
+        'research_candidates': 'Investigación/Prueba',
         'uploaded_locked': 'Ledger subido',
         'resolved': 'Resueltos',
         'record': 'Récord',
@@ -158,14 +154,14 @@ TEXT = {
         'download_private': 'Descargar CSV privado de auditoría',
         'no_rows': 'No se encontraron filas. Ejecuta What Are the Odds primero o sube un CSV.',
         'no_locked': 'Aún no hay filas bloqueadas con prueba. Crea bloqueos o sube un ledger con proof_id y locked_at_utc.',
-        'no_candidates': 'No hay candidatos oficiales. Las filas deben ser eventos futuros con evento, pronóstico, probabilidad, cuota decimal, casa/fuente y hora de inicio.',
+        'no_official_candidates': 'No hay candidatos oficiales +EV. Estas filas pueden servir como prueba de acierto, pero no pasaron los filtros estrictos de valor de apuesta.',
         'no_research_candidates': 'No hay candidatos de investigación/prueba. Las filas deben ser predicciones futuras con campos básicos de evento y pick.',
         'no_review_rows': 'Ninguna fila llegó a revisión. Activa filas watch/tracker para archivos legacy, o envía filas desde Predictor Pro/What Are the Odds.',
-        'lock_created': 'Filas oficiales bloqueadas creadas',
+        'lock_created': 'Filas oficiales +EV bloqueadas creadas',
         'research_lock_created': 'Filas investigación/prueba bloqueadas creadas',
-        'lock_not_created': 'No se creó ningún ledger oficial.',
+        'lock_not_created': 'No se creó ningún ledger oficial +EV.',
         'research_lock_not_created': 'No se creó ningún ledger de investigación/prueba.',
-        'lock_not_created_detail': 'El botón funcionó, pero todas las filas revisadas fueron bloqueadas para este modo. El diagnóstico abajo muestra exactamente qué falta.',
+        'lock_not_created_detail': 'El botón funcionó, pero todas las filas revisadas fueron bloqueadas para este tipo de ledger. El diagnóstico abajo muestra exactamente qué falta.',
         'lock_not_created_no_review': 'El botón funcionó, pero ninguna fila calificó para revisión. Probablemente es un archivo solo de resultados o sin evento/pronóstico.',
         'blocker_summary': 'Por qué se bloquearon las filas',
         'blocked_preview': 'Vista diagnóstica de filas bloqueadas',
@@ -202,6 +198,7 @@ def session_rows() -> tuple[str, list[dict]]:
     sources = [
         ('what_are_the_odds_latest_rows', 'What Are the Odds'),
         ('pro_predictor_latest_rows', 'Pro Predictor'),
+        ('pro_predictor_high_confidence_rows', 'Pro Predictor high-confidence'),
         ('scanner_pro_latest_rows', 'Scanner Pro'),
         ('odds_lock_pro_locked_rows', 'Odds Lock Pro'),
         ('ara_latest_predictions', 'Latest session'),
@@ -320,9 +317,9 @@ def apply_research_mode(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame
     out = frame.copy()
-    remaining = []
-    ignored = []
-    ready = []
+    remaining: list[str] = []
+    ignored: list[str] = []
+    ready: list[bool] = []
     for row in out.to_dict(orient='records'):
         remaining_blockers = research_remaining_blockers(row)
         ignored_blockers = research_ignored_blockers(row)
@@ -392,6 +389,16 @@ def research_lock_rows(frame: pd.DataFrame, *, analyst: str, max_units: float, w
     return pd.DataFrame(rows)
 
 
+def mark_official_locked(frame: pd.DataFrame, workspace_id: str) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    out = frame.copy()
+    out['test_window_id'] = workspace_id
+    out['ledger_type'] = 'official_plus_ev_future_only'
+    out['official_ev_pick'] = True
+    return out
+
+
 def blocker_summary(frame: pd.DataFrame, column: str = 'lock_blockers') -> pd.DataFrame:
     if frame.empty or column not in frame.columns:
         return pd.DataFrame()
@@ -418,6 +425,40 @@ def diagnostic_columns(frame: pd.DataFrame) -> list[str]:
     return [col for col in preferred if col in frame.columns]
 
 
+def show_blocked_diagnostics(frame: pd.DataFrame, *, blocker_column: str) -> None:
+    if frame.empty:
+        st.info(t('no_review_rows'))
+        return
+    blocked = blocker_summary(frame, column=blocker_column)
+    if not blocked.empty:
+        st.subheader(t('blocker_summary'))
+        st.dataframe(blocked, use_container_width=True, hide_index=True)
+    cols = diagnostic_columns(frame)
+    st.subheader(t('blocked_preview'))
+    st.dataframe(frame[cols] if cols else frame, use_container_width=True, hide_index=True)
+
+
+def show_candidates(frame: pd.DataFrame) -> None:
+    show_cols = [col for col in [
+        'event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price',
+        'bookmaker', 'odds_source', 'agent_decision', 'agent_score', 'scanner_strength_score',
+        'model_edge', 'stake_units', 'prelock_status', 'official_lock_ready', 'research_lock_ready',
+        'research_lock_blockers', 'ignored_value_blockers', 'public_confidence', 'public_reason',
+    ] if col in frame.columns]
+    st.dataframe(frame[show_cols] if show_cols else frame, use_container_width=True, hide_index=True)
+
+
+def publish_locked_rows(locked: pd.DataFrame, *, source_label: str, workspace_id: str) -> pd.DataFrame:
+    if locked.empty:
+        return pd.DataFrame()
+    locked = locked.copy()
+    locked['test_window_id'] = workspace_id
+    st.session_state['odds_lock_pro_locked_rows'] = locked.to_dict('records')
+    st.session_state['ara_latest_predictions'] = locked.to_dict('records')
+    st.session_state['ara_latest_predictions_source'] = f'Odds Lock Pro {source_label}:{workspace_id}'
+    return filter_locked_proof_rows(locked)
+
+
 st.title(t('title'))
 st.caption(t('caption'))
 st.info(t('info'))
@@ -439,11 +480,8 @@ if raw.empty:
     st.stop()
 
 normalized = normalize_frame(raw)
-mode_labels = {'research': t('research_mode'), 'official': t('official_mode')}
-ledger_mode = st.radio(t('ledger_mode'), ['research', 'official'], index=0, format_func=lambda key: mode_labels[key], horizontal=False)
-research_mode = ledger_mode == 'research'
-if research_mode:
-    st.caption(t('research_help'))
+st.caption(t('research_help'))
+st.caption(t('official_help'))
 include_watch = st.checkbox(t('include_watch'), value=True)
 analyst = st.text_input(t('analyst'), value='ReparoEdge · Powered by Reparodynamics')
 max_units = st.number_input(t('max_units'), min_value=0.25, max_value=10.0, value=1.0, step=0.25)
@@ -468,46 +506,46 @@ review_rows = prepare_lock_candidates(working, include_watch=include_watch, stri
 review_rows = apply_research_mode(review_rows)
 official_candidates = review_rows[review_rows.get('official_lock_ready', pd.Series(dtype=bool)).fillna(False)].copy() if not review_rows.empty else pd.DataFrame()
 research_candidates = review_rows[review_rows.get('research_lock_ready', pd.Series(dtype=bool)).fillna(False)].copy() if not review_rows.empty else pd.DataFrame()
-candidates = research_candidates if research_mode else official_candidates
 existing_locked = filter_locked_proof_rows(pd.DataFrame(st.session_state.get('odds_lock_pro_locked_rows', [])))
 uploaded_locked = filter_locked_proof_rows(normalized) if has_proof_fields(normalized) else pd.DataFrame()
 
-status_cols = st.columns(5)
+status_cols = st.columns(6)
 status_cols[0].metric(t('input_rows'), int(len(normalized)))
 status_cols[1].metric(t('shortlisted'), int(len(working)))
 status_cols[2].metric(t('reviewed'), int(len(review_rows)))
-status_cols[3].metric(t('eligible_candidates') if research_mode else t('official_candidates'), int(len(candidates)))
-status_cols[4].metric(t('uploaded_locked'), int(len(uploaded_locked)))
+status_cols[3].metric(t('research_candidates'), int(len(research_candidates)))
+status_cols[4].metric(t('official_candidates'), int(len(official_candidates)))
+status_cols[5].metric(t('uploaded_locked'), int(len(uploaded_locked)))
 
-if st.button(t('lock_research') if research_mode else t('lock'), type='primary', use_container_width=True):
-    if research_mode:
-        locked = research_lock_rows(candidates, analyst=analyst, max_units=float(max_units), workspace_id=workspace_id)
-    else:
-        locked = lock_rows(working, analyst=analyst, max_units=float(max_units), include_watch=include_watch, strict=True, require_future=True)
+button_cols = st.columns(2)
+research_clicked = button_cols[0].button(t('lock_research'), type='primary', use_container_width=True)
+official_clicked = button_cols[1].button(t('lock'), type='secondary', use_container_width=True)
+
+if research_clicked:
+    locked = research_lock_rows(research_candidates, analyst=analyst, max_units=float(max_units), workspace_id=workspace_id)
     if locked.empty:
-        st.error(t('research_lock_not_created') if research_mode else t('lock_not_created'))
+        st.error(t('research_lock_not_created'))
         st.warning(t('lock_not_created_no_review') if review_rows.empty else t('lock_not_created_detail'))
-        blocked_column = 'research_lock_blockers' if research_mode else 'lock_blockers'
-        blocked = blocker_summary(review_rows, column=blocked_column)
-        if not blocked.empty:
-            st.subheader(t('blocker_summary'))
-            st.dataframe(blocked, use_container_width=True, hide_index=True)
-        if not review_rows.empty:
-            cols = diagnostic_columns(review_rows)
-            st.subheader(t('blocked_preview'))
-            st.dataframe(review_rows[cols] if cols else review_rows, use_container_width=True, hide_index=True)
+        show_blocked_diagnostics(review_rows, blocker_column='research_lock_blockers')
     else:
-        locked['test_window_id'] = workspace_id
-        st.session_state['odds_lock_pro_locked_rows'] = locked.to_dict('records')
-        st.session_state['ara_latest_predictions'] = locked.to_dict('records')
-        st.session_state['ara_latest_predictions_source'] = f'Odds Lock Pro:{workspace_id}'
-        existing_locked = filter_locked_proof_rows(locked)
-        st.success(f"{t('research_lock_created') if research_mode else t('lock_created')}: {len(locked)}")
+        existing_locked = publish_locked_rows(locked, source_label='research/test', workspace_id=workspace_id)
+        st.success(f"{t('research_lock_created')}: {len(locked)}")
+
+if official_clicked:
+    locked = lock_rows(working, analyst=analyst, max_units=float(max_units), include_watch=include_watch, strict=True, require_future=True)
+    locked = mark_official_locked(locked, workspace_id)
+    if locked.empty:
+        st.error(t('lock_not_created'))
+        st.warning(t('lock_not_created_no_review') if review_rows.empty else t('lock_not_created_detail'))
+        show_blocked_diagnostics(review_rows, blocker_column='lock_blockers')
+    else:
+        existing_locked = publish_locked_rows(locked, source_label='official +EV', workspace_id=workspace_id)
+        st.success(f"{t('lock_created')}: {len(locked)}")
 
 active_locked = merge_ledgers(existing_locked, uploaded_locked)
 summary = summarize_locked_picks(active_locked)
 audit = proof_audit_summary(active_locked)
-health_frame_source = active_locked if not active_locked.empty else candidates
+health_frame_source = active_locked if not active_locked.empty else (research_candidates if not research_candidates.empty else official_candidates)
 
 cols = st.columns(8)
 cols[0].metric(t('rows'), summary['locked_picks'])
@@ -522,32 +560,23 @@ cols[7].metric(t('proof_quality'), f"{audit['proof_quality_score']}/100")
 st.subheader(t('handoff'))
 st.dataframe(page_health_frame(health_frame_source, page='what_are_the_odds'), use_container_width=True, hide_index=True)
 
-tabs = st.tabs([t('research_candidates') if research_mode else t('candidates'), t('locked'), t('dashboard'), t('reports'), t('bankroll'), t('client')])
+tabs = st.tabs([t('research_candidates_tab'), t('official_candidates_tab'), t('locked'), t('dashboard'), t('reports'), t('bankroll'), t('client')])
 
 with tabs[0]:
-    if candidates.empty:
-        st.warning(t('no_research_candidates') if research_mode else t('no_candidates'))
-        if review_rows.empty:
-            st.info(t('no_review_rows'))
-        else:
-            blocked_column = 'research_lock_blockers' if research_mode else 'lock_blockers'
-            blocked = blocker_summary(review_rows, column=blocked_column)
-            if not blocked.empty:
-                st.subheader(t('blocker_summary'))
-                st.dataframe(blocked, use_container_width=True, hide_index=True)
-            cols = diagnostic_columns(review_rows)
-            st.subheader(t('blocked_preview'))
-            st.dataframe(review_rows[cols] if cols else review_rows, use_container_width=True, hide_index=True)
+    if research_candidates.empty:
+        st.warning(t('no_research_candidates'))
+        show_blocked_diagnostics(review_rows, blocker_column='research_lock_blockers')
     else:
-        show_cols = [col for col in [
-            'event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price',
-            'bookmaker', 'odds_source', 'agent_decision', 'agent_score', 'scanner_strength_score',
-            'model_edge', 'stake_units', 'prelock_status', 'official_lock_ready', 'research_lock_ready',
-            'research_lock_blockers', 'ignored_value_blockers', 'public_confidence', 'public_reason',
-        ] if col in candidates.columns]
-        st.dataframe(candidates[show_cols] if show_cols else candidates, use_container_width=True, hide_index=True)
+        show_candidates(research_candidates)
 
 with tabs[1]:
+    if official_candidates.empty:
+        st.warning(t('no_official_candidates'))
+        show_blocked_diagnostics(review_rows, blocker_column='lock_blockers')
+    else:
+        show_candidates(official_candidates)
+
+with tabs[2]:
     if active_locked.empty:
         st.warning(t('no_locked'))
     else:
@@ -559,7 +588,7 @@ with tabs[1]:
             st.session_state['odds_lock_pro_locked_rows'] = saved.to_dict('records')
             st.success(f"{t('saved_persistent')}: {workspace_id} / {len(saved)} rows")
 
-with tabs[2]:
+with tabs[3]:
     st.json({**summary, **audit})
     by_sport = performance_by_group(active_locked, 'sport')
     if not by_sport.empty:
@@ -570,17 +599,17 @@ with tabs[2]:
         st.subheader('By market' if LANG == 'en' else 'Por mercado')
         st.dataframe(by_market, use_container_width=True, hide_index=True)
 
-with tabs[3]:
+with tabs[4]:
     report_language = st.radio(t('report_language'), ['English', 'Español'], horizontal=True, index=0 if LANG == 'en' else 1)
     public_only = st.checkbox(t('public_only'), value=True, key='report_public_only')
     report_text = daily_report(active_locked, language=report_language, public_only=public_only)
     st.text_area(t('report'), value=report_text, height=360)
 
-with tabs[4]:
+with tabs[5]:
     exposure = exposure_summary(active_locked, daily_limit_units=float(daily_limit), sport_limit_units=float(sport_limit))
     st.dataframe(exposure, use_container_width=True, hide_index=True)
 
-with tabs[5]:
+with tabs[6]:
     public_only_client = st.checkbox(t('public_only'), value=True, key='client_public_only')
     client = client_view(active_locked, public_only=public_only_client)
     st.dataframe(client, use_container_width=True, hide_index=True)
