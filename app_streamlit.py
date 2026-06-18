@@ -19,12 +19,6 @@ def _is_numeric_value(value: Any) -> bool:
 
 
 def _slider_as_number_input(target: Any, original_slider: Any, *args: Any, **kwargs: Any) -> Any:
-    """Render simple numeric sliders as plus/minus number inputs.
-
-    Range/date/time sliders fall back to the native Streamlit slider so unusual
-    controls do not break. The app's setting sliders are all simple numeric
-    controls, so they render as mobile-friendly +/- fields.
-    """
     original_kwargs = dict(kwargs)
     try:
         if args:
@@ -33,20 +27,9 @@ def _slider_as_number_input(target: Any, original_slider: Any, *args: Any, **kwa
         else:
             label = kwargs.pop("label")
             rest = []
-
         ordered = [
-            "min_value",
-            "max_value",
-            "value",
-            "step",
-            "format",
-            "key",
-            "help",
-            "on_change",
-            "args",
-            "kwargs",
-            "disabled",
-            "label_visibility",
+            "min_value", "max_value", "value", "step", "format", "key", "help",
+            "on_change", "args", "kwargs", "disabled", "label_visibility",
         ]
         params: dict[str, Any] = {}
         for name in ordered:
@@ -54,20 +37,16 @@ def _slider_as_number_input(target: Any, original_slider: Any, *args: Any, **kwa
                 params[name] = rest.pop(0)
             elif name in kwargs:
                 params[name] = kwargs.pop(name)
-
         if rest:
             return original_slider(*args, **original_kwargs)
-
         min_value = params.get("min_value")
         max_value = params.get("max_value")
         value = params.get("value")
         step = params.get("step")
         if isinstance(value, (list, tuple)) or not all(_is_numeric_value(item) for item in (min_value, max_value, value, step)):
             return original_slider(*args, **original_kwargs)
-
         if value is None:
             value = min_value if min_value is not None else 0.0
-
         number_kwargs: dict[str, Any] = dict(kwargs)
         for name in ("min_value", "max_value", "step", "format", "key", "help", "on_change", "args", "kwargs"):
             if name in params and params[name] is not None:
@@ -105,16 +84,13 @@ try:
 except Exception:
     pass
 
-# Use the shared language selector state from the pages. The navigation is built
-# before each page renders, so it must read session state directly to translate
-# sidebar page labels on rerun.
 LANG_VALUE = st.session_state.get("global_language", st.session_state.get("pro_predictor_language", "English"))
 LANG = "es" if LANG_VALUE == "Español" else "en"
 
 NAV_LABELS = {
     "en": {
+        "signal_board": "Signal Board",
         "pro_predictor": "Pro Predictor",
-        "ultra70_profit_mode": "Ultra 70 Profit Mode",
         "simulation_lab": "Simulation Lab",
         "threshold_optimizer": "Threshold Optimizer",
         "what_are_the_odds": "What Are the Odds",
@@ -124,8 +100,8 @@ NAV_LABELS = {
         "reset_lock_file": "Reset Lock File",
     },
     "es": {
+        "signal_board": "Signal Board",
         "pro_predictor": "Predictor Pro",
-        "ultra70_profit_mode": "Modo de Ganancia Ultra 70",
         "simulation_lab": "Laboratorio de Simulación",
         "threshold_optimizer": "Optimizador de Umbral",
         "what_are_the_odds": "Qué Probabilidades Hay",
@@ -141,14 +117,13 @@ def nav_text(key: str) -> str:
     return NAV_LABELS[LANG].get(key, NAV_LABELS["en"].get(key, key))
 
 
-# Brand stays in the sidebar without replacing navigation.
 st.sidebar.markdown("### :green[ABA] Signal :red[Pro]")
 st.sidebar.caption(APP_TAGLINE)
 st.sidebar.markdown("---")
 
 PAGES = [
+    st.Page("pages/signal_board.py", title=nav_text("signal_board")),
     st.Page("pages/pro_predictor.py", title=nav_text("pro_predictor")),
-    st.Page("pages/ultra80_profit_mode.py", title=nav_text("ultra70_profit_mode")),
     st.Page("pages/simulation_lab.py", title=nav_text("simulation_lab")),
     st.Page("pages/threshold_optimizer.py", title=nav_text("threshold_optimizer")),
     st.Page("pages/what_are_the_odds.py", title=nav_text("what_are_the_odds")),
@@ -158,15 +133,12 @@ PAGES = [
     st.Page("pages/reset_lock_file.py", title=nav_text("reset_lock_file")),
 ]
 
-# Curated navigation must stay visible in the sidebar. Do not disable
-# [client].showSidebarNavigation in .streamlit/config.toml.
 current_page = st.navigation(PAGES, position="sidebar", expanded=True)
 
 
-def _ignore_late_page_config(*args, **kwargs):
+def _ignore_late_page_config(*args: Any, **kwargs: Any) -> None:
     return None
 
 
-# Existing page files still call set_page_config; ignore those after the main app config.
 st.set_page_config = _ignore_late_page_config
 current_page.run()
