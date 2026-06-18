@@ -16,19 +16,24 @@ def test_main_navigation_uses_signal_board_and_hides_ultra70() -> None:
     assert 'pages/ultra80_profit_mode.py' not in shell
 
 
-def test_streamlit_config_allows_sidebar_navigation() -> None:
+def test_streamlit_config_uses_custom_sidebar_links() -> None:
     config = (repo_root() / '.streamlit' / 'config.toml').read_text(encoding='utf-8')
-    assert 'showSidebarNavigation = true' in config
-    assert 'showSidebarNavigation = false' not in config
+    assert 'showSidebarNavigation = false' in config
+    assert 'custom-bottom-sidebar-links' in config
 
 
-def test_native_sidebar_navigation_is_not_hidden_by_sitecustomize() -> None:
-    sitecustomize = (repo_root() / 'sitecustomize.py').read_text(encoding='utf-8')
+def test_shell_uses_custom_page_routing() -> None:
     shell = (repo_root() / 'streamlit_app.py').read_text(encoding='utf-8')
-    assert "position='sidebar'" in shell
-    assert 'sidebar_tools.install_sidebar_tools' not in sitecustomize
-    assert 'render_curated_sidebar(st,' not in sitecustomize
-    assert 'stSidebarNav' not in sitecustomize
+    assert "position='hidden'" in shell
+    assert 'hidden-nav-custom-bottom-links' in shell
+
+
+def test_sitecustomize_renders_sidebar_links_after_language() -> None:
+    sitecustomize = (repo_root() / 'sitecustomize.py').read_text(encoding='utf-8')
+    assert 'def _install_sidebar_page_links()' in sitecustomize
+    assert 'st.sidebar.radio = radio' in sitecustomize
+    assert 'st.sidebar.selectbox = selectbox' in sitecustomize
+    assert "('Pro Predictor', 'pages/pro_predictor.py')" in sitecustomize
 
 
 def test_signal_board_has_direct_sidebar_links() -> None:
