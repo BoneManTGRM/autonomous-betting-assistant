@@ -12,7 +12,7 @@ except Exception:
 
 APP_NAME = 'ABA Signal Pro'
 APP_TAGLINE = 'Powered by Reparodynamics'
-APP_BUILD = 'hidden-nav-custom-bottom-links-v1'
+APP_BUILD = 'hidden-nav-bottom-links-v2'
 REPO_ROOT = Path(__file__).resolve().parent
 REPO_MEMORY_PATH = REPO_ROOT / 'data' / 'ara_permanent_learning_memory.csv'
 
@@ -48,6 +48,20 @@ CORE_PAGES = [
 ]
 
 
+def render_bottom_sidebar_links() -> None:
+    with st.sidebar:
+        st.markdown('---')
+        st.markdown('### Tools')
+        for page in CORE_PAGES:
+            try:
+                st.page_link(page.url_path, label=page.title)
+            except Exception:
+                try:
+                    st.page_link(page, label=page.title)
+                except Exception:
+                    st.caption(page.title)
+
+
 def install_report_branding() -> None:
     try:
         from autonomous_betting_agent import odds_lock_tools
@@ -75,8 +89,10 @@ if install_memory_read_merge is not None:
 install_report_branding()
 
 try:
-    # Keep Streamlit's native page list hidden so pages render below the language selector.
-    page = st.navigation(CORE_PAGES, position='hidden')
-    page.run()
+    # Keep Streamlit's native page list hidden so links render below each page's language selector.
+    current_page = st.navigation(CORE_PAGES, position='hidden')
+    current_page.run()
+    render_bottom_sidebar_links()
 except AttributeError:
     import pages.pro_predictor  # noqa: F401,E402
+    render_bottom_sidebar_links()
