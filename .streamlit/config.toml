@@ -1,4 +1,4 @@
-# deploy trigger: custom-brand-language-tools-v7
+# deploy trigger: clean-shell-sidebar-v8
 [server]
 headless = true
 
@@ -6,6 +6,6 @@ headless = true
 gatherUsageStats = false
 
 [client]
-# Hide Streamlit's automatic file-list sidebar. Use the app's branded sidebar instead.
+# Hide Streamlit's automatic file-list sidebar. The app shell renders ABA brand, language, and Tools.
 showSidebarNavigation = false
 toolbarMode = "minimal"
