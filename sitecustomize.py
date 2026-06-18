@@ -51,7 +51,7 @@ def _install_sidebar_fallback() -> None:
         from autonomous_betting_agent.sidebar_nav import APP_TAGLINE, SIDEBAR_CSS, normalize_language, render_tools_only
     except Exception:
         return
-    if getattr(st, '_aba_sidebar_fallback_v13', False):
+    if getattr(st, '_aba_sidebar_fallback_v14', False):
         return
 
     original_sidebar_radio = st.sidebar.radio
@@ -64,18 +64,18 @@ def _install_sidebar_fallback() -> None:
     original_dg_caption = DeltaGenerator.caption
 
     def _shared_language() -> str:
-        for key in ('global_language', 'pro_predictor_language', 'signal_board_language', 'odds_lock_pro_language'):
+        for key in ('global_language', 'app_language', 'learning_memory_language', 'pro_predictor_language', 'signal_board_language', 'odds_lock_pro_language'):
             value = st.session_state.get(key)
             if value in ('English', 'Español'):
                 return value
         return 'English'
 
     def _draw_prefix() -> None:
-        if st.session_state.get('_aba_sidebar_rendered_v13'):
+        if st.session_state.get('_aba_sidebar_rendered_v14'):
             return
         try:
             with st.sidebar:
-                st.session_state['_aba_sidebar_rendered_v13'] = True
+                st.session_state['_aba_sidebar_rendered_v14'] = True
                 st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
                 st.markdown('### :green[ABA] Signal :red[Pro]')
                 st.caption(APP_TAGLINE)
@@ -84,11 +84,11 @@ def _install_sidebar_fallback() -> None:
             pass
 
     def _draw_tools(value: Any) -> None:
-        if st.session_state.get('_aba_sidebar_tools_rendered_v13'):
+        if st.session_state.get('_aba_sidebar_tools_rendered_v14'):
             return
         try:
             with st.sidebar:
-                st.session_state['_aba_sidebar_tools_rendered_v13'] = True
+                st.session_state['_aba_sidebar_tools_rendered_v14'] = True
                 render_tools_only(st, normalize_language(value))
         except Exception:
             pass
@@ -98,7 +98,7 @@ def _install_sidebar_fallback() -> None:
             if self_obj is None:
                 return original(label, options, *args, **kwargs)
             return original(self_obj, label, options, *args, **kwargs)
-        if st.session_state.get('_aba_sidebar_rendered_v13') or st.session_state.get('_aba_sidebar_rendered_v12'):
+        if st.session_state.get('_aba_sidebar_rendered_v14') or st.session_state.get('_aba_sidebar_rendered_v13') or st.session_state.get('_aba_sidebar_rendered_v12'):
             return _shared_language()
         _draw_prefix()
         kwargs['horizontal'] = True
@@ -155,7 +155,34 @@ def _install_sidebar_fallback() -> None:
     DeltaGenerator.selectbox = dg_selectbox
     DeltaGenerator.text_input = dg_text_input
     DeltaGenerator.caption = dg_caption
-    st._aba_sidebar_fallback_v13 = True
+    st._aba_sidebar_fallback_v14 = True
+
+
+def _patch_ui_language_selector() -> None:
+    if _running_in_ci():
+        return
+    try:
+        import streamlit as st
+        import autonomous_betting_agent.ui_language as ui_language
+        from autonomous_betting_agent.sidebar_nav import render_app_sidebar
+    except Exception:
+        return
+    if getattr(ui_language, '_aba_patched_render_language_selector_v14', False):
+        return
+
+    def render_language_selector(*, key: str) -> str:
+        page_key = key.replace('_language', '')
+        lang_code = render_app_sidebar(page_key, language_key=key, selector='radio')
+        try:
+            selected = 'Español' if lang_code == 'es' else 'English'
+            st.session_state['app_language'] = selected
+            st.session_state['global_language'] = selected
+        except Exception:
+            pass
+        return lang_code
+
+    ui_language.render_language_selector = render_language_selector
+    ui_language._aba_patched_render_language_selector_v14 = True
 
 
 def _install_runtime_helpers() -> None:
@@ -184,4 +211,5 @@ def _install_runtime_helpers() -> None:
 
 
 _install_sidebar_fallback()
+_patch_ui_language_selector()
 _install_runtime_helpers()
