@@ -144,6 +144,7 @@ def _install_all_runtime_hooks() -> None:
                 streamlit_module.divider()
 
         sidebar_tools.render_curated_sidebar = render_pages_only
+        sidebar_tools.render_curated_sidebar(st, st.session_state.get('global_language', st.session_state.get('pro_predictor_language', 'English')))
     except Exception:
         pass
     try:
