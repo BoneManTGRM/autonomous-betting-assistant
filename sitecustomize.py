@@ -11,6 +11,7 @@ LANGUAGE_KEYS = [
     'signal_board_language',
     'threshold_optimizer_language',
     'what_are_the_odds_language',
+    'what_are_the_odds_pro_language',
     'odds_lock_pro_language',
     'public_proof_dashboard_language',
     'learning_memory_language',
@@ -56,12 +57,6 @@ def _running_in_ci() -> bool:
     return os.getenv('CI', '').lower() == 'true' or os.getenv('GITHUB_ACTIONS', '').lower() == 'true'
 
 
-def _is_orphan_workflow_heading(body: Any) -> bool:
-    text = str(body or '').strip().lower()
-    cleaned = text.replace('#', '').replace('*', '').strip()
-    return cleaned in {'workflow', 'flujo de trabajo'}
-
-
 def _is_language_widget(label: Any, options: Any) -> bool:
     try:
         values = list(options)
@@ -79,6 +74,18 @@ def _shared_language(st: Any) -> str:
     return 'English'
 
 
+def _sync_language(st: Any, value: Any, *, active_key: str | None = None) -> None:
+    if value not in ('English', 'Español'):
+        return
+    for key in LANGUAGE_KEYS:
+        if key == active_key:
+            continue
+        try:
+            st.session_state[key] = value
+        except Exception:
+            pass
+
+
 def _prepare_language_kwargs(st: Any, options: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     try:
         values = list(options)
@@ -89,20 +96,23 @@ def _prepare_language_kwargs(st: Any, options: Any, kwargs: dict[str, Any]) -> d
         if current in values:
             kwargs = dict(kwargs)
             kwargs['index'] = values.index(current)
+    kwargs['horizontal'] = True
     return kwargs
 
 
-def _sync_language(st: Any, value: Any) -> None:
-    if value not in ('English', 'Español'):
+def _is_test_window_label(label: Any) -> bool:
+    text = str(label or '').strip().lower()
+    return text in {'test window id', 'id de ventana de prueba'}
+
+
+def _is_active_test_caption(body: Any) -> bool:
+    text = str(body or '').strip().lower()
+    return text.startswith('active test ledger') or text.startswith('ledger de prueba activo')
+
+
+def _render_brand_and_tools(st: Any) -> None:
+    if getattr(st, '_aba_sidebar_explicit_rendering', False):
         return
-    for key in LANGUAGE_KEYS:
-        try:
-            st.session_state[key] = value
-        except Exception:
-            pass
-
-
-def _render_brand(st: Any) -> None:
     try:
         with st.sidebar:
             st.markdown('### :green[ABA] Signal :red[Pro]')
@@ -112,11 +122,14 @@ def _render_brand(st: Any) -> None:
         pass
 
 
-def _render_page_links(st: Any) -> None:
+def _render_tools(st: Any) -> None:
+    if getattr(st, '_aba_sidebar_explicit_rendering', False):
+        return
     try:
+        lang = _shared_language(st)
         with st.sidebar:
             st.markdown('---')
-            st.markdown('### Tools')
+            st.markdown('### ' + ('Herramientas' if lang == 'Español' else 'Tools'))
             for label, path in PAGE_LINKS:
                 try:
                     st.page_link(path, label=label)
@@ -126,7 +139,7 @@ def _render_page_links(st: Any) -> None:
         pass
 
 
-def _install_sidebar_page_links() -> None:
+def _install_sidebar_safety_hooks() -> None:
     if _running_in_ci():
         return
     try:
@@ -134,137 +147,97 @@ def _install_sidebar_page_links() -> None:
         from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-    if getattr(st, '_aba_sidebar_page_links_patch_v7', False):
+    if getattr(st, '_aba_sidebar_safety_hooks_v10', False):
         return
 
     original_sidebar_radio = st.sidebar.radio
     original_sidebar_selectbox = st.sidebar.selectbox
+    original_sidebar_text_input = st.sidebar.text_input
+    original_sidebar_caption = st.sidebar.caption
     original_dg_radio = DeltaGenerator.radio
     original_dg_selectbox = DeltaGenerator.selectbox
+    original_dg_text_input = DeltaGenerator.text_input
+    original_dg_caption = DeltaGenerator.caption
 
     def sidebar_radio(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        language_widget = _is_language_widget(label, options)
-        if language_widget:
-            _render_brand(st)
+        if _is_language_widget(label, options):
+            _render_brand_and_tools(st)
             kwargs = _prepare_language_kwargs(st, options, kwargs)
-        value = original_sidebar_radio(label, options, *args, **kwargs)
-        if language_widget:
-            _sync_language(st, value)
-            _render_page_links(st)
-        return value
+            value = original_sidebar_radio(label, options, *args, **kwargs)
+            _sync_language(st, value, active_key=kwargs.get('key'))
+            _render_tools(st)
+            return value
+        return original_sidebar_radio(label, options, *args, **kwargs)
 
     def sidebar_selectbox(label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        language_widget = _is_language_widget(label, options)
-        if language_widget:
-            _render_brand(st)
+        if _is_language_widget(label, options):
+            _render_brand_and_tools(st)
             kwargs = _prepare_language_kwargs(st, options, kwargs)
-        value = original_sidebar_selectbox(label, options, *args, **kwargs)
-        if language_widget:
-            _sync_language(st, value)
-            _render_page_links(st)
-        return value
+            # Force legacy selectboxes into a compact radio-style control.
+            value = original_sidebar_radio(label, options, *args, **kwargs)
+            _sync_language(st, value, active_key=kwargs.get('key'))
+            _render_tools(st)
+            return value
+        return original_sidebar_selectbox(label, options, *args, **kwargs)
+
+    def sidebar_text_input(label: Any, *args: Any, **kwargs: Any) -> Any:
+        if _is_test_window_label(label):
+            key = kwargs.get('key') or 'aba_test_window_id'
+            default = kwargs.get('value', 'test_01')
+            return st.session_state.get(key, st.session_state.get('aba_test_window_id', default))
+        return original_sidebar_text_input(label, *args, **kwargs)
+
+    def sidebar_caption(body: Any, *args: Any, **kwargs: Any) -> Any:
+        if _is_active_test_caption(body):
+            return st.empty()
+        return original_sidebar_caption(body, *args, **kwargs)
 
     def dg_radio(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        language_widget = _is_language_widget(label, options)
-        if language_widget:
-            _render_brand(st)
+        if _is_language_widget(label, options) and not getattr(st, '_aba_sidebar_explicit_rendering', False):
+            _render_brand_and_tools(st)
             kwargs = _prepare_language_kwargs(st, options, kwargs)
-        value = original_dg_radio(self, label, options, *args, **kwargs)
-        if language_widget:
-            _sync_language(st, value)
-            _render_page_links(st)
-        return value
+            value = original_dg_radio(self, label, options, *args, **kwargs)
+            _sync_language(st, value, active_key=kwargs.get('key'))
+            _render_tools(st)
+            return value
+        return original_dg_radio(self, label, options, *args, **kwargs)
 
     def dg_selectbox(self: Any, label: Any, options: Any, *args: Any, **kwargs: Any) -> Any:
-        language_widget = _is_language_widget(label, options)
-        if language_widget:
-            _render_brand(st)
+        if _is_language_widget(label, options) and not getattr(st, '_aba_sidebar_explicit_rendering', False):
+            _render_brand_and_tools(st)
             kwargs = _prepare_language_kwargs(st, options, kwargs)
-        value = original_dg_selectbox(self, label, options, *args, **kwargs)
-        if language_widget:
-            _sync_language(st, value)
-            _render_page_links(st)
-        return value
+            value = original_dg_radio(self, label, options, *args, **kwargs)
+            _sync_language(st, value, active_key=kwargs.get('key'))
+            _render_tools(st)
+            return value
+        return original_dg_selectbox(self, label, options, *args, **kwargs)
+
+    def dg_text_input(self: Any, label: Any, *args: Any, **kwargs: Any) -> Any:
+        if _is_test_window_label(label):
+            key = kwargs.get('key') or 'aba_test_window_id'
+            default = kwargs.get('value', 'test_01')
+            return st.session_state.get(key, st.session_state.get('aba_test_window_id', default))
+        return original_dg_text_input(self, label, *args, **kwargs)
+
+    def dg_caption(self: Any, body: Any, *args: Any, **kwargs: Any) -> Any:
+        if _is_active_test_caption(body):
+            return self.empty()
+        return original_dg_caption(self, body, *args, **kwargs)
 
     st.sidebar.radio = sidebar_radio
     st.sidebar.selectbox = sidebar_selectbox
+    st.sidebar.text_input = sidebar_text_input
+    st.sidebar.caption = sidebar_caption
     DeltaGenerator.radio = dg_radio
     DeltaGenerator.selectbox = dg_selectbox
-    st._aba_sidebar_page_links_patch_v7 = True
+    DeltaGenerator.text_input = dg_text_input
+    DeltaGenerator.caption = dg_caption
+    st._aba_sidebar_safety_hooks_v10 = True
 
 
-def _install_streamlit_content_guards() -> None:
+def _install_runtime_helpers() -> None:
     if _running_in_ci():
         return
-    try:
-        import streamlit as st
-        from streamlit.delta_generator import DeltaGenerator
-        real_st_subheader = st.subheader
-        real_dg_subheader = DeltaGenerator.subheader
-        real_st_header = st.header
-        real_dg_header = DeltaGenerator.header
-        real_st_markdown = st.markdown
-        real_dg_markdown = DeltaGenerator.markdown
-        real_st_write = st.write
-        real_dg_write = DeltaGenerator.write
-
-        def safe_subheader(body: Any, *args: Any, **kwargs: Any) -> Any:
-            if _is_orphan_workflow_heading(body):
-                return st.empty()
-            return real_st_subheader(body, *args, **kwargs)
-
-        def safe_dg_subheader(self: Any, body: Any, *args: Any, **kwargs: Any) -> Any:
-            if _is_orphan_workflow_heading(body):
-                return self.empty()
-            return real_dg_subheader(self, body, *args, **kwargs)
-
-        def safe_header(body: Any, *args: Any, **kwargs: Any) -> Any:
-            if _is_orphan_workflow_heading(body):
-                return st.empty()
-            return real_st_header(body, *args, **kwargs)
-
-        def safe_dg_header(self: Any, body: Any, *args: Any, **kwargs: Any) -> Any:
-            if _is_orphan_workflow_heading(body):
-                return self.empty()
-            return real_dg_header(self, body, *args, **kwargs)
-
-        def safe_markdown(body: Any, *args: Any, **kwargs: Any) -> Any:
-            if _is_orphan_workflow_heading(body):
-                return st.empty()
-            return real_st_markdown(body, *args, **kwargs)
-
-        def safe_dg_markdown(self: Any, body: Any, *args: Any, **kwargs: Any) -> Any:
-            if _is_orphan_workflow_heading(body):
-                return self.empty()
-            return real_dg_markdown(self, body, *args, **kwargs)
-
-        def safe_write(*args: Any, **kwargs: Any) -> Any:
-            if len(args) == 1 and _is_orphan_workflow_heading(args[0]):
-                return st.empty()
-            return real_st_write(*args, **kwargs)
-
-        def safe_dg_write(self: Any, *args: Any, **kwargs: Any) -> Any:
-            if len(args) == 1 and _is_orphan_workflow_heading(args[0]):
-                return self.empty()
-            return real_dg_write(self, *args, **kwargs)
-
-        st.subheader = safe_subheader
-        DeltaGenerator.subheader = safe_dg_subheader
-        st.header = safe_header
-        DeltaGenerator.header = safe_dg_header
-        st.markdown = safe_markdown
-        DeltaGenerator.markdown = safe_dg_markdown
-        st.write = safe_write
-        DeltaGenerator.write = safe_dg_write
-    except Exception:
-        pass
-
-
-def _install_all_runtime_hooks() -> None:
-    if _running_in_ci():
-        return
-    _install_sidebar_page_links()
-    _install_streamlit_content_guards()
     try:
         from autonomous_betting_agent.pro_predictor_defaults_patch import install_pro_predictor_defaults_patch
         install_pro_predictor_defaults_patch()
@@ -287,4 +260,5 @@ def _install_all_runtime_hooks() -> None:
         pass
 
 
-_install_all_runtime_hooks()
+_install_sidebar_safety_hooks()
+_install_runtime_helpers()
