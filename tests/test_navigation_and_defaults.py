@@ -16,18 +16,20 @@ def test_main_navigation_uses_signal_board_and_hides_ultra70() -> None:
     assert 'pages/ultra80_profit_mode.py' not in shell
 
 
-def test_streamlit_config_keeps_stable_native_navigation() -> None:
+def test_streamlit_config_uses_custom_tools_only() -> None:
     config = (repo_root() / '.streamlit' / 'config.toml').read_text(encoding='utf-8')
-    assert 'showSidebarNavigation = true' in config
-    assert 'showSidebarNavigation = false' not in config
-    assert 'restore-stable-native-nav' in config
+    assert 'showSidebarNavigation = false' in config
+    assert 'clean-custom-tools-sidebar' in config
 
 
-def test_shell_still_defines_signal_board_pages() -> None:
-    shell = (repo_root() / 'streamlit_app.py').read_text(encoding='utf-8')
-    assert 'Signal Board' in shell
-    assert 'Pro Predictor' in shell
-    assert 'pages/pro_predictor.py' in shell
+def test_custom_sidebar_has_brand_and_tools() -> None:
+    text = (repo_root() / 'sitecustomize.py').read_text(encoding='utf-8')
+    assert "APP_NAME = 'ABA Signal Pro'" in text
+    assert "APP_TAGLINE = 'Powered by Reparodynamics'" in text
+    assert '### :green[ABA] Signal :red[Pro]' in text
+    assert "('Signal Board', 'pages/signal_board.py')" in text
+    assert "('Pro Predictor', 'pages/pro_predictor.py')" in text
+    assert "('What Are the Odds', 'pages/what_are_the_odds.py')" in text
 
 
 def test_sitecustomize_skips_streamlit_hooks_in_ci() -> None:
