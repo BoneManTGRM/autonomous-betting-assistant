@@ -11,7 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  python-quality:
+  test:
+    name: Python compile and pytest
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,14 +27,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install pandas streamlit requests
+          python -m pip install -r requirements.txt
 
-      - name: Compile Python files
+      - name: Show environment
         run: |
-          python -m compileall streamlit_app.py app_streamlit.py autonomous_betting_agent pages tests
+          python --version
+          python -m pip --version
+          python -m pip list
 
-      - name: Run tests
+      - name: Compile source
         run: |
-          if [ -d tests ]; then python -m pytest tests -q; else echo "No tests directory found"; fi
+          python -m compileall autonomous_betting_agent pages tests streamlit_app.py app_streamlit.py
+
+      - name: Run pytest
+        run: |
+          python -m pytest -q tests
