@@ -22,7 +22,7 @@ PROFILE_VALUES = {
     'baseline_accuracy_min_edge': -0.03,
     'baseline_accuracy_strong_edge': 0.04,
     'baseline_accuracy_min_strength': 38.0,
-    'baseline_accuracy_use_high_conf': True,
+    'baseline_accuracy_use_high_conf': False,
     'baseline_accuracy_max_high_conf': 300,
     'baseline_accuracy_min_high_prob': 0.58,
     'baseline_accuracy_min_high_edge': -0.03,
