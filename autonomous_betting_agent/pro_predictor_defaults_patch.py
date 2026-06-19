@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-
+# Target profile based on Cody's larger-list result:
+# 108 picks, 60 finished, 43-17 = 71.7% while still maintaining useful volume.
+# This does not guarantee 70%+, but it sets Pro Predictor's defaults to reproduce
+# the same style: broad enough volume, light filters, then top-ranked export.
 NUMBER_DEFAULTS = {
     'Max sports': 50,
     'Máximo de deportes': 50,
@@ -18,87 +21,62 @@ MULTI_DEFAULTS = {
 }
 
 PROFILE_VALUES = {
+    # Main default profile: Large List 70 Mode.
     'baseline_accuracy_min_books': 1,
     'baseline_accuracy_min_model_prob': 0.58,
     'baseline_accuracy_min_edge': -0.03,
     'baseline_accuracy_strong_edge': 0.04,
     'baseline_accuracy_min_strength': 38.0,
-    'baseline_accuracy_max_high_conf': 250,
-    'baseline_accuracy_min_high_prob': 0.60,
+    'baseline_accuracy_use_high_conf': True,
+    'baseline_accuracy_max_high_conf': 108,
+    'baseline_accuracy_min_high_prob': 0.58,
     'baseline_accuracy_min_high_edge': -0.03,
-    'baseline_accuracy_min_high_strength': 40.0,
-    'baseline_accuracy_min_high_agent': 40.0,
+    'baseline_accuracy_min_high_strength': 38.0,
+    'baseline_accuracy_min_high_agent': 35.0,
+    # Keep other profiles aligned but distinct.
+    'balanced_confidence_min_books': 1,
+    'balanced_confidence_min_model_prob': 0.60,
+    'balanced_confidence_min_edge': -0.02,
+    'balanced_confidence_strong_edge': 0.03,
+    'balanced_confidence_min_strength': 45.0,
+    'balanced_confidence_use_high_conf': True,
+    'balanced_confidence_max_high_conf': 75,
+    'balanced_confidence_min_high_prob': 0.60,
+    'balanced_confidence_min_high_edge': -0.015,
+    'balanced_confidence_min_high_strength': 45.0,
+    'balanced_confidence_min_high_agent': 45.0,
+    'profit_strict_min_books': 2,
+    'profit_strict_min_model_prob': 0.62,
+    'profit_strict_min_edge': 0.01,
+    'profit_strict_strong_edge': 0.05,
+    'profit_strict_min_strength': 55.0,
+    'profit_strict_use_high_conf': True,
+    'profit_strict_max_high_conf': 25,
+    'profit_strict_min_high_prob': 0.64,
+    'profit_strict_min_high_edge': 0.00,
+    'profit_strict_min_high_strength': 55.0,
+    'profit_strict_min_high_agent': 55.0,
 }
 
 
-def _label(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
-    if args:
-        return str(args[0])
-    return str(kwargs.get('label', ''))
+def apply_large_list_70_defaults(st_module: Any) -> None:
+    """Set Pro Predictor widget defaults without monkey-patching Streamlit.
+
+    Streamlit buttons/uploads were fragile when we used runtime monkey-patches.
+    This function only preloads session-state values for Pro Predictor widget keys.
+    It does not override st.button, st.form, st.file_uploader, number_input, or
+    multiselect behavior.
+    """
+    for key, value in PROFILE_VALUES.items():
+        try:
+            st_module.session_state.setdefault(key, value)
+        except Exception:
+            pass
 
 
 def install_pro_predictor_defaults_patch() -> None:
     try:
         import streamlit as st
-        from streamlit.delta_generator import DeltaGenerator
     except Exception:
         return
-
-    for key, value in PROFILE_VALUES.items():
-        st.session_state[key] = value
-
-    if getattr(st, '_aba_pro_predictor_defaults_patch_v2', False):
-        return
-
-    real_number = st.number_input
-    real_multi = st.multiselect
-    real_dg_number = DeltaGenerator.number_input
-    real_dg_multi = DeltaGenerator.multiselect
-
-    def patch_number_call(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
-        label = _label(args, kwargs)
-        if label not in NUMBER_DEFAULTS:
-            return args, kwargs
-        value = NUMBER_DEFAULTS[label]
-        patched_args = list(args)
-        patched_kwargs = dict(kwargs)
-        if len(patched_args) >= 4:
-            patched_args[3] = value
-        else:
-            patched_kwargs['value'] = value
-        return tuple(patched_args), patched_kwargs
-
-    def patch_multi_call(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
-        label = _label(args, kwargs)
-        if label not in MULTI_DEFAULTS:
-            return args, kwargs
-        default = MULTI_DEFAULTS[label]
-        patched_args = list(args)
-        patched_kwargs = dict(kwargs)
-        if len(patched_args) >= 3:
-            patched_args[2] = default
-        else:
-            patched_kwargs['default'] = default
-        return tuple(patched_args), patched_kwargs
-
-    def number_input(*args: Any, **kwargs: Any) -> Any:
-        patched_args, patched_kwargs = patch_number_call(args, kwargs)
-        return real_number(*patched_args, **patched_kwargs)
-
-    def multiselect(*args: Any, **kwargs: Any) -> Any:
-        patched_args, patched_kwargs = patch_multi_call(args, kwargs)
-        return real_multi(*patched_args, **patched_kwargs)
-
-    def dg_number_input(self: Any, *args: Any, **kwargs: Any) -> Any:
-        patched_args, patched_kwargs = patch_number_call(args, kwargs)
-        return real_dg_number(self, *patched_args, **patched_kwargs)
-
-    def dg_multiselect(self: Any, *args: Any, **kwargs: Any) -> Any:
-        patched_args, patched_kwargs = patch_multi_call(args, kwargs)
-        return real_dg_multi(self, *patched_args, **patched_kwargs)
-
-    st.number_input = number_input
-    st.multiselect = multiselect
-    DeltaGenerator.number_input = dg_number_input
-    DeltaGenerator.multiselect = dg_multiselect
-    st._aba_pro_predictor_defaults_patch_v2 = True
+    apply_large_list_70_defaults(st)
