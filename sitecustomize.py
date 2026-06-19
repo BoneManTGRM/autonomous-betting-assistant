@@ -189,6 +189,11 @@ def _install_runtime_helpers() -> None:
     if _running_in_ci():
         return
     try:
+        from autonomous_betting_agent.mobile_button_fallback import install_mobile_button_fallback
+        install_mobile_button_fallback()
+    except Exception:
+        pass
+    try:
         from autonomous_betting_agent.direct_pick_lock_patch import install_direct_pick_lock_patch
         install_direct_pick_lock_patch()
     except Exception:
