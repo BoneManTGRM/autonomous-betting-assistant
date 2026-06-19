@@ -14,8 +14,8 @@ LANG = render_app_sidebar('what_are_the_odds', language_key='what_are_the_odds_p
 TEXT = {
     'en': {
         'title': 'What Are the Odds',
-        'caption': 'Manual review board. Enter one row or load rows, and the page saves them automatically for the next tools.',
-        'info': 'No submit button is required. Once the required fields are filled, the row appears and is saved automatically.',
+        'caption': 'Manual review board. Enter one row, paste CSV text, or use latest Pro Predictor rows. The page saves rows automatically for the next tools.',
+        'info': 'Mobile-safe mode: no button or file-upload button is required. Fill the single-game fields or paste CSV text, and the row/table saves automatically.',
         'workflow': 'Clean path: Pro Predictor → What Are the Odds → Odds Lock → Public Proof Dashboard → Learning Memory.',
         'single_game': 'Single Game Manual Check',
         'event': 'Game / event name',
@@ -31,17 +31,19 @@ TEXT = {
         'books': 'Source count',
         'notes': 'Notes',
         'session': 'Use latest Pro Predictor session rows',
-        'bulk': 'Advanced CSV / bulk input',
+        'paste_title': 'Mobile-safe CSV paste',
+        'paste': 'Paste CSV text here',
+        'paste_help': 'Paste the whole CSV including the header row. This avoids the mobile upload button completely.',
+        'upload_optional': 'Optional desktop upload fallback',
         'upload': 'Upload CSV file(s)',
-        'paste': 'Or paste CSV text',
-        'waiting': 'Fill event, pick, probability, and decimal or American price. Or load rows from session/upload/paste.',
+        'waiting': 'Fill event, pick, probability, and decimal or American price. Or paste CSV text / use latest session rows.',
         'saved': 'Rows are saved automatically for Odds Lock Pro and the public dashboard.',
         'download': 'Download analyzed rows',
     },
     'es': {
         'title': 'What Are the Odds',
-        'caption': 'Tablero de revisión manual. Ingresa una fila o carga filas, y la página las guarda automáticamente para las siguientes herramientas.',
-        'info': 'No se necesita botón. Cuando llenas los campos necesarios, la fila aparece y se guarda automáticamente.',
+        'caption': 'Tablero de revisión manual. Ingresa una fila, pega CSV o usa filas recientes de Predictor Pro. La página guarda automáticamente para las siguientes herramientas.',
+        'info': 'Modo seguro para móvil: no se necesita botón ni botón de subida. Llena los campos o pega CSV y se guarda automáticamente.',
         'workflow': 'Ruta limpia: Predictor Pro → What Are the Odds → Odds Lock → Dashboard Público → Memoria.',
         'single_game': 'Revisión Manual de Un Solo Juego',
         'event': 'Juego / evento',
@@ -57,10 +59,12 @@ TEXT = {
         'books': 'Número de fuentes',
         'notes': 'Notas',
         'session': 'Usar filas recientes de Predictor Pro',
-        'bulk': 'Entrada CSV / masiva avanzada',
+        'paste_title': 'Pegar CSV seguro para móvil',
+        'paste': 'Pega texto CSV aquí',
+        'paste_help': 'Pega todo el CSV incluyendo encabezados. Esto evita completamente el botón móvil de subir archivo.',
+        'upload_optional': 'Subida opcional para escritorio',
         'upload': 'Subir archivo(s) CSV',
-        'paste': 'O pegar texto CSV',
-        'waiting': 'Llena evento, pick, probabilidad y precio decimal o americano. O carga filas por sesión/subida/pegado.',
+        'waiting': 'Llena evento, pick, probabilidad y precio decimal o americano. O pega CSV / usa filas recientes.',
         'saved': 'Las filas se guardan automáticamente para Odds Lock Pro y el dashboard público.',
         'download': 'Descargar filas analizadas',
     },
@@ -161,25 +165,31 @@ def load_session_rows() -> pd.DataFrame:
     return pd.DataFrame()
 
 
-def load_bulk_rows() -> pd.DataFrame:
+def load_pasted_rows() -> pd.DataFrame:
+    pasted = str(st.session_state.get('wato_pasted_csv') or '').strip()
+    if not pasted:
+        return pd.DataFrame()
+    try:
+        frame = pd.read_csv(StringIO(pasted))
+        frame['source_file'] = 'pasted_csv_mobile_safe'
+        return frame
+    except Exception as exc:
+        st.warning(f'Pasted CSV could not be read: {exc}')
+        return pd.DataFrame()
+
+
+def load_optional_uploads() -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
-    uploads = st.file_uploader(t('upload'), type=['csv'], accept_multiple_files=True)
-    if uploads:
-        for upload in uploads:
-            try:
-                frame = pd.read_csv(upload)
-                frame['source_file'] = upload.name
-                frames.append(frame)
-            except Exception as exc:
-                st.warning(f'CSV could not be read: {exc}')
-    pasted = st.text_area(t('paste'), key='wato_pasted_csv', height=120)
-    if pasted.strip():
-        try:
-            frame = pd.read_csv(StringIO(pasted.strip()))
-            frame['source_file'] = 'pasted_csv'
-            frames.append(frame)
-        except Exception as exc:
-            st.warning(f'Pasted CSV could not be read: {exc}')
+    with st.expander(t('upload_optional'), expanded=False):
+        uploads = st.file_uploader(t('upload'), type=['csv'], accept_multiple_files=True)
+        if uploads:
+            for upload in uploads:
+                try:
+                    frame = pd.read_csv(upload)
+                    frame['source_file'] = upload.name
+                    frames.append(frame)
+                except Exception as exc:
+                    st.warning(f'CSV could not be read: {exc}')
     return pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
 
 
@@ -216,8 +226,10 @@ c7.number_input(t('books'), min_value=0, max_value=100, value=1, step=1, key='wa
 st.text_input(t('source'), key='wato_bookmaker', placeholder='DraftKings / FanDuel / Bet365')
 st.text_area(t('notes'), key='wato_notes', height=100, placeholder='Context notes')
 st.checkbox(t('session'), value=False, key='wato_use_session')
-with st.expander(t('bulk'), expanded=False):
-    bulk = load_bulk_rows()
+
+st.subheader(t('paste_title'))
+st.text_area(t('paste'), key='wato_pasted_csv', height=160, help=t('paste_help'), placeholder='event,prediction,model_probability,decimal_price\nTeam A at Team B,Team A,0.61,1.91')
+optional_uploads = load_optional_uploads()
 
 frames: list[pd.DataFrame] = []
 manual = build_manual_row()
@@ -226,8 +238,11 @@ if manual is not None:
 session_frame = load_session_rows()
 if not session_frame.empty:
     frames.append(session_frame)
-if not bulk.empty:
-    frames.append(bulk)
+pasted_frame = load_pasted_rows()
+if not pasted_frame.empty:
+    frames.append(pasted_frame)
+if not optional_uploads.empty:
+    frames.append(optional_uploads)
 
 if not frames:
     st.warning(t('waiting'))
