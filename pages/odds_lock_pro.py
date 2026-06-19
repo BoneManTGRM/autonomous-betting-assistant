@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import base64
+import html
 from typing import Any, Mapping
 
 import pandas as pd
 import streamlit as st
 
-from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 from autonomous_betting_agent.commercial_platform_tools import (
     filter_locked_proof_rows,
     load_persistent_ledger,
@@ -29,7 +30,9 @@ from autonomous_betting_agent.odds_lock_tools import (
     proof_id_from_hash,
     summarize_locked_picks,
 )
+from autonomous_betting_agent.pick_hold_store import load_first_available, save_held_rows
 from autonomous_betting_agent.row_normalizer import normalize_frame, safe_text
+from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
 st.set_page_config(page_title='Odds Lock Pro', layout='wide')
 LANG = render_app_sidebar('odds_lock_pro', language_key='odds_lock_pro_language', selector='radio')
@@ -37,20 +40,17 @@ LANG = render_app_sidebar('odds_lock_pro', language_key='odds_lock_pro_language'
 TEXT = {
     'en': {
         'title': 'Odds Lock Pro',
-        'caption': 'Create timestamped research/test locks, official +EV locks, and persistent proof ledgers.',
-        'info': 'Research/Test is for accuracy proof. Official +EV is stricter betting-value proof.',
+        'caption': 'Create timestamped research/test locks and persistent proof ledgers.',
+        'info': 'Use this page to lock rows before games start. Public Proof Dashboard reads the saved proof ledger.',
         'test_window': 'Test Window ID',
         'test_window_help': 'Use the same ID in Public Proof Dashboard, such as test_01.',
-        'active_test_window': 'Active test ledger',
         'input': 'Input',
-        'use_session': 'Use latest rows from session',
-        'upload': 'Upload prediction, high-confidence, or locked-ledger CSV',
+        'use_session': 'Use latest saved/session rows',
+        'upload': 'Upload prediction or locked-ledger CSV',
         'source': 'Input source',
         'include_watch': 'Include watch/tracker rows',
         'analyst': 'Analyst / brand name',
         'max_units': 'Max stake units per pick',
-        'daily_limit': 'Daily exposure limit',
-        'sport_limit': 'Per-sport exposure limit',
         'shortlist': 'Highest-confidence shortlist',
         'use_shortlist': 'Use shortlist',
         'max_shortlist': 'Max shortlist rows',
@@ -62,21 +62,19 @@ TEXT = {
         'lock_created': 'Created and saved official +EV locked rows',
         'research_lock_not_created': 'No research/test ledger was created.',
         'lock_not_created': 'No official +EV ledger was created.',
-        'no_rows': 'No rows found. Run Pro Predictor / What Are the Odds first or upload a CSV.',
+        'no_rows': 'No rows found. Run Pro Predictor first or upload a CSV.',
         'no_locked': 'No locked proof rows yet.',
         'locked': 'Locked proof ledger',
         'research_candidates_tab': 'Research/Test candidates',
         'official_candidates_tab': 'Official +EV candidates',
         'dashboard': 'Proof dashboard',
         'reports': 'Report generator',
-        'bankroll': 'Bankroll / exposure',
         'client': 'Client view',
         'input_rows': 'Input rows',
         'persistent_rows': 'Saved ledger',
         'reviewed': 'Reviewed',
         'research_candidates': 'Research/Test',
         'official_candidates': 'Official +EV',
-        'uploaded_locked': 'Uploaded locked',
         'rows': 'Rows',
         'resolved': 'Resolved',
         'record': 'Record',
@@ -87,36 +85,32 @@ TEXT = {
         'proof_quality': 'Proof quality',
         'download_locked': 'Download locked proof CSV',
         'download_client': 'Download client-view CSV',
-        'download_private': 'Download private audit CSV',
         'save_persistent': 'Re-save locked rows to this test ledger',
         'saved_persistent': 'Saved to persistent test ledger',
         'blocker_summary': 'Why rows were blocked',
         'blocked_preview': 'Blocked-row diagnostic preview',
         'no_research_candidates': 'No research/test candidates found.',
-        'no_official_candidates': 'No official +EV candidates found. These rows can still be valid research/test locks.',
+        'no_official_candidates': 'No official +EV candidates found. Research/test may still be usable.',
         'no_review_rows': 'No rows reached lock-candidate review.',
         'report_language': 'Report language',
         'public_only': 'Public/client-safe view',
         'report': 'Copy/paste report',
-        'handoff': 'Four-tool handoff health',
-        'saved_note': 'Locked rows now auto-save to the test ledger, so Public Proof Dashboard can load them after page changes.',
+        'handoff': 'Handoff health',
+        'saved_note': 'This version loads Pro Predictor handoff rows from session, local memory, and local JSON fallback.',
     },
     'es': {
         'title': 'Odds Lock Pro',
-        'caption': 'Crea bloqueos investigación/prueba, bloqueos oficiales +EV y ledgers persistentes.',
-        'info': 'Investigación/Prueba mide acierto. Oficial +EV es prueba estricta de valor de apuesta.',
+        'caption': 'Crea bloqueos investigación/prueba y ledgers persistentes.',
+        'info': 'Usa esta página para bloquear filas antes de los juegos. El Dashboard Público lee el ledger guardado.',
         'test_window': 'ID de ventana de prueba',
         'test_window_help': 'Usa el mismo ID en el Dashboard Público, como test_01.',
-        'active_test_window': 'Ledger de prueba activo',
         'input': 'Entrada',
-        'use_session': 'Usar últimas filas de la sesión',
-        'upload': 'Subir CSV de predicciones, alta confianza o ledger bloqueado',
+        'use_session': 'Usar últimas filas guardadas/sesión',
+        'upload': 'Subir CSV de predicciones o ledger bloqueado',
         'source': 'Fuente de entrada',
         'include_watch': 'Incluir filas watch/tracker',
         'analyst': 'Analista / marca',
         'max_units': 'Máximo de unidades por pick',
-        'daily_limit': 'Límite diario de exposición',
-        'sport_limit': 'Límite por deporte',
         'shortlist': 'Lista corta de máxima confianza',
         'use_shortlist': 'Usar lista corta',
         'max_shortlist': 'Máximo de filas',
@@ -128,21 +122,19 @@ TEXT = {
         'lock_created': 'Filas oficiales +EV creadas y guardadas',
         'research_lock_not_created': 'No se creó ledger investigación/prueba.',
         'lock_not_created': 'No se creó ledger oficial +EV.',
-        'no_rows': 'No hay filas. Ejecuta Predictor Pro / What Are the Odds o sube un CSV.',
+        'no_rows': 'No hay filas. Ejecuta Predictor Pro o sube un CSV.',
         'no_locked': 'Aún no hay filas bloqueadas.',
         'locked': 'Ledger bloqueado',
         'research_candidates_tab': 'Candidatos investigación/prueba',
         'official_candidates_tab': 'Candidatos oficiales +EV',
         'dashboard': 'Dashboard de prueba',
         'reports': 'Generador de reportes',
-        'bankroll': 'Bankroll / exposición',
-        'client': 'Vista para clientes',
+        'client': 'Vista cliente',
         'input_rows': 'Filas entrada',
         'persistent_rows': 'Ledger guardado',
         'reviewed': 'Revisadas',
         'research_candidates': 'Investigación/Prueba',
         'official_candidates': 'Oficial +EV',
-        'uploaded_locked': 'Bloqueadas subidas',
         'rows': 'Filas',
         'resolved': 'Resueltas',
         'record': 'Récord',
@@ -153,19 +145,18 @@ TEXT = {
         'proof_quality': 'Calidad prueba',
         'download_locked': 'Descargar CSV bloqueado',
         'download_client': 'Descargar CSV cliente',
-        'download_private': 'Descargar CSV privado',
         'save_persistent': 'Re-guardar filas bloqueadas',
         'saved_persistent': 'Guardado en ledger persistente',
         'blocker_summary': 'Por qué se bloquearon',
         'blocked_preview': 'Diagnóstico de filas bloqueadas',
         'no_research_candidates': 'No hay candidatos investigación/prueba.',
-        'no_official_candidates': 'No hay candidatos +EV. Aún pueden servir como investigación/prueba.',
+        'no_official_candidates': 'No hay candidatos +EV. Investigación/prueba aún puede servir.',
         'no_review_rows': 'Ninguna fila llegó a revisión.',
         'report_language': 'Idioma del reporte',
-        'public_only': 'Vista segura para público/clientes',
+        'public_only': 'Vista segura público/cliente',
         'report': 'Reporte para copiar/pegar',
-        'handoff': 'Salud del traspaso entre herramientas',
-        'saved_note': 'Las filas bloqueadas ahora se guardan automáticamente para que el Dashboard Público las cargue al cambiar de página.',
+        'handoff': 'Salud del traspaso',
+        'saved_note': 'Esta versión carga filas de Predictor Pro desde sesión, memoria local y JSON local.',
     },
 }
 
@@ -174,40 +165,55 @@ RESEARCH_TEST_IGNORED_BLOCKERS = {
     'negative_model_edge', 'negative_expected_value', 'robust_ev_below_0', 'robust_profit80_below_0',
     'strict_robust_ev_below_1_5pct', 'price_range_risk_too_high', 'price_range_risk_above_profit_mode_limit',
 }
+HANDOFF_KEYS = [
+    'pro_predictor_latest_rows',
+    'pro_predictor_high_confidence_rows',
+    'ara_latest_predictions',
+    'what_are_the_odds_latest_rows',
+    'odds_lock_pro_locked_rows',
+    'public_proof_dashboard_refresh_rows',
+]
 
 
 def t(key: str) -> str:
-    return TEXT[LANG].get(key, TEXT['en'].get(key, key))
+    return TEXT.get(LANG, TEXT['en']).get(key, TEXT['en'].get(key, key))
 
 
 def pct(value: float | None) -> str:
     return 'N/A' if value is None else f'{value * 100:.1f}%'
 
 
-def session_rows() -> tuple[str, list[dict]]:
-    sources = [
-        ('what_are_the_odds_latest_rows', 'What Are the Odds'),
-        ('pro_predictor_latest_rows', 'Pro Predictor'),
-        ('pro_predictor_high_confidence_rows', 'Pro Predictor high-confidence'),
-        ('scanner_pro_latest_rows', 'Scanner Pro'),
-        ('odds_lock_pro_locked_rows', 'Odds Lock Pro'),
-        ('ara_latest_predictions', 'Latest session'),
-    ]
-    for key, label in sources:
+def csv_link(label: str, frame: pd.DataFrame, filename: str) -> None:
+    data = base64.b64encode(frame.to_csv(index=False).encode('utf-8')).decode('ascii')
+    st.markdown(
+        f'<a href="data:text/csv;base64,{data}" download="{html.escape(filename)}" '
+        f'style="display:block;text-align:center;background:#ef5350;color:white;'
+        f'padding:.75rem 1rem;border-radius:.45rem;text-decoration:none;font-weight:700;">'
+        f'{html.escape(label)}</a>',
+        unsafe_allow_html=True,
+    )
+
+
+def rows_from_sources(workspace_id: str) -> tuple[str, list[dict[str, Any]]]:
+    for key in HANDOFF_KEYS:
         rows = st.session_state.get(key) or []
         if rows:
-            return label, rows
+            return key, [dict(row) for row in rows if isinstance(row, dict)]
+    key, rows = load_first_available(HANDOFF_KEYS, workspace_id)
+    if rows:
+        st.session_state[key] = rows
+        return f'local:{key}', rows
     return '', []
 
 
-def read_inputs() -> tuple[str, pd.DataFrame]:
-    label, rows = session_rows()
+def read_inputs(workspace_id: str) -> tuple[str, pd.DataFrame]:
+    label, rows = rows_from_sources(workspace_id)
     use_session = st.checkbox(t('use_session'), value=bool(rows))
     frames: list[pd.DataFrame] = []
     names: list[str] = []
     if use_session and rows:
         frames.append(pd.DataFrame(rows))
-        names.append(label or 'session_rows')
+        names.append(label or 'saved_rows')
     uploads = st.file_uploader(t('upload'), type=['csv'], accept_multiple_files=True)
     if uploads:
         for upload in uploads:
@@ -248,13 +254,10 @@ def shortlist_frame(frame: pd.DataFrame, *, use_shortlist: bool, max_rows: int, 
         out['_shortlist_probability'] = probability
         out = out[out['_shortlist_probability'].fillna(0.0) >= float(min_probability)]
     if not out.empty and score.notna().any():
-        score = score.reindex(out.index)
-        out['_shortlist_score'] = score
+        out['_shortlist_score'] = score.reindex(out.index)
         out = out[out['_shortlist_score'].fillna(0.0) >= float(min_score)]
-    if out.empty:
-        return out.drop(columns=[col for col in ['_shortlist_probability', '_shortlist_score'] if col in out.columns], errors='ignore')
     sort_cols = [col for col in ['_shortlist_score', '_shortlist_probability', 'agent_score', 'scanner_strength_score', 'model_edge'] if col in out.columns]
-    if sort_cols:
+    if sort_cols and not out.empty:
         out = out.sort_values(sort_cols, ascending=False, na_position='last')
     if int(max_rows) > 0:
         out = out.head(int(max_rows))
@@ -278,9 +281,7 @@ def apply_research_mode(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame
     out = frame.copy()
-    remaining: list[str] = []
-    ignored: list[str] = []
-    ready: list[bool] = []
+    remaining, ignored, ready = [], [], []
     for row in out.to_dict(orient='records'):
         remaining_blockers = research_remaining_blockers(row)
         remaining.append('; '.join(remaining_blockers))
@@ -341,7 +342,7 @@ def research_lock_rows(frame: pd.DataFrame, *, analyst: str, max_units: float, w
         item['stake_units'] = research_stake_units(item, max_units=max_units)
         item['proof_status'] = lock_status(item, locked_at=locked_dt)
         item['public_confidence'] = 'Research/Test'
-        item['public_reason'] = 'Accuracy test lock; EV/profitability blockers ignored. Not an official +EV betting pick.'
+        item['public_reason'] = 'Accuracy test lock; value blockers ignored. Not an official +EV pick.'
         item['profit_units'] = profit_units(item)
         item['proof_hash'] = proof_hash(item)
         item['proof_id'] = proof_id_from_hash(item['proof_hash'])
@@ -359,6 +360,24 @@ def mark_official_locked(frame: pd.DataFrame, workspace_id: str) -> pd.DataFrame
     return out
 
 
+def publish_locked_rows(locked: pd.DataFrame, *, source_label: str, workspace_id: str) -> pd.DataFrame:
+    if locked.empty:
+        return pd.DataFrame()
+    locked = locked.copy()
+    locked['test_window_id'] = workspace_id
+    existing = load_persistent_ledger(workspace_id=workspace_id)
+    session_locked = pd.DataFrame(st.session_state.get('odds_lock_pro_locked_rows', []))
+    combined = merge_ledgers(existing, locked, session_locked)
+    saved = save_persistent_ledger(combined, workspace_id=workspace_id)
+    final = saved if not saved.empty else filter_locked_proof_rows(locked)
+    records = final.to_dict('records')
+    for key in ['odds_lock_pro_locked_rows', 'public_proof_dashboard_refresh_rows', 'ara_latest_predictions']:
+        st.session_state[key] = records
+        save_held_rows(key, records, workspace_id)
+    st.session_state['ara_latest_predictions_source'] = f'Odds Lock Pro {source_label}:{workspace_id}'
+    return final
+
+
 def blocker_summary(frame: pd.DataFrame, column: str = 'lock_blockers') -> pd.DataFrame:
     if frame.empty or column not in frame.columns:
         return pd.DataFrame()
@@ -368,14 +387,7 @@ def blocker_summary(frame: pd.DataFrame, column: str = 'lock_blockers') -> pd.Da
             key = item.strip()
             if key:
                 counts[key] = counts.get(key, 0) + 1
-    if not counts:
-        return pd.DataFrame()
     return pd.DataFrame([{'blocker': key, 'rows': value} for key, value in sorted(counts.items(), key=lambda item: (-item[1], item[0]))])
-
-
-def diagnostic_columns(frame: pd.DataFrame) -> list[str]:
-    preferred = ['event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'bookmaker', 'odds_source', 'event_start_utc', 'agent_decision', 'decision', 'lock_ready', 'prelock_status', 'lock_blockers', 'research_lock_blockers', 'ignored_value_blockers', 'result_status', 'source_file']
-    return [col for col in preferred if col in frame.columns]
 
 
 def show_blocked_diagnostics(frame: pd.DataFrame, *, blocker_column: str) -> None:
@@ -386,14 +398,14 @@ def show_blocked_diagnostics(frame: pd.DataFrame, *, blocker_column: str) -> Non
     if not blocked.empty:
         st.subheader(t('blocker_summary'))
         st.dataframe(blocked, use_container_width=True, hide_index=True)
-    cols = diagnostic_columns(frame)
+    cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'bookmaker', 'odds_source', 'event_start_utc', 'agent_decision', 'lock_ready', 'prelock_status', 'lock_blockers', 'research_lock_blockers', 'ignored_value_blockers'] if col in frame.columns]
     st.subheader(t('blocked_preview'))
     st.dataframe(frame[cols] if cols else frame, use_container_width=True, hide_index=True)
 
 
 def show_candidates(frame: pd.DataFrame) -> None:
-    show_cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'bookmaker', 'odds_source', 'agent_decision', 'agent_score', 'scanner_strength_score', 'model_edge', 'stake_units', 'prelock_status', 'official_lock_ready', 'research_lock_ready', 'research_lock_blockers', 'ignored_value_blockers', 'public_confidence', 'public_reason'] if col in frame.columns]
-    st.dataframe(frame[show_cols] if show_cols else frame, use_container_width=True, hide_index=True)
+    cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'model_probability', 'decimal_price', 'bookmaker', 'odds_source', 'agent_decision', 'agent_score', 'scanner_strength_score', 'model_edge', 'stake_units', 'prelock_status', 'official_lock_ready', 'research_lock_ready', 'research_lock_blockers', 'ignored_value_blockers', 'public_confidence', 'public_reason'] if col in frame.columns]
+    st.dataframe(frame[cols] if cols else frame, use_container_width=True, hide_index=True)
 
 
 def exposure_summary(frame: pd.DataFrame, *, daily_limit_units: float, sport_limit_units: float) -> pd.DataFrame:
@@ -410,22 +422,6 @@ def exposure_summary(frame: pd.DataFrame, *, daily_limit_units: float, sport_lim
     return pd.DataFrame(rows)
 
 
-def publish_locked_rows(locked: pd.DataFrame, *, source_label: str, workspace_id: str) -> pd.DataFrame:
-    if locked.empty:
-        return pd.DataFrame()
-    locked = locked.copy()
-    locked['test_window_id'] = workspace_id
-    existing = load_persistent_ledger(workspace_id=workspace_id)
-    combined = merge_ledgers(existing, locked, pd.DataFrame(st.session_state.get('odds_lock_pro_locked_rows', [])))
-    saved = save_persistent_ledger(combined, workspace_id=workspace_id)
-    final = saved if not saved.empty else filter_locked_proof_rows(locked)
-    st.session_state['odds_lock_pro_locked_rows'] = final.to_dict('records')
-    st.session_state['ara_latest_predictions'] = final.to_dict('records')
-    st.session_state['ara_latest_predictions_source'] = f'Odds Lock Pro {source_label}:{workspace_id}'
-    st.session_state['public_proof_dashboard_refresh_rows'] = final.to_dict('records')
-    return final
-
-
 st.title(t('title'))
 st.caption(t('caption'))
 st.info(t('info'))
@@ -435,26 +431,25 @@ with st.expander(t('input'), expanded=True):
     workspace_input = st.text_input(t('test_window'), value=st.session_state.get('aba_test_window_id', 'test_01'), help=t('test_window_help'))
     workspace_id = normalize_workspace_id(workspace_input)
     st.session_state['aba_test_window_id'] = workspace_id
-    source_name, raw = read_inputs()
+    source_name, raw = read_inputs(workspace_id)
     include_watch = st.checkbox(t('include_watch'), value=True)
     analyst = st.text_input(t('analyst'), value='ABA Signal Pro · Powered by Reparodynamics')
     max_units = st.number_input(t('max_units'), min_value=0.25, max_value=10.0, value=1.0, step=0.25)
-    daily_limit = st.number_input(t('daily_limit'), min_value=0.25, max_value=500.0, value=500.0, step=5.0)
-    sport_limit = st.number_input(t('sport_limit'), min_value=0.25, max_value=500.0, value=500.0, step=5.0)
+    daily_limit = st.number_input('Daily exposure limit', min_value=0.25, max_value=500.0, value=500.0, step=5.0)
+    sport_limit = st.number_input('Per-sport exposure limit', min_value=0.25, max_value=500.0, value=500.0, step=5.0)
 
-workspace_id = normalize_workspace_id(st.session_state.get('aba_test_window_id', 'test_01'))
 persistent_locked = load_persistent_ledger(workspace_id=workspace_id)
 normalized_for_upload = normalize_frame(raw) if not raw.empty else pd.DataFrame()
 uploaded_locked = filter_locked_proof_rows(normalized_for_upload) if not normalized_for_upload.empty and has_proof_fields(normalized_for_upload) else pd.DataFrame()
 
 if raw.empty and persistent_locked.empty:
     st.caption(f"{t('source')}: none")
-    st.caption(f"{t('active_test_window')}: {workspace_id}")
+    st.caption(f"Active test ledger: {workspace_id}")
     st.warning(t('no_rows'))
     st.stop()
 
 st.caption(f"{t('source')}: {source_name or 'persistent ledger'}")
-st.caption(f"{t('active_test_window')}: {workspace_id}")
+st.caption(f"Active test ledger: {workspace_id}")
 
 normalized = normalized_for_upload
 if not normalized.empty:
@@ -482,7 +477,7 @@ status_cols[1].metric(t('persistent_rows'), int(len(persistent_locked)))
 status_cols[2].metric(t('reviewed'), int(len(review_rows)))
 status_cols[3].metric(t('research_candidates'), int(len(research_candidates)))
 status_cols[4].metric(t('official_candidates'), int(len(official_candidates)))
-status_cols[5].metric(t('uploaded_locked'), int(len(uploaded_locked)))
+status_cols[5].metric('Uploaded locked', int(len(uploaded_locked)))
 
 button_cols = st.columns(2)
 research_clicked = button_cols[0].button(t('lock_research'), type='primary', use_container_width=True, disabled=research_candidates.empty)
@@ -524,7 +519,7 @@ cols[7].metric(t('proof_quality'), f"{audit['proof_quality_score']}/100")
 st.subheader(t('handoff'))
 st.dataframe(page_health_frame(health_frame_source, page='what_are_the_odds'), use_container_width=True, hide_index=True)
 
-tabs = st.tabs([t('research_candidates_tab'), t('official_candidates_tab'), t('locked'), t('dashboard'), t('reports'), t('bankroll'), t('client')])
+tabs = st.tabs([t('research_candidates_tab'), t('official_candidates_tab'), t('locked'), t('dashboard'), t('reports'), 'Exposure', t('client')])
 
 with tabs[0]:
     if research_candidates.empty:
@@ -545,7 +540,7 @@ with tabs[2]:
         st.warning(t('no_locked'))
     else:
         st.dataframe(active_locked, use_container_width=True, hide_index=True)
-        st.download_button(t('download_locked'), active_locked.to_csv(index=False), file_name=f'odds_lock_pro_locked_ledger_{workspace_id}.csv', mime='text/csv')
+        csv_link(t('download_locked'), active_locked, f'odds_lock_pro_locked_ledger_{workspace_id}.csv')
         if st.button(t('save_persistent'), use_container_width=True):
             saved = publish_locked_rows(active_locked, source_label='manual-save', workspace_id=workspace_id)
             st.success(f"{t('saved_persistent')}: {workspace_id} / {len(saved)} rows")
@@ -575,4 +570,4 @@ with tabs[6]:
     public_only_client = st.checkbox(t('public_only'), value=True, key='client_public_only')
     client = client_view(active_locked, public_only=public_only_client)
     st.dataframe(client, use_container_width=True, hide_index=True)
-    st.download_button(t('download_client') if public_only_client else t('download_private'), client.to_csv(index=False), file_name=f'odds_lock_pro_client_view_{workspace_id}.csv' if public_only_client else f'odds_lock_pro_private_audit_{workspace_id}.csv', mime='text/csv')
+    csv_link(t('download_client'), client, f'odds_lock_pro_client_view_{workspace_id}.csv')
