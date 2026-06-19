@@ -20,12 +20,7 @@ _FALLBACK_MEMORY: dict[str, list[dict[str, Any]]] = {}
 
 
 def _memory_store() -> dict[str, list[dict[str, Any]]]:
-    """Process-level store that survives Streamlit page changes and reruns.
-
-    Streamlit Cloud file writes can be unreliable for app-session proof handoff.
-    This gives Odds Lock Pro and Public Proof Dashboard a second persistence
-    layer inside the running app process.
-    """
+    """Process-level store that survives Streamlit page changes and reruns."""
     try:
         import streamlit as st
 
@@ -49,10 +44,18 @@ def _store_key(key: str, workspace_id: Any = 'test_01') -> str:
     return f'{normalize_workspace_id(workspace_id)}::{key}'
 
 
+def _safe_key(key: str) -> str:
+    return ''.join(char if char.isalnum() or char in {'-', '_'} else '_' for char in str(key))
+
+
 def _path_for(key: str, workspace_id: Any = 'test_01') -> Path:
     workspace = normalize_workspace_id(workspace_id)
-    safe_key = ''.join(char if char.isalnum() or char in {'-', '_'} else '_' for char in str(key))
-    return DATA_DIR / f'held_picks_{workspace}_{safe_key}.json'
+    return DATA_DIR / f'held_picks_{workspace}_{_safe_key(key)}.json'
+
+
+def _backup_path_for(key: str, workspace_id: Any = 'test_01') -> Path:
+    workspace = normalize_workspace_id(workspace_id)
+    return DATA_DIR / f'held_picks_{workspace}_{_safe_key(key)}.backup.json'
 
 
 def rows_from_any(value: Any) -> list[dict[str, Any]]:
@@ -67,38 +70,74 @@ def rows_from_any(value: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _write_payload(path: Path, payload: dict[str, Any]) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + '.tmp')
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str) + '\n', encoding='utf-8')
+    tmp.replace(path)
+
+
 def save_held_rows(key: str, rows: Any, workspace_id: Any = 'test_01') -> int:
     if key not in HELD_KEYS:
         return 0
+    workspace = normalize_workspace_id(workspace_id)
     cleaned = rows_from_any(rows)
-    if not cleaned:
-        return 0
-    _memory_store()[_store_key(key, workspace_id)] = cleaned
+    store = _memory_store()
+    store[_store_key(key, workspace)] = cleaned
+    if workspace != 'test_01':
+        store[_store_key(key, 'test_01')] = cleaned
+    store[_store_key(f'latest_{key}', 'test_01')] = cleaned
     try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        payload = {'version': 'held-picks-v3', 'workspace_id': normalize_workspace_id(workspace_id), 'key': key, 'rows': cleaned}
-        _path_for(key, workspace_id).write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str) + '\n', encoding='utf-8')
+        payload = {'version': 'held-picks-v4-local-memory', 'workspace_id': workspace, 'key': key, 'rows': cleaned}
+        _write_payload(_path_for(key, workspace), payload)
+        _write_payload(_backup_path_for(key, workspace), payload)
+        if workspace != 'test_01':
+            _write_payload(_path_for(key, 'test_01'), {'version': 'held-picks-v4-local-memory', 'workspace_id': 'test_01', 'key': key, 'rows': cleaned})
+        _write_payload(_path_for(f'latest_{key}', 'test_01'), {'version': 'held-picks-v4-local-memory', 'workspace_id': 'test_01', 'key': f'latest_{key}', 'rows': cleaned})
     except Exception:
         pass
     return len(cleaned)
 
 
-def load_held_rows(key: str, workspace_id: Any = 'test_01') -> list[dict[str, Any]]:
-    memory_rows = _memory_store().get(_store_key(key, workspace_id), [])
-    if memory_rows:
-        return [dict(row) for row in memory_rows if isinstance(row, dict)]
-    path = _path_for(key, workspace_id)
+def _load_payload(path: Path) -> list[dict[str, Any]]:
     try:
         if not path.exists():
             return []
         payload = json.loads(path.read_text(encoding='utf-8'))
         rows = payload.get('rows', [])
-        cleaned = [dict(row) for row in rows if isinstance(row, dict)]
-        if cleaned:
-            _memory_store()[_store_key(key, workspace_id)] = cleaned
-        return cleaned
+        return [dict(row) for row in rows if isinstance(row, dict)]
     except Exception:
         return []
+
+
+def load_held_rows(key: str, workspace_id: Any = 'test_01') -> list[dict[str, Any]]:
+    if key not in HELD_KEYS:
+        return []
+    workspace = normalize_workspace_id(workspace_id)
+    store = _memory_store()
+    for lookup_key, lookup_workspace in [
+        (key, workspace),
+        (key, 'test_01'),
+        (f'latest_{key}', 'test_01'),
+    ]:
+        memory_rows = store.get(_store_key(lookup_key, lookup_workspace), [])
+        if memory_rows:
+            return [dict(row) for row in memory_rows if isinstance(row, dict)]
+        for path in [_path_for(lookup_key, lookup_workspace), _backup_path_for(lookup_key, lookup_workspace)]:
+            rows = _load_payload(path)
+            if rows:
+                store[_store_key(lookup_key, lookup_workspace)] = rows
+                return rows
+    try:
+        safe = _safe_key(key)
+        for path in sorted(DATA_DIR.glob(f'held_picks_*_{safe}.json'), key=lambda p: p.stat().st_mtime, reverse=True):
+            rows = _load_payload(path)
+            if rows:
+                store[_store_key(key, workspace)] = rows
+                return rows
+    except Exception:
+        pass
+    return []
 
 
 def load_first_available(keys: list[str] | tuple[str, ...], workspace_id: Any = 'test_01') -> tuple[str, list[dict[str, Any]]]:
