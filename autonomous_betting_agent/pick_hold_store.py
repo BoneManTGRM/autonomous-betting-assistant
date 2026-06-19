@@ -13,6 +13,8 @@ HELD_KEYS = {
     'pro_predictor_latest_rows',
     'pro_predictor_high_confidence_rows',
     'ara_latest_predictions',
+    'odds_lock_pro_locked_rows',
+    'public_proof_dashboard_refresh_rows',
 }
 
 
@@ -48,7 +50,7 @@ def save_held_rows(key: str, rows: Any, workspace_id: Any = 'test_01') -> int:
     if not cleaned:
         return 0
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    payload = {'version': 'held-picks-v1', 'workspace_id': normalize_workspace_id(workspace_id), 'key': key, 'rows': cleaned}
+    payload = {'version': 'held-picks-v2', 'workspace_id': normalize_workspace_id(workspace_id), 'key': key, 'rows': cleaned}
     _path_for(key, workspace_id).write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str) + '\n', encoding='utf-8')
     return len(cleaned)
 
