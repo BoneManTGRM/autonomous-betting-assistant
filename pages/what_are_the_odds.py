@@ -34,8 +34,7 @@ TEXT = {
         'paste_title': 'Mobile-safe CSV paste',
         'paste': 'Paste CSV text here',
         'paste_help': 'Paste the whole CSV including the header row. This avoids the mobile upload button completely.',
-        'upload_optional': 'Optional desktop upload fallback',
-        'upload': 'Upload CSV file(s)',
+        'upload_disabled': 'File upload is disabled on this mobile-safe page because the upload picker is unreliable on your phone. Use paste CSV instead.',
         'waiting': 'Fill event, pick, probability, and decimal or American price. Or paste CSV text / use latest session rows.',
         'saved': 'Rows are saved automatically for Odds Lock Pro and the public dashboard.',
         'download': 'Download analyzed rows',
@@ -62,8 +61,7 @@ TEXT = {
         'paste_title': 'Pegar CSV seguro para móvil',
         'paste': 'Pega texto CSV aquí',
         'paste_help': 'Pega todo el CSV incluyendo encabezados. Esto evita completamente el botón móvil de subir archivo.',
-        'upload_optional': 'Subida opcional para escritorio',
-        'upload': 'Subir archivo(s) CSV',
+        'upload_disabled': 'La subida de archivo está desactivada en esta página segura para móvil porque el selector de subida falla en tu teléfono. Usa pegar CSV.',
         'waiting': 'Llena evento, pick, probabilidad y precio decimal o americano. O pega CSV / usa filas recientes.',
         'saved': 'Las filas se guardan automáticamente para Odds Lock Pro y el dashboard público.',
         'download': 'Descargar filas analizadas',
@@ -178,21 +176,6 @@ def load_pasted_rows() -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def load_optional_uploads() -> pd.DataFrame:
-    frames: list[pd.DataFrame] = []
-    with st.expander(t('upload_optional'), expanded=False):
-        uploads = st.file_uploader(t('upload'), type=['csv'], accept_multiple_files=True)
-        if uploads:
-            for upload in uploads:
-                try:
-                    frame = pd.read_csv(upload)
-                    frame['source_file'] = upload.name
-                    frames.append(frame)
-                except Exception as exc:
-                    st.warning(f'CSV could not be read: {exc}')
-    return pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
-
-
 def save_rows(frame: pd.DataFrame) -> None:
     rows = frame.to_dict('records')
     for key in ['what_are_the_odds_latest_rows', 'ara_latest_predictions', 'odds_lock_pro_candidate_rows', 'public_proof_dashboard_refresh_rows']:
@@ -228,8 +211,8 @@ st.text_area(t('notes'), key='wato_notes', height=100, placeholder='Context note
 st.checkbox(t('session'), value=False, key='wato_use_session')
 
 st.subheader(t('paste_title'))
+st.caption(t('upload_disabled'))
 st.text_area(t('paste'), key='wato_pasted_csv', height=160, help=t('paste_help'), placeholder='event,prediction,model_probability,decimal_price\nTeam A at Team B,Team A,0.61,1.91')
-optional_uploads = load_optional_uploads()
 
 frames: list[pd.DataFrame] = []
 manual = build_manual_row()
@@ -241,8 +224,6 @@ if not session_frame.empty:
 pasted_frame = load_pasted_rows()
 if not pasted_frame.empty:
     frames.append(pasted_frame)
-if not optional_uploads.empty:
-    frames.append(optional_uploads)
 
 if not frames:
     st.warning(t('waiting'))
