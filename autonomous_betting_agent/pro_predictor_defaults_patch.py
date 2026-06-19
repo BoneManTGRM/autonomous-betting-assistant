@@ -62,16 +62,18 @@ PROFILE_VALUES = {
 def apply_large_list_70_defaults(st_module: Any) -> None:
     """Set Pro Predictor widget defaults without monkey-patching Streamlit.
 
-    Streamlit buttons/uploads were fragile when we used runtime monkey-patches.
-    This function only preloads session-state values for Pro Predictor widget keys.
-    It does not override st.button, st.form, st.file_uploader, number_input, or
-    multiselect behavior.
+    This overwrites the profile defaults once per browser session so stale old
+    values do not survive after the update. It does not override Streamlit
+    buttons, forms, uploaders, or download controls.
     """
-    for key, value in PROFILE_VALUES.items():
-        try:
-            st_module.session_state.setdefault(key, value)
-        except Exception:
-            pass
+    try:
+        if st_module.session_state.get('_large_list_70_defaults_applied_v2'):
+            return
+        for key, value in PROFILE_VALUES.items():
+            st_module.session_state[key] = value
+        st_module.session_state['_large_list_70_defaults_applied_v2'] = True
+    except Exception:
+        pass
 
 
 def install_pro_predictor_defaults_patch() -> None:
