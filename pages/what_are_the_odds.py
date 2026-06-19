@@ -15,7 +15,7 @@ TEXT = {
     'en': {
         'title': 'What Are the Odds',
         'caption': 'Manual review board. Enter one row, paste CSV text, or use latest Pro Predictor rows. The page saves rows automatically for the next tools.',
-        'info': 'Mobile-safe mode: no button or file-upload button is required. Fill the single-game fields or paste CSV text, and the row/table saves automatically.',
+        'info': 'Mobile-safe mode: no buttons and no file-upload button. Fill the single-game fields or paste CSV text, and the row/table saves automatically.',
         'workflow': 'Clean path: Pro Predictor → What Are the Odds → Odds Lock → Public Proof Dashboard → Learning Memory.',
         'single_game': 'Single Game Manual Check',
         'event': 'Game / event name',
@@ -37,12 +37,11 @@ TEXT = {
         'upload_disabled': 'File upload is disabled on this mobile-safe page because the upload picker is unreliable on your phone. Use paste CSV instead.',
         'waiting': 'Fill event, pick, probability, and decimal or American price. Or paste CSV text / use latest session rows.',
         'saved': 'Rows are saved automatically for Odds Lock Pro and the public dashboard.',
-        'download': 'Download analyzed rows',
     },
     'es': {
         'title': 'What Are the Odds',
         'caption': 'Tablero de revisión manual. Ingresa una fila, pega CSV o usa filas recientes de Predictor Pro. La página guarda automáticamente para las siguientes herramientas.',
-        'info': 'Modo seguro para móvil: no se necesita botón ni botón de subida. Llena los campos o pega CSV y se guarda automáticamente.',
+        'info': 'Modo seguro para móvil: sin botones y sin botón de subida. Llena los campos o pega CSV y se guarda automáticamente.',
         'workflow': 'Ruta limpia: Predictor Pro → What Are the Odds → Odds Lock → Dashboard Público → Memoria.',
         'single_game': 'Revisión Manual de Un Solo Juego',
         'event': 'Juego / evento',
@@ -64,7 +63,6 @@ TEXT = {
         'upload_disabled': 'La subida de archivo está desactivada en esta página segura para móvil porque el selector de subida falla en tu teléfono. Usa pegar CSV.',
         'waiting': 'Llena evento, pick, probabilidad y precio decimal o americano. O pega CSV / usa filas recientes.',
         'saved': 'Las filas se guardan automáticamente para Odds Lock Pro y el dashboard público.',
-        'download': 'Descargar filas analizadas',
     },
 }
 
@@ -233,4 +231,3 @@ output = pd.concat(frames, ignore_index=True, sort=False)
 save_rows(output)
 st.success(t('saved'))
 st.dataframe(output, use_container_width=True, hide_index=True)
-st.download_button(t('download'), output.to_csv(index=False), file_name='what_are_the_odds_analyzed_rows.csv', mime='text/csv', use_container_width=True)
