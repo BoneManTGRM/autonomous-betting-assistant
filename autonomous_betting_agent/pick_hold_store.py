@@ -16,6 +16,26 @@ HELD_KEYS = {
     'odds_lock_pro_locked_rows',
     'public_proof_dashboard_refresh_rows',
 }
+_FALLBACK_MEMORY: dict[str, list[dict[str, Any]]] = {}
+
+
+def _memory_store() -> dict[str, list[dict[str, Any]]]:
+    """Process-level store that survives Streamlit page changes and reruns.
+
+    Streamlit Cloud file writes can be unreliable for app-session proof handoff.
+    This gives Odds Lock Pro and Public Proof Dashboard a second persistence
+    layer inside the running app process.
+    """
+    try:
+        import streamlit as st
+
+        @st.cache_resource(show_spinner=False)
+        def _cached_store() -> dict[str, list[dict[str, Any]]]:
+            return {}
+
+        return _cached_store()
+    except Exception:
+        return _FALLBACK_MEMORY
 
 
 def normalize_workspace_id(value: Any = 'test_01') -> str:
@@ -23,6 +43,10 @@ def normalize_workspace_id(value: Any = 'test_01') -> str:
     cleaned = ''.join(char if char.isalnum() or char in {'-', '_'} else '_' for char in text)
     cleaned = '_'.join(part for part in cleaned.split('_') if part)
     return cleaned[:48] or 'test_01'
+
+
+def _store_key(key: str, workspace_id: Any = 'test_01') -> str:
+    return f'{normalize_workspace_id(workspace_id)}::{key}'
 
 
 def _path_for(key: str, workspace_id: Any = 'test_01') -> Path:
@@ -49,20 +73,30 @@ def save_held_rows(key: str, rows: Any, workspace_id: Any = 'test_01') -> int:
     cleaned = rows_from_any(rows)
     if not cleaned:
         return 0
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    payload = {'version': 'held-picks-v2', 'workspace_id': normalize_workspace_id(workspace_id), 'key': key, 'rows': cleaned}
-    _path_for(key, workspace_id).write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str) + '\n', encoding='utf-8')
+    _memory_store()[_store_key(key, workspace_id)] = cleaned
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        payload = {'version': 'held-picks-v3', 'workspace_id': normalize_workspace_id(workspace_id), 'key': key, 'rows': cleaned}
+        _path_for(key, workspace_id).write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str) + '\n', encoding='utf-8')
+    except Exception:
+        pass
     return len(cleaned)
 
 
 def load_held_rows(key: str, workspace_id: Any = 'test_01') -> list[dict[str, Any]]:
+    memory_rows = _memory_store().get(_store_key(key, workspace_id), [])
+    if memory_rows:
+        return [dict(row) for row in memory_rows if isinstance(row, dict)]
     path = _path_for(key, workspace_id)
     try:
         if not path.exists():
             return []
         payload = json.loads(path.read_text(encoding='utf-8'))
         rows = payload.get('rows', [])
-        return [dict(row) for row in rows if isinstance(row, dict)]
+        cleaned = [dict(row) for row in rows if isinstance(row, dict)]
+        if cleaned:
+            _memory_store()[_store_key(key, workspace_id)] = cleaned
+        return cleaned
     except Exception:
         return []
 
