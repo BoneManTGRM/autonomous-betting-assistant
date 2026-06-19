@@ -8,11 +8,10 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from autonomous_betting_agent.tool_sidebar import render_tool_sidebar
+from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
 st.set_page_config(page_title='Simulation Lab', layout='wide')
-LANG = 'es' if st.sidebar.selectbox('Language / Idioma', ['English', 'Español'], key='simulation_lab_language') == 'Español' else 'en'
-render_tool_sidebar('simulation_lab', LANG)
+LANG = render_app_sidebar('simulation_lab', language_key='simulation_lab_language', selector='radio')
 
 TEXT = {
     'en': {
