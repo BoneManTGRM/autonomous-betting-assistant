@@ -8,602 +8,233 @@ import streamlit as st
 
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
-from autonomous_betting_agent.agent_decision_engine import agent_decision_summary, build_agent_decisions, lock_ready_candidates, playable_candidates
-from autonomous_betting_agent.api_snapshot_memory import build_api_snapshots, snapshot_memory_summary
-from autonomous_betting_agent.clv_intelligence import build_clv_intelligence, clv_by_segment, clv_summary
-from autonomous_betting_agent.four_tool_orchestrator import page_health, page_health_frame
-from autonomous_betting_agent.mobile_report import compact_report_frame
-from autonomous_betting_agent.odds_accuracy_tools import enrich_odds_accuracy, odds_accuracy_display_columns, odds_accuracy_summary
-from autonomous_betting_agent.odds_breakdown import build_odds_breakdown
-from autonomous_betting_agent.performance_segments import build_segment_frame, top_segments
-from autonomous_betting_agent.post_loss_autopsy import autopsy_summary, build_loss_autopsies, future_rules
-from autonomous_betting_agent.row_normalizer import normalize_frame, safe_text
-from autonomous_betting_agent.scanner_strength import score_scanner_frame, scanner_strength_summary
-from autonomous_betting_agent.sport_specific_models import build_sport_specific_decisions, sport_model_summary
-from autonomous_betting_agent.walk_forward_lab import walk_forward_summary, walk_forward_validate
-
 st.set_page_config(page_title='What Are the Odds', layout='wide')
 LANG = render_app_sidebar('what_are_the_odds', language_key='what_are_the_odds_pro_language', selector='radio')
 
 TEXT = {
     'en': {
         'title': 'What Are the Odds',
-        'caption': 'The pro market/value command board. It combines Scanner Pro strength, Pro Predictor probabilities, manual context, odds-quality scoring, EV, CLV, loss review, walk-forward validation, and sport routing.',
-        'info': 'For one game, fill out the Single Game Manual Check fields below. For large files or pasted CSVs, open Advanced CSV / bulk input.',
-        'workflow': 'Clean path: Scanner Pro → Pro Predictor → What Are the Odds → Odds Lock → Public Proof Dashboard → Learning Memory.',
-        'advanced_bulk': 'Advanced CSV / bulk input',
-        'bulk_help': 'Use this only when you already have a CSV file or want to paste multiple rows. For one game, use the form fields above.',
+        'caption': 'Manual review board. Enter one row or load rows, and the page saves them automatically for the next tools.',
+        'info': 'No submit button is required. Once the required fields are filled, the row appears and is saved automatically.',
+        'workflow': 'Clean path: Pro Predictor → What Are the Odds → Odds Lock → Public Proof Dashboard → Learning Memory.',
+        'single_game': 'Single Game Manual Check',
+        'event': 'Game / event name',
+        'sport': 'Sport / league',
+        'market': 'Market type',
+        'pick': 'Pick / prediction',
+        'start': 'Event start UTC',
+        'start_help': 'Use ISO format, for example 2026-06-17T23:10:00Z.',
+        'decimal': 'Decimal price',
+        'american': 'American price',
+        'prob': 'Model probability %',
+        'source': 'Source',
+        'books': 'Source count',
+        'notes': 'Notes',
+        'session': 'Use latest Pro Predictor session rows',
+        'bulk': 'Advanced CSV / bulk input',
         'upload': 'Upload CSV file(s)',
         'paste': 'Or paste CSV text',
-        'use_session': 'Use latest Scanner Pro / Pro Predictor session rows',
-        'waiting': 'Fill and submit the single-game form, use latest session rows, upload CSVs, or paste CSV text.',
-        'single_game': 'Single Game Manual Check',
-        'single_game_help': 'Type one game here. The app will create one auditable row, calculate implied probability, EV, edge, odds quality, confidence tier, agent decision, and lock eligibility.',
-        'single_event': 'Game / event name',
-        'single_sport': 'Sport / league',
-        'single_market': 'Market type',
-        'single_pick': 'Pick / prediction',
-        'single_start': 'Event start UTC',
-        'single_start_help': 'Use ISO format, for example 2026-06-17T23:10:00Z. Future start time is required for official proof locking.',
-        'single_decimal': 'Decimal odds',
-        'single_american': 'American odds',
-        'single_probability': 'Model probability %',
-        'single_bookmaker': 'Bookmaker / source',
-        'single_books': 'Book count',
-        'single_closing': 'Closing decimal price, if known',
-        'single_manual_adj': 'Manual probability adjustment, percentage points',
-        'single_notes': 'Notes: injuries, lineup, weather, rest, travel, motivation, market news',
-        'single_submit': 'Analyze this single game',
-        'single_loaded': 'Single-game manual row added to this analysis.',
-        'single_missing': 'Missing required fields. Enter at least event, pick, model probability, and decimal or American odds.',
-        'single_tip': 'Minimum needed: event, pick, model probability, odds, bookmaker/source, and future start time if you want official proof.',
-        'min_edge': 'Minimum model-vs-market edge',
-        'strong_edge': 'Strong edge threshold',
-        'min_strength': 'Minimum scanner strength',
-        'min_train_rows': 'Walk-forward minimum training rows',
-        'manual_context': 'Manual context / expert override',
-        'manual_help': 'Optional global adjustment for all loaded rows. Positive values increase model probability; negative values reduce it. Keep adjustments small unless you have strong evidence.',
-        'apply_manual': 'Apply manual context to model probability',
-        'global_adj': 'Global probability adjustment, percentage points',
-        'manual_confidence': 'Manual context confidence',
-        'source_override': 'Bookmaker/source override if missing',
-        'manual_notes': 'Manual notes applied to all rows',
-        'manual_csv': 'Optional per-row manual CSV patch',
-        'manual_csv_help': 'Optional columns: event,prediction,manual_probability_adjustment,decimal_price,bookmaker,closing_decimal_price,injury_note,weather_note,lineup_note,market_note,manual_context_notes',
-        'manual_audit': 'Manual audit',
-        'accuracy_center': 'Odds accuracy center',
-        'accuracy_help': 'This section checks whether the row has enough market information to trust the price/value calculation. It adds implied probability, no-vig probability when multiple outcomes exist, fair price, EV per unit, data-quality flags, and a value rating.',
-        'manual_rows': 'Manual rows matched',
-        'odds_quality': 'Odds quality',
-        'positive_ev': 'Positive EV',
-        'premium_value': 'Premium value',
-        'source': 'Source',
-        'rows': 'Rows',
-        'playable': 'Playable',
-        'lock_ready': 'Lock ready',
-        'watch': 'Watch only',
-        'review': 'Review needed',
-        'avg_strength': 'Avg scan strength',
-        'premium': 'Premium scans',
-        'clv_ready': 'CLV ready',
-        'next': 'Next',
-        'handoff': 'Four-tool handoff health',
-        'best_board': 'Best Board',
-        'all_decisions': 'All decisions',
-        'lock_candidates': 'Lock-ready',
-        'scanner_rank': 'Scanner rank',
-        'odds_breakdown': 'Odds breakdown',
-        'segments': 'Segments',
-        'clv': 'CLV',
-        'loss_autopsy': 'Loss autopsy',
-        'walk_lab': 'Walk-forward',
-        'sport_models': 'Sport models',
-        'exports': 'Exports',
-        'no_best': 'No playable candidates after filters.',
-        'session_saved': 'Rows saved in session for Odds Lock, Learning Memory, and Max Agent Intelligence review.',
-        'manual_saved': 'Manual context was applied before decision scoring.',
+        'waiting': 'Fill event, pick, probability, and decimal or American price. Or load rows from session/upload/paste.',
+        'saved': 'Rows are saved automatically for Odds Lock Pro and the public dashboard.',
+        'download': 'Download analyzed rows',
     },
     'es': {
         'title': 'What Are the Odds',
-        'caption': 'Tablero pro de mercado/valor. Combina fuerza de Scanner Pro, probabilidades de Predictor Pro, contexto manual, calidad de cuotas, EV, CLV, revisión de pérdidas, walk-forward y rutas por deporte.',
-        'info': 'Para un solo juego, llena los campos de Revisión Manual abajo. Para archivos grandes o CSV pegado, abre Entrada CSV / masiva avanzada.',
-        'workflow': 'Ruta limpia: Scanner Pro → Predictor Pro → What Are the Odds → Odds Lock → Dashboard Público → Memoria.',
-        'advanced_bulk': 'Entrada CSV / masiva avanzada',
-        'bulk_help': 'Usa esto solo cuando ya tienes un archivo CSV o quieres pegar varias filas. Para un juego, usa los campos de arriba.',
+        'caption': 'Tablero de revisión manual. Ingresa una fila o carga filas, y la página las guarda automáticamente para las siguientes herramientas.',
+        'info': 'No se necesita botón. Cuando llenas los campos necesarios, la fila aparece y se guarda automáticamente.',
+        'workflow': 'Ruta limpia: Predictor Pro → What Are the Odds → Odds Lock → Dashboard Público → Memoria.',
+        'single_game': 'Revisión Manual de Un Solo Juego',
+        'event': 'Juego / evento',
+        'sport': 'Deporte / liga',
+        'market': 'Tipo de mercado',
+        'pick': 'Pick / pronóstico',
+        'start': 'Inicio del evento UTC',
+        'start_help': 'Usa formato ISO, por ejemplo 2026-06-17T23:10:00Z.',
+        'decimal': 'Precio decimal',
+        'american': 'Precio americano',
+        'prob': 'Probabilidad del modelo %',
+        'source': 'Fuente',
+        'books': 'Número de fuentes',
+        'notes': 'Notas',
+        'session': 'Usar filas recientes de Predictor Pro',
+        'bulk': 'Entrada CSV / masiva avanzada',
         'upload': 'Subir archivo(s) CSV',
         'paste': 'O pegar texto CSV',
-        'use_session': 'Usar filas recientes de Scanner Pro / Pro Predictor',
-        'waiting': 'Llena y envía el formulario de un juego, usa filas recientes, sube CSVs o pega CSV.',
-        'single_game': 'Revisión Manual de Un Solo Juego',
-        'single_game_help': 'Escribe un juego aquí. La app crea una fila auditable y calcula probabilidad implícita, EV, ventaja, calidad de cuotas, tier, decisión del agente y elegibilidad de bloqueo.',
-        'single_event': 'Juego / evento',
-        'single_sport': 'Deporte / liga',
-        'single_market': 'Tipo de mercado',
-        'single_pick': 'Pick / pronóstico',
-        'single_start': 'Inicio del evento UTC',
-        'single_start_help': 'Usa formato ISO, por ejemplo 2026-06-17T23:10:00Z. La hora futura es obligatoria para prueba oficial.',
-        'single_decimal': 'Cuota decimal',
-        'single_american': 'Cuota americana',
-        'single_probability': 'Probabilidad del modelo %',
-        'single_bookmaker': 'Casa / fuente',
-        'single_books': 'Número de casas',
-        'single_closing': 'Cuota decimal de cierre, si existe',
-        'single_manual_adj': 'Ajuste manual de probabilidad, puntos porcentuales',
-        'single_notes': 'Notas: lesiones, alineación, clima, descanso, viaje, motivación, mercado',
-        'single_submit': 'Analizar este juego',
-        'single_loaded': 'Fila manual de un solo juego agregada al análisis.',
-        'single_missing': 'Faltan campos. Ingresa evento, pick, probabilidad y cuota decimal o americana.',
-        'single_tip': 'Mínimo necesario: evento, pick, probabilidad, cuota, casa/fuente e inicio futuro si quieres prueba oficial.',
-        'min_edge': 'Ventaja mínima modelo-vs-mercado',
-        'strong_edge': 'Umbral de ventaja fuerte',
-        'min_strength': 'Fuerza mínima del escáner',
-        'min_train_rows': 'Mínimo de filas de entrenamiento walk-forward',
-        'manual_context': 'Contexto manual / ajuste experto',
-        'manual_help': 'Ajuste global opcional para todas las filas. Valores positivos suben la probabilidad; negativos la bajan. Mantén ajustes pequeños salvo evidencia fuerte.',
-        'apply_manual': 'Aplicar contexto manual a la probabilidad del modelo',
-        'global_adj': 'Ajuste global de probabilidad, puntos porcentuales',
-        'manual_confidence': 'Confianza del contexto manual',
-        'source_override': 'Casa/fuente si falta',
-        'manual_notes': 'Notas manuales aplicadas a todas las filas',
-        'manual_csv': 'CSV manual opcional por fila',
-        'manual_csv_help': 'Columnas opcionales: event,prediction,manual_probability_adjustment,decimal_price,bookmaker,closing_decimal_price,injury_note,weather_note,lineup_note,market_note,manual_context_notes',
-        'manual_audit': 'Auditoría manual',
-        'accuracy_center': 'Centro de precisión de cuotas',
-        'accuracy_help': 'Esta sección revisa si la fila tiene suficiente información de mercado para confiar en el cálculo de precio/valor. Agrega probabilidad implícita, sin margen cuando hay varios resultados, cuota justa, EV por unidad, banderas de calidad y rating de valor.',
-        'manual_rows': 'Filas manuales encontradas',
-        'odds_quality': 'Calidad cuotas',
-        'positive_ev': 'EV positivo',
-        'premium_value': 'Valor premium',
-        'source': 'Fuente',
-        'rows': 'Filas',
-        'playable': 'Jugables',
-        'lock_ready': 'Listas para bloquear',
-        'watch': 'Solo vigilar',
-        'review': 'Revisar',
-        'avg_strength': 'Fuerza promedio',
-        'premium': 'Escaneos premium',
-        'clv_ready': 'CLV listo',
-        'next': 'Siguiente',
-        'handoff': 'Salud del traspaso entre herramientas',
-        'best_board': 'Best Board',
-        'all_decisions': 'Todas las decisiones',
-        'lock_candidates': 'Listas para bloquear',
-        'scanner_rank': 'Ranking del escáner',
-        'odds_breakdown': 'Desglose de cuotas',
-        'segments': 'Segmentos',
-        'clv': 'CLV',
-        'loss_autopsy': 'Autopsia de pérdidas',
-        'walk_lab': 'Walk-forward',
-        'sport_models': 'Modelos por deporte',
-        'exports': 'Exportaciones',
-        'no_best': 'No hay candidatos jugables después de los filtros.',
-        'session_saved': 'Las filas se guardaron en sesión para Odds Lock, Memoria de Aprendizaje y Max Agent Intelligence.',
-        'manual_saved': 'El contexto manual fue aplicado antes de calificar decisiones.',
+        'waiting': 'Llena evento, pick, probabilidad y precio decimal o americano. O carga filas por sesión/subida/pegado.',
+        'saved': 'Las filas se guardan automáticamente para Odds Lock Pro y el dashboard público.',
+        'download': 'Descargar filas analizadas',
     },
 }
-
-PRIORITY_COLUMNS = [
-    'event', 'sport', 'market_type', 'prediction', 'model_probability_clean', 'manual_adjusted_probability',
-    'market_implied_probability', 'no_vig_implied_probability', 'model_market_edge', 'edge_percent',
-    'expected_value_per_unit', 'expected_value_percent', 'value_rating', 'odds_trust_grade', 'recommended_action',
-    'needed_info', 'odds_accuracy_score', 'decimal_price', 'fair_decimal_price',
-    'best_price', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score', 'scanner_strength_tier',
-    'scanner_recommendation', 'recommended_stake_units', 'event_timing_status', 'lock_ready', 'line_value_signal',
-    'manual_probability_adjustment', 'manual_context_notes', 'odds_quality_flags', 'decision_reasons',
-]
-
-MANUAL_PATCH_COLUMNS = [
-    'manual_probability_adjustment', 'decimal_price', 'bookmaker', 'closing_decimal_price',
-    'injury_note', 'weather_note', 'lineup_note', 'market_note', 'manual_context_notes',
-]
 
 
 def t(key: str) -> str:
     return TEXT[LANG].get(key, TEXT['en'].get(key, key))
 
 
-def pct(value: float | None) -> str:
-    return 'N/A' if value is None else f'{value * 100:.1f}%'
-
-
-def clean_key(value: Any) -> str:
-    return ' '.join(str(value or '').lower().replace('-', ' ').replace('_', ' ').split())
-
-
-def row_key(row: dict[str, Any]) -> str:
-    return f"{clean_key(row.get('event'))}|{clean_key(row.get('prediction'))}"
-
-
-def safe_number(value: Any) -> float | None:
+def safe_float(value: Any, default: float | None = None) -> float | None:
     try:
         parsed = float(str(value).replace('%', '').replace(',', '').strip())
     except (TypeError, ValueError):
-        return None
+        return default
     if pd.isna(parsed):
-        return None
+        return default
     return parsed
 
 
-def probability_from_row(row: dict[str, Any]) -> float | None:
-    for key in ['model_probability', 'model_probability_clean', 'final_probability_value', 'probability']:
-        value = safe_number(row.get(key))
-        if value is None:
-            continue
-        if value > 1.0:
-            value /= 100.0
-        if 0.0 < value < 1.0:
-            return value
-    return None
-
-
 def decimal_from_american(value: Any) -> float | None:
-    odds = safe_number(value)
-    if odds is None:
+    raw = safe_float(value)
+    if raw is None or raw == 0:
         return None
-    if odds >= 100:
-        return round(1.0 + odds / 100.0, 6)
-    if odds <= -100:
-        return round(1.0 + 100.0 / abs(odds), 6)
-    return None
+    if raw > 0:
+        return round(1.0 + raw / 100.0, 6)
+    return round(1.0 + 100.0 / abs(raw), 6)
 
 
-def session_rows() -> tuple[str, list[dict]]:
-    sources = [
-        ('pro_predictor_latest_rows', 'Pro Predictor'),
-        ('pro_predictor_high_confidence_rows', 'Pro Predictor high-confidence'),
-        ('scanner_pro_latest_rows', 'Scanner Pro'),
-        ('what_are_the_odds_latest_rows', 'What Are the Odds'),
-        ('ara_latest_predictions', 'Latest session'),
-    ]
-    for key, label in sources:
-        rows = st.session_state.get(key) or []
-        if rows:
-            return label, rows
-    return '', []
+def probability_clean(value: Any) -> float | None:
+    raw = safe_float(value)
+    if raw is None or raw <= 0:
+        return None
+    if raw > 1:
+        raw = raw / 100.0
+    return round(max(0.0, min(1.0, raw)), 6)
 
 
-def read_inputs() -> tuple[str, pd.DataFrame]:
-    label, rows = session_rows()
-    frames: list[pd.DataFrame] = []
-    names: list[str] = []
-    use_session = st.checkbox(t('use_session'), value=bool(rows))
-    if use_session and rows:
-        frames.append(pd.DataFrame(rows))
-        names.append(label or 'session_rows')
-    with st.expander(t('advanced_bulk'), expanded=False):
-        st.caption(t('bulk_help'))
-        uploads = st.file_uploader(t('upload'), type=['csv'], accept_multiple_files=True)
-        pasted = st.text_area(t('paste'), height=120)
-        if uploads:
-            for upload in uploads:
-                try:
-                    frame = pd.read_csv(upload)
-                    frame['source_file'] = upload.name
-                    frames.append(frame)
-                    names.append(upload.name)
-                except Exception as exc:
-                    st.warning(f'Could not read {upload.name}: {exc}')
-        if pasted.strip():
-            try:
-                frame = pd.read_csv(StringIO(pasted.strip()))
-                frame['source_file'] = 'pasted_csv'
-                frames.append(frame)
-                names.append('pasted_csv')
-            except Exception as exc:
-                st.warning(f'Could not read pasted CSV: {exc}')
-    if not frames:
-        return '', pd.DataFrame()
-    return ', '.join(names), pd.concat(frames, ignore_index=True, sort=False)
+def implied_probability(decimal_price: float | None) -> float | None:
+    if decimal_price is None or decimal_price <= 1.0:
+        return None
+    return round(1.0 / decimal_price, 6)
 
 
-def single_game_manual_frame() -> tuple[str, pd.DataFrame]:
-    st.subheader(t('single_game'))
-    st.info(t('single_game_help'))
-    st.caption(t('single_tip'))
-    with st.form('single_game_manual_form', clear_on_submit=False):
-        top = st.columns(2)
-        event = top[0].text_input(t('single_event'), value='', placeholder='Los Angeles Dodgers at San Diego Padres')
-        sport = top[1].text_input(t('single_sport'), value='', placeholder='MLB, NBA, WNBA, Soccer, Tennis')
-        mid = st.columns(4)
-        market_type = mid[0].selectbox(t('single_market'), ['h2h', 'spreads', 'totals', 'prop', 'other'])
-        prediction = mid[1].text_input(t('single_pick'), value='', placeholder='Los Angeles Dodgers')
-        event_start = mid[2].text_input(t('single_start'), value='', help=t('single_start_help'), placeholder='2026-06-17T23:10:00Z')
-        bookmaker = mid[3].text_input(t('single_bookmaker'), value='', placeholder='DraftKings / FanDuel / Bet365')
-        odds_cols = st.columns(5)
-        decimal_odds = odds_cols[0].number_input(t('single_decimal'), min_value=0.0, max_value=1000.0, value=0.0, step=0.01, help='Example: 1.91')
-        american_odds = odds_cols[1].number_input(t('single_american'), min_value=-5000.0, max_value=5000.0, value=0.0, step=5.0, help='Example: -110 or +135. Used only if decimal odds is blank.')
-        model_probability = odds_cols[2].number_input(t('single_probability'), min_value=0.0, max_value=100.0, value=0.0, step=0.5, help='Example: 62 means 62%.')
-        book_count = odds_cols[3].number_input(t('single_books'), min_value=0, max_value=100, value=1, step=1)
-        closing_price = odds_cols[4].number_input(t('single_closing'), min_value=0.0, max_value=1000.0, value=0.0, step=0.01)
-        manual_adj = st.slider(t('single_manual_adj'), min_value=-15.0, max_value=15.0, value=0.0, step=0.5)
-        notes = st.text_area(t('single_notes'), height=120, placeholder='Example: starting pitcher confirmed, no major injuries, weather normal, price still playable')
-        submitted = st.form_submit_button(t('single_submit'), use_container_width=True)
-    if not submitted:
-        return '', pd.DataFrame()
-    price = float(decimal_odds) if float(decimal_odds) > 1.0 else decimal_from_american(american_odds)
-    probability = float(model_probability)
-    if probability > 1.0:
-        probability = probability / 100.0
-    if not event.strip() or not prediction.strip() or price is None or not (0.0 < probability < 1.0):
-        st.warning(t('single_missing'))
-        return '', pd.DataFrame()
-    row = {
-        'event': event.strip(),
-        'sport': sport.strip() or 'manual_single_game',
-        'market_type': market_type,
-        'prediction': prediction.strip(),
-        'event_start_utc': event_start.strip(),
-        'model_probability': round(probability, 6),
-        'model_probability_clean': round(probability, 6),
+def build_manual_row() -> dict[str, Any] | None:
+    event = str(st.session_state.get('wato_event') or '').strip()
+    pick = str(st.session_state.get('wato_pick') or '').strip()
+    if not event or not pick:
+        return None
+    decimal_price = safe_float(st.session_state.get('wato_decimal'))
+    american_price = safe_float(st.session_state.get('wato_american'))
+    price = decimal_price if decimal_price and decimal_price > 1.0 else decimal_from_american(american_price)
+    prob = probability_clean(st.session_state.get('wato_probability'))
+    if prob is None or price is None:
+        return None
+    market_prob = implied_probability(price)
+    edge = round(prob - market_prob, 6) if market_prob is not None else None
+    ev = round(prob * price - 1.0, 6)
+    score = round(max(0.0, min(100.0, prob * 70.0 + max(-10.0, min(25.0, (edge or 0) * 300.0)) + 5.0)), 2)
+    return {
+        'event': event,
+        'sport': str(st.session_state.get('wato_sport') or '').strip() or 'manual_single_game',
+        'market_type': str(st.session_state.get('wato_market') or 'h2h'),
+        'prediction': pick,
+        'event_start_utc': str(st.session_state.get('wato_start') or '').strip(),
+        'model_probability': prob,
+        'model_probability_clean': prob,
         'decimal_price': round(float(price), 6),
-        'bookmaker': bookmaker.strip() or 'manual_source',
-        'odds_source': bookmaker.strip() or 'manual_single_game',
-        'bookmaker_count': int(book_count),
-        'books': int(book_count),
-        'closing_decimal_price': round(float(closing_price), 6) if float(closing_price) > 1.0 else '',
-        'manual_probability_adjustment': round(float(manual_adj) / 100.0, 6),
-        'manual_context_notes': notes.strip(),
+        'american_odds': american_price if american_price not in (None, 0) else '',
+        'market_implied_probability': market_prob if market_prob is not None else '',
+        'model_market_edge': edge if edge is not None else '',
+        'edge_percent': round(edge * 100.0, 2) if edge is not None else '',
+        'expected_value_per_unit': ev,
+        'expected_value_percent': round(ev * 100.0, 2),
+        'bookmaker': str(st.session_state.get('wato_bookmaker') or '').strip() or 'manual_source',
+        'odds_source': str(st.session_state.get('wato_bookmaker') or '').strip() or 'manual_source',
+        'bookmaker_count': int(st.session_state.get('wato_books') or 1),
+        'books': int(st.session_state.get('wato_books') or 1),
+        'manual_context_notes': str(st.session_state.get('wato_notes') or '').strip(),
         'single_game_manual': True,
         'source_file': 'single_game_manual_check',
-        'decision': 'manual_single_game_review',
+        'agent_decision': 'play_strong' if ev > 0 and prob >= 0.58 else 'research_watch',
+        'agent_score': score,
+        'scanner_strength_score': score,
+        'recommended_action': 'review_and_route',
+        'lock_ready': bool(str(st.session_state.get('wato_start') or '').strip()),
         'result_status': 'pending',
     }
-    st.success(t('single_loaded'))
-    return 'single_game_manual_check', pd.DataFrame([row])
 
 
-def read_manual_patch(text: str) -> pd.DataFrame:
-    if not text.strip():
+def load_session_rows() -> pd.DataFrame:
+    if not st.session_state.get('wato_use_session'):
         return pd.DataFrame()
+    for key in ['pro_predictor_high_confidence_rows', 'pro_predictor_latest_rows', 'ara_latest_predictions']:
+        rows = st.session_state.get(key) or []
+        if rows:
+            return pd.DataFrame(rows)
+    return pd.DataFrame()
+
+
+def load_bulk_rows() -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    uploads = st.file_uploader(t('upload'), type=['csv'], accept_multiple_files=True)
+    if uploads:
+        for upload in uploads:
+            try:
+                frame = pd.read_csv(upload)
+                frame['source_file'] = upload.name
+                frames.append(frame)
+            except Exception as exc:
+                st.warning(f'CSV could not be read: {exc}')
+    pasted = st.text_area(t('paste'), key='wato_pasted_csv', height=120)
+    if pasted.strip():
+        try:
+            frame = pd.read_csv(StringIO(pasted.strip()))
+            frame['source_file'] = 'pasted_csv'
+            frames.append(frame)
+        except Exception as exc:
+            st.warning(f'Pasted CSV could not be read: {exc}')
+    return pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
+
+
+def save_rows(frame: pd.DataFrame) -> None:
+    rows = frame.to_dict('records')
+    for key in ['what_are_the_odds_latest_rows', 'ara_latest_predictions', 'odds_lock_pro_candidate_rows', 'public_proof_dashboard_refresh_rows']:
+        st.session_state[key] = rows
     try:
-        return normalize_frame(pd.read_csv(StringIO(text.strip())))
-    except Exception as exc:
-        st.warning(f'Manual CSV could not be read: {exc}')
-        return pd.DataFrame()
-
-
-def merge_manual_patch(base: pd.DataFrame, manual: pd.DataFrame) -> pd.DataFrame:
-    if base.empty or manual.empty:
-        return base
-    out = base.copy()
-    manual_rows: dict[str, dict[str, Any]] = {}
-    for item in manual.to_dict(orient='records'):
-        key = row_key(item)
-        if key.strip('|'):
-            manual_rows[key] = item
-    if not manual_rows:
-        return out
-    patched = []
-    for item in out.to_dict(orient='records'):
-        current = dict(item)
-        match = manual_rows.get(row_key(current))
-        if match:
-            current['manual_patch_matched'] = True
-            for column in MANUAL_PATCH_COLUMNS:
-                value = match.get(column)
-                if safe_text(value):
-                    current[column] = value
-        else:
-            current['manual_patch_matched'] = False
-        patched.append(current)
-    return pd.DataFrame(patched)
-
-
-def apply_manual_context(frame: pd.DataFrame, *, apply_manual: bool, global_adjustment_pp: float, confidence: float, source_override: str, notes: str) -> pd.DataFrame:
-    if frame.empty:
-        return frame
-    rows = []
-    confidence_factor = max(0.0, min(1.0, float(confidence) / 100.0))
-    global_delta = max(-0.15, min(0.15, float(global_adjustment_pp) / 100.0)) * confidence_factor
-    for row in frame.to_dict(orient='records'):
-        item = dict(row)
-        if source_override.strip() and not safe_text(item.get('bookmaker')):
-            item['bookmaker'] = source_override.strip()
-            item['odds_source'] = source_override.strip()
-        existing_notes = safe_text(item.get('manual_context_notes'))
-        if notes.strip():
-            item['manual_context_notes'] = '; '.join([part for part in [existing_notes, notes.strip()] if part])
-        patch_delta = safe_number(item.get('manual_probability_adjustment'))
-        if patch_delta is None:
-            patch_delta = 0.0
-        patch_delta = max(-0.15, min(0.15, float(patch_delta) / (100.0 if abs(float(patch_delta)) > 1.0 else 1.0))) * confidence_factor
-        total_delta = round(global_delta + patch_delta, 6)
-        item['manual_probability_adjustment'] = total_delta
-        item['manual_context_confidence'] = float(confidence)
-        item['manual_context_applied'] = bool(apply_manual)
-        base_probability = probability_from_row(item)
-        if apply_manual and base_probability is not None:
-            adjusted = round(max(0.01, min(0.99, base_probability + total_delta)), 6)
-            item['model_probability_before_manual'] = base_probability
-            item['manual_adjusted_probability'] = adjusted
-            item['model_probability'] = adjusted
-            item['model_probability_clean'] = adjusted
-        rows.append(item)
-    return pd.DataFrame(rows)
-
-
-def compact_columns(frame: pd.DataFrame) -> pd.DataFrame:
-    if frame.empty:
-        return frame
-    columns = [column for column in PRIORITY_COLUMNS if column in frame.columns]
-    return frame[columns] if columns else frame
-
-
-def max_board(decisions: pd.DataFrame, min_strength: float) -> pd.DataFrame:
-    if decisions.empty or 'agent_decision' not in decisions.columns:
-        return pd.DataFrame()
-    out = decisions[decisions['agent_decision'].astype(str).isin(['play_strong', 'play_small'])].copy()
-    if 'scanner_strength_score' in out.columns:
-        out = out[pd.to_numeric(out['scanner_strength_score'], errors='coerce').fillna(0) >= float(min_strength)]
-    if out.empty:
-        return out
-    for col in ['lock_ready', 'agent_score', 'scanner_strength_score', 'model_market_edge', 'model_probability_clean', 'expected_value_per_unit', 'odds_accuracy_score']:
-        if col not in out.columns:
-            continue
-        if col == 'lock_ready':
-            out[col] = out[col].astype(bool)
-        else:
-            out[col] = pd.to_numeric(out[col], errors='coerce').fillna(0)
-    sort_cols = [col for col in ['lock_ready', 'odds_accuracy_score', 'agent_score', 'expected_value_per_unit', 'scanner_strength_score', 'model_market_edge', 'model_probability_clean'] if col in out.columns]
-    if sort_cols:
-        out = out.sort_values(sort_cols, ascending=False)
-    return compact_columns(out).head(75)
+        from autonomous_betting_agent.pick_hold_store import save_held_rows
+        workspace_id = str(st.session_state.get('aba_test_window_id') or 'test_01')
+        save_held_rows('what_are_the_odds_latest_rows', rows, workspace_id)
+        save_held_rows('ara_latest_predictions', rows, workspace_id)
+    except Exception:
+        pass
 
 
 st.title(t('title'))
 st.caption(t('caption'))
 st.info(t('info'))
 st.caption(t('workflow'))
-single_source, single_game = single_game_manual_frame()
-source, raw = read_inputs()
-if raw.empty and not single_game.empty:
-    source = single_source
-    raw = single_game
-elif not raw.empty and not single_game.empty:
-    source = ', '.join([part for part in [source, single_source] if part])
-    raw = pd.concat([single_game, raw], ignore_index=True, sort=False)
-if raw.empty:
+
+st.subheader(t('single_game'))
+st.text_input(t('event'), key='wato_event', placeholder='Los Angeles Dodgers at San Diego Padres')
+st.text_input(t('pick'), key='wato_pick', placeholder='Los Angeles Dodgers')
+c1, c2, c3 = st.columns(3)
+c1.text_input(t('sport'), key='wato_sport', placeholder='MLB, NBA, WNBA, Soccer, Tennis')
+c2.selectbox(t('market'), ['h2h', 'spreads', 'totals', 'prop', 'other'], key='wato_market')
+c3.text_input(t('start'), key='wato_start', placeholder='2026-06-17T23:10:00Z', help=t('start_help'))
+c4, c5, c6, c7 = st.columns(4)
+c4.number_input(t('decimal'), min_value=0.0, max_value=1000.0, value=0.0, step=0.01, key='wato_decimal')
+c5.number_input(t('american'), min_value=-5000.0, max_value=5000.0, value=0.0, step=5.0, key='wato_american')
+c6.number_input(t('prob'), min_value=0.0, max_value=100.0, value=0.0, step=0.5, key='wato_probability')
+c7.number_input(t('books'), min_value=0, max_value=100, value=1, step=1, key='wato_books')
+st.text_input(t('source'), key='wato_bookmaker', placeholder='DraftKings / FanDuel / Bet365')
+st.text_area(t('notes'), key='wato_notes', height=100, placeholder='Context notes')
+st.checkbox(t('session'), value=False, key='wato_use_session')
+with st.expander(t('bulk'), expanded=False):
+    bulk = load_bulk_rows()
+
+frames: list[pd.DataFrame] = []
+manual = build_manual_row()
+if manual is not None:
+    frames.append(pd.DataFrame([manual]))
+session_frame = load_session_rows()
+if not session_frame.empty:
+    frames.append(session_frame)
+if not bulk.empty:
+    frames.append(bulk)
+
+if not frames:
     st.warning(t('waiting'))
     st.stop()
 
-min_edge = st.slider(t('min_edge'), min_value=0.0, max_value=0.20, value=0.035, step=0.005)
-strong_edge = st.slider(t('strong_edge'), min_value=0.0, max_value=0.30, value=0.075, step=0.005)
-min_strength = st.slider(t('min_strength'), min_value=0.0, max_value=100.0, value=35.0, step=1.0)
-min_train_rows = st.number_input(t('min_train_rows'), min_value=1, max_value=500, value=10, step=1)
-
-with st.expander(t('manual_context'), expanded=False):
-    st.info(t('manual_help'))
-    c1, c2, c3, c4 = st.columns(4)
-    apply_manual = c1.checkbox(t('apply_manual'), value=True)
-    global_adj = c2.slider(t('global_adj'), min_value=-10.0, max_value=10.0, value=0.0, step=0.5)
-    manual_confidence = c3.slider(t('manual_confidence'), min_value=0.0, max_value=100.0, value=75.0, step=5.0)
-    source_override = c4.text_input(t('source_override'), value='')
-    manual_notes = st.text_area(t('manual_notes'), height=80)
-    manual_csv_text = st.text_area(t('manual_csv'), height=140, help=t('manual_csv_help'))
-
-manual_patch = read_manual_patch(manual_csv_text)
-normalized = normalize_frame(raw)
-normalized = merge_manual_patch(normalized, manual_patch)
-normalized = apply_manual_context(
-    normalized,
-    apply_manual=bool(apply_manual),
-    global_adjustment_pp=float(global_adj),
-    confidence=float(manual_confidence),
-    source_override=source_override,
-    notes=manual_notes,
-)
-normalized = enrich_odds_accuracy(normalized)
-accuracy_stats = odds_accuracy_summary(normalized)
-scored_input = score_scanner_frame(normalized)
-decisions = build_agent_decisions(scored_input, min_edge=float(min_edge), strong_edge=float(strong_edge))
-decisions = score_scanner_frame(decisions)
-plays = playable_candidates(decisions, min_edge=float(min_edge), strong_edge=float(strong_edge))
-lock_ready = lock_ready_candidates(decisions, min_edge=float(min_edge), strong_edge=float(strong_edge))
-summary = agent_decision_summary(decisions, min_edge=float(min_edge), strong_edge=float(strong_edge))
-strength = scanner_strength_summary(decisions)
-health = page_health(decisions, page='what_are_the_odds')
-best = max_board(decisions, min_strength=float(min_strength))
-segments = build_segment_frame(normalized)
-top = top_segments(normalized, min_resolved=1, limit=30)
-clv = build_clv_intelligence(normalized)
-clv_stats = clv_summary(normalized)
-clv_sport = clv_by_segment(normalized, 'sport')
-losses = build_loss_autopsies(normalized)
-loss_stats = autopsy_summary(normalized)
-rules = future_rules(normalized)
-walk = walk_forward_validate(normalized, min_train_rows=int(min_train_rows))
-walk_stats = walk_forward_summary(normalized, min_train_rows=int(min_train_rows))
-sport_decisions = build_sport_specific_decisions(normalized)
-sport_stats = sport_model_summary(normalized)
-snapshots = build_api_snapshots(normalized)
-snapshot_stats = snapshot_memory_summary(normalized)
-try:
-    odds_main, odds_props, odds_diag = build_odds_breakdown(normalized)
-except Exception:
-    odds_main, odds_props, odds_diag = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
-st.session_state['what_are_the_odds_latest_rows'] = decisions.to_dict('records')
-st.session_state['ara_latest_predictions'] = decisions.to_dict('records')
-st.session_state['ara_latest_predictions_source'] = 'What Are the Odds'
-st.session_state['ara_latest_predictions_saved_at'] = pd.Timestamp.utcnow().isoformat()
-
-st.success(t('session_saved'))
-if apply_manual:
-    st.caption(t('manual_saved'))
-st.caption(f"{t('source')}: {source}")
-cols = st.columns(13)
-cols[0].metric(t('rows'), len(normalized))
-cols[1].metric(t('manual_rows'), int(pd.Series(normalized.get('manual_patch_matched', pd.Series(dtype=bool))).astype(str).str.lower().eq('true').sum()))
-cols[2].metric(t('odds_quality'), 'N/A' if accuracy_stats['avg_odds_accuracy_score'] is None else accuracy_stats['avg_odds_accuracy_score'])
-cols[3].metric(t('positive_ev'), accuracy_stats['positive_ev_rows'])
-cols[4].metric(t('premium_value'), accuracy_stats['premium_value_rows'])
-cols[5].metric(t('playable'), summary['play_strong'] + summary['play_small'])
-cols[6].metric(t('lock_ready'), health['lock_ready_rows'])
-cols[7].metric(t('watch'), summary['watch_only'])
-cols[8].metric(t('review'), summary['review_needed'])
-cols[9].metric(t('avg_strength'), 'N/A' if strength['avg_score'] is None else strength['avg_score'])
-cols[10].metric(t('premium'), strength['premium_scan'])
-cols[11].metric(t('clv_ready'), clv_stats['ready'])
-cols[12].metric(t('next'), health['next_action'])
-
-st.subheader(t('handoff'))
-st.dataframe(page_health_frame(decisions, page='what_are_the_odds'), use_container_width=True, hide_index=True)
-
-tabs = st.tabs([t('best_board'), t('all_decisions'), t('lock_candidates'), t('scanner_rank'), t('manual_audit'), t('accuracy_center'), t('odds_breakdown'), t('segments'), t('clv'), t('loss_autopsy'), t('walk_lab'), t('sport_models'), t('exports')])
-with tabs[0]:
-    if best.empty:
-        st.info(t('no_best'))
-    else:
-        st.dataframe(best, use_container_width=True, hide_index=True)
-with tabs[1]:
-    st.dataframe(compact_columns(decisions).head(800), use_container_width=True, hide_index=True)
-with tabs[2]:
-    st.dataframe(compact_columns(lock_ready).head(400), use_container_width=True, hide_index=True)
-with tabs[3]:
-    scanner_cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'decimal_price', 'bookmaker', 'bookmaker_count', 'scanner_strength_score', 'scanner_strength_tier', 'scanner_recommendation', 'scanner_reasons'] if col in decisions.columns]
-    st.dataframe(decisions[scanner_cols].head(400) if scanner_cols else decisions.head(400), use_container_width=True, hide_index=True)
-with tabs[4]:
-    manual_cols = [col for col in ['event', 'prediction', 'model_probability_before_manual', 'manual_probability_adjustment', 'manual_adjusted_probability', 'manual_context_confidence', 'manual_patch_matched', 'single_game_manual', 'injury_note', 'weather_note', 'lineup_note', 'market_note', 'manual_context_notes'] if col in normalized.columns]
-    st.dataframe(normalized[manual_cols].head(500) if manual_cols else normalized.head(500), use_container_width=True, hide_index=True)
-with tabs[5]:
-    st.info(t('accuracy_help'))
-    st.json(accuracy_stats)
-    accuracy_cols = odds_accuracy_display_columns(normalized)
-    st.dataframe(normalized[accuracy_cols].head(800) if accuracy_cols else normalized.head(800), use_container_width=True, hide_index=True)
-with tabs[6]:
-    st.dataframe(compact_report_frame(odds_main).head(500) if not odds_main.empty else odds_main, use_container_width=True, hide_index=True)
-    if not odds_props.empty:
-        st.subheader('Props / Scores' if LANG == 'en' else 'Props / Marcadores')
-        st.dataframe(odds_props.head(300), use_container_width=True, hide_index=True)
-with tabs[7]:
-    st.subheader('Top segments' if LANG == 'en' else 'Mejores segmentos')
-    st.dataframe(top, use_container_width=True, hide_index=True)
-    st.subheader('All segments' if LANG == 'en' else 'Todos los segmentos')
-    st.dataframe(segments, use_container_width=True, hide_index=True)
-with tabs[8]:
-    st.json(clv_stats)
-    st.dataframe(clv.head(500), use_container_width=True, hide_index=True)
-    st.subheader('CLV by sport' if LANG == 'en' else 'CLV por deporte')
-    st.dataframe(clv_sport, use_container_width=True, hide_index=True)
-with tabs[9]:
-    st.json(loss_stats)
-    st.dataframe(losses.head(300), use_container_width=True, hide_index=True)
-    st.subheader('Future rules' if LANG == 'en' else 'Reglas futuras')
-    st.dataframe(rules, use_container_width=True, hide_index=True)
-with tabs[10]:
-    st.json(walk_stats)
-    st.dataframe(walk.head(500), use_container_width=True, hide_index=True)
-with tabs[11]:
-    st.dataframe(sport_stats, use_container_width=True, hide_index=True)
-    st.dataframe(sport_decisions.head(500), use_container_width=True, hide_index=True)
-with tabs[12]:
-    st.download_button('Download all decisions' if LANG == 'en' else 'Descargar todas las decisiones', decisions.to_csv(index=False), file_name='what_are_the_odds_decisions.csv', mime='text/csv')
-    st.download_button('Download best board' if LANG == 'en' else 'Descargar Best Board', best.to_csv(index=False), file_name='what_are_the_odds_best_board.csv', mime='text/csv')
-    st.download_button('Download lock-ready' if LANG == 'en' else 'Descargar listas para bloquear', lock_ready.to_csv(index=False), file_name='what_are_the_odds_lock_ready.csv', mime='text/csv')
-    st.download_button('Download odds accuracy' if LANG == 'en' else 'Descargar precisión de cuotas', normalized.to_csv(index=False), file_name='what_are_the_odds_accuracy_center.csv', mime='text/csv')
-    st.download_button('Download manual audit' if LANG == 'en' else 'Descargar auditoría manual', normalized.to_csv(index=False), file_name='what_are_the_odds_manual_audit.csv', mime='text/csv')
-    st.download_button('Download scanner rank' if LANG == 'en' else 'Descargar ranking del escáner', decisions.to_csv(index=False), file_name='what_are_the_odds_scanner_rank.csv', mime='text/csv')
-    st.download_button('Download CLV' if LANG == 'en' else 'Descargar CLV', clv.to_csv(index=False), file_name='what_are_the_odds_clv.csv', mime='text/csv')
-    st.download_button('Download loss autopsy' if LANG == 'en' else 'Descargar autopsia de pérdidas', losses.to_csv(index=False), file_name='what_are_the_odds_loss_autopsy.csv', mime='text/csv')
-    st.download_button('Download walk-forward' if LANG == 'en' else 'Descargar walk-forward', walk.to_csv(index=False), file_name='what_are_the_odds_walk_forward.csv', mime='text/csv')
-    st.download_button('Download API snapshots' if LANG == 'en' else 'Descargar snapshots API', snapshots.to_csv(index=False), file_name='what_are_the_odds_api_snapshots.csv', mime='text/csv')
+output = pd.concat(frames, ignore_index=True, sort=False)
+save_rows(output)
+st.success(t('saved'))
+st.dataframe(output, use_container_width=True, hide_index=True)
+st.download_button(t('download'), output.to_csv(index=False), file_name='what_are_the_odds_analyzed_rows.csv', mime='text/csv', use_container_width=True)
