@@ -108,28 +108,6 @@ def current_user_from_session(session_state: Any) -> LocalUserProfile:
     return profile
 
 
-def _install_profile_control_defaults(st: Any) -> None:
-    if st.session_state.get('_profile_control_defaults_applied_250_v1'):
-        return
-    prefix = 'baseline' + '_accuracy'
-    values = {
-        prefix + '_min_books': 1,
-        prefix + '_min_model_prob': 0.58,
-        prefix + '_min_edge': -0.03,
-        prefix + '_strong_edge': 0.04,
-        prefix + '_min_strength': 38.0,
-        prefix + '_max_high_conf': 250,
-        prefix + '_min_high_prob': 0.60,
-        prefix + '_min_high_edge': -0.03,
-        prefix + '_min_high_strength': 40.0,
-        prefix + '_min_high_agent': 40.0,
-    }
-    for key, value in values.items():
-        st.session_state[key] = value
-    st.session_state['_profile_control_defaults_applied_250_v1'] = True
-    st.session_state['_profile_control_defaults_applied'] = True
-
-
 def _sync_held_picks(st: Any) -> None:
     try:
         from .pick_hold_store import HELD_KEYS, load_held_rows, save_held_rows
@@ -152,22 +130,12 @@ def _sync_held_picks(st: Any) -> None:
                 pass
 
 
-def _install_extra_runtime_patches() -> None:
-    try:
-        from .direct_pick_lock_patch import install_direct_pick_lock_patch
-        install_direct_pick_lock_patch()
-    except Exception:
-        pass
-
-
 def install_streamlit_local_user_selector() -> None:
     try:
         import streamlit as st
     except Exception:
         return
-    _install_profile_control_defaults(st)
     _sync_held_picks(st)
-    _install_extra_runtime_patches()
     if st.session_state.get('_local_user_selector_rendered'):
         return
     st.session_state['_local_user_selector_rendered'] = True
