@@ -20,6 +20,7 @@ from autonomous_betting_agent.commercial_platform_tools import (
     save_persistent_ledger,
 )
 from autonomous_betting_agent.odds_lock_tools import performance_by_group, update_profit_columns
+from autonomous_betting_agent.pick_hold_store import load_first_available, save_held_rows
 from autonomous_betting_agent.row_normalizer import normalize_frame
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
@@ -36,7 +37,7 @@ TEXT = {
         'active_test_window': 'Active test ledger',
         'use_demo': 'Show demo ledger if no real ledger exists',
         'use_db': 'Use saved test ledger database',
-        'use_session': 'Use Odds Lock Pro session rows',
+        'use_session': 'Use saved/session rows',
         'upload_ledger': 'Upload locked ledger or historical tracker CSV',
         'upload_results': 'Upload finished results CSV for auto-grading',
         'save_db': 'Save merged ledger to this test ledger',
@@ -88,7 +89,7 @@ TEXT = {
         'active_test_window': 'Ledger de prueba activo',
         'use_demo': 'Mostrar ledger demo si no hay ledger real',
         'use_db': 'Usar base guardada de esta prueba',
-        'use_session': 'Usar filas de Odds Lock Pro en sesión',
+        'use_session': 'Usar filas guardadas/sesión',
         'upload_ledger': 'Subir CSV de ledger bloqueado o tracker histórico',
         'upload_results': 'Subir CSV de resultados finalizados para autocalificar',
         'save_db': 'Guardar ledger combinado en este ledger de prueba',
@@ -133,6 +134,8 @@ TEXT = {
     },
 }
 
+SESSION_KEYS = ['public_proof_dashboard_refresh_rows', 'odds_lock_pro_locked_rows', 'ara_latest_predictions']
+
 
 def t(key: str) -> str:
     return TEXT[LANG].get(key, TEXT['en'].get(key, key))
@@ -140,6 +143,18 @@ def t(key: str) -> str:
 
 def pct(value: float | None, digits: int = 1) -> str:
     return 'N/A' if value is None else f'{value * 100:.{digits}f}%'
+
+
+def load_saved_session_rows(workspace_id: str) -> tuple[str, pd.DataFrame]:
+    for key in SESSION_KEYS:
+        rows = st.session_state.get(key) or []
+        if rows:
+            return key, pd.DataFrame(rows)
+    key, rows = load_first_available(SESSION_KEYS, workspace_id)
+    if rows:
+        st.session_state[key] = rows
+        return f'local:{key}', pd.DataFrame(rows)
+    return '', pd.DataFrame()
 
 
 def read_sources(workspace_id: str, *, use_db: bool, use_session: bool, use_demo: bool, uploads: list | None) -> tuple[str, pd.DataFrame, pd.DataFrame, int]:
@@ -155,13 +170,13 @@ def read_sources(workspace_id: str, *, use_db: bool, use_session: bool, use_demo
             raw_count += len(db)
             names.append(f'persistent_ledger:{workspace_id}')
     if use_session:
-        rows = st.session_state.get('odds_lock_pro_locked_rows') or []
-        if rows:
-            session_frame = pd.DataFrame(rows)
+        label, session_frame = load_saved_session_rows(workspace_id)
+        if not session_frame.empty:
             raw_frames.append(session_frame)
-            ledger_frames.append(session_frame)
+            locked = filter_locked_proof_rows(session_frame)
+            ledger_frames.append(locked if not locked.empty else session_frame)
             raw_count += len(session_frame)
-            names.append('session_locked_rows')
+            names.append(label)
     if uploads:
         for upload in uploads:
             try:
@@ -264,7 +279,12 @@ if results_upload is not None and not ledger.empty:
         if st.button(t('apply_results'), type='primary', use_container_width=True):
             ledger, update_stats = apply_result_updates(ledger, result_frame)
             ledger['test_window_id'] = workspace_id
-            st.session_state['odds_lock_pro_locked_rows'] = ledger.to_dict('records')
+            records = ledger.to_dict('records')
+            st.session_state['odds_lock_pro_locked_rows'] = records
+            st.session_state['public_proof_dashboard_refresh_rows'] = records
+            save_held_rows('odds_lock_pro_locked_rows', records, workspace_id)
+            save_held_rows('public_proof_dashboard_refresh_rows', records, workspace_id)
+            save_persistent_ledger(ledger, workspace_id=workspace_id)
             st.json({t('updated'): update_stats})
     except Exception as exc:
         st.warning(str(exc))
@@ -272,6 +292,9 @@ if results_upload is not None and not ledger.empty:
 if not ledger.empty and source != 'demo_ledger' and st.button(t('save_db'), use_container_width=True):
     ledger['test_window_id'] = workspace_id
     ledger = save_persistent_ledger(ledger, workspace_id=workspace_id)
+    records = ledger.to_dict('records')
+    save_held_rows('odds_lock_pro_locked_rows', records, workspace_id)
+    save_held_rows('public_proof_dashboard_refresh_rows', records, workspace_id)
     st.success(('Saved persistent ledger: ' if LANG == 'en' else 'Ledger persistente guardado: ') + workspace_id)
 
 ledger = filter_locked_proof_rows(ledger)
