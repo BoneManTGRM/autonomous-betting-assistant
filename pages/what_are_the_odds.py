@@ -14,8 +14,8 @@ LANG = render_app_sidebar('what_are_the_odds', language_key='what_are_the_odds_p
 TEXT = {
     'en': {
         'title': 'What Are the Odds',
-        'caption': 'Manual review board. Enter one row, paste CSV text, or use latest Pro Predictor rows. The page saves rows automatically for the next tools.',
-        'info': 'Mobile-safe mode: no buttons and no file-upload button. Fill the single-game fields or paste CSV text, and the row/table saves automatically.',
+        'caption': 'Manual review board. Enter one row, upload CSV, paste CSV text, or use latest Pro Predictor rows. The page saves rows automatically for the next tools.',
+        'info': 'Fill the single-game fields, upload a CSV, or paste CSV text. No Analyze button is required; rows save automatically when valid data is present.',
         'workflow': 'Clean path: Pro Predictor → What Are the Odds → Odds Lock → Public Proof Dashboard → Learning Memory.',
         'single_game': 'Single Game Manual Check',
         'event': 'Game / event name',
@@ -31,17 +31,17 @@ TEXT = {
         'books': 'Source count',
         'notes': 'Notes',
         'session': 'Use latest Pro Predictor session rows',
-        'paste_title': 'Mobile-safe CSV paste',
-        'paste': 'Paste CSV text here',
-        'paste_help': 'Paste the whole CSV including the header row. This avoids the mobile upload button completely.',
-        'upload_disabled': 'File upload is disabled on this mobile-safe page because the upload picker is unreliable on your phone. Use paste CSV instead.',
-        'waiting': 'Fill event, pick, probability, and decimal or American price. Or paste CSV text / use latest session rows.',
+        'csv_title': 'CSV input',
+        'upload': 'Upload CSV file(s)',
+        'paste': 'Or paste CSV text here',
+        'paste_help': 'Paste the whole CSV including the header row. This is a fallback if mobile upload fails.',
+        'waiting': 'Fill event, pick, probability, and decimal or American price. Or upload/paste CSV text / use latest session rows.',
         'saved': 'Rows are saved automatically for Odds Lock Pro and the public dashboard.',
     },
     'es': {
         'title': 'What Are the Odds',
-        'caption': 'Tablero de revisión manual. Ingresa una fila, pega CSV o usa filas recientes de Predictor Pro. La página guarda automáticamente para las siguientes herramientas.',
-        'info': 'Modo seguro para móvil: sin botones y sin botón de subida. Llena los campos o pega CSV y se guarda automáticamente.',
+        'caption': 'Tablero de revisión manual. Ingresa una fila, sube CSV, pega CSV o usa filas recientes de Predictor Pro. La página guarda automáticamente para las siguientes herramientas.',
+        'info': 'Llena los campos, sube un CSV o pega texto CSV. No se necesita botón de análisis; las filas se guardan automáticamente cuando hay datos válidos.',
         'workflow': 'Ruta limpia: Predictor Pro → What Are the Odds → Odds Lock → Dashboard Público → Memoria.',
         'single_game': 'Revisión Manual de Un Solo Juego',
         'event': 'Juego / evento',
@@ -57,11 +57,11 @@ TEXT = {
         'books': 'Número de fuentes',
         'notes': 'Notas',
         'session': 'Usar filas recientes de Predictor Pro',
-        'paste_title': 'Pegar CSV seguro para móvil',
-        'paste': 'Pega texto CSV aquí',
-        'paste_help': 'Pega todo el CSV incluyendo encabezados. Esto evita completamente el botón móvil de subir archivo.',
-        'upload_disabled': 'La subida de archivo está desactivada en esta página segura para móvil porque el selector de subida falla en tu teléfono. Usa pegar CSV.',
-        'waiting': 'Llena evento, pick, probabilidad y precio decimal o americano. O pega CSV / usa filas recientes.',
+        'csv_title': 'Entrada CSV',
+        'upload': 'Subir archivo(s) CSV',
+        'paste': 'O pega texto CSV aquí',
+        'paste_help': 'Pega todo el CSV incluyendo encabezados. Esto queda como respaldo si falla la subida móvil.',
+        'waiting': 'Llena evento, pick, probabilidad y precio decimal o americano. O sube/pega CSV / usa filas recientes.',
         'saved': 'Las filas se guardan automáticamente para Odds Lock Pro y el dashboard público.',
     },
 }
@@ -161,6 +161,20 @@ def load_session_rows() -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def load_uploaded_rows() -> pd.DataFrame:
+    uploads = st.file_uploader(t('upload'), type=['csv'], accept_multiple_files=True, key='wato_csv_upload')
+    frames: list[pd.DataFrame] = []
+    if uploads:
+        for upload in uploads:
+            try:
+                frame = pd.read_csv(upload)
+                frame['source_file'] = upload.name
+                frames.append(frame)
+            except Exception as exc:
+                st.warning(f'CSV could not be read: {exc}')
+    return pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
+
+
 def load_pasted_rows() -> pd.DataFrame:
     pasted = str(st.session_state.get('wato_pasted_csv') or '').strip()
     if not pasted:
@@ -208,8 +222,8 @@ st.text_input(t('source'), key='wato_bookmaker', placeholder='DraftKings / FanDu
 st.text_area(t('notes'), key='wato_notes', height=100, placeholder='Context notes')
 st.checkbox(t('session'), value=False, key='wato_use_session')
 
-st.subheader(t('paste_title'))
-st.caption(t('upload_disabled'))
+st.subheader(t('csv_title'))
+uploaded_frame = load_uploaded_rows()
 st.text_area(t('paste'), key='wato_pasted_csv', height=160, help=t('paste_help'), placeholder='event,prediction,model_probability,decimal_price\nTeam A at Team B,Team A,0.61,1.91')
 
 frames: list[pd.DataFrame] = []
@@ -219,6 +233,8 @@ if manual is not None:
 session_frame = load_session_rows()
 if not session_frame.empty:
     frames.append(session_frame)
+if not uploaded_frame.empty:
+    frames.append(uploaded_frame)
 pasted_frame = load_pasted_rows()
 if not pasted_frame.empty:
     frames.append(pasted_frame)
