@@ -16,9 +16,10 @@ from autonomous_betting_agent.four_tool_orchestrator import page_health, page_he
 from autonomous_betting_agent.live_api_context import LiveAPIContextBuilder
 from autonomous_betting_agent.live_odds import list_sports, scan_market
 from autonomous_betting_agent.multi_source_fusion import fuse_row
+from autonomous_betting_agent.pick_hold_store import save_held_rows
 from autonomous_betting_agent.scanner_strength import score_scanner_frame, scanner_strength_summary
 
-APP_VERSION = 'pro-predictor-v19-large-list-volume-300'
+APP_VERSION = 'pro-predictor-v20-persistent-handoff'
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SPORT_KEYS = ['basketball_nba', 'baseball_mlb', 'soccer_epl']
 
@@ -35,7 +36,7 @@ TEXT = {
         'sport_search': 'Sport/feed search', 'team_filter': 'Team/player filter', 'manual_keys': 'Manual sport keys', 'regions': 'Bookmaker regions', 'markets': 'Markets', 'max_sports': 'Max sports', 'max_events': 'Max events per sport', 'latest_date': 'Latest event date',
         'filters': 'Filters', 'min_books': 'Minimum books', 'min_prob': 'Minimum model probability', 'min_edge': 'Minimum edge', 'strong_edge': 'Strong edge threshold', 'min_signal': 'Minimum signal strength',
         'large_setup': 'Large-list volume output', 'send_large': 'Send large-list volume rows to Odds Lock Pro', 'max_rows': 'Max large-list rows', 'min_agent': 'Large-list min agent score',
-        'run': 'Run Pro Predictor', 'saved': 'Large-list rows saved and handed off to Odds Lock Pro.', 'no_rows': 'No prediction rows passed the filters.', 'api_error': 'Could not load sports list. Check API key/quota or use manual sport keys.',
+        'run': 'Run Pro Predictor', 'saved': 'Large-list rows saved to session, local memory, and Odds Lock Pro handoff store.', 'no_rows': 'No prediction rows passed the filters.', 'api_error': 'Could not load sports list. Check API key/quota or use manual sport keys.',
         'all_count': 'All passed', 'large_count': 'Large list', 'lock_ready': 'Lock ready', 'avg_signal': 'Avg signal', 'premium': 'Premium signals', 'next': 'Next', 'handoff': 'Handoff health',
         'large_tab': 'Large-list volume', 'all_tab': 'All rows', 'lock_tab': 'Lock-ready subset', 'skipped': 'Skipped feeds / API errors', 'download_large': 'Download large-list CSV', 'download_all': 'Download all rows CSV', 'no_skipped': 'No skipped feeds.',
         'profile_note': 'Large List 70 mode ranks the top available candidates instead of requiring every row to be lock-ready. Lock-ready stays separate.',
@@ -49,26 +50,18 @@ TEXT = {
         'sport_search': 'Buscar deporte/feed', 'team_filter': 'Filtro de equipo/jugador', 'manual_keys': 'Claves manuales de deporte', 'regions': 'Regiones de casas', 'markets': 'Mercados', 'max_sports': 'Máximo de deportes', 'max_events': 'Máximo de eventos por deporte', 'latest_date': 'Fecha máxima del evento',
         'filters': 'Filtros', 'min_books': 'Mínimo de casas', 'min_prob': 'Probabilidad mínima del modelo', 'min_edge': 'Ventaja mínima', 'strong_edge': 'Umbral de ventaja fuerte', 'min_signal': 'Fuerza mínima de señal',
         'large_setup': 'Salida de lista grande', 'send_large': 'Enviar lista grande a Odds Lock Pro', 'max_rows': 'Máximo de filas de lista grande', 'min_agent': 'Puntaje agente mínimo',
-        'run': 'Ejecutar Predictor Pro', 'saved': 'Lista grande guardada y enviada a Odds Lock Pro.', 'no_rows': 'Ninguna fila pasó los filtros.', 'api_error': 'No se pudo cargar la lista de deportes. Revisa la clave/cuota API o usa claves manuales.',
+        'run': 'Ejecutar Predictor Pro', 'saved': 'Lista grande guardada en sesión, memoria local y traspaso a Odds Lock Pro.', 'no_rows': 'Ninguna fila pasó los filtros.', 'api_error': 'No se pudo cargar la lista de deportes. Revisa la clave/cuota API o usa claves manuales.',
         'all_count': 'Todas aprobadas', 'large_count': 'Lista grande', 'lock_ready': 'Listas para bloquear', 'avg_signal': 'Señal promedio', 'premium': 'Señales premium', 'next': 'Siguiente', 'handoff': 'Salud del traspaso',
         'large_tab': 'Lista grande', 'all_tab': 'Todas las filas', 'lock_tab': 'Subconjunto listo', 'skipped': 'Feeds omitidos / errores API', 'download_large': 'Descargar CSV lista grande', 'download_all': 'Descargar CSV total', 'no_skipped': 'No hubo feeds omitidos.',
         'profile_note': 'Lista Grande 70 clasifica los mejores candidatos disponibles sin exigir que cada fila esté lista para bloquear. Las filas listas quedan separadas.',
     },
 }
 
-DEFAULTS = {
-    'min_books': 1,
-    'min_prob': 0.58,
-    'min_edge': -0.03,
-    'strong_edge': 0.04,
-    'min_signal': 38.0,
-    'max_rows': 300,
-    'min_agent': 35.0,
-}
+DEFAULTS = {'min_books': 1, 'min_prob': 0.58, 'min_edge': -0.03, 'strong_edge': 0.04, 'min_signal': 38.0, 'max_rows': 300, 'min_agent': 35.0}
 
 
 def t(key: str) -> str:
-    return TEXT[LANG].get(key, TEXT['en'].get(key, key))
+    return TEXT.get(LANG, TEXT['en']).get(key, TEXT['en'].get(key, key))
 
 
 def get_secret(*names: str) -> str:
@@ -87,13 +80,7 @@ def get_secret(*names: str) -> str:
 
 def csv_link(label: str, frame: pd.DataFrame, filename: str) -> None:
     data = base64.b64encode(frame.to_csv(index=False).encode('utf-8')).decode('ascii')
-    st.markdown(
-        f'<a href="data:text/csv;base64,{data}" download="{html.escape(filename)}" '
-        f'style="display:block;text-align:center;background:#ef5350;color:white;'
-        f'padding:.75rem 1rem;border-radius:.45rem;text-decoration:none;font-weight:700;">'
-        f'{html.escape(label)}</a>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(f'<a href="data:text/csv;base64,{data}" download="{html.escape(filename)}" style="display:block;text-align:center;background:#ef5350;color:white;padding:.75rem 1rem;border-radius:.45rem;text-decoration:none;font-weight:700;">{html.escape(label)}</a>', unsafe_allow_html=True)
 
 
 def clean(value: Any) -> str:
@@ -207,6 +194,8 @@ def build_rows(events: list[Any], sport: Any, *, context_builder: LiveAPIContext
             if books < int(min_books):
                 continue
             prediction = getattr(outcome, 'name', '')
+            market_type = getattr(outcome, 'market', 'h2h') or 'h2h'
+            line_point = getattr(outcome, 'point', None)
             market_probability = float(getattr(outcome, 'normalized_probability', 0.0) or 0.0)
             best_price = getattr(outcome, 'best_price', None) or getattr(outcome, 'average_price', None)
             try:
@@ -221,8 +210,8 @@ def build_rows(events: list[Any], sport: Any, *, context_builder: LiveAPIContext
             rows.append({
                 'event': event_name, 'event_id': getattr(event, 'event_id', ''), 'sport': sport_title, 'sport_key': sport_key,
                 'event_start_utc': getattr(event, 'commence_time', ''), 'event_date': str(event_day), 'home_team': getattr(event, 'home_team', ''), 'away_team': getattr(event, 'away_team', ''),
-                'market_type': 'h2h', 'prediction': prediction, 'model_probability': model_probability, 'model_probability_clean': model_probability, 'market_probability': round(market_probability, 6),
-                'market_implied_probability': implied, 'model_market_edge': edge, 'decimal_price': best_price, 'best_price': best_price, 'average_price': getattr(outcome, 'average_price', None),
+                'market_type': market_type, 'line_point': line_point, 'prediction': prediction, 'model_probability': model_probability, 'model_probability_clean': model_probability, 'market_probability': round(market_probability, 6),
+                'market_implied_probability': implied, 'model_market_edge': edge, 'decimal_price': best_price, 'odds_at_pick': best_price, 'best_price': best_price, 'average_price': getattr(outcome, 'average_price', None), 'worst_price': getattr(outcome, 'worst_price', None),
                 'bookmaker': getattr(outcome, 'best_bookmaker', '') or '', 'bookmaker_count': books, 'books': books, 'market_overround': getattr(event, 'market_overround', None), 'odds_source': 'The Odds API',
                 'final_probability': pct(model_probability), 'reliability_score': fused.reliability_score, 'confidence': fused.confidence, 'fusion_reason': fused.fusion_reason, 'fusion_warning': fused.fusion_warning,
                 'match_score': f'{match:.0%}', 'prediction_timestamp': '', 'result_status': '', **api_context,
@@ -249,6 +238,16 @@ def add_large_list_scores(frame: pd.DataFrame, *, strong_edge: float) -> pd.Data
 
 def display_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.rename(columns={'scanner_strength_score': 'signal_strength_score', 'scanner_strength_tier': 'signal_strength_tier'})
+
+
+def persist_handoff(*, decisions: pd.DataFrame, large: pd.DataFrame, handoff: pd.DataFrame) -> None:
+    workspace_id = str(st.session_state.get('aba_test_window_id', 'test_01') or 'test_01')
+    save_held_rows('pro_predictor_latest_rows', handoff, workspace_id)
+    save_held_rows('pro_predictor_high_confidence_rows', large, workspace_id)
+    save_held_rows('ara_latest_predictions', handoff, workspace_id)
+    save_held_rows('pro_predictor_latest_rows', handoff, 'test_01')
+    save_held_rows('pro_predictor_high_confidence_rows', large, 'test_01')
+    save_held_rows('ara_latest_predictions', handoff, 'test_01')
 
 
 st.title(t('title'))
@@ -280,7 +279,7 @@ with left:
     manual_keys = parse_manual_keys(st.text_input(t('manual_keys'), value='', help='basketball_nba, baseball_mlb, soccer_epl'))
 with right:
     regions = st.multiselect(t('regions'), ['us', 'us2', 'uk', 'eu', 'au'], default=['us', 'us2', 'eu', 'uk'])
-    markets = st.multiselect(t('markets'), ['h2h', 'spreads', 'totals'], default=['h2h'])
+    markets = st.multiselect(t('markets'), ['h2h', 'spreads', 'totals'], default=['h2h', 'spreads', 'totals'])
     max_sports = st.number_input(t('max_sports'), min_value=1, max_value=250, value=50, step=1)
     max_events = st.number_input(t('max_events'), min_value=1, max_value=500, value=500, step=25)
     latest_event_date = st.date_input(t('latest_date'), value=next_sunday())
@@ -352,6 +351,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
     st.session_state['ara_latest_predictions'] = handoff.to_dict('records')
     st.session_state['ara_latest_predictions_source'] = 'Pro Predictor large-list volume' if send_large else 'Pro Predictor all rows'
     st.session_state['ara_latest_predictions_saved_at'] = pd.Timestamp.utcnow().isoformat()
+    persist_handoff(decisions=decisions, large=large, handoff=handoff)
     st.success(t('saved'))
     strength = scanner_strength_summary(decisions)
     health = page_health(handoff, page='pro_predictor')
@@ -365,7 +365,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
     st.subheader(t('handoff'))
     st.dataframe(display_frame(page_health_frame(handoff, page='pro_predictor')), use_container_width=True, hide_index=True)
     tabs = st.tabs([t('large_tab'), t('all_tab'), t('lock_tab'), t('skipped')])
-    display_cols = [col for col in ['event', 'sport', 'market_type', 'prediction', 'model_probability_clean', 'market_implied_probability', 'model_market_edge', 'decimal_price', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score', 'scanner_strength_tier', 'lock_ready', 'decision_signals'] if col in decisions.columns]
+    display_cols = [col for col in ['event', 'sport', 'market_type', 'line_point', 'prediction', 'model_probability_clean', 'market_implied_probability', 'model_market_edge', 'decimal_price', 'odds_at_pick', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score', 'scanner_strength_tier', 'lock_ready', 'decision_signals'] if col in decisions.columns]
     with tabs[0]:
         st.dataframe(display_frame(large[display_cols] if display_cols else large), use_container_width=True, hide_index=True)
         csv_link(t('download_large'), display_frame(large), 'pro_predictor_large_list_volume.csv')
