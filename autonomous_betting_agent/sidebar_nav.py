@@ -69,6 +69,16 @@ def _tool_label(english: str, spanish: str, lang: str) -> str:
     return spanish if lang == 'es' else english
 
 
+def _apply_page_defaults(st: Any, page_key: str) -> None:
+    if page_key != 'pro_predictor':
+        return
+    try:
+        from .pro_predictor_defaults_patch import apply_large_list_70_defaults
+        apply_large_list_70_defaults(st)
+    except Exception:
+        pass
+
+
 def render_tools_only(st: Any, lang: str) -> None:
     st.markdown('---')
     st.markdown('### ' + ('Herramientas' if lang == 'es' else 'Tools'))
@@ -82,6 +92,7 @@ def render_tools_only(st: Any, lang: str) -> None:
 def render_app_sidebar(page_key: str, *, language_key: str | None = None, selector: str = 'radio') -> str:
     import streamlit as st
 
+    _apply_page_defaults(st, page_key)
     key = language_key or f'{page_key}_language'
     current = _current_language(st)
     index = 1 if current == 'Español' else 0
