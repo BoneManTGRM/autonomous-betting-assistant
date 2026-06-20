@@ -145,7 +145,10 @@
       "proof_hash": "8bee01a3464cdcbc305d0ff6b97a580c8f7bb6fcad8c4618f1e1c9087a6cbd23",
       "proof_id": "OLP-8BEE01A3464C",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Derry City at Shamrock Rovers",
@@ -287,7 +290,10 @@
       "proof_hash": "982ebc87a2685f9e9c67a57b9ea32a48bc27cbef916329261774712321fbe1ce",
       "proof_id": "OLP-982EBC87A268",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Belgium at New Zealand",
@@ -429,7 +435,10 @@
       "proof_hash": "6e8f23282c8fa89be8f38709841682daee9461d49d886a4c824961db3049e314",
       "proof_id": "OLP-6E8F23282C8F",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Londrina at Cuiabá",
@@ -571,7 +580,10 @@
       "proof_hash": "58710f2f12ae8e59f308957a4aa6a0bc0878310a5b57d845abee8c97a35125ad",
       "proof_id": "OLP-58710F2F12AE",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Ivory Coast at Curaçao",
@@ -713,7 +725,10 @@
       "proof_hash": "686ef4cad0ef26451ec45ae5e08024e38a10a174ec274ef034ab1ec9559c15ba",
       "proof_id": "OLP-686EF4CAD0EF",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Shanghai SIPG FC at Henan FC",
@@ -855,7 +870,10 @@
       "proof_hash": "fa5a3c51d87c383343895eeed91f46c60d880b52e6e9c873d7ef572422e2709a",
       "proof_id": "OLP-FA5A3C51D87C",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Criciuma at América Mineiro",
@@ -997,7 +1015,10 @@
       "proof_hash": "65e69a1aa71f87a2a01c86b7da9891d54df008bf3252d66313d8de0480d5542e",
       "proof_id": "OLP-65E69A1AA71F",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Egypt at New Zealand",
@@ -1139,7 +1160,10 @@
       "proof_hash": "3eda51e5e28b6d586bd54854fe53c0be9f7818a8b53810ef277bcec330efb409",
       "proof_id": "OLP-3EDA51E5E28B",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Cape Verde at Uruguay",
@@ -1281,7 +1305,10 @@
       "proof_hash": "0c3b1c4824ecff0c6ce65bc00329798aea11e9663ed1acfba68ef0f773968a89",
       "proof_id": "OLP-0C3B1C4824EC",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Djurgardens IF at BK Hacken",
@@ -1423,7 +1450,10 @@
       "proof_hash": "3f3781287b03aa95ca0c3bc2cfdb214f7586d4e8d02214f64e9070389978f449",
       "proof_id": "OLP-3F3781287B03",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Ivory Coast at Curaçao",
@@ -1565,7 +1595,10 @@
       "proof_hash": "1cc42fb1956eb443cd3d7992469a4a8330882edc86aa181cc902b472885a224b",
       "proof_id": "OLP-1CC42FB1956E",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "South Korea at South Africa",
@@ -1707,7 +1740,10 @@
       "proof_hash": "6a0d619ec87a08273615b384bff532c046eafe2e542b692ff1f6b755f159b7fe",
       "proof_id": "OLP-6A0D619EC87A",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Leon Shahbazyan at Levan Chokheli",
@@ -1849,7 +1885,10 @@
       "proof_hash": "3618a8b6dfac684cf9acac0e66c519e0ca5a0d728266d2fb830b8a5e2e24df76",
       "proof_id": "OLP-3618A8B6DFAC",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Netherlands at Tunisia",
@@ -1991,7 +2030,10 @@
       "proof_hash": "8e2156812dace342de04d17c475a21990262c2a4b669500c3bcb4a8eceeb0535",
       "proof_id": "OLP-8E2156812DAC",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "HJK Helsinki at IFK Mariehamn",
@@ -2133,7 +2175,10 @@
       "proof_hash": "a688cc7ef7f2093ac355904d79c1a8d7f73243fca42a7c807a0e3b24c3b523bd",
       "proof_id": "OLP-A688CC7EF7F2",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Qatar at Bosnia & Herzegovina",
@@ -2275,7 +2320,10 @@
       "proof_hash": "bd2fd77734e0f1df144f038842d847638e5d95d7beb6791c0921b1000a873f3f",
       "proof_id": "OLP-BD2FD77734E0",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Nautico PE at Vila Nova",
@@ -2417,7 +2465,10 @@
       "proof_hash": "1c32f42a21636b3df84e06fdc7ba457b4b5685da442594209398f27a862efc85",
       "proof_id": "OLP-1C32F42A2163",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Iran at Belgium",
@@ -2559,7 +2610,10 @@
       "proof_hash": "0dc7af3a12f8e7697e8f1b454f4f70029de2565a4c9317523894aacadcabedcd",
       "proof_id": "OLP-0DC7AF3A12F8",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Ljungskile SK at IK Oddevold",
@@ -2701,7 +2755,10 @@
       "proof_hash": "a40b411cc1c9ead8dfacb97ad9e4a57abcf4e38d09ccda32a5d4c8b791fba86a",
       "proof_id": "OLP-A40B411CC1C9",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Algeria at Jordan",
@@ -2843,7 +2900,10 @@
       "proof_hash": "ec19aca0e3dfe5e9398e6557bde4836f8318b9df1a7ef5230af85ed4fb45a7ad",
       "proof_id": "OLP-EC19ACA0E3DF",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Hyder Amil at Christian Rodriguez",
@@ -2985,7 +3045,10 @@
       "proof_hash": "4ced344721b6343d1fff74d12e35f5da60387ecb9528d9547a4eb5207156d0bc",
       "proof_id": "OLP-4CED344721B6",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Tianjin Jinmen Tiger FC at Chongqing Tonglianglong FC",
@@ -3127,7 +3190,10 @@
       "proof_hash": "a3b72113a4934611591d21bcaa538b686ce1d38f2cbb6b7fd225c0a35aa16799",
       "proof_id": "OLP-A3B72113A493",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Falkenbergs FF at Östers IF",
@@ -3269,7 +3335,10 @@
       "proof_hash": "b54a3cae8840390c88d43271c66130e8686e5f661a9329ca384886d318a61cb1",
       "proof_id": "OLP-B54A3CAE8840",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Japan at Tunisia",
@@ -3411,7 +3480,10 @@
       "proof_hash": "c13e44d31ad576d2dc6cb59dba9a2fc17b281aa6ff150bd9aecebde4edce11ed",
       "proof_id": "OLP-C13E44D31AD5",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Qatar at Bosnia & Herzegovina",
@@ -3553,7 +3625,10 @@
       "proof_hash": "1b89e0fa90c1bc578b2e73f720f32d70a3c41ebb72af132e902617a2b725156d",
       "proof_id": "OLP-1B89E0FA90C1",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Beatriz Mesquita at Melissa Mullins",
@@ -3695,7 +3770,10 @@
       "proof_hash": "eaa1447acf2762438fe8c94ce705486b71e9254ecf54c0967f37a85b6b8c7e8a",
       "proof_id": "OLP-EAA1447ACF27",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Hammarby IF at IF Elfsborg",
@@ -3837,7 +3915,10 @@
       "proof_hash": "198aaf2df7733f7f6201233d39ee6296c0539fc7d68f5998a1aa8f4b3d158f64",
       "proof_id": "OLP-198AAF2DF773",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Shanghai Shenhua FC at Dalian Yingbo",
@@ -3979,7 +4060,10 @@
       "proof_hash": "d7c64729b21eba018b4d6bc959dc67d3d533429c4fc40fb0c8948848d9e16da4",
       "proof_id": "OLP-D7C64729B21E",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Bohemians at Shelbourne Dublin",
@@ -4121,7 +4205,10 @@
       "proof_hash": "7260a7b87fc84ab251791a144123fce6634d105fb15985b2a89d66700cb0e2be",
       "proof_id": "OLP-7260A7B87FC8",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "HJK Helsinki at IFK Mariehamn",
@@ -4263,7 +4350,10 @@
       "proof_hash": "163f248e000ec73634df0ca7fb38308a786d27fafd140b99292f752dc5d72d32",
       "proof_id": "OLP-163F248E000E",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "England at Panama",
@@ -4405,7 +4495,10 @@
       "proof_hash": "c4155b61047762fd4a084ed87dff47a359d300e4379baa9d21cccc374fc44d81",
       "proof_id": "OLP-C4155B610477",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Lone'er Kavanagh at Brandon Royval",
@@ -4547,7 +4640,10 @@
       "proof_hash": "96a2242969a153fd58fd48d33049c8d006aaeceae203fdb50bc8ecd3db0b159c",
       "proof_id": "OLP-96A2242969A1",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "USA at Turkey",
@@ -4689,7 +4785,10 @@
       "proof_hash": "dcae3c833132a45f29f2394dfbf07c97c6c752256dc743a6bd159dbb533ac309",
       "proof_id": "OLP-DCAE3C833132",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "SJK Seinäjoki at FC Inter Turku",
@@ -4831,7 +4930,10 @@
       "proof_hash": "f57aeb8283dbdef6a4e0360daf6bc84f87d5e5790d3d8fc0b98ccfcd7fe78924",
       "proof_id": "OLP-F57AEB8283DB",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Senegal at Norway",
@@ -4973,7 +5075,10 @@
       "proof_hash": "8fd16864516cf676e69a9d95382e447b60bd5540a17134d1e7e2d2453b42cab4",
       "proof_id": "OLP-8FD16864516C",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Austria at Argentina",
@@ -5115,7 +5220,10 @@
       "proof_hash": "647c44416d77a05604c86795dac5d9eca870cb1dcb8d5c08675f456219c6774b",
       "proof_id": "OLP-647C44416D77",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Iraq at France",
@@ -5257,7 +5365,10 @@
       "proof_hash": "f7606467e912d624b53a3a8c0bc129d6ead33717ae16a4f41602e934abb79266",
       "proof_id": "OLP-F7606467E912",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Croatia at Panama",
@@ -5399,7 +5510,10 @@
       "proof_hash": "fb7fc16bcbd2659f435f3063c9a6b2c43d77649cf78abdb9faf5a89a0826a6a2",
       "proof_id": "OLP-FB7FC16BCBD2",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Cape Verde at Uruguay",
@@ -5541,7 +5655,10 @@
       "proof_hash": "8a5d020f586faf3b5c17d052b40d7d15f9d3decb3266c44f9721a592a6fb17e1",
       "proof_id": "OLP-8A5D020F586F",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Hammarby IF at IF Elfsborg",
@@ -5683,7 +5800,10 @@
       "proof_hash": "7c07f8d897de6fbda002a35b594f4b371783d56d982f01830f98c575506142da",
       "proof_id": "OLP-7C07F8D897DE",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Andre Fili at Vinicius Oliveira",
@@ -5825,7 +5945,10 @@
       "proof_hash": "b5de538e6062cc1cb7d016c6609033c90b7d025f0c6983a4cbda0453b648df97",
       "proof_id": "OLP-B5DE538E6062",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "DR Congo at Colombia",
@@ -5967,7 +6090,10 @@
       "proof_hash": "8d81c79aa933070965a8a0826aa05fbd41b0439bcfe1fba3f88015ba006cc4b7",
       "proof_id": "OLP-8D81C79AA933",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Austria at Algeria",
@@ -6109,7 +6235,10 @@
       "proof_hash": "6ea9236e1586b91d350b7db1c730774fa29ab26235f5e6401c0bdcc706f31426",
       "proof_id": "OLP-6EA9236E1586",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "IFK Värnamo at IK Brage",
@@ -6251,7 +6380,10 @@
       "proof_hash": "700fe6bd7b894964bb23046f87109e6a1afa02f8ea8bbfe49757240fdc83d131",
       "proof_id": "OLP-700FE6BD7B89",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Algeria at Jordan",
@@ -6393,7 +6525,10 @@
       "proof_hash": "7589fd47d886b9e730688740430dbc883506792be571f0be21cc9b2e2b5d3b0d",
       "proof_id": "OLP-7589FD47D886",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Austria at Argentina",
@@ -6535,7 +6670,10 @@
       "proof_hash": "c1df1936312a1e9a92e858ee48410a80a168f3ea3d09ab8775e65c118391a9e7",
       "proof_id": "OLP-C1DF1936312A",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Navajo Stirling at Ion Cutelaba",
@@ -6677,7 +6815,10 @@
       "proof_hash": "c69048971fb6c9ef36ed5706b5223efbe2bc7e5d1084d7c46d61b8fe633f6df9",
       "proof_id": "OLP-C69048971FB6",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "India at South Africa",
@@ -6819,7 +6960,10 @@
       "proof_hash": "2c8e1bf8b9fef3e431087b4a3efb19e20d1264c6d0fdd322f1a42dda09517fe6",
       "proof_id": "OLP-2C8E1BF8B9FE",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Brazil at Scotland",
@@ -6961,7 +7105,10 @@
       "proof_hash": "dd064416a6ef397e6ef3eb6c608de19cbcc5d57b6cf535d6e2581cf33b9259eb",
       "proof_id": "OLP-DD064416A6EF",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     },
     {
       "event": "Baltimore Orioles at Los Angeles Dodgers",
@@ -7103,7 +7250,10 @@
       "proof_hash": "29e38076a9c40a73eef21010289e9343939e759bf15458925b659fddcaad6c5f",
       "proof_id": "OLP-29E38076A9C4",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "source_store_key": "persistent_ledger",
+      "market_supported_for_proof": true,
+      "unsupported_market_reason": ""
     }
   ]
 }
