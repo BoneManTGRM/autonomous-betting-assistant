@@ -57,8 +57,8 @@ def scan_for_widget_monkey_patches() -> None:
         raise AssertionError('Forbidden Streamlit widget monkey-patch assignments:\n' + '\n'.join(violations))
 
 
-def test_large_list_70_defaults() -> None:
-    from autonomous_betting_agent.pro_predictor_defaults_patch import PROFILE_VALUES
+def test_large_list_defaults() -> None:
+    from autonomous_betting_agent.pro_predictor_defaults_patch import MULTI_DEFAULTS, PROFILE_VALUES
 
     expected = {
         'baseline_accuracy_min_books': 1,
@@ -66,8 +66,8 @@ def test_large_list_70_defaults() -> None:
         'baseline_accuracy_min_edge': -0.03,
         'baseline_accuracy_strong_edge': 0.04,
         'baseline_accuracy_min_strength': 38.0,
-        'baseline_accuracy_use_high_conf': True,
-        'baseline_accuracy_max_high_conf': 108,
+        'baseline_accuracy_use_high_conf': False,
+        'baseline_accuracy_max_high_conf': 300,
         'baseline_accuracy_min_high_prob': 0.58,
         'baseline_accuracy_min_high_edge': -0.03,
         'baseline_accuracy_min_high_strength': 38.0,
@@ -76,6 +76,8 @@ def test_large_list_70_defaults() -> None:
     for key, value in expected.items():
         if PROFILE_VALUES.get(key) != value:
             raise AssertionError(f'{key} expected {value!r}, got {PROFILE_VALUES.get(key)!r}')
+    if MULTI_DEFAULTS.get('Bookmaker regions') != ['us', 'us2', 'eu', 'uk']:
+        raise AssertionError('Bookmaker regions defaults changed unexpectedly')
 
 
 def test_locked_pick_persistence() -> None:
@@ -120,7 +122,7 @@ def main() -> None:
     compile_all_python()
     scan_for_widget_monkey_patches()
     test_core_modules_import()
-    test_large_list_70_defaults()
+    test_large_list_defaults()
     test_locked_pick_persistence()
     print('SMOKE_SCAN_OK')
 
