@@ -1,1 +1,9 @@
-{"format":"chunked","parts":0,"rows_count":0}
+{
+  "version": "held-picks-v7-github-chunked",
+  "format": "chunked",
+  "workspace_id": "test_01",
+  "key": "odds_lock_pro_locked_rows",
+  "parts": 4,
+  "rows_count": 198,
+  "chunk_size": 50
+}
