@@ -1,31 +1,31 @@
-area,area_type,group_value,records,avg_predicted,actual_hit_rate,actual_minus_predicted,smoothed_hit_rate,smoothed_edge,reliability,brier,memory_type,importance,action
-Probability bucket: 60-70%,probability_bucket,60-70%,69,0.67,0.724638,0.054638,0.718961,0.048961,0.822792,0.202523,probability_bucket,0.097922,raise_trust
-Probability source: fallback_high_confidence,probability_source,fallback_high_confidence,69,0.67,0.724638,0.054638,0.718961,0.048961,0.822792,0.202523,probability_source,0.097922,raise_trust
-Market: estimated_score,market_type,estimated_score,69,0.67,0.724638,0.054638,0.718961,0.048961,0.822792,0.202523,market_type,0.097922,raise_trust
-Sport: ATP Halle Open,sport,ATP Halle Open,10,0.67,0.5,-0.17,0.575556,-0.094444,0.502377,0.2789,sport,0.076798,lower_trust
-ATP Halle Open / 60-70%,sport_probability_bucket,ATP Halle Open|60-70%,10,0.67,0.5,-0.17,0.575556,-0.094444,0.502377,0.2789,sport_probability_bucket,0.076798,lower_trust
-ATP Halle Open / estimated_score,sport_market,ATP Halle Open|estimated_score,10,0.67,0.5,-0.17,0.575556,-0.094444,0.502377,0.2789,sport_market,0.076798,lower_trust
-Sport: WNBA,sport,WNBA,6,0.67,0.833333,0.163333,0.74,0.07,0.526822,0.165567,sport,0.041573,raise_trust
-WNBA / 60-70%,sport_probability_bucket,WNBA|60-70%,6,0.67,0.833333,0.163333,0.74,0.07,0.526822,0.165567,sport_probability_bucket,0.041573,raise_trust
-WNBA / estimated_score,sport_market,WNBA|estimated_score,6,0.67,0.833333,0.163333,0.74,0.07,0.526822,0.165567,sport_market,0.041573,raise_trust
-Sport: FIFA World Cup,sport,FIFA World Cup,14,0.67,0.714286,0.044286,0.698182,0.028182,0.617401,0.206043,sport,0.028468,watch
-FIFA World Cup / 60-70%,sport_probability_bucket,FIFA World Cup|60-70%,14,0.67,0.714286,0.044286,0.698182,0.028182,0.617401,0.206043,sport_probability_bucket,0.028468,watch
-FIFA World Cup / estimated_score,sport_market,FIFA World Cup|estimated_score,14,0.67,0.714286,0.044286,0.698182,0.028182,0.617401,0.206043,sport_market,0.028468,watch
-Sport: WTA German Open,sport,WTA German Open,5,0.67,0.8,0.13,0.72,0.05,0.491422,0.1769,sport,0.026583,raise_trust
-WTA German Open / 60-70%,sport_probability_bucket,WTA German Open|60-70%,5,0.67,0.8,0.13,0.72,0.05,0.491422,0.1769,sport_probability_bucket,0.026583,raise_trust
-WTA German Open / estimated_score,sport_market,WTA German Open|estimated_score,5,0.67,0.8,0.13,0.72,0.05,0.491422,0.1769,sport_market,0.026583,raise_trust
-Sport: MLB,sport,MLB,5,0.67,0.8,0.13,0.72,0.05,0.491422,0.1769,sport,0.026583,raise_trust
-MLB / 60-70%,sport_probability_bucket,MLB|60-70%,5,0.67,0.8,0.13,0.72,0.05,0.491422,0.1769,sport_probability_bucket,0.026583,raise_trust
-MLB / estimated_score,sport_market,MLB|estimated_score,5,0.67,0.8,0.13,0.72,0.05,0.491422,0.1769,sport_market,0.026583,raise_trust
-Sport: ATP Queen's Club Championships,sport,ATP Queen's Club Championships,10,0.67,0.7,0.03,0.686667,0.016667,0.561877,0.2109,sport,0.013553,watch
-ATP Queen's Club Championships / 60-70%,sport_probability_bucket,ATP Queen's Club Championships|60-70%,10,0.67,0.7,0.03,0.686667,0.016667,0.561877,0.2109,sport_probability_bucket,0.013553,watch
-ATP Queen's Club Championships / estimated_score,sport_market,ATP Queen's Club Championships|estimated_score,10,0.67,0.7,0.03,0.686667,0.016667,0.561877,0.2109,sport_market,0.013553,watch
-Sport: NCAA Baseball,sport,NCAA Baseball,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport,0.000353,watch
-NCAA Baseball / 60-70%,sport_probability_bucket,NCAA Baseball|60-70%,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport_probability_bucket,0.000353,watch
-NCAA Baseball / estimated_score,sport_market,NCAA Baseball|estimated_score,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport_market,0.000353,watch
-Sport: AFL,sport,AFL,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport,0.000353,watch
-AFL / 60-70%,sport_probability_bucket,AFL|60-70%,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport_probability_bucket,0.000353,watch
-AFL / estimated_score,sport_market,AFL|estimated_score,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport_market,0.000353,watch
-Sport: NRL,sport,NRL,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport,0.000353,watch
-NRL / 60-70%,sport_probability_bucket,NRL|60-70%,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport_probability_bucket,0.000353,watch
-NRL / estimated_score,sport_market,NRL|estimated_score,3,0.67,0.666667,-0.003333,0.669091,-0.000909,0.384725,0.222233,sport_market,0.000353,watch
+area,area_type,group_value,records,avg_predicted,actual_hit_rate,actual_minus_predicted,smoothed_hit_rate,smoothed_edge,stake_units,profit_units,roi,avg_price,avg_clv_percent,beat_close_rate,reliability,brier,memory_type,importance,action
+Probability bucket: 60-70%,probability_bucket,60-70%,71,0.67,0.71831,0.04831,0.713418,0.043418,71.0,31.0,0.43662,,,,0.872078,0.204675,probability_bucket,0.486835,raise_trust
+Probability source: fallback_high_confidence,probability_source,fallback_high_confidence,71,0.67,0.71831,0.04831,0.713418,0.043418,71.0,31.0,0.43662,,,,0.872078,0.204675,probability_source,0.486835,raise_trust
+Market: estimated_score,market_type,estimated_score,71,0.67,0.71831,0.04831,0.713418,0.043418,71.0,31.0,0.43662,,,,0.872078,0.204675,market_type,0.486835,raise_trust
+Sport: FIFA World Cup,sport,FIFA World Cup,14,0.67,0.714286,0.044286,0.698182,0.028182,14.0,6.0,0.428571,,,,0.700036,0.206043,sport,0.230502,raise_trust
+FIFA World Cup / 60-70%,sport_probability_bucket,FIFA World Cup|60-70%,14,0.67,0.714286,0.044286,0.698182,0.028182,14.0,6.0,0.428571,,,,0.700036,0.206043,sport_probability_bucket,0.230502,raise_trust
+FIFA World Cup / estimated_score,sport_market,FIFA World Cup|estimated_score,14,0.67,0.714286,0.044286,0.698182,0.028182,14.0,6.0,0.428571,,,,0.700036,0.206043,sport_market,0.230502,raise_trust
+Sport: ATP Queen's Club Championships,sport,ATP Queen's Club Championships,10,0.67,0.7,0.03,0.686667,0.016667,10.0,4.0,0.4,,,,0.653615,0.2109,sport,0.176184,raise_trust
+ATP Queen's Club Championships / 60-70%,sport_probability_bucket,ATP Queen's Club Championships|60-70%,10,0.67,0.7,0.03,0.686667,0.016667,10.0,4.0,0.4,,,,0.653615,0.2109,sport_probability_bucket,0.176184,raise_trust
+ATP Queen's Club Championships / estimated_score,sport_market,ATP Queen's Club Championships|estimated_score,10,0.67,0.7,0.03,0.686667,0.016667,10.0,4.0,0.4,,,,0.653615,0.2109,sport_market,0.176184,raise_trust
+Sport: WNBA,sport,WNBA,6,0.67,0.833333,0.163333,0.74,0.07,6.0,4.0,0.666667,,,,0.618723,0.165567,sport,0.160352,raise_trust
+WNBA / 60-70%,sport_probability_bucket,WNBA|60-70%,6,0.67,0.833333,0.163333,0.74,0.07,6.0,4.0,0.666667,,,,0.618723,0.165567,sport_probability_bucket,0.160352,raise_trust
+WNBA / estimated_score,sport_market,WNBA|estimated_score,6,0.67,0.833333,0.163333,0.74,0.07,6.0,4.0,0.666667,,,,0.618723,0.165567,sport_market,0.160352,raise_trust
+Sport: WTA German Open,sport,WTA German Open,5,0.67,0.8,0.13,0.72,0.05,5.0,3.0,0.6,,,,0.590076,0.1769,sport,0.132914,raise_trust
+WTA German Open / 60-70%,sport_probability_bucket,WTA German Open|60-70%,5,0.67,0.8,0.13,0.72,0.05,5.0,3.0,0.6,,,,0.590076,0.1769,sport_probability_bucket,0.132914,raise_trust
+WTA German Open / estimated_score,sport_market,WTA German Open|estimated_score,5,0.67,0.8,0.13,0.72,0.05,5.0,3.0,0.6,,,,0.590076,0.1769,sport_market,0.132914,raise_trust
+Sport: MLB,sport,MLB,5,0.67,0.8,0.13,0.72,0.05,5.0,3.0,0.6,,,,0.590076,0.1769,sport,0.132914,raise_trust
+MLB / 60-70%,sport_probability_bucket,MLB|60-70%,5,0.67,0.8,0.13,0.72,0.05,5.0,3.0,0.6,,,,0.590076,0.1769,sport_probability_bucket,0.132914,raise_trust
+MLB / estimated_score,sport_market,MLB|estimated_score,5,0.67,0.8,0.13,0.72,0.05,5.0,3.0,0.6,,,,0.590076,0.1769,sport_market,0.132914,raise_trust
+Sport: AFL,sport,AFL,4,0.67,0.75,0.08,0.696667,0.026667,4.0,2.0,0.5,,,,0.553947,0.1939,sport,0.105154,raise_trust
+AFL / 60-70%,sport_probability_bucket,AFL|60-70%,4,0.67,0.75,0.08,0.696667,0.026667,4.0,2.0,0.5,,,,0.553947,0.1939,sport_probability_bucket,0.105154,raise_trust
+AFL / estimated_score,sport_market,AFL|estimated_score,4,0.67,0.75,0.08,0.696667,0.026667,4.0,2.0,0.5,,,,0.553947,0.1939,sport_market,0.105154,raise_trust
+Sport: NCAA Baseball,sport,NCAA Baseball,3,0.67,0.666667,-0.003333,0.669091,-0.000909,3.0,1.0,0.333333,,,,0.505025,0.222233,sport,0.077921,raise_trust
+NCAA Baseball / 60-70%,sport_probability_bucket,NCAA Baseball|60-70%,3,0.67,0.666667,-0.003333,0.669091,-0.000909,3.0,1.0,0.333333,,,,0.505025,0.222233,sport_probability_bucket,0.077921,raise_trust
+NCAA Baseball / estimated_score,sport_market,NCAA Baseball|estimated_score,3,0.67,0.666667,-0.003333,0.669091,-0.000909,3.0,1.0,0.333333,,,,0.505025,0.222233,sport_market,0.077921,raise_trust
+Sport: ATP Halle Open,sport,ATP Halle Open,10,0.67,0.5,-0.17,0.575556,-0.094444,10.0,0.0,0.0,,,,0.411115,0.2789,sport,0.076798,lower_trust
+ATP Halle Open / 60-70%,sport_probability_bucket,ATP Halle Open|60-70%,10,0.67,0.5,-0.17,0.575556,-0.094444,10.0,0.0,0.0,,,,0.411115,0.2789,sport_probability_bucket,0.076798,lower_trust
+ATP Halle Open / estimated_score,sport_market,ATP Halle Open|estimated_score,10,0.67,0.5,-0.17,0.575556,-0.094444,10.0,0.0,0.0,,,,0.411115,0.2789,sport_market,0.076798,lower_trust
+Sport: NRL,sport,NRL,4,0.67,0.5,-0.17,0.613333,-0.056667,4.0,0.0,0.0,,,,0.300822,0.2789,sport,0.026288,lower_trust
+NRL / 60-70%,sport_probability_bucket,NRL|60-70%,4,0.67,0.5,-0.17,0.613333,-0.056667,4.0,0.0,0.0,,,,0.300822,0.2789,sport_probability_bucket,0.026288,lower_trust
+NRL / estimated_score,sport_market,NRL|estimated_score,4,0.67,0.5,-0.17,0.613333,-0.056667,4.0,0.0,0.0,,,,0.300822,0.2789,sport_market,0.026288,lower_trust
