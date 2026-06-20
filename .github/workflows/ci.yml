@@ -16,6 +16,7 @@ jobs:
   test:
     name: Python compile and pytest
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,23 +25,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
+          cache: pip
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Show environment
-        run: |
-          python --version
-          python -m pip --version
-          python -m pip list
-
       - name: Compile source
         run: |
-          python -m compileall autonomous_betting_agent pages tests streamlit_app.py app_streamlit.py
+          python -m compileall streamlit_app.py app_streamlit.py autonomous_betting_agent pages tests
 
       - name: Run pytest
         run: |
-          python -m pytest -q tests
+          python -m pytest -q tests > pytest.log 2>&1 || (cat pytest.log && exit 1)
+          cat pytest.log
