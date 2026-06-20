@@ -146,11 +146,16 @@ def _feature_key(area_type: str, value: str) -> str:
     return f'{area_type}:{value}'.lower()
 
 
-def load_pattern_index(memory_path: str | Path = MEMORY_BANK_PATH) -> dict[str, dict[str, Any]]:
+def load_memory_payload(memory_path: str | Path = MEMORY_BANK_PATH) -> dict[str, Any]:
     try:
         payload = json.loads(Path(memory_path).read_text(encoding='utf-8'))
     except Exception:
         return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def load_pattern_index(memory_path: str | Path = MEMORY_BANK_PATH) -> dict[str, dict[str, Any]]:
+    payload = load_memory_payload(memory_path)
     patterns = payload.get('patterns', [])
     index: dict[str, dict[str, Any]] = {}
     for pattern in patterns:
@@ -164,22 +169,83 @@ def load_pattern_index(memory_path: str | Path = MEMORY_BANK_PATH) -> dict[str, 
     return index
 
 
-def _pattern_adjustment(pattern: Mapping[str, Any]) -> tuple[float, str]:
+def _pattern_metrics(pattern: Mapping[str, Any]) -> dict[str, float]:
     records = _safe_float(pattern.get('records')) or 0.0
     reliability = _safe_float(pattern.get('reliability')) or 0.0
     smoothed_edge = _safe_float(pattern.get('smoothed_edge'))
-    roi = _safe_float(pattern.get('roi'))
     if smoothed_edge is None:
         smoothed_edge = _safe_float(pattern.get('actual_minus_predicted')) or 0.0
+    roi = _safe_float(pattern.get('roi'))
+    profit_units = _safe_float(pattern.get('profit_units')) or 0.0
     sample_weight = min(1.0, math.log(records + 1.0) / math.log(101.0)) if records > 0 else 0.0
     trust = max(0.0, min(1.0, 0.55 * reliability + 0.45 * sample_weight))
-    adjustment = float(smoothed_edge) * trust * 22.0
-    if roi is not None:
-        adjustment += max(-4.0, min(4.0, roi * 18.0)) * trust
-    adjustment = max(-12.0, min(12.0, adjustment))
-    action = 'boost' if adjustment > 1.25 else 'penalty' if adjustment < -1.25 else 'neutral'
+    return {
+        'records': records,
+        'reliability': reliability,
+        'smoothed_edge': float(smoothed_edge or 0.0),
+        'roi': float(roi) if roi is not None else 0.0,
+        'roi_known': 1.0 if roi is not None else 0.0,
+        'profit_units': profit_units,
+        'trust': trust,
+    }
+
+
+def _pattern_adjustment(pattern: Mapping[str, Any]) -> tuple[float, str, bool, str]:
+    metrics = _pattern_metrics(pattern)
+    adjustment = metrics['smoothed_edge'] * metrics['trust'] * 22.0
+    if metrics['roi_known']:
+        adjustment += max(-4.0, min(4.0, metrics['roi'] * 18.0)) * metrics['trust']
+    adjustment = max(-14.0, min(14.0, adjustment))
+    hard_block = bool(
+        metrics['records'] >= 50
+        and metrics['reliability'] >= 0.45
+        and (
+            metrics['smoothed_edge'] <= -0.06
+            or (metrics['roi_known'] and metrics['roi'] <= -0.08)
+            or metrics['profit_units'] <= -10.0
+        )
+    )
+    action = 'block' if hard_block else 'boost' if adjustment > 1.25 else 'penalty' if adjustment < -1.25 else 'neutral'
     label = f"{pattern.get('area_type','pattern')}={pattern.get('group_value','')} {action} {adjustment:+.2f}"
-    return adjustment, label
+    return adjustment, label, hard_block, action
+
+
+def recommend_stake_units(*, learned_score: float, total_adjustment: float, blocked: bool, base_units: float = 0.10) -> float:
+    if blocked or learned_score < 35:
+        return 0.0
+    if learned_score >= 78 and total_adjustment >= 4:
+        return 1.0
+    if learned_score >= 68 and total_adjustment >= 1:
+        return 0.5
+    if learned_score >= 55:
+        return max(base_units, 0.25)
+    return base_units
+
+
+def threshold_suggestions(memory_path: str | Path = MEMORY_BANK_PATH) -> dict[str, Any]:
+    payload = load_memory_payload(memory_path)
+    patterns = [row for row in payload.get('patterns', []) if isinstance(row, dict)]
+    positive = []
+    negative = []
+    for pattern in patterns:
+        metrics = _pattern_metrics(pattern)
+        enriched = {**pattern, **metrics}
+        if metrics['records'] >= 20 and (metrics['smoothed_edge'] > 0.025 or metrics['roi'] > 0.03):
+            positive.append(enriched)
+        if metrics['records'] >= 20 and (metrics['smoothed_edge'] < -0.035 or metrics['roi'] < -0.04):
+            negative.append(enriched)
+    positive.sort(key=lambda row: (float(row.get('roi', 0)), float(row.get('smoothed_edge', 0)), float(row.get('records', 0))), reverse=True)
+    negative.sort(key=lambda row: (float(row.get('roi', 0)), float(row.get('smoothed_edge', 0))))
+    preferred_markets = [row.get('group_value') for row in positive if row.get('area_type') in {'market_type', 'sport_market'}][:8]
+    avoid_patterns = [row.get('area') or f"{row.get('area_type')}={row.get('group_value')}" for row in negative[:8]]
+    return {
+        'preferred_markets': preferred_markets,
+        'avoid_patterns': avoid_patterns,
+        'positive_pattern_count': len(positive),
+        'negative_pattern_count': len(negative),
+        'recommended_min_learned_score': 55 if len(positive) < 10 else 60,
+        'recommended_min_edge': 0.0 if len(positive) < 10 else 0.01,
+    }
 
 
 def apply_adaptive_learning(frame: pd.DataFrame, *, memory_path: str | Path = MEMORY_BANK_PATH) -> pd.DataFrame:
@@ -191,6 +257,10 @@ def apply_adaptive_learning(frame: pd.DataFrame, *, memory_path: str | Path = ME
         out['learning_pattern_count'] = 0
         out['learning_adjustment_score'] = 0.0
         out['learned_agent_score'] = pd.to_numeric(out.get('agent_score'), errors='coerce').fillna(0.0)
+        out['learned_model_probability'] = pd.to_numeric(out.get('model_probability_clean', out.get('model_probability')), errors='coerce').fillna(0.0)
+        out['learning_blocked'] = False
+        out['learning_action'] = 'no_memory'
+        out['recommended_stake_units'] = pd.to_numeric(out.get('recommended_stake_units'), errors='coerce').fillna(0.10)
         out['learning_notes'] = 'no_learning_memory_loaded'
         return out
     rows: list[dict[str, Any]] = []
@@ -199,29 +269,61 @@ def apply_adaptive_learning(frame: pd.DataFrame, *, memory_path: str | Path = ME
         adjustments: list[float] = []
         notes: list[str] = []
         matched = 0
+        blocked = False
+        action_counts = {'boost': 0, 'penalty': 0, 'block': 0, 'neutral': 0}
         for area_type, value in _row_features(row):
             pattern = index.get(_feature_key(area_type, value))
             if not pattern:
                 continue
             matched += 1
-            adjustment, note = _pattern_adjustment(pattern)
+            adjustment, note, hard_block, action = _pattern_adjustment(pattern)
             adjustments.append(adjustment)
-            if abs(adjustment) >= 1.0:
+            action_counts[action] = action_counts.get(action, 0) + 1
+            blocked = blocked or hard_block
+            if abs(adjustment) >= 1.0 or hard_block:
                 notes.append(note[:90])
         if adjustments:
             positive = sum(value for value in adjustments if value > 0)
             negative = sum(value for value in adjustments if value < 0)
-            total = max(-18.0, min(18.0, positive * 0.65 + negative * 0.95))
+            total = max(-20.0, min(20.0, positive * 0.65 + negative * 0.95))
         else:
             total = 0.0
+        if blocked:
+            total = min(total, -18.0)
         base_score = _safe_float(row.get('agent_score')) or 0.0
         base_prob = _safe_float(row.get('model_probability_clean') or row.get('model_probability')) or 0.0
         learned_score = max(0.0, min(100.0, base_score + total))
         learned_probability = max(0.01, min(0.99, base_prob + (total / 100.0) * 0.18)) if base_prob else base_prob
+        base_units = _safe_float(row.get('recommended_stake_units')) or 0.10
+        if blocked:
+            learning_action = 'block_or_review'
+        elif action_counts['boost'] > action_counts['penalty']:
+            learning_action = 'boost'
+        elif action_counts['penalty'] > action_counts['boost']:
+            learning_action = 'penalty'
+        else:
+            learning_action = 'watch'
         row['learning_pattern_count'] = matched
         row['learning_adjustment_score'] = round(total, 3)
         row['learned_agent_score'] = round(learned_score, 3)
         row['learned_model_probability'] = round(learned_probability, 6) if learned_probability else ''
+        row['learning_blocked'] = bool(blocked)
+        row['learning_action'] = learning_action
+        row['recommended_stake_units'] = recommend_stake_units(learned_score=learned_score, total_adjustment=total, blocked=blocked, base_units=base_units)
         row['learning_notes'] = '; '.join(notes[:5]) if notes else ('matched_neutral_patterns' if matched else 'no_matching_patterns')
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def learning_impact_summary(frame: pd.DataFrame) -> dict[str, Any]:
+    if frame is None or frame.empty:
+        return {'rows': 0, 'boosted': 0, 'penalized': 0, 'blocked': 0, 'avg_adjustment': 0.0}
+    adjustment = pd.to_numeric(frame.get('learning_adjustment_score'), errors='coerce').fillna(0.0)
+    blocked = frame.get('learning_blocked') if 'learning_blocked' in frame.columns else pd.Series(False, index=frame.index)
+    return {
+        'rows': int(len(frame)),
+        'boosted': int((adjustment > 1.25).sum()),
+        'penalized': int((adjustment < -1.25).sum()),
+        'blocked': int(pd.Series(blocked).astype(bool).sum()),
+        'avg_adjustment': round(float(adjustment.mean()), 3) if len(adjustment) else 0.0,
+    }
