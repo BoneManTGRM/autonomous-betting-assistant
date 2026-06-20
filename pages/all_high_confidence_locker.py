@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import html
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -10,23 +11,26 @@ import streamlit as st
 from autonomous_betting_agent.all_high_confidence_locker import lock_all_high_confidence_rows
 from autonomous_betting_agent.commercial_platform_tools import (
     filter_locked_proof_rows,
-    load_persistent_ledger,
     merge_ledgers,
     normalize_workspace_id,
     proof_audit_summary,
-    save_persistent_ledger,
 )
-from autonomous_betting_agent.pick_hold_store import load_first_available, save_held_rows
+from autonomous_betting_agent.pick_hold_store import load_first_available
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
 st.set_page_config(page_title='All High Confidence Locker', layout='wide')
 LANG = render_app_sidebar('all_high_confidence_locker', language_key='all_high_confidence_locker_language', selector='radio')
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+INTERNAL_LEDGER_PATH = REPO_ROOT / 'data' / 'all_high_confidence_internal_ledger.csv'
+INTERNAL_SESSION_KEY = 'all_high_confidence_locked_rows'
+RESEARCH_SESSION_KEY = 'research_proof_dashboard_rows'
+
 TEXT = {
     'en': {
         'title': 'All High Confidence Locker',
         'caption': 'Accept every supported high-confidence row for large-sample internal proof testing.',
-        'note': 'This mode is for volume testing. Rows are marked internal/research, not official +EV proof. Tennis/ATP/WTA/ITF/Challenger rows are still rejected.',
+        'note': 'This mode is for volume testing only. Rows are marked internal/research and are isolated from the official +EV public proof stores. Tennis/ATP/WTA/ITF/Challenger rows are still rejected.',
         'workspace': 'Workspace ID',
         'use_session': 'Use latest saved/session rows',
         'upload': 'Upload Pro Predictor high-confidence CSV',
@@ -39,14 +43,14 @@ TEXT = {
         'input_rows': 'Input rows',
         'locked_rows': 'Locked/internal rows',
         'rejected_rows': 'Rejected rows',
-        'saved_rows': 'Saved ledger rows',
-        'download': 'Download all high-confidence locked CSV',
+        'saved_rows': 'Saved internal ledger rows',
+        'download': 'Download all-high-confidence internal CSV',
         'rejected': 'Rejected unsupported rows',
     },
     'es': {
         'title': 'Bloqueador Alta Confianza Total',
         'caption': 'Acepta todas las filas soportadas de alta confianza para prueba interna de gran muestra.',
-        'note': 'Este modo es para prueba de volumen. Las filas se marcan como internas/investigación, no como prueba oficial +EV. Tenis/ATP/WTA/ITF/Challenger se rechaza.',
+        'note': 'Este modo es solo para prueba de volumen. Las filas se marcan internas/investigación y están aisladas de las pruebas oficiales +EV públicas. Tenis/ATP/WTA/ITF/Challenger se rechaza.',
         'workspace': 'ID de workspace',
         'use_session': 'Usar últimas filas guardadas/sesión',
         'upload': 'Subir CSV alta confianza de Predictor Pro',
@@ -59,8 +63,8 @@ TEXT = {
         'input_rows': 'Filas de entrada',
         'locked_rows': 'Filas internas bloqueadas',
         'rejected_rows': 'Filas rechazadas',
-        'saved_rows': 'Filas guardadas',
-        'download': 'Descargar CSV bloqueado alta confianza',
+        'saved_rows': 'Filas internas guardadas',
+        'download': 'Descargar CSV interno alta confianza',
         'rejected': 'Filas rechazadas no soportadas',
     },
 }
@@ -75,6 +79,43 @@ HANDOFF_KEYS = [
 
 def t(key: str) -> str:
     return TEXT.get(LANG, TEXT['en']).get(key, TEXT['en'].get(key, key))
+
+
+def internal_ledger_path(workspace_id: str) -> Path:
+    workspace = normalize_workspace_id(workspace_id)
+    if workspace in {'default', 'shared', 'main'}:
+        return INTERNAL_LEDGER_PATH
+    return INTERNAL_LEDGER_PATH.with_name(f'{INTERNAL_LEDGER_PATH.stem}_{workspace}{INTERNAL_LEDGER_PATH.suffix}')
+
+
+def load_internal_ledger(workspace_id: str) -> pd.DataFrame:
+    session_rows = st.session_state.get(INTERNAL_SESSION_KEY) or []
+    frames: list[pd.DataFrame] = []
+    if session_rows:
+        frames.append(pd.DataFrame(session_rows))
+    path = internal_ledger_path(workspace_id)
+    try:
+        if path.exists():
+            frames.append(pd.read_csv(path))
+    except Exception:
+        pass
+    return merge_ledgers(*frames) if frames else pd.DataFrame()
+
+
+def save_internal_ledger(frame: pd.DataFrame | list[dict[str, Any]], workspace_id: str) -> pd.DataFrame:
+    cleaned = filter_locked_proof_rows(frame)
+    if cleaned.empty:
+        return pd.DataFrame()
+    records = cleaned.to_dict('records')
+    st.session_state[INTERNAL_SESSION_KEY] = records
+    st.session_state[RESEARCH_SESSION_KEY] = records
+    try:
+        path = internal_ledger_path(workspace_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        cleaned.to_csv(path, index=False)
+    except Exception:
+        pass
+    return cleaned
 
 
 def csv_link(label: str, frame: pd.DataFrame, filename: str) -> None:
@@ -134,7 +175,7 @@ analyst = st.text_input(t('analyst'), value='ABA Signal Pro · Powered by Reparo
 max_units = st.number_input(t('max_units'), min_value=0.25, max_value=10.0, value=1.0, step=0.25)
 
 source_name, raw = read_inputs(workspace_id)
-persistent = load_persistent_ledger(workspace_id=workspace_id)
+persistent = load_internal_ledger(workspace_id)
 
 st.caption(f"{t('source')}: {source_name or 'none'}")
 metrics = st.columns(4)
@@ -150,19 +191,13 @@ if st.button(t('create'), type='primary', use_container_width=True, disabled=raw
     if locked.empty:
         st.error(t('no_rows'))
     else:
-        existing = load_persistent_ledger(workspace_id=workspace_id)
+        existing = load_internal_ledger(workspace_id)
         combined = merge_ledgers(existing, locked)
-        saved = save_persistent_ledger(combined, workspace_id=workspace_id)
-        final = saved if not saved.empty else filter_locked_proof_rows(locked)
-        records = final.to_dict('records')
-        for key in ['odds_lock_pro_locked_rows', 'public_proof_dashboard_refresh_rows', 'ara_latest_predictions']:
-            st.session_state[key] = records
-            save_held_rows(key, records, workspace_id)
-        st.session_state['ara_latest_predictions_source'] = f'All High Confidence Locker:{workspace_id}'
+        final = save_internal_ledger(combined, workspace_id)
         st.success(f"{t('created')}: {len(locked)} / saved {len(final)}")
         st.session_state['all_high_confidence_rejected_rows'] = rejected.to_dict('records')
 
-active = load_persistent_ledger(workspace_id=workspace_id)
+active = load_internal_ledger(workspace_id)
 rejected = pd.DataFrame(st.session_state.get('all_high_confidence_rejected_rows', []))
 summary = proof_audit_summary(active)
 
@@ -174,7 +209,7 @@ metrics[3].metric('Valid pre-start', int(summary['locked_before_start']))
 
 if not active.empty:
     st.dataframe(active, use_container_width=True, hide_index=True)
-    csv_link(t('download'), active, f'all_high_confidence_locked_{workspace_id}.csv')
+    csv_link(t('download'), active, f'all_high_confidence_internal_{workspace_id}.csv')
 
 if not rejected.empty:
     st.subheader(t('rejected'))
