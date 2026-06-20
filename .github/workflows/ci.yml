@@ -38,5 +38,11 @@ jobs:
 
       - name: Run pytest
         run: |
-          python -m pytest -q tests > pytest.log 2>&1 || (cat pytest.log && exit 1)
-          cat pytest.log
+          python -m pytest -q tests > pytest.log 2>&1
+
+      - name: Upload pytest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-pytest-log
+          path: pytest.log
