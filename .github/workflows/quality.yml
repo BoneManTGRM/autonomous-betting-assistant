@@ -2,9 +2,11 @@ name: Quality Check
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - '**'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -13,8 +15,9 @@ permissions:
 jobs:
   python-quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
-      CI: "true"
+      CI: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,17 +26,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
+          cache: pip
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install pandas streamlit requests pytest
+          python -m pip install -r requirements.txt
 
       - name: Compile Python files
-        run: python -m compileall -q streamlit_app.py app_streamlit.py autonomous_betting_agent pages tests
+        run: |
+          python -m compileall streamlit_app.py app_streamlit.py autonomous_betting_agent pages tests
 
       - name: Run tests
-        run: python -m pytest tests -q --disable-warnings
+        run: |
+          python -m pytest -q tests --disable-warnings
