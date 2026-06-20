@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
+from autonomous_betting_agent.adaptive_learning import apply_adaptive_learning
 from autonomous_betting_agent.four_tool_orchestrator import page_health, page_health_frame
 from autonomous_betting_agent.live_api_context import LiveAPIContextBuilder
 from autonomous_betting_agent.live_odds import list_sports, scan_market
@@ -19,7 +20,7 @@ from autonomous_betting_agent.multi_source_fusion import fuse_row
 from autonomous_betting_agent.pick_hold_store import save_held_rows
 from autonomous_betting_agent.scanner_strength import score_scanner_frame, scanner_strength_summary
 
-APP_VERSION = 'pro-predictor-v20-persistent-handoff'
+APP_VERSION = 'pro-predictor-v21-adaptive-learning-ranker'
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SPORT_KEYS = ['basketball_nba', 'baseball_mlb', 'soccer_epl']
 
@@ -29,31 +30,31 @@ LANG = render_app_sidebar('pro_predictor', language_key='pro_predictor_language'
 TEXT = {
     'en': {
         'title': 'Pro Predictor',
-        'caption': 'Scans markets, scores candidates, and sends the ranked large-list volume output to Odds Lock Pro.',
-        'workflow': 'Clean path: Pro Predictor → Large List Volume → Odds Lock Pro → Public Proof Dashboard → Learning Memory.',
+        'caption': 'Scans markets, scores candidates, applies learned pattern ranking, and sends the ranked large-list output to Odds Lock Pro.',
+        'workflow': 'Clean path: Pro Predictor → Adaptive Learning Ranker → Odds Lock Pro → Public Proof Dashboard → Learning Memory.',
         'api_sources': 'API sources', 'odds_key': 'Odds API key', 'sports_key': 'SportsDataIO key', 'weather_key': 'WeatherAPI key', 'enabled': 'Enabled', 'missing': 'Missing',
         'setup': 'Prediction setup', 'scan_scope': 'Scan scope', 'all_sports': 'All active sports', 'one_sport': 'One sport/league', 'team_player': 'One team/player', 'manual_sports': 'Manual sport keys only',
         'sport_search': 'Sport/feed search', 'team_filter': 'Team/player filter', 'manual_keys': 'Manual sport keys', 'regions': 'Bookmaker regions', 'markets': 'Markets', 'max_sports': 'Max sports', 'max_events': 'Max events per sport', 'latest_date': 'Latest event date',
         'filters': 'Filters', 'min_books': 'Minimum books', 'min_prob': 'Minimum model probability', 'min_edge': 'Minimum edge', 'strong_edge': 'Strong edge threshold', 'min_signal': 'Minimum signal strength',
-        'large_setup': 'Large-list volume output', 'send_large': 'Send large-list volume rows to Odds Lock Pro', 'max_rows': 'Max large-list rows', 'min_agent': 'Large-list min agent score',
+        'large_setup': 'Large-list volume output', 'send_large': 'Send large-list volume rows to Odds Lock Pro', 'max_rows': 'Max large-list rows', 'min_agent': 'Large-list min learned score',
         'run': 'Run Pro Predictor', 'saved': 'Large-list rows saved to session, local memory, and Odds Lock Pro handoff store.', 'no_rows': 'No prediction rows passed the filters.', 'api_error': 'Could not load sports list. Check API key/quota or use manual sport keys.',
         'all_count': 'All passed', 'large_count': 'Large list', 'lock_ready': 'Lock ready', 'avg_signal': 'Avg signal', 'premium': 'Premium signals', 'next': 'Next', 'handoff': 'Handoff health',
         'large_tab': 'Large-list volume', 'all_tab': 'All rows', 'lock_tab': 'Lock-ready subset', 'skipped': 'Skipped feeds / API errors', 'download_large': 'Download large-list CSV', 'download_all': 'Download all rows CSV', 'no_skipped': 'No skipped feeds.',
-        'profile_note': 'Large List 70 mode ranks the top available candidates instead of requiring every row to be lock-ready. Lock-ready stays separate.',
+        'profile_note': 'Adaptive Learning Ranker uses Learning Memory patterns to boost historically profitable patterns and penalize weak patterns before choosing the top 300.',
     },
     'es': {
         'title': 'Predictor Pro',
-        'caption': 'Escanea mercados, califica candidatos y envía la lista grande clasificada a Odds Lock Pro.',
-        'workflow': 'Ruta limpia: Predictor Pro → Lista Grande → Odds Lock Pro → Dashboard Público → Memoria.',
+        'caption': 'Escanea mercados, califica candidatos, aplica ranking aprendido y envía la lista grande a Odds Lock Pro.',
+        'workflow': 'Ruta limpia: Predictor Pro → Ranking Aprendido → Odds Lock Pro → Dashboard Público → Memoria.',
         'api_sources': 'Fuentes API', 'odds_key': 'Clave de Odds API', 'sports_key': 'Clave de SportsDataIO', 'weather_key': 'Clave de WeatherAPI', 'enabled': 'Activada', 'missing': 'Falta',
         'setup': 'Configuración de predicción', 'scan_scope': 'Alcance', 'all_sports': 'Todos los deportes activos', 'one_sport': 'Un deporte/liga', 'team_player': 'Un equipo/jugador', 'manual_sports': 'Solo claves manuales',
         'sport_search': 'Buscar deporte/feed', 'team_filter': 'Filtro de equipo/jugador', 'manual_keys': 'Claves manuales de deporte', 'regions': 'Regiones de casas', 'markets': 'Mercados', 'max_sports': 'Máximo de deportes', 'max_events': 'Máximo de eventos por deporte', 'latest_date': 'Fecha máxima del evento',
         'filters': 'Filtros', 'min_books': 'Mínimo de casas', 'min_prob': 'Probabilidad mínima del modelo', 'min_edge': 'Ventaja mínima', 'strong_edge': 'Umbral de ventaja fuerte', 'min_signal': 'Fuerza mínima de señal',
-        'large_setup': 'Salida de lista grande', 'send_large': 'Enviar lista grande a Odds Lock Pro', 'max_rows': 'Máximo de filas de lista grande', 'min_agent': 'Puntaje agente mínimo',
+        'large_setup': 'Salida de lista grande', 'send_large': 'Enviar lista grande a Odds Lock Pro', 'max_rows': 'Máximo de filas de lista grande', 'min_agent': 'Puntaje aprendido mínimo',
         'run': 'Ejecutar Predictor Pro', 'saved': 'Lista grande guardada en sesión, memoria local y traspaso a Odds Lock Pro.', 'no_rows': 'Ninguna fila pasó los filtros.', 'api_error': 'No se pudo cargar la lista de deportes. Revisa la clave/cuota API o usa claves manuales.',
         'all_count': 'Todas aprobadas', 'large_count': 'Lista grande', 'lock_ready': 'Listas para bloquear', 'avg_signal': 'Señal promedio', 'premium': 'Señales premium', 'next': 'Siguiente', 'handoff': 'Salud del traspaso',
         'large_tab': 'Lista grande', 'all_tab': 'Todas las filas', 'lock_tab': 'Subconjunto listo', 'skipped': 'Feeds omitidos / errores API', 'download_large': 'Descargar CSV lista grande', 'download_all': 'Descargar CSV total', 'no_skipped': 'No hubo feeds omitidos.',
-        'profile_note': 'Lista Grande 70 clasifica los mejores candidatos disponibles sin exigir que cada fila esté lista para bloquear. Las filas listas quedan separadas.',
+        'profile_note': 'El ranking aprendido usa patrones de Memoria para subir patrones rentables y penalizar patrones débiles antes de escoger el top 300.',
     },
 }
 
@@ -233,6 +234,9 @@ def add_large_list_scores(frame: pd.DataFrame, *, strong_edge: float) -> pd.Data
     out['decision_reasons'] = ''
     out['decision_signals'] = 'large_list_volume_candidate'
     out['recommended_stake_units'] = 0.10
+    out = apply_adaptive_learning(out)
+    out['agent_score'] = pd.to_numeric(out.get('learned_agent_score'), errors='coerce').fillna(out['agent_score']).round(3)
+    out['decision_signals'] = out['decision_signals'].astype(str) + '; adaptive_learning_ranker'
     return out
 
 
@@ -341,7 +345,8 @@ if st.button(t('run'), type='primary', use_container_width=True):
     if decisions.empty:
         st.info(t('no_rows'))
         st.stop()
-    decisions = decisions.sort_values(['agent_score', 'scanner_strength_score', 'model_probability_clean', 'model_market_edge'], ascending=False, na_position='last').reset_index(drop=True)
+    sort_cols = [col for col in ['learned_agent_score', 'agent_score', 'learning_adjustment_score', 'scanner_strength_score', 'model_probability_clean', 'model_market_edge'] if col in decisions.columns]
+    decisions = decisions.sort_values(sort_cols, ascending=False, na_position='last').reset_index(drop=True)
     large = decisions.head(int(max_rows)).reset_index(drop=True)
     lock_ready = large[large['lock_ready'].astype(bool)].copy() if 'lock_ready' in large.columns else pd.DataFrame()
     handoff = large if send_large else decisions
@@ -349,7 +354,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
     st.session_state['pro_predictor_high_confidence_rows'] = large.to_dict('records')
     st.session_state['pro_predictor_latest_rows'] = handoff.to_dict('records')
     st.session_state['ara_latest_predictions'] = handoff.to_dict('records')
-    st.session_state['ara_latest_predictions_source'] = 'Pro Predictor large-list volume' if send_large else 'Pro Predictor all rows'
+    st.session_state['ara_latest_predictions_source'] = 'Pro Predictor adaptive large-list volume' if send_large else 'Pro Predictor adaptive all rows'
     st.session_state['ara_latest_predictions_saved_at'] = pd.Timestamp.utcnow().isoformat()
     persist_handoff(decisions=decisions, large=large, handoff=handoff)
     st.success(t('saved'))
@@ -365,7 +370,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
     st.subheader(t('handoff'))
     st.dataframe(display_frame(page_health_frame(handoff, page='pro_predictor')), use_container_width=True, hide_index=True)
     tabs = st.tabs([t('large_tab'), t('all_tab'), t('lock_tab'), t('skipped')])
-    display_cols = [col for col in ['event', 'sport', 'market_type', 'line_point', 'prediction', 'model_probability_clean', 'market_implied_probability', 'model_market_edge', 'decimal_price', 'odds_at_pick', 'bookmaker', 'agent_decision', 'agent_score', 'scanner_strength_score', 'scanner_strength_tier', 'lock_ready', 'decision_signals'] if col in decisions.columns]
+    display_cols = [col for col in ['event', 'sport', 'market_type', 'line_point', 'prediction', 'model_probability_clean', 'learned_model_probability', 'market_implied_probability', 'model_market_edge', 'decimal_price', 'odds_at_pick', 'bookmaker', 'agent_decision', 'agent_score', 'learning_adjustment_score', 'learning_pattern_count', 'scanner_strength_score', 'scanner_strength_tier', 'lock_ready', 'learning_notes', 'decision_signals'] if col in decisions.columns]
     with tabs[0]:
         st.dataframe(display_frame(large[display_cols] if display_cols else large), use_container_width=True, hide_index=True)
         csv_link(t('download_large'), display_frame(large), 'pro_predictor_large_list_volume.csv')
