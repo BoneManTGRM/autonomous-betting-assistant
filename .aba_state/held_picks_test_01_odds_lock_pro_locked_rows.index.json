@@ -3,7 +3,7 @@
   "format": "chunked",
   "workspace_id": "test_01",
   "key": "odds_lock_pro_locked_rows",
-  "parts": 4,
-  "rows_count": 198,
+  "parts": 1,
+  "rows_count": 0,
   "chunk_size": 50
 }
