@@ -137,6 +137,10 @@ def _write_payload(path: Path, payload: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
+def _empty_payload(key: str, workspace_id: Any = 'test_01') -> dict[str, Any]:
+    return {'version': 'held-picks-v7-github-chunked', 'workspace_id': normalize_workspace_id(workspace_id), 'key': key, 'rows': []}
+
+
 def _github_get_json(path: str) -> tuple[dict[str, Any], str, int]:
     token = _github_token()
     repo = _github_repo()
@@ -246,6 +250,30 @@ def save_held_rows(key: str, rows: Any, workspace_id: Any = 'test_01') -> int:
     except Exception:
         pass
     return len(cleaned)
+
+
+def clear_held_rows(key: str, workspace_id: Any = 'test_01') -> int:
+    if key not in HELD_KEYS:
+        return 0
+    workspace = normalize_workspace_id(workspace_id)
+    aliases = [(key, workspace), (key, 'test_01'), (f'latest_{key}', 'test_01')]
+    store = _memory_store()
+    for alias_key, alias_workspace in aliases:
+        store[_store_key(alias_key, alias_workspace)] = []
+        try:
+            _write_payload(_path_for(alias_key, alias_workspace), _empty_payload(alias_key, alias_workspace))
+            _write_payload(_backup_path_for(alias_key, alias_workspace), _empty_payload(alias_key, alias_workspace))
+        except Exception:
+            pass
+        try:
+            _github_save_payload(alias_key, [], alias_workspace)
+        except Exception:
+            pass
+    return 1
+
+
+def clear_all_held_rows(workspace_id: Any = 'test_01') -> int:
+    return sum(clear_held_rows(key, workspace_id) for key in sorted(HELD_KEYS))
 
 
 def _load_payload(path: Path) -> list[dict[str, Any]]:
