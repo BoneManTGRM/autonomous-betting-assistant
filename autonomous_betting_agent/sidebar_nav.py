@@ -26,7 +26,7 @@ TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Threshold Optimizer', 'Optimizador de Umbral', 'pages/threshold_optimizer.py'),
     ('What Are the Odds', 'Cuáles Son las Cuotas', 'pages/what_are_the_odds.py'),
     ('Odds Lock Pro', 'Bloqueo de Cuotas Pro', 'pages/odds_lock_pro.py'),
-    ('Public Proof Dashboard', 'Dashboard Público de Prueba', 'pages/public_proof_dashboard.py'),
+    ('Public Proof Dashboard', 'Panel Público de Prueba', 'pages/public_proof_dashboard.py'),
     ('Storage Diagnostics', 'Diagnóstico de Almacenamiento', 'pages/storage_diagnostics.py'),
     ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory.py'),
 )
