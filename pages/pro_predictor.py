@@ -20,7 +20,7 @@ from autonomous_betting_agent.multi_source_fusion import fuse_row
 from autonomous_betting_agent.pick_hold_store import save_held_rows
 from autonomous_betting_agent.scanner_strength import score_scanner_frame, scanner_strength_summary
 
-APP_VERSION = 'pro-predictor-v21-adaptive-learning-ranker'
+APP_VERSION = 'pro-predictor-v22-volume-safe-defaults'
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SPORT_KEYS = ['basketball_nba', 'baseball_mlb', 'soccer_epl']
 
@@ -40,7 +40,7 @@ TEXT = {
         'run': 'Run Pro Predictor', 'saved': 'Large-list rows saved to session, local memory, and Odds Lock Pro handoff store.', 'no_rows': 'No prediction rows passed the filters.', 'api_error': 'Could not load sports list. Check API key/quota or use manual sport keys.',
         'all_count': 'All passed', 'large_count': 'Large list', 'lock_ready': 'Lock ready', 'avg_signal': 'Avg signal', 'premium': 'Premium signals', 'next': 'Next', 'handoff': 'Handoff health',
         'large_tab': 'Large-list volume', 'all_tab': 'All rows', 'lock_tab': 'Lock-ready subset', 'skipped': 'Skipped feeds / API errors', 'download_large': 'Download large-list CSV', 'download_all': 'Download all rows CSV', 'no_skipped': 'No skipped feeds.',
-        'profile_note': 'Adaptive Learning Ranker uses Learning Memory patterns to boost historically profitable patterns and penalize weak patterns before choosing the top 300.',
+        'profile_note': 'Volume-safe defaults preserve a large proof sample while still requiring model probability, market edge, signal strength, book coverage, and adaptive learning rank. Unsupported tennis/ATP/WTA-style feeds are skipped for this workflow.',
     },
     'es': {
         'title': 'Predictor Pro',
@@ -54,11 +54,12 @@ TEXT = {
         'run': 'Ejecutar Predictor Pro', 'saved': 'Lista grande guardada en sesión, memoria local y traspaso a Odds Lock Pro.', 'no_rows': 'Ninguna fila pasó los filtros.', 'api_error': 'No se pudo cargar la lista de deportes. Revisa la clave/cuota API o usa claves manuales.',
         'all_count': 'Todas aprobadas', 'large_count': 'Lista grande', 'lock_ready': 'Listas para bloquear', 'avg_signal': 'Señal promedio', 'premium': 'Señales premium', 'next': 'Siguiente', 'handoff': 'Salud del traspaso',
         'large_tab': 'Lista grande', 'all_tab': 'Todas las filas', 'lock_tab': 'Subconjunto listo', 'skipped': 'Feeds omitidos / errores API', 'download_large': 'Descargar CSV lista grande', 'download_all': 'Descargar CSV total', 'no_skipped': 'No hubo feeds omitidos.',
-        'profile_note': 'El ranking aprendido usa patrones de Memoria para subir patrones rentables y penalizar patrones débiles antes de escoger el top 300.',
+        'profile_note': 'La configuración de volumen conserva una muestra grande de prueba sin dejar de exigir probabilidad, ventaja, señal, cobertura de casas y ranking aprendido. Feeds tipo tenis/ATP/WTA se omiten para este flujo.',
     },
 }
 
-DEFAULTS = {'min_books': 1, 'min_prob': 0.58, 'min_edge': -0.03, 'strong_edge': 0.04, 'min_signal': 38.0, 'max_rows': 300, 'min_agent': 35.0}
+# Volume-safe defaults: enough picks for proof testing without turning off quality filters.
+DEFAULTS = {'min_books': 1, 'min_prob': 0.58, 'min_edge': -0.03, 'strong_edge': 0.04, 'min_signal': 38.0, 'max_rows': 700, 'min_agent': 35.0}
 
 
 def t(key: str) -> str:
@@ -86,6 +87,12 @@ def csv_link(label: str, frame: pd.DataFrame, filename: str) -> None:
 
 def clean(value: Any) -> str:
     return ' '.join(str(value or '').lower().replace('-', ' ').replace('_', ' ').split())
+
+
+def unsupported_sport(value: Any) -> bool:
+    text = clean(value)
+    blocked = ('tennis', 'atp', 'wta', 'itf', 'challenger')
+    return any(term in text for term in blocked)
 
 
 def similarity(left: Any, right: Any) -> float:
@@ -181,6 +188,10 @@ def api_coverage_fields(api_context: dict[str, Any], *, odds: bool, sports: bool
 def build_rows(events: list[Any], sport: Any, *, context_builder: LiveAPIContextBuilder, odds_key: str, sports_key: str, weather_key: str, team_filter: str, latest_event_date: date, min_books: int) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for event in events:
+        sport_title = getattr(event, 'sport_title', getattr(sport, 'title', ''))
+        sport_key = getattr(event, 'sport_key', getattr(sport, 'key', ''))
+        if unsupported_sport(f'{sport_key} {sport_title}'):
+            continue
         event_day = parse_event_date(getattr(event, 'commence_time', ''))
         if event_day is None or event_day > latest_event_date:
             continue
@@ -188,8 +199,6 @@ def build_rows(events: list[Any], sport: Any, *, context_builder: LiveAPIContext
         if team_filter.strip() and match < 0.85:
             continue
         event_name = f"{getattr(event, 'away_team', '')} at {getattr(event, 'home_team', '')}".strip()
-        sport_title = getattr(event, 'sport_title', getattr(sport, 'title', ''))
-        sport_key = getattr(event, 'sport_key', getattr(sport, 'key', ''))
         for outcome in getattr(event, 'outcomes', []) or []:
             books = int(getattr(event, 'bookmaker_count', 0) or getattr(outcome, 'source_count', 0) or 0)
             if books < int(min_books):
@@ -246,12 +255,10 @@ def display_frame(frame: pd.DataFrame) -> pd.DataFrame:
 
 def persist_handoff(*, decisions: pd.DataFrame, large: pd.DataFrame, handoff: pd.DataFrame) -> None:
     workspace_id = str(st.session_state.get('aba_test_window_id', 'test_01') or 'test_01')
-    save_held_rows('pro_predictor_latest_rows', handoff, workspace_id)
-    save_held_rows('pro_predictor_high_confidence_rows', large, workspace_id)
-    save_held_rows('ara_latest_predictions', handoff, workspace_id)
-    save_held_rows('pro_predictor_latest_rows', handoff, 'test_01')
-    save_held_rows('pro_predictor_high_confidence_rows', large, 'test_01')
-    save_held_rows('ara_latest_predictions', handoff, 'test_01')
+    for target_workspace in {workspace_id, 'test_01'}:
+        save_held_rows('pro_predictor_latest_rows', handoff, target_workspace)
+        save_held_rows('pro_predictor_high_confidence_rows', large, target_workspace)
+        save_held_rows('ara_latest_predictions', handoff, target_workspace)
 
 
 st.title(t('title'))
@@ -299,7 +306,7 @@ with st.expander(t('filters'), expanded=True):
 with st.expander(t('large_setup'), expanded=True):
     h1, h2, h3 = st.columns(3)
     send_large = h1.checkbox(t('send_large'), value=True)
-    max_rows = h2.number_input(t('max_rows'), min_value=1, max_value=500, value=DEFAULTS['max_rows'], step=25)
+    max_rows = h2.number_input(t('max_rows'), min_value=1, max_value=1000, value=DEFAULTS['max_rows'], step=25)
     min_agent = h3.number_input(t('min_agent'), min_value=0.0, max_value=100.0, value=DEFAULTS['min_agent'], step=1.0)
 
 if st.button(t('run'), type='primary', use_container_width=True):
@@ -317,7 +324,8 @@ if st.button(t('run'), type='primary', use_container_width=True):
         sport_keys = manual_keys or DEFAULT_SPORT_KEYS[:2]
         selected_sports = [type('Sport', (), {'key': key, 'title': key, 'group': '', 'description': ''})() for key in sport_keys]
     else:
-        selected_sports = sorted(sports, key=lambda sport: sport_score(sport, sport_query), reverse=True)[: int(max_sports)]
+        selected_sports = [sport for sport in sports if not unsupported_sport(f"{getattr(sport, 'key', '')} {getattr(sport, 'title', '')} {getattr(sport, 'group', '')}")]
+        selected_sports = sorted(selected_sports, key=lambda sport: sport_score(sport, sport_query), reverse=True)[: int(max_sports)]
         if scope == 'one' and sport_query.strip() and clean(sport_query) != 'auto':
             selected_sports = [sport for sport in selected_sports if sport_score(sport, sport_query) >= 0.35]
     context_builder = LiveAPIContextBuilder(sportsdataio_key=sports_key, weatherapi_key=weather_key)
