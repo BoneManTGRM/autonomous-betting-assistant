@@ -25,6 +25,7 @@ TOOLS: tuple[tuple[str, str, str], ...] = (
     ('What Are the Odds', 'What Are the Odds', 'pages/what_are_the_odds.py'),
     ('Odds Lock Pro', 'Odds Lock Pro', 'pages/odds_lock_pro.py'),
     ('Public Proof Dashboard', 'Dashboard Público de Prueba', 'pages/public_proof_dashboard.py'),
+    ('Storage Diagnostics', 'Diagnóstico de Almacenamiento', 'pages/storage_diagnostics.py'),
     ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory.py'),
 )
 PRO_PREDICTOR_LARGE_LIST_70_DEFAULTS = {
