@@ -1,0 +1,9 @@
+{
+  "version": "held-picks-v7-github-chunked",
+  "format": "chunked",
+  "workspace_id": "test_01",
+  "key": "ara_latest_predictions",
+  "parts": 3,
+  "rows_count": 108,
+  "chunk_size": 50
+}
