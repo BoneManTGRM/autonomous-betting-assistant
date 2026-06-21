@@ -42,12 +42,17 @@ ALIASES = {
     '_price_range_risk': ('_price_range_risk', 'price_range_risk', 'price_range'),
 }
 
+VOID_LABELS = {
+    'void', 'push', 'pushed', 'draw_no_bet_push', 'cancelled', 'canceled',
+    'cancelation', 'cancellation', 'postponed', 'abandoned', 'no_action',
+}
+
 RESULT_MAP = {
     'won': 'win', 'win': 'win', 'w': 'win', 'correct': 'win', 'hit': 'win', 'true': 'win', 'yes': 'win', '1': 'win', '1.0': 'win',
     'ganada': 'win', 'gano': 'win', 'ganó': 'win', 'victoria': 'win', 'acierto': 'win',
     'lost': 'loss', 'loss': 'loss', 'l': 'loss', 'incorrect': 'loss', 'miss': 'loss', 'false': 'loss', 'no': 'loss', '0': 'loss', '0.0': 'loss',
     'perdida': 'loss', 'perdio': 'loss', 'perdió': 'loss', 'derrota': 'loss', 'fallo': 'loss',
-    'void': 'void', 'push': 'void', 'pushed': 'void', 'draw_no_bet_push': 'void', 'cancelled': 'void', 'canceled': 'void', 'cancelation': 'void', 'cancellation': 'void', 'postponed': 'void', 'abandoned': 'void', 'no_action': 'void',
+    **{label: 'void' for label in VOID_LABELS},
     'pending': 'pending', 'unknown': 'pending', 'scheduled': 'pending', 'live': 'pending',
 }
 
@@ -115,7 +120,23 @@ def probability_value(row: Mapping[str, Any], canonical_name: str = 'model_proba
     return None
 
 
+def has_void_label(row: Mapping[str, Any]) -> bool:
+    normalized = normalized_mapping(row)
+    aliases = ALIASES['result_status'] + ALIASES['final_score']
+    for alias in aliases:
+        value = safe_text(normalized.get(clean_key(alias))).lower()
+        if not value:
+            continue
+        if value in VOID_LABELS:
+            return True
+        if any(label in value for label in VOID_LABELS):
+            return True
+    return False
+
+
 def result_status(row: Mapping[str, Any]) -> str:
+    if has_void_label(row):
+        return 'void'
     raw = first_text(row, 'result_status').lower()
     if raw in RESULT_MAP:
         return RESULT_MAP[raw]
@@ -186,5 +207,6 @@ def normalize_frame(frame: pd.DataFrame) -> pd.DataFrame:
         for key, value in normalized.items():
             if key not in item or not safe_text(item.get(key)):
                 item[key] = value
+        item['result_status'] = normalized['result_status']
         rows.append(item)
     return dedupe_frame(pd.DataFrame(rows))
