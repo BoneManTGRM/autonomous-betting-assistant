@@ -101,4 +101,21 @@ def _install_price_normalizer() -> None:
     live_odds._aba_price_normalizer_v1 = True
 
 
+def _install_adaptive_learning_area_key_normalizer() -> None:
+    try:
+        from . import adaptive_learning
+    except Exception:
+        return
+    if getattr(adaptive_learning, '_aba_area_key_normalizer_v1', False):
+        return
+
+    def normalized_feature_key(area_type: str, value: str) -> str:
+        area = str(area_type or '').strip().lower().replace('-', '_').replace(' ', '_')
+        return f'{area}:{value}'.lower()
+
+    adaptive_learning._feature_key = normalized_feature_key
+    adaptive_learning._aba_area_key_normalizer_v1 = True
+
+
 _install_price_normalizer()
+_install_adaptive_learning_area_key_normalizer()
