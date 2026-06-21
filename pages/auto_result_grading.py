@@ -12,7 +12,7 @@ from autonomous_betting_agent.auto_result_grading_tools import (
     odds_scores_to_result_frame,
     result_upload_template,
 )
-from autonomous_betting_agent.closing_line_tools import collect_closing_lines
+from autonomous_betting_agent.closing_line_tools import collect_closing_lines, collect_closing_lines_for_all_sports
 from autonomous_betting_agent.commercial_platform_tools import load_persistent_ledger, save_persistent_ledger
 from autonomous_betting_agent.live_odds import _get_json, validate_api_key
 from autonomous_betting_agent.tool_sidebar import render_tool_sidebar
@@ -33,6 +33,8 @@ TEXT = {
         'closing': 'Collect closing/current odds for CLV',
         'closing_help': 'Run this close to event start for pending locked picks. It saves the current market average as closing_decimal_price so the Public Proof Dashboard can calculate CLV.',
         'collect_closing': 'Collect closing odds for CLV',
+        'all_sports': 'Auto-collect for all sport keys in ledger',
+        'pending_only': 'Pending rows only',
         'sport_key': 'Sport key',
         'regions': 'Regions',
         'markets': 'Markets',
@@ -55,6 +57,8 @@ TEXT = {
         'closing': 'Recolectar cuotas de cierre/actuales para CLV',
         'closing_help': 'Ejecuta esto cerca del inicio del evento para picks bloqueados pendientes. Guarda el promedio actual del mercado como closing_decimal_price para calcular CLV.',
         'collect_closing': 'Recolectar cuotas de cierre para CLV',
+        'all_sports': 'Recolectar automáticamente para todas las sport keys del ledger',
+        'pending_only': 'Solo filas pendientes',
         'sport_key': 'Sport key',
         'regions': 'Regiones',
         'markets': 'Mercados',
@@ -124,25 +128,43 @@ with st.expander(t('fetch'), expanded=False):
 
 with st.expander(t('closing'), expanded=False):
     st.caption(t('closing_help'))
-    closing_sport_key = st.text_input(t('sport_key'), value='', key='closing_sport_key')
+    all_sports = st.checkbox(t('all_sports'), value=True)
+    closing_sport_key = st.text_input(t('sport_key'), value='', key='closing_sport_key', disabled=all_sports)
     regions = st.text_input(t('regions'), value='us,eu,uk', key='closing_regions')
     markets = st.text_input(t('markets'), value='h2h,spreads,totals', key='closing_markets')
     closing_override = st.text_input(t('api_key'), value='', type='password', key='closing_api_key')
     overwrite = st.checkbox(t('overwrite_closing'), value=False)
-    if st.button(t('collect_closing'), type='primary', use_container_width=True) and closing_sport_key.strip():
+    pending_only = st.checkbox(t('pending_only'), value=True)
+    if st.button(t('collect_closing'), type='primary', use_container_width=True):
         try:
-            updated, stats = collect_closing_lines(
-                ledger,
-                api_key=get_key(closing_override),
-                sport_key=closing_sport_key.strip(),
-                regions=regions.strip() or 'us,eu,uk',
-                markets=markets.strip() or 'h2h,spreads,totals',
-                overwrite_existing=overwrite,
-            )
+            if all_sports:
+                updated, stats = collect_closing_lines_for_all_sports(
+                    ledger,
+                    api_key=get_key(closing_override),
+                    regions=regions.strip() or 'us,eu,uk',
+                    markets=markets.strip() or 'h2h,spreads,totals',
+                    overwrite_existing=overwrite,
+                    pending_only=pending_only,
+                )
+            elif closing_sport_key.strip():
+                updated, stats = collect_closing_lines(
+                    ledger,
+                    api_key=get_key(closing_override),
+                    sport_key=closing_sport_key.strip(),
+                    regions=regions.strip() or 'us,eu,uk',
+                    markets=markets.strip() or 'h2h,spreads,totals',
+                    overwrite_existing=overwrite,
+                    pending_only=pending_only,
+                )
+            else:
+                updated, stats = pd.DataFrame(), {'updated_rows': 0, 'reason': 'missing_sport_key'}
             st.json(stats)
             if not updated.empty:
                 save_persistent_ledger(updated)
                 ledger = load_persistent_ledger()
+                status_cols = [col for col in ['event', 'prediction', 'result_status', 'closing_decimal_price', 'closing_collection_status', 'closing_match_confidence'] if col in ledger.columns]
+                if status_cols:
+                    st.dataframe(ledger[status_cols], use_container_width=True, hide_index=True)
                 st.success(t('saved'))
         except Exception as exc:
             st.error(str(exc))
