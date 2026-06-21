@@ -1,4 +1,4 @@
-# deploy trigger: public-proof-centralized-sidebar-v15
+# deploy trigger: public-proof-centralized-sidebar-v16
 [server]
 headless = true
 
@@ -8,4 +8,5 @@ gatherUsageStats = false
 [client]
 # Hide Streamlit's automatic file-list sidebar. Pages render the shared ABA sidebar.
 showSidebarNavigation = false
-toolbarMode = "minimal"
+# Keep the Streamlit toolbar visible so the app menu/reboot controls remain available.
+toolbarMode = "auto"
