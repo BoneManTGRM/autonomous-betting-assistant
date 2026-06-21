@@ -3,7 +3,7 @@ import unittest
 import pandas as pd
 
 from autonomous_betting_agent.odds_lock_tools import lock_rows, summarize_locked_picks
-from autonomous_betting_agent.row_normalizer import result_status
+from autonomous_betting_agent.row_normalizer import normalize_frame, result_status
 
 
 class VoidOutcomeTests(unittest.TestCase):
@@ -39,6 +39,14 @@ class VoidOutcomeTests(unittest.TestCase):
         self.assertEqual(summary['hit_rate'], 0.5)
         self.assertEqual(float(frame.loc[2, 'profit_units']), 0.0)
         self.assertEqual(float(frame.loc[3, 'profit_units']), 0.0)
+
+    def test_legacy_loss_is_repaired_when_void_label_exists_elsewhere(self):
+        frame = normalize_frame(pd.DataFrame([
+            {'event': 'A at B', 'prediction': 'B', 'result_status': 'loss', 'outcome': 'push'},
+            {'event': 'C at D', 'prediction': 'D', 'result_status': 'loss', 'result_note': 'cancelled before start'},
+        ]))
+        self.assertEqual(frame.loc[0, 'result_status'], 'void')
+        self.assertEqual(frame.loc[1, 'result_status'], 'void')
 
 
 if __name__ == '__main__':
