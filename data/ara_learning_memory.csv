@@ -1,10 +1,10 @@
 area,area_type,group_value,records,avg_predicted,actual_hit_rate,actual_minus_predicted,smoothed_hit_rate,smoothed_edge,stake_units,profit_units,roi,avg_price,avg_clv_percent,beat_close_rate,reliability,brier,memory_type,importance,action
-Market: estimated_score,market_type,estimated_score,55,0.6,0.763636,0.163636,0.742857,0.142857,55.0,29.0,0.527273,,,,0.870455,0.207273,market_type,0.685714,raise_trust
-Probability bucket: 60-70%,probability_bucket,60-70%,66,0.6,0.742424,0.142424,0.727027,0.127027,66.0,32.0,0.484848,,,,0.867803,0.211515,probability_bucket,0.654054,raise_trust
-Probability source: fallback_medium_confidence,probability_source,fallback_medium_confidence,66,0.6,0.742424,0.142424,0.727027,0.127027,66.0,32.0,0.484848,,,,0.867803,0.211515,probability_source,0.654054,raise_trust
-Sport: FIFA World Cup,sport,FIFA World Cup,18,0.6,0.722222,0.122222,0.684615,0.084615,18.0,8.0,0.444444,,,,0.727158,0.215556,sport,0.341025,raise_trust
-FIFA World Cup / 60-70%,sport_probability_bucket,FIFA World Cup|60-70%,18,0.6,0.722222,0.122222,0.684615,0.084615,18.0,8.0,0.444444,,,,0.727158,0.215556,sport_probability_bucket,0.341025,raise_trust
-FIFA World Cup / estimated_score,sport_market,FIFA World Cup|estimated_score,18,0.6,0.722222,0.122222,0.684615,0.084615,18.0,8.0,0.444444,,,,0.727158,0.215556,sport_market,0.341025,raise_trust
+Market: estimated_score,market_type,estimated_score,56,0.6,0.767857,0.167857,0.746875,0.146875,56.0,30.0,0.535714,,,,0.870982,0.206429,market_type,0.69375,raise_trust
+Probability bucket: 60-70%,probability_bucket,60-70%,67,0.6,0.746269,0.146269,0.730667,0.130667,67.0,33.0,0.492537,,,,0.868284,0.210746,probability_bucket,0.661333,raise_trust
+Probability source: fallback_medium_confidence,probability_source,fallback_medium_confidence,67,0.6,0.746269,0.146269,0.730667,0.130667,67.0,33.0,0.492537,,,,0.868284,0.210746,probability_source,0.661333,raise_trust
+Sport: FIFA World Cup,sport,FIFA World Cup,19,0.6,0.736842,0.136842,0.696296,0.096296,19.0,9.0,0.473684,,,,0.736161,0.212632,sport,0.368731,raise_trust
+FIFA World Cup / 60-70%,sport_probability_bucket,FIFA World Cup|60-70%,19,0.6,0.736842,0.136842,0.696296,0.096296,19.0,9.0,0.473684,,,,0.736161,0.212632,sport_probability_bucket,0.368731,raise_trust
+FIFA World Cup / estimated_score,sport_market,FIFA World Cup|estimated_score,19,0.6,0.736842,0.136842,0.696296,0.096296,19.0,9.0,0.473684,,,,0.736161,0.212632,sport_market,0.368731,raise_trust
 Market: round/method,market_type,round/method,11,0.6,0.636364,0.036364,0.621053,0.021053,11.0,3.0,0.272727,,,,0.652144,0.232727,market_type,0.19093,raise_trust
 Sport: WNBA,sport,WNBA,6,0.6,0.833333,0.233333,0.7,0.1,6.0,4.0,0.666667,,,,0.601369,0.193333,sport,0.178169,raise_trust
 WNBA / 60-70%,sport_probability_bucket,WNBA|60-70%,6,0.6,0.833333,0.233333,0.7,0.1,6.0,4.0,0.666667,,,,0.601369,0.193333,sport_probability_bucket,0.178169,raise_trust
