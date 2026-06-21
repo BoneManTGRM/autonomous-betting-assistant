@@ -57,6 +57,17 @@ section[data-testid="stSidebar"] a[href*="pages/"] {
 }
 section[data-testid="stSidebar"] a[href*="pages/"]:hover { background: rgba(255,255,255,.10); }
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 { margin-top: .65rem; }
+.aba-sidebar-title {
+  font-size: 1.45rem;
+  line-height: 1.2;
+  font-weight: 850;
+  margin: .35rem 0 .25rem 0;
+  background: linear-gradient(90deg, #f6d365 0%, #fda085 40%, #70e1f5 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.aba-sidebar-tagline { color: rgba(255,255,255,.62); margin-bottom: 1rem; }
 .aba-safe-download {
   display:inline-block; padding:.65rem 1rem; border-radius:.7rem; background:#ef5350; color:#fff!important;
   text-decoration:none!important; font-weight:700; margin:.35rem 0;
@@ -84,17 +95,17 @@ def _label(item: tuple[str, str, str], language: str) -> str:
     return item[1] if normalize_language(language) == 'es' else item[0]
 
 
-def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'selectbox') -> str:
+def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'radio') -> str:
     import streamlit as st
 
     with st.sidebar:
         st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
-        st.markdown(f'### ABA Signal Pro')
-        st.caption(APP_TAGLINE if _current_language(st) == 'English' else APP_TAGLINE_ES)
-        if selector == 'radio':
-            language = st.radio('Language / Idioma', ['English', 'Español'], key=language_key, horizontal=True)
-        else:
-            language = st.selectbox('Language / Idioma', ['English', 'Español'], key=language_key)
+        st.markdown('<div class="aba-sidebar-title">ABA Signal Pro</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="aba-sidebar-tagline">{html.escape(APP_TAGLINE if _current_language(st) == "English" else APP_TAGLINE_ES)}</div>',
+            unsafe_allow_html=True,
+        )
+        language = st.radio('Language / Idioma', ['English', 'Español'], key=language_key, horizontal=True)
         st.markdown('---')
         for item in TOOLS:
             label = _label(item, language)
