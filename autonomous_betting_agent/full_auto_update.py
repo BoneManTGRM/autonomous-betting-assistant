@@ -21,6 +21,7 @@ ESPN_SCOREBOARD_MAP = {
     'icehockey_nhl': ('hockey', 'nhl'),
     'soccer_epl': ('soccer', 'eng.1'),
 }
+ODDS_API_MAX_SCORE_DAYS_FROM = 3
 
 
 def get_api_key(override: str = '') -> str:
@@ -141,6 +142,15 @@ def fetch_espn_completed_scores(sport_key: str, *, days_from: int = 7) -> pd.Dat
     return pd.DataFrame(rows).drop_duplicates(subset=['event', 'event_start_utc', 'sport_key'])
 
 
+def _merge_result_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    valid = [frame for frame in frames if frame is not None and not frame.empty]
+    if not valid:
+        return pd.DataFrame()
+    merged = pd.concat(valid, ignore_index=True, sort=False)
+    dedupe_cols = [col for col in ['event', 'event_start_utc', 'sport_key', 'winner', 'final_score'] if col in merged.columns]
+    return merged.drop_duplicates(subset=dedupe_cols or None)
+
+
 def fetch_completed_scores_for_ledger(
     ledger: pd.DataFrame | list[dict[str, Any]],
     *,
@@ -152,25 +162,46 @@ def fetch_completed_scores_for_ledger(
     keys = [safe_text(sport_key)] if safe_text(sport_key) else sport_keys_from_ledger(locked)
     frames: list[pd.DataFrame] = []
     stats: list[dict[str, Any]] = []
+    requested_days = max(1, int(days_from))
+    odds_days = min(requested_days, ODDS_API_MAX_SCORE_DAYS_FROM)
     for key in keys:
         if not key:
             continue
+        sport_frames: list[pd.DataFrame] = []
+        odds_error = ''
         try:
-            payload = _get_json(f'/v4/sports/{key}/scores/', {'apiKey': api_key, 'daysFrom': int(days_from), 'dateFormat': 'iso'})
-            frame = odds_scores_to_result_frame_v2(payload)
-            stats.append({'sport_key': key, 'result_rows': int(len(frame)), 'status': 'ok', 'source': 'the_odds_api_scores'})
-            if not frame.empty:
-                frames.append(frame)
-            continue
+            payload = _get_json(f'/v4/sports/{key}/scores/', {'apiKey': api_key, 'daysFrom': odds_days, 'dateFormat': 'iso'})
+            odds_frame = odds_scores_to_result_frame_v2(payload)
+            if not odds_frame.empty:
+                sport_frames.append(odds_frame)
+            odds_status = 'ok'
         except Exception as exc:
+            odds_status = 'skipped_error'
             odds_error = _public_error(exc)
-        fallback = fetch_espn_completed_scores(key, days_from=int(days_from))
-        if not fallback.empty:
-            stats.append({'sport_key': key, 'result_rows': int(len(fallback)), 'status': 'ok_fallback', 'source': 'espn_scoreboard_fallback', 'odds_api_error': odds_error})
-            frames.append(fallback)
+        espn_frame = fetch_espn_completed_scores(key, days_from=requested_days)
+        if not espn_frame.empty:
+            sport_frames.append(espn_frame)
+        combined = _merge_result_frames(sport_frames)
+        if not combined.empty:
+            source = 'the_odds_api_scores'
+            status = 'ok'
+            if odds_status != 'ok' and not espn_frame.empty:
+                source = 'espn_scoreboard_fallback'
+                status = 'ok_fallback'
+            elif odds_status == 'ok' and not espn_frame.empty and requested_days > odds_days:
+                source = 'the_odds_api_scores+espn_scoreboard_fallback'
+                status = 'ok_augmented'
+            item = {'sport_key': key, 'result_rows': int(len(combined)), 'status': status, 'source': source, 'requested_days': requested_days, 'odds_api_days_from': odds_days}
+            if odds_error:
+                item['odds_api_error'] = odds_error
+            stats.append(item)
+            frames.append(combined)
         else:
-            stats.append({'sport_key': key, 'result_rows': 0, 'status': 'skipped_error', 'source': 'none', 'error': odds_error})
-    results = pd.concat(frames, ignore_index=True, sort=False).drop_duplicates() if frames else pd.DataFrame()
+            item = {'sport_key': key, 'result_rows': 0, 'status': 'skipped_error', 'source': 'none', 'requested_days': requested_days, 'odds_api_days_from': odds_days}
+            if odds_error:
+                item['error'] = odds_error
+            stats.append(item)
+    results = _merge_result_frames(frames)
     return results, stats
 
 
