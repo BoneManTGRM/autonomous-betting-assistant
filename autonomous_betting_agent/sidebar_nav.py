@@ -6,6 +6,7 @@ from typing import Any
 
 APP_TAGLINE = 'Powered by Reparodynamics'
 APP_TAGLINE_ES = 'Impulsado por Reparodynamics'
+GLOBAL_LANGUAGE_KEY = 'aba_global_language'
 LANGUAGE_KEYS = ['global_language','signal_board_language','pro_predictor_language','threshold_optimizer_language','what_are_the_odds_language','what_are_the_odds_pro_language','odds_lock_pro_language','public_proof_dashboard_language','storage_diagnostics_language','learning_memory_language','learning_impact_report_language','simulation_lab_language','proof_control_center_language','reset_storage_language']
 TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
@@ -46,7 +47,7 @@ def _language_label(value: Any) -> str:
 
 
 def _current_language(st: Any) -> str:
-    value = st.session_state.get('global_language')
+    value = st.session_state.get(GLOBAL_LANGUAGE_KEY)
     if value in ('English', 'Español'):
         return value
     for key in LANGUAGE_KEYS:
@@ -58,11 +59,8 @@ def _current_language(st: Any) -> str:
 
 def _sync_global_from_key(language_key: str) -> None:
     import streamlit as st
-    language = _language_label(st.session_state.get(language_key, st.session_state.get('global_language', 'English')))
-    st.session_state['global_language'] = language
-    for key in LANGUAGE_KEYS:
-        if key != language_key:
-            st.session_state[key] = language
+    language = _language_label(st.session_state.get(language_key, st.session_state.get(GLOBAL_LANGUAGE_KEY, 'English')))
+    st.session_state[GLOBAL_LANGUAGE_KEY] = language
 
 
 def _label(item: tuple[str, str, str], language: str) -> str:
@@ -72,18 +70,19 @@ def _label(item: tuple[str, str, str], language: str) -> str:
 def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'radio') -> str:
     import streamlit as st
     language = _language_label(_current_language(st))
-    st.session_state['global_language'] = language
-    st.session_state[language_key] = language
+    st.session_state[GLOBAL_LANGUAGE_KEY] = language
+    if st.session_state.get(language_key) not in (None, language):
+        try:
+            del st.session_state[language_key]
+        except Exception:
+            pass
     with st.sidebar:
         st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
         st.markdown('<div class="aba-sidebar-title">ABA Signal Pro</div>', unsafe_allow_html=True)
         tagline = APP_TAGLINE if language == 'English' else APP_TAGLINE_ES
         st.markdown(f'<div class="aba-sidebar-tagline">{html.escape(tagline)}</div>', unsafe_allow_html=True)
-        language = st.radio('Language / Idioma', ['English', 'Español'], key=language_key, horizontal=True, on_change=_sync_global_from_key, args=(language_key,))
-        st.session_state['global_language'] = language
-        for key in LANGUAGE_KEYS:
-            if key != language_key:
-                st.session_state[key] = language
+        language = st.radio('Language / Idioma', ['English', 'Español'], index=0 if language == 'English' else 1, key=language_key, horizontal=True, on_change=_sync_global_from_key, args=(language_key,))
+        st.session_state[GLOBAL_LANGUAGE_KEY] = language
         st.markdown('---')
         for item in TOOLS:
             label = _label(item, language)
