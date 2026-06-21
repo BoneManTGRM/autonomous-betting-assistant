@@ -6,22 +6,7 @@ from typing import Any
 
 APP_TAGLINE = 'Powered by Reparodynamics'
 APP_TAGLINE_ES = 'Impulsado por Reparodynamics'
-LANGUAGE_KEYS = [
-    'global_language',
-    'signal_board_language',
-    'pro_predictor_language',
-    'threshold_optimizer_language',
-    'what_are_the_odds_language',
-    'what_are_the_odds_pro_language',
-    'odds_lock_pro_language',
-    'public_proof_dashboard_language',
-    'storage_diagnostics_language',
-    'learning_memory_language',
-    'learning_impact_report_language',
-    'simulation_lab_language',
-    'proof_control_center_language',
-    'reset_storage_language',
-]
+LANGUAGE_KEYS = ['global_language','signal_board_language','pro_predictor_language','threshold_optimizer_language','what_are_the_odds_language','what_are_the_odds_pro_language','odds_lock_pro_language','public_proof_dashboard_language','storage_diagnostics_language','learning_memory_language','learning_impact_report_language','simulation_lab_language','proof_control_center_language','reset_storage_language']
 TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
@@ -35,43 +20,16 @@ TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Reset Storage', 'Reiniciar almacenamiento', 'pages/reset_storage.py'),
     ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory_safe.py'),
 )
-PRO_PREDICTOR_LARGE_LIST_70_DEFAULTS = {
-    'baseline_accuracy_min_books': 1,
-    'baseline_accuracy_min_model_prob': 0.58,
-    'baseline_accuracy_min_edge': -0.03,
-    'baseline_accuracy_strong_edge': 0.04,
-    'baseline_accuracy_min_strength': 38.0,
-    'baseline_accuracy_use_high_conf': True,
-    'baseline_accuracy_max_high_conf': 700,
-    'baseline_accuracy_min_high_prob': 0.58,
-    'baseline_accuracy_min_high_edge': -0.03,
-    'baseline_accuracy_min_high_strength': 38.0,
-    'baseline_accuracy_min_high_agent': 35.0,
-}
+PRO_PREDICTOR_LARGE_LIST_70_DEFAULTS = {'baseline_accuracy_min_books': 1,'baseline_accuracy_min_model_prob': 0.58,'baseline_accuracy_min_edge': -0.03,'baseline_accuracy_strong_edge': 0.04,'baseline_accuracy_min_strength': 38.0,'baseline_accuracy_use_high_conf': True,'baseline_accuracy_max_high_conf': 700,'baseline_accuracy_min_high_prob': 0.58,'baseline_accuracy_min_high_edge': -0.03,'baseline_accuracy_min_high_strength': 38.0,'baseline_accuracy_min_high_agent': 35.0}
 SIDEBAR_CSS = '''
 <style>
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"] { padding-top: 1.4rem; }
-section[data-testid="stSidebar"] a[href*="pages/"] {
-  display: block; padding: .62rem .82rem; border-radius: .75rem; margin: .18rem 0;
-  text-decoration: none !important; font-weight: 650;
-}
+section[data-testid="stSidebar"] a[href*="pages/"] { display: block; padding: .62rem .82rem; border-radius: .75rem; margin: .18rem 0; text-decoration: none !important; font-weight: 650; }
 section[data-testid="stSidebar"] a[href*="pages/"]:hover { background: rgba(255,255,255,.10); }
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 { margin-top: .65rem; }
-.aba-sidebar-title {
-  font-size: 1.45rem;
-  line-height: 1.2;
-  font-weight: 850;
-  margin: .35rem 0 .25rem 0;
-  background: linear-gradient(90deg, #f6d365 0%, #fda085 40%, #70e1f5 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
+.aba-sidebar-title { font-size: 1.45rem; line-height: 1.2; font-weight: 850; margin: .35rem 0 .25rem 0; background: linear-gradient(90deg, #f6d365 0%, #fda085 40%, #70e1f5 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .aba-sidebar-tagline { color: rgba(255,255,255,.62); margin-bottom: 1rem; }
-.aba-safe-download {
-  display:inline-block; padding:.65rem 1rem; border-radius:.7rem; background:#ef5350; color:#fff!important;
-  text-decoration:none!important; font-weight:700; margin:.35rem 0;
-}
+.aba-safe-download { display:inline-block; padding:.65rem 1rem; border-radius:.7rem; background:#ef5350; color:#fff!important; text-decoration:none!important; font-weight:700; margin:.35rem 0; }
 </style>
 '''
 
@@ -83,12 +41,28 @@ def normalize_language(value: Any) -> str:
     return 'en'
 
 
+def _language_label(value: Any) -> str:
+    return 'Español' if normalize_language(value) == 'es' else 'English'
+
+
 def _current_language(st: Any) -> str:
+    value = st.session_state.get('global_language')
+    if value in ('English', 'Español'):
+        return value
     for key in LANGUAGE_KEYS:
         value = st.session_state.get(key)
         if value in ('English', 'Español'):
             return value
     return 'English'
+
+
+def _sync_language(st: Any, language: str) -> None:
+    chosen = _language_label(language)
+    for key in LANGUAGE_KEYS:
+        try:
+            st.session_state[key] = chosen
+        except Exception:
+            pass
 
 
 def _label(item: tuple[str, str, str], language: str) -> str:
@@ -97,15 +71,18 @@ def _label(item: tuple[str, str, str], language: str) -> str:
 
 def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'radio') -> str:
     import streamlit as st
-
+    starting_language = _language_label(_current_language(st))
+    try:
+        st.session_state[language_key] = starting_language
+    except Exception:
+        pass
     with st.sidebar:
         st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
         st.markdown('<div class="aba-sidebar-title">ABA Signal Pro</div>', unsafe_allow_html=True)
-        st.markdown(
-            f'<div class="aba-sidebar-tagline">{html.escape(APP_TAGLINE if _current_language(st) == "English" else APP_TAGLINE_ES)}</div>',
-            unsafe_allow_html=True,
-        )
+        tagline = APP_TAGLINE if starting_language == 'English' else APP_TAGLINE_ES
+        st.markdown(f'<div class="aba-sidebar-tagline">{html.escape(tagline)}</div>', unsafe_allow_html=True)
         language = st.radio('Language / Idioma', ['English', 'Español'], key=language_key, horizontal=True)
+        _sync_language(st, language)
         st.markdown('---')
         for item in TOOLS:
             label = _label(item, language)
