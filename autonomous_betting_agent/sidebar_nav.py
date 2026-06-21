@@ -29,12 +29,10 @@ TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Threshold Optimizer', 'Optimizador de Umbral', 'pages/threshold_optimizer.py'),
     ('What Are the Odds', 'Cuáles Son las Cuotas', 'pages/what_are_the_odds.py'),
     ('Odds Lock Pro', 'Bloqueo de Cuotas Pro', 'pages/odds_lock_pro.py'),
-    ('Auto Result Sync', 'Sincronización Automática de Resultados', 'pages/auto_result_sync.py'),
     ('Proof Control Center', 'Centro de Control de Prueba', 'pages/proof_control_center.py'),
     ('Public Proof Dashboard', 'Panel Público de Prueba', 'pages/public_proof_dashboard.py'),
     ('Storage Diagnostics', 'Diagnóstico de Almacenamiento', 'pages/storage_diagnostics.py'),
     ('Reset Storage', 'Reiniciar almacenamiento', 'pages/reset_storage.py'),
-    ('Auto Learning Cycle', 'Ciclo Automático de Aprendizaje', 'pages/auto_learning_cycle.py'),
     ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory_safe.py'),
 )
 PRO_PREDICTOR_LARGE_LIST_70_DEFAULTS = {
