@@ -19,6 +19,8 @@ HELD_KEYS = {
     'odds_lock_pro_locked_rows',
     'public_proof_dashboard_refresh_rows',
 }
+PROOF_KEYS = {'odds_lock_pro_locked_rows', 'public_proof_dashboard_refresh_rows'}
+LATEST_ALIAS_KEYS = {'what_are_the_odds_latest_rows', 'pro_predictor_latest_rows', 'pro_predictor_high_confidence_rows', 'ara_latest_predictions'}
 _FALLBACK_MEMORY: dict[str, list[dict[str, Any]]] = {}
 GITHUB_API = 'https://api.github.com'
 GITHUB_STATE_DIR = '.aba_state'
@@ -118,15 +120,62 @@ def _github_headers(token: str) -> dict[str, str]:
     }
 
 
+def _clean_key(value: Any) -> str:
+    return ' '.join(str(value or '').strip().lower().replace('-', ' ').replace('_', ' ').split())
+
+
+def _row_identity(row: dict[str, Any]) -> tuple[str, ...]:
+    proof_id = _clean_key(row.get('proof_id'))
+    if proof_id:
+        return ('proof_id', proof_id)
+    stable = _clean_key(row.get('stable_pick_key') or row.get('source_pick_key') or row.get('pick_key'))
+    if stable:
+        return ('stable', stable)
+    event_id = _clean_key(row.get('event_id') or row.get('game_id') or row.get('fixture_id'))
+    if event_id:
+        return (
+            'event_id',
+            event_id,
+            _clean_key(row.get('market_type') or row.get('market')),
+            _clean_key(row.get('line_point') or row.get('line')),
+            _clean_key(row.get('prediction') or row.get('pick') or row.get('selection')),
+        )
+    return (
+        'event',
+        _clean_key(row.get('event') or row.get('event_name') or row.get('game') or row.get('match')),
+        _clean_key(row.get('sport') or row.get('sport_key') or row.get('league')),
+        _clean_key(row.get('market_type') or row.get('market')),
+        _clean_key(row.get('line_point') or row.get('line')),
+        _clean_key(row.get('prediction') or row.get('pick') or row.get('selection')),
+        _clean_key(row.get('event_start_utc') or row.get('commence_time') or row.get('start')),
+    )
+
+
+def dedupe_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep one row per durable identity while preserving the newest copy.
+
+    This prevents repeated button clicks from inflating durable storage counts.
+    """
+    deduped: dict[tuple[str, ...], dict[str, Any]] = {}
+    order: list[tuple[str, ...]] = []
+    for raw in rows:
+        row = dict(raw)
+        key = _row_identity(row)
+        if key not in deduped:
+            order.append(key)
+        deduped[key] = row
+    return [deduped[key] for key in order]
+
+
 def rows_from_any(value: Any) -> list[dict[str, Any]]:
     if value is None:
         return []
     if isinstance(value, pd.DataFrame):
         if value.empty:
             return []
-        return value.to_dict(orient='records')
+        return dedupe_rows(value.to_dict(orient='records'))
     if isinstance(value, list):
-        return [dict(row) for row in value if isinstance(row, dict)]
+        return dedupe_rows([dict(row) for row in value if isinstance(row, dict)])
     return []
 
 
@@ -138,7 +187,7 @@ def _write_payload(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _empty_payload(key: str, workspace_id: Any = 'test_01') -> dict[str, Any]:
-    return {'version': 'held-picks-v7-github-chunked', 'workspace_id': normalize_workspace_id(workspace_id), 'key': key, 'rows': []}
+    return {'version': 'held-picks-v8-deduped', 'workspace_id': normalize_workspace_id(workspace_id), 'key': key, 'rows': []}
 
 
 def _github_get_json(path: str) -> tuple[dict[str, Any], str, int]:
@@ -191,31 +240,41 @@ def _github_get_payload(key: str, workspace_id: Any = 'test_01') -> tuple[list[d
             part_payload, _part_sha, _ = _github_get_json(_github_part_path(key, workspace_id, part))
             part_rows = part_payload.get('rows', [])
             rows.extend([dict(row) for row in part_rows if isinstance(row, dict)])
-        return rows, index_sha
+        return dedupe_rows(rows), index_sha
     payload, sha, _ = _github_get_json(_github_path(key, workspace_id))
     rows = payload.get('rows', [])
-    return [dict(row) for row in rows if isinstance(row, dict)], sha
+    return dedupe_rows([dict(row) for row in rows if isinstance(row, dict)]), sha
 
 
 def _github_save_payload(key: str, rows: list[dict[str, Any]], workspace_id: Any = 'test_01') -> bool:
     if not github_store_enabled():
         return False
     workspace = normalize_workspace_id(workspace_id)
-    parts = [rows[index:index + GITHUB_CHUNK_SIZE] for index in range(0, len(rows), GITHUB_CHUNK_SIZE)] or [[]]
+    cleaned = dedupe_rows(rows)
+    old_index, _old_sha, _ = _github_get_json(_github_index_path(key, workspace))
+    old_parts = int(old_index.get('parts') or 0) if old_index.get('format') == 'chunked' else 0
+    parts = [cleaned[index:index + GITHUB_CHUNK_SIZE] for index in range(0, len(cleaned), GITHUB_CHUNK_SIZE)] or [[]]
     ok = True
     for part_index, part_rows in enumerate(parts):
         ok = _github_put_json(
             _github_part_path(key, workspace, part_index),
-            {'version': 'held-picks-v7-github-chunked', 'format': 'chunk', 'workspace_id': workspace, 'key': key, 'part': part_index, 'rows': part_rows},
+            {'version': 'held-picks-v8-deduped', 'format': 'chunk', 'workspace_id': workspace, 'key': key, 'part': part_index, 'rows': part_rows},
             f'Persist {key} part {part_index} for {workspace}',
         ) and ok
+    # Clear stale old chunks so old 1120-row ledgers cannot reappear after a smaller clean save.
+    for stale_part in range(len(parts), old_parts):
+        ok = _github_put_json(
+            _github_part_path(key, workspace, stale_part),
+            {'version': 'held-picks-v8-deduped', 'format': 'chunk', 'workspace_id': workspace, 'key': key, 'part': stale_part, 'rows': []},
+            f'Clear stale {key} part {stale_part} for {workspace}',
+        ) and ok
     index_payload = {
-        'version': 'held-picks-v7-github-chunked',
+        'version': 'held-picks-v8-deduped',
         'format': 'chunked',
         'workspace_id': workspace,
         'key': key,
         'parts': len(parts),
-        'rows_count': len(rows),
+        'rows_count': len(cleaned),
         'chunk_size': GITHUB_CHUNK_SIZE,
     }
     ok = _github_put_json(_github_index_path(key, workspace), index_payload, f'Persist {key} index for {workspace}') and ok
@@ -229,24 +288,20 @@ def save_held_rows(key: str, rows: Any, workspace_id: Any = 'test_01') -> int:
     cleaned = rows_from_any(rows)
     store = _memory_store()
     store[_store_key(key, workspace)] = cleaned
-    if workspace != 'test_01':
-        store[_store_key(key, 'test_01')] = cleaned
-    store[_store_key(f'latest_{key}', 'test_01')] = cleaned
+    if key in LATEST_ALIAS_KEYS:
+        store[_store_key(f'latest_{key}', workspace)] = cleaned
     try:
-        payload = {'version': 'held-picks-v7-github-chunked', 'workspace_id': workspace, 'key': key, 'rows': cleaned}
+        payload = {'version': 'held-picks-v8-deduped', 'workspace_id': workspace, 'key': key, 'rows': cleaned}
         _write_payload(_path_for(key, workspace), payload)
         _write_payload(_backup_path_for(key, workspace), payload)
-        if workspace != 'test_01':
-            _write_payload(_path_for(key, 'test_01'), {'version': 'held-picks-v7-github-chunked', 'workspace_id': 'test_01', 'key': key, 'rows': cleaned})
-        _write_payload(_path_for(f'latest_{key}', 'test_01'), {'version': 'held-picks-v7-github-chunked', 'workspace_id': 'test_01', 'key': f'latest_{key}', 'rows': cleaned})
+        if key in LATEST_ALIAS_KEYS:
+            _write_payload(_path_for(f'latest_{key}', workspace), {'version': 'held-picks-v8-deduped', 'workspace_id': workspace, 'key': f'latest_{key}', 'rows': cleaned})
     except Exception:
         pass
     try:
         _github_save_payload(key, cleaned, workspace)
-        if workspace != 'test_01':
-            _github_save_payload(key, cleaned, 'test_01')
-        if key in {'odds_lock_pro_locked_rows', 'public_proof_dashboard_refresh_rows', 'ara_latest_predictions'}:
-            _github_save_payload(f'latest_{key}', cleaned, 'test_01')
+        if key in LATEST_ALIAS_KEYS:
+            _github_save_payload(f'latest_{key}', cleaned, workspace)
     except Exception:
         pass
     return len(cleaned)
@@ -256,7 +311,13 @@ def clear_held_rows(key: str, workspace_id: Any = 'test_01') -> int:
     if key not in HELD_KEYS:
         return 0
     workspace = normalize_workspace_id(workspace_id)
-    aliases = [(key, workspace), (key, 'test_01'), (f'latest_{key}', 'test_01')]
+    aliases = [(key, workspace)]
+    if key in LATEST_ALIAS_KEYS:
+        aliases.append((f'latest_{key}', workspace))
+    # Also clear legacy test_01/latest aliases that older builds wrote to.
+    if workspace != 'test_01':
+        aliases.append((key, 'test_01'))
+        aliases.append((f'latest_{key}', 'test_01'))
     store = _memory_store()
     for alias_key, alias_workspace in aliases:
         store[_store_key(alias_key, alias_workspace)] = []
@@ -282,9 +343,16 @@ def _load_payload(path: Path) -> list[dict[str, Any]]:
             return []
         payload = json.loads(path.read_text(encoding='utf-8'))
         rows = payload.get('rows', [])
-        return [dict(row) for row in rows if isinstance(row, dict)]
+        return dedupe_rows([dict(row) for row in rows if isinstance(row, dict)])
     except Exception:
         return []
+
+
+def _candidate_lookups(key: str, workspace: str) -> list[tuple[str, str]]:
+    lookups = [(key, workspace)]
+    if key in LATEST_ALIAS_KEYS:
+        lookups.append((f'latest_{key}', workspace))
+    return lookups
 
 
 def load_held_rows(key: str, workspace_id: Any = 'test_01') -> list[dict[str, Any]]:
@@ -292,14 +360,10 @@ def load_held_rows(key: str, workspace_id: Any = 'test_01') -> list[dict[str, An
         return []
     workspace = normalize_workspace_id(workspace_id)
     store = _memory_store()
-    for lookup_key, lookup_workspace in [
-        (key, workspace),
-        (key, 'test_01'),
-        (f'latest_{key}', 'test_01'),
-    ]:
-        memory_rows = store.get(_store_key(lookup_key, lookup_workspace), [])
+    for lookup_key, lookup_workspace in _candidate_lookups(key, workspace):
+        memory_rows = dedupe_rows(store.get(_store_key(lookup_key, lookup_workspace), []))
         if memory_rows:
-            return [dict(row) for row in memory_rows if isinstance(row, dict)]
+            return memory_rows
         for path in [_path_for(lookup_key, lookup_workspace), _backup_path_for(lookup_key, lookup_workspace)]:
             rows = _load_payload(path)
             if rows:
@@ -309,15 +373,6 @@ def load_held_rows(key: str, workspace_id: Any = 'test_01') -> list[dict[str, An
         if rows:
             store[_store_key(lookup_key, lookup_workspace)] = rows
             return rows
-    try:
-        safe = _safe_key(key)
-        for path in sorted(DATA_DIR.glob(f'held_picks_*_{safe}.json'), key=lambda p: p.stat().st_mtime, reverse=True):
-            rows = _load_payload(path)
-            if rows:
-                store[_store_key(key, workspace)] = rows
-                return rows
-    except Exception:
-        pass
     return []
 
 
