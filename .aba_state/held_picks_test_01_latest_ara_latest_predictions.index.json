@@ -3,7 +3,7 @@
   "format": "chunked",
   "workspace_id": "test_01",
   "key": "latest_ara_latest_predictions",
-  "parts": 1,
-  "rows_count": 38,
+  "parts": 6,
+  "rows_count": 261,
   "chunk_size": 50
 }
