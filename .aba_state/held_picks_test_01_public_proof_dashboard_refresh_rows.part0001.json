@@ -131,7 +131,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -163,7 +163,13 @@
       "proof_hash": "53c1488826d8c06edb40500463fcedf2c078d87a54be4a3ee4e96cf3d166aa5a",
       "proof_id": "OLP-53C1488826D8",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5318,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Haiti at Morocco",
@@ -291,7 +297,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -323,7 +329,13 @@
       "proof_hash": "d8ed9d348f0075303d4ee76cdad2bd1f1e9fa75a0ff03a267d6ab05498455a4b",
       "proof_id": "OLP-D8ED9D348F00",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6016,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Chicago Cubs at New York Mets",
@@ -451,7 +463,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -483,7 +495,13 @@
       "proof_hash": "7799e4345ef435f945d97a29b7c48a96951de6d599594cd018512b5508e50754",
       "proof_id": "OLP-7799E4345EF4",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6591,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Minnesota Twins at Arizona Diamondbacks",
@@ -519,7 +537,7 @@
       "fusion_warning": "",
       "match_score": "100%",
       "prediction_timestamp": "2026-06-21T18:26:17Z",
-      "result_status": "pending",
+      "result_status": "win",
       "odds_api_source_used": "yes",
       "sportsdataio_source_used": "no",
       "sportsdataio_status": "used",
@@ -608,10 +626,10 @@
       "source_file": NaN,
       "american_odds": "",
       "odds_timestamp": "",
-      "winner": "",
-      "final_score": "",
+      "winner": "Minnesota Twins",
+      "final_score": "Minnesota Twins 16 - 8 Arizona Diamondbacks",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": 0.5615,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -643,7 +661,13 @@
       "proof_hash": "7c904bbc785a85c3c6afdd57411e68c7c8cee92a557840dac28144608d7d7a2c",
       "proof_id": "OLP-7C904BBC785A",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 1.0,
+      "auto_result_status": "spread_cover",
+      "matched_event": "Minnesota Twins at Arizona Diamondbacks",
+      "home_score": 8.0,
+      "away_score": 16.0,
+      "graded_at_utc": "2026-06-21T18:26:47+00:00"
     },
     {
       "event": "DR Congo at Colombia",
@@ -771,7 +795,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -803,7 +827,13 @@
       "proof_hash": "605b418369e2e389e8d4fe3c1b19f58ccfbaa3665ad0c185a0d7567bd6e54c11",
       "proof_id": "OLP-605B418369E2",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5449,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "England at Panama",
@@ -931,7 +961,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -963,7 +993,13 @@
       "proof_hash": "162b39e651815f45bf79926d008e41825b92726ccd30079a0714fe118e14921f",
       "proof_id": "OLP-162B39E65181",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5437,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Argentina at Jordan",
@@ -1091,7 +1127,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -1123,7 +1159,13 @@
       "proof_hash": "05324157a3a4088ffe3fa9fa38f80ec3dafeed2c37c024e8cac043260e9ab33d",
       "proof_id": "OLP-05324157A3A4",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5206,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Belgium at New Zealand",
@@ -1251,7 +1293,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -1283,7 +1325,13 @@
       "proof_hash": "6720ce6f2f1e095138915304ed861561426db9e41485aa6a48019534354cb563",
       "proof_id": "OLP-6720CE6F2F1E",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5407,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Cleveland Guardians at Chicago White Sox",
@@ -1411,7 +1459,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -1443,7 +1491,13 @@
       "proof_hash": "b4c717f01a44411b0006aa1e8d6cc4e859433a2138822786b63f6ea9b5ad661b",
       "proof_id": "OLP-B4C717F01A44",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6409,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Qatar at Bosnia & Herzegovina",
@@ -1571,7 +1625,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -1603,7 +1657,13 @@
       "proof_hash": "040f224e02edc5f453ed844da2eb2f17a5119a8e9d8f97d1baf9ab5e37ac3f34",
       "proof_id": "OLP-040F224E02ED",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5318,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Senegal at Norway",
@@ -1731,7 +1791,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -1763,7 +1823,13 @@
       "proof_hash": "6b7ae2537baf158f6324025143e64f2221d1ba00fff8158607ef96a1d45e35e4",
       "proof_id": "OLP-6B7AE2537BAF",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5184,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Jean Matsumoto at Bekzat Almakhan",
@@ -1891,7 +1957,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -1923,7 +1989,13 @@
       "proof_hash": "e76490fb413b7bdd007cf361135127516aaad6b9a332bee53a82115b9af01a5e",
       "proof_id": "OLP-E76490FB413B",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.37,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Ghana at England",
@@ -2051,7 +2123,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -2083,7 +2155,13 @@
       "proof_hash": "8cbc38fed1af00204dc637582093d6422703a7f2576b40fa9593dd07b304e792",
       "proof_id": "OLP-8CBC38FED1AF",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5565,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Uzbekistan at Portugal",
@@ -2211,7 +2289,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -2243,7 +2321,13 @@
       "proof_hash": "0e7010b19687eb38aa59c8303e44dcb1efad0afb1100408c2663ae883c32ca74",
       "proof_id": "OLP-0E7010B19687",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5184,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "New York Yankees at Detroit Tigers",
@@ -2371,7 +2455,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -2403,7 +2487,13 @@
       "proof_hash": "eda82c3572a2bd090f055d94fcf2bec741cdc89a5df128cbf4fda8692c4e82f5",
       "proof_id": "OLP-EDA82C3572A2",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5778,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Austria at Algeria",
@@ -2531,7 +2621,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -2563,7 +2653,13 @@
       "proof_hash": "b57d5bc48bb3f425dfc7a338fecad40e3e67a16f643cc668765c8b97b40d6aeb",
       "proof_id": "OLP-B57D5BC48BB3",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6441,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Netherlands at Tunisia",
@@ -2691,7 +2787,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -2723,7 +2819,13 @@
       "proof_hash": "d03b0c7436b23dbe3c98f28de5c43bcf7cb7c070ebea1595e6dcaff8e1ec32fc",
       "proof_id": "OLP-D03B0C7436B2",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6289,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Minnesota Twins at Arizona Diamondbacks",
@@ -2759,7 +2861,7 @@
       "fusion_warning": "",
       "match_score": "100%",
       "prediction_timestamp": "2026-06-21T18:26:17Z",
-      "result_status": "pending",
+      "result_status": "win",
       "odds_api_source_used": "yes",
       "sportsdataio_source_used": "no",
       "sportsdataio_status": "used",
@@ -2848,10 +2950,10 @@
       "source_file": NaN,
       "american_odds": "",
       "odds_timestamp": "",
-      "winner": "",
-      "final_score": "",
+      "winner": "Minnesota Twins",
+      "final_score": "Minnesota Twins 16 - 8 Arizona Diamondbacks",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": 0.6,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -2883,7 +2985,13 @@
       "proof_hash": "89a22e11377c4be7e8610b1bc3a081529a4883b0de4c1a65d1ac1782e85f7c26",
       "proof_id": "OLP-89A22E11377C",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 1.0,
+      "auto_result_status": "total_over_hit",
+      "matched_event": "Minnesota Twins at Arizona Diamondbacks",
+      "home_score": 8.0,
+      "away_score": 16.0,
+      "graded_at_utc": "2026-06-21T18:26:47+00:00"
     },
     {
       "event": "Boston Red Sox at Seattle Mariners",
@@ -2919,7 +3027,7 @@
       "fusion_warning": "",
       "match_score": "100%",
       "prediction_timestamp": "2026-06-21T18:26:17Z",
-      "result_status": "pending",
+      "result_status": "win",
       "odds_api_source_used": "yes",
       "sportsdataio_source_used": "no",
       "sportsdataio_status": "used",
@@ -3008,10 +3116,10 @@
       "source_file": NaN,
       "american_odds": "",
       "odds_timestamp": "",
-      "winner": "",
-      "final_score": "",
+      "winner": "Boston Red Sox",
+      "final_score": "Boston Red Sox 5 - 1 Seattle Mariners",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": 0.6,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -3043,7 +3151,13 @@
       "proof_hash": "e5f49481734979b911cdad88c58c0efdf233577025d1ec0158c3c5c17985e758",
       "proof_id": "OLP-E5F494817349",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 1.0,
+      "auto_result_status": "total_over_hit",
+      "matched_event": "Boston Red Sox at Seattle Mariners",
+      "home_score": 1.0,
+      "away_score": 5.0,
+      "graded_at_utc": "2026-06-21T18:26:47+00:00"
     },
     {
       "event": "Ivory Coast at Curaçao",
@@ -3171,7 +3285,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -3203,7 +3317,13 @@
       "proof_hash": "2c7d989b3cd58a2b96e4d198794d1afd9f327e5ae3a3c29bb3180b30a1406706",
       "proof_id": "OLP-2C7D989B3CD5",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6909,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Iran at Belgium",
@@ -3331,7 +3451,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -3363,7 +3483,13 @@
       "proof_hash": "7007c6988779fc4b9c0142f922395563625ae32735ea81a74465ce8d3f1977c2",
       "proof_id": "OLP-7007C6988779",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6394,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Pittsburgh Pirates at Colorado Rockies",
@@ -3399,7 +3525,7 @@
       "fusion_warning": "",
       "match_score": "100%",
       "prediction_timestamp": "2026-06-21T18:26:17Z",
-      "result_status": "pending",
+      "result_status": "loss",
       "odds_api_source_used": "yes",
       "sportsdataio_source_used": "no",
       "sportsdataio_status": "used",
@@ -3488,10 +3614,10 @@
       "source_file": NaN,
       "american_odds": "",
       "odds_timestamp": "",
-      "winner": "",
-      "final_score": "",
+      "winner": "Colorado Rockies",
+      "final_score": "Pittsburgh Pirates 1 - 2 Colorado Rockies",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": -1.0,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -3523,7 +3649,13 @@
       "proof_hash": "a947beee9792d35ed37f68b4894389a151c2da50cd0e62083064d75a98bb3352",
       "proof_id": "OLP-A947BEEE9792",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 1.0,
+      "auto_result_status": "total_over_miss",
+      "matched_event": "Pittsburgh Pirates at Colorado Rockies",
+      "home_score": 2.0,
+      "away_score": 1.0,
+      "graded_at_utc": "2026-06-21T18:26:47+00:00"
     },
     {
       "event": "Brazil at Scotland",
@@ -3651,7 +3783,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -3683,7 +3815,13 @@
       "proof_hash": "d1f2b71ee4f175c0434afaa8d9d60a390959d0af32c8b18cf8dc156f30e8f2ef",
       "proof_id": "OLP-D1F2B71EE4F1",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6419,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "San Diego Padres at Texas Rangers",
@@ -3811,7 +3949,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -3843,7 +3981,13 @@
       "proof_hash": "b654592aecc37c71de2fdba082ab1bb8a48db447d1bc08528241a6e82b48ff65",
       "proof_id": "OLP-B654592AECC3",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.85,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Washington Mystics at Minnesota Lynx",
@@ -3971,7 +4115,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -4003,7 +4147,13 @@
       "proof_hash": "bc8c82a3ff1be43c9ca2b02270e93a2702d0c3d078ba932de7c41b645d63eb4b",
       "proof_id": "OLP-BC8C82A3FF1B",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6797,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Iraq at France",
@@ -4131,7 +4281,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -4163,7 +4313,13 @@
       "proof_hash": "d28cd2bc3519e708e83fab83017922e7f40a6be1fedfb4585a60a9bee0c59f96",
       "proof_id": "OLP-D28CD2BC3519",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5389,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Iran at Egypt",
@@ -4291,7 +4447,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -4323,7 +4479,13 @@
       "proof_hash": "e0c6b6f9733e759a70207cb035462e177a6ce6b709bccea0b42053e23d26ff39",
       "proof_id": "OLP-E0C6B6F9733E",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5113,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "DR Congo at Colombia",
@@ -4451,7 +4613,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -4483,7 +4645,13 @@
       "proof_hash": "6e9433a600da52a1e250df8e367131441a4af63601c7ff2f488ec9d4cb16f9c1",
       "proof_id": "OLP-6E9433A600DA",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5449,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "France at Norway",
@@ -4611,7 +4779,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -4643,7 +4811,13 @@
       "proof_hash": "a6add20e90fa40845329e3484f2060e6879e1e6b9db139eb48b7e45ef24228c4",
       "proof_id": "OLP-A6ADD20E90FA",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Houston Astros at Toronto Blue Jays",
@@ -4771,7 +4945,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -4803,7 +4977,13 @@
       "proof_hash": "31fdd9946d8355b8e9531708198dbe023d438ca77b4da191a52971073a22240e",
       "proof_id": "OLP-31FDD9946D83",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5355,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Argentina at Jordan",
@@ -4931,7 +5111,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -4963,7 +5143,13 @@
       "proof_hash": "e377df033fd03f055f674c542128269d3718b38c1a05984e4eb82a7f7cd991b3",
       "proof_id": "OLP-E377DF033FD0",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5206,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Boston Red Sox at Seattle Mariners",
@@ -4999,7 +5185,7 @@
       "fusion_warning": "",
       "match_score": "100%",
       "prediction_timestamp": "2026-06-21T18:26:17Z",
-      "result_status": "pending",
+      "result_status": "loss",
       "odds_api_source_used": "yes",
       "sportsdataio_source_used": "no",
       "sportsdataio_status": "used",
@@ -5088,10 +5274,10 @@
       "source_file": NaN,
       "american_odds": "",
       "odds_timestamp": "",
-      "winner": "",
-      "final_score": "",
+      "winner": "Boston Red Sox",
+      "final_score": "Boston Red Sox 5 - 1 Seattle Mariners",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": -1.0,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -5123,7 +5309,13 @@
       "proof_hash": "e20556255e2362673bdf82b1f93d803d3c940633a987685e1b3423121ccdd3b8",
       "proof_id": "OLP-E20556255E23",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 1.0,
+      "auto_result_status": "spread_no_cover",
+      "matched_event": "Boston Red Sox at Seattle Mariners",
+      "home_score": 1.0,
+      "away_score": 5.0,
+      "graded_at_utc": "2026-06-21T18:26:47+00:00"
     },
     {
       "event": "Algeria at Jordan",
@@ -5251,7 +5443,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -5283,7 +5475,13 @@
       "proof_hash": "290427bd9f63068fe515aad79109c7a2490cf70e440f409c04a0726482000aa1",
       "proof_id": "OLP-290427BD9F63",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5318,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Egypt at New Zealand",
@@ -5411,7 +5609,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -5443,7 +5641,13 @@
       "proof_hash": "1c15b6248f4e60f33398ce39f3d71c857330079d2d44333fda449957c8f5ee0f",
       "proof_id": "OLP-1C15B6248F4E",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5598,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Haiti at Morocco",
@@ -5571,7 +5775,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -5603,7 +5807,13 @@
       "proof_hash": "2c7bc083f2264909653e879304f441da1f0bda4a6b90a8cb5548c31ec9970ed8",
       "proof_id": "OLP-2C7BC083F226",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6016,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Australia at Paraguay",
@@ -5731,7 +5941,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -5763,7 +5973,13 @@
       "proof_hash": "017ccf56b5b1d6256362c51fea157b19663040d2242ca7269383640fcbce52b0",
       "proof_id": "OLP-017CCF56B5B1",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6797,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "South Korea at South Africa",
@@ -5891,7 +6107,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -5923,7 +6139,13 @@
       "proof_hash": "011fef74936c5dbf2e6417fc8a1b7dd76ded46a5a2255370709578f7333f1139",
       "proof_id": "OLP-011FEF74936C",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6458,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Ivory Coast at Curaçao",
@@ -6051,7 +6273,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -6083,7 +6305,13 @@
       "proof_hash": "817c1343d29ee4ea04fecb064fa5b960695b4aa87855f0677abb591b9e910326",
       "proof_id": "OLP-817C1343D29E",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6909,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Australia at Paraguay",
@@ -6211,7 +6439,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -6243,7 +6471,13 @@
       "proof_hash": "b2ab608ae1c0f0fa6df949fb2480c753abc144e877ecbd9fe663dc8aa08d21c9",
       "proof_id": "OLP-B2AB608AE1C0",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6797,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Cape Verde at Uruguay",
@@ -6371,7 +6605,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -6403,7 +6637,13 @@
       "proof_hash": "05ea3b60f9f4f429cb1009f018f65a45614c1fd2f834c6dea6d49a3f7011a5d2",
       "proof_id": "OLP-05EA3B60F9F4",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6027,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Netherlands at Tunisia",
@@ -6531,7 +6771,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -6563,7 +6803,13 @@
       "proof_hash": "27e85efb5921eef96ae9e922ccc862c8b7dbb56ef10b282e6ced57365668ce8f",
       "proof_id": "OLP-27E85EFB5921",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6289,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Senegal at Norway",
@@ -6691,7 +6937,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -6723,7 +6969,13 @@
       "proof_hash": "6ec30364fda87e45e409a22b9c438630c2e3c9f2237332ecaad5a7585eaaafe2",
       "proof_id": "OLP-6EC30364FDA8",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5184,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "DR Congo at Colombia",
@@ -6851,7 +7103,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -6883,7 +7135,13 @@
       "proof_hash": "641b5d65d66158e068c46890824cd3b82a22e87e1a98eaaff7190f05f6f2f2f0",
       "proof_id": "OLP-641B5D65D661",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5449,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Cape Verde at Uruguay",
@@ -7011,7 +7269,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -7043,7 +7301,13 @@
       "proof_hash": "a82d48a4d11fa1ed143e77b7f013a8288fb8bcd3f89d3202c04fbad62afdc539",
       "proof_id": "OLP-A82D48A4D11F",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6027,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Netherlands at Tunisia",
@@ -7171,7 +7435,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -7203,7 +7467,13 @@
       "proof_hash": "6134c68bf802e8754eb0886bdbf979010bda7d2ff10cc289e04537acfe76a307",
       "proof_id": "OLP-6134C68BF802",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6289,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Qatar at Bosnia & Herzegovina",
@@ -7331,7 +7601,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -7363,7 +7633,13 @@
       "proof_hash": "7081f8db9df71d37724cd4a2365ed4afa3d3ffd9a91a76b0bb237b928a0e7280",
       "proof_id": "OLP-7081F8DB9DF7",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5318,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Ivory Coast at Curaçao",
@@ -7491,7 +7767,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -7523,7 +7799,13 @@
       "proof_hash": "1d6bf9da5c3835cf40a6a07ffb1ce574b596c06c8cf5360e198c496c55b229fc",
       "proof_id": "OLP-1D6BF9DA5C38",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6909,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "England at Panama",
@@ -7651,7 +7933,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -7683,7 +7965,13 @@
       "proof_hash": "fd74aa7af44cb2af93f35766f331cd702f834aad1e74747a9b895f609811220d",
       "proof_id": "OLP-FD74AA7AF44C",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.5437,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "USA at Turkey",
@@ -7811,7 +8099,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -7843,7 +8131,13 @@
       "proof_hash": "f0d91817dda381fb340998c4068a214800eea3a44e4d90b3dd7538954ca3b511",
       "proof_id": "OLP-F0D91817DDA3",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.6919,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     },
     {
       "event": "Canada at Switzerland",
@@ -7971,7 +8265,7 @@
       "winner": "",
       "final_score": "",
       "stake_units": 1.0,
-      "profit_units": null,
+      "profit_units": NaN,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -8003,7 +8297,13 @@
       "proof_hash": "9391bf3d5653467eb74c04a335fed6767bfd8711e79ec53c023f1835591434eb",
       "proof_id": "OLP-9391BF3D5653",
       "clv_percent": "",
-      "beat_close": ""
+      "beat_close": "",
+      "auto_result_match_confidence": 0.55,
+      "auto_result_status": "needs_review_no_match",
+      "matched_event": NaN,
+      "home_score": NaN,
+      "away_score": NaN,
+      "graded_at_utc": NaN
     }
   ]
 }
