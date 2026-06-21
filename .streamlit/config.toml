@@ -1,4 +1,4 @@
-# deploy trigger: toolbar-v17
+# deploy trigger: crash-fix-v18
 [server]
 headless = true
 
