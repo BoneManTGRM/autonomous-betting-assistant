@@ -6,6 +6,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from autonomous_betting_agent.odds_quality import audit_prices
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
 st.set_page_config(page_title='What Are the Odds', layout='wide')
@@ -38,6 +39,9 @@ TEXT = {
         'waiting': 'Fill event, pick, probability, and decimal or American price. Or upload/paste CSV text / use latest session rows.',
         'saved': 'Rows are saved automatically for Odds Lock Pro and the public dashboard.',
         'deduped': 'Merged rows deduplicated before handoff.',
+        'safety': 'Price safety gate',
+        'passed': 'Passed',
+        'review': 'Needs review',
     },
     'es': {
         'title': 'What Are the Odds',
@@ -65,6 +69,9 @@ TEXT = {
         'waiting': 'Llena evento, pick, probabilidad y precio decimal o americano. O sube/pega CSV / usa filas recientes.',
         'saved': 'Las filas se guardan automáticamente para Odds Lock Pro y el dashboard público.',
         'deduped': 'Filas combinadas deduplicadas antes de enviarlas.',
+        'safety': 'Revisión de precio',
+        'passed': 'Aprobadas',
+        'review': 'Revisar',
     },
 }
 
@@ -127,24 +134,7 @@ def _has_rich_odds(row: pd.Series) -> bool:
     return any(col in row.index and pd.notna(row.get(col)) and str(row.get(col)).strip() not in ('', 'nan', 'None') for col in rich_cols)
 
 
-def _dedupe_sort_value(row: pd.Series) -> tuple[int, int, float, str]:
-    rich = 1 if _has_rich_odds(row) else 0
-    lock_ready = 1 if str(row.get('lock_ready', '')).strip().lower() in ('true', '1', 'yes') else 0
-    score = safe_float(row.get('agent_score'), 0.0) or 0.0
-    source = _clean_text(row.get('source_file'))
-    return (rich, lock_ready, score, source)
-
-
 def dedupe_merged_rows(frame: pd.DataFrame) -> tuple[pd.DataFrame, int]:
-    """Remove accidental duplicate imports while keeping distinct markets.
-
-    Priority order:
-    1. Exact full-row duplicates.
-    2. Exact prediction-market duplicates by event_id/event, market, line and prediction.
-    3. Fallback result-only rows when a richer odds row for the same event+prediction exists.
-
-    This intentionally keeps different markets for the same game, e.g. h2h and totals.
-    """
     if frame.empty:
         return frame, 0
 
@@ -170,7 +160,6 @@ def dedupe_merged_rows(frame: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     work['_aba_lock'] = work.get('lock_ready', pd.Series('', index=work.index)).map(lambda value: 1 if str(value).strip().lower() in ('true', '1', 'yes') else 0)
     work['_aba_agent_score_sort'] = work.get('agent_score', pd.Series(0, index=work.index)).map(lambda value: safe_float(value, 0.0) or 0.0)
 
-    # Drop duplicate rows for the same exact market/pick; richer rows win.
     sort_cols = ['_aba_rich', '_aba_lock', '_aba_agent_score_sort']
     work = work.sort_values(sort_cols, ascending=[False, False, False], kind='mergesort')
     exact_key_cols = ['_aba_event_key', '_aba_market_key', '_aba_line_key', '_aba_prediction_key']
@@ -179,7 +168,6 @@ def dedupe_merged_rows(frame: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     unkeyed = work[~exact_mask]
     work = pd.concat([keyed, unkeyed], ignore_index=True, sort=False)
 
-    # If the same event+prediction exists in both rich and fallback result-only rows, keep rich.
     rich_pairs = set(
         work.loc[work['_aba_rich'].eq(1), ['_aba_event_key', '_aba_prediction_key']]
         .astype(str)
@@ -194,6 +182,54 @@ def dedupe_merged_rows(frame: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     work = work.drop(columns=helper_cols, errors='ignore').reset_index(drop=True)
     removed = before - len(work)
     return work, max(0, int(removed))
+
+
+def _text_has_unsupported_market(row: dict[str, Any]) -> bool:
+    text = ' '.join(str(row.get(col, '')) for col in ['sport', 'sport_key', 'league', 'event', 'market_type']).lower()
+    text = ' ' + text.replace('_', ' ').replace('-', ' ') + ' '
+    return any(term in text for term in [' tennis ', ' atp ', ' wta ', ' itf ', ' challenger '])
+
+
+def apply_price_safety(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if frame.empty:
+        return frame, pd.DataFrame()
+    passed: list[dict[str, Any]] = []
+    review: list[dict[str, Any]] = []
+    for row in frame.to_dict('records'):
+        item = dict(row)
+        if _text_has_unsupported_market(item):
+            item['odds_audit_status'] = 'review'
+            item['odds_audit_reason'] = 'unsupported_market'
+            item['lock_ready'] = False
+            review.append(item)
+            continue
+        audit = audit_prices(
+            best_price=item.get('best_price') or item.get('odds_at_pick') or item.get('decimal_price'),
+            average_price=item.get('average_price') or item.get('decimal_price'),
+            worst_price=item.get('worst_price'),
+            normalized_probability=item.get('market_probability') or item.get('market_implied_probability'),
+            market=item.get('market_type'),
+        )
+        item['decimal_price'] = audit.decimal_price
+        item['odds_at_pick'] = audit.odds_at_pick
+        item['_robust_decimal_price'] = audit.robust_decimal_price
+        item['market_implied_probability'] = audit.implied_probability
+        item['_price_range_risk'] = audit.price_range_risk
+        item['best_to_average_ratio'] = audit.best_to_average_ratio
+        item['odds_audit_status'] = 'review' if audit.quarantine else 'pass'
+        item['odds_audit_reason'] = audit.reason
+        item['odds_source_policy'] = 'average_price_for_proof_best_price_for_reference'
+        model_probability = probability_clean(item.get('model_probability_clean') or item.get('model_probability') or item.get('learned_model_probability'))
+        if model_probability is not None and audit.implied_probability is not None:
+            item['model_market_edge'] = round(model_probability - audit.implied_probability, 6)
+            if audit.decimal_price:
+                item['expected_value_per_unit'] = round(model_probability * float(audit.decimal_price) - 1.0, 6)
+        if audit.quarantine:
+            item['lock_ready'] = False
+            review.append(item)
+        else:
+            passed.append(item)
+    return pd.DataFrame(passed), pd.DataFrame(review)
 
 
 def build_manual_row() -> dict[str, Any] | None:
@@ -336,8 +372,18 @@ if not frames:
 
 raw_output = pd.concat(frames, ignore_index=True, sort=False)
 output, removed_count = dedupe_merged_rows(raw_output)
-save_rows(output)
+passed_output, review_output = apply_price_safety(output)
+save_rows(passed_output)
 st.success(t('saved'))
 if removed_count:
     st.info(f"{t('deduped')} Removed: {removed_count}. Final rows: {len(output)}.")
-st.dataframe(output, use_container_width=True, hide_index=True)
+st.subheader(t('safety'))
+cols = st.columns(3)
+cols[0].metric('Input', len(output))
+cols[1].metric(t('passed'), len(passed_output))
+cols[2].metric(t('review'), len(review_output))
+tab_pass, tab_review = st.tabs([t('passed'), t('review')])
+with tab_pass:
+    st.dataframe(passed_output, use_container_width=True, hide_index=True)
+with tab_review:
+    st.dataframe(review_output, use_container_width=True, hide_index=True)
