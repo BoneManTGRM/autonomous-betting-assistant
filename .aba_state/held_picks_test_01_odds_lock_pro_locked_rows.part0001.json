@@ -164,7 +164,7 @@
       "proof_id": "OLP-53C1488826D8",
       "clv_percent": "",
       "beat_close": "",
-      "auto_result_match_confidence": 0.5875,
+      "auto_result_match_confidence": 0.5318,
       "auto_result_status": "needs_review_no_match",
       "matched_event": NaN,
       "home_score": NaN,
@@ -667,7 +667,7 @@
       "matched_event": "Minnesota Twins at Arizona Diamondbacks",
       "home_score": 8.0,
       "away_score": 16.0,
-      "graded_at_utc": "2026-06-21T18:26:42+00:00"
+      "graded_at_utc": "2026-06-21T18:26:47+00:00"
     },
     {
       "event": "DR Congo at Colombia",
@@ -1658,7 +1658,7 @@
       "proof_id": "OLP-040F224E02ED",
       "clv_percent": "",
       "beat_close": "",
-      "auto_result_match_confidence": 0.5875,
+      "auto_result_match_confidence": 0.5318,
       "auto_result_status": "needs_review_no_match",
       "matched_event": NaN,
       "home_score": NaN,
@@ -2991,7 +2991,7 @@
       "matched_event": "Minnesota Twins at Arizona Diamondbacks",
       "home_score": 8.0,
       "away_score": 16.0,
-      "graded_at_utc": "2026-06-21T18:26:42+00:00"
+      "graded_at_utc": "2026-06-21T18:26:47+00:00"
     },
     {
       "event": "Boston Red Sox at Seattle Mariners",
@@ -3157,7 +3157,7 @@
       "matched_event": "Boston Red Sox at Seattle Mariners",
       "home_score": 1.0,
       "away_score": 5.0,
-      "graded_at_utc": "2026-06-21T18:26:42+00:00"
+      "graded_at_utc": "2026-06-21T18:26:47+00:00"
     },
     {
       "event": "Ivory Coast at Curaçao",
@@ -3655,7 +3655,7 @@
       "matched_event": "Pittsburgh Pirates at Colorado Rockies",
       "home_score": 2.0,
       "away_score": 1.0,
-      "graded_at_utc": "2026-06-21T18:26:42+00:00"
+      "graded_at_utc": "2026-06-21T18:26:47+00:00"
     },
     {
       "event": "Brazil at Scotland",
@@ -5315,7 +5315,7 @@
       "matched_event": "Boston Red Sox at Seattle Mariners",
       "home_score": 1.0,
       "away_score": 5.0,
-      "graded_at_utc": "2026-06-21T18:26:42+00:00"
+      "graded_at_utc": "2026-06-21T18:26:47+00:00"
     },
     {
       "event": "Algeria at Jordan",
@@ -7634,7 +7634,7 @@
       "proof_id": "OLP-7081F8DB9DF7",
       "clv_percent": "",
       "beat_close": "",
-      "auto_result_match_confidence": 0.5875,
+      "auto_result_match_confidence": 0.5318,
       "auto_result_status": "needs_review_no_match",
       "matched_event": NaN,
       "home_score": NaN,
@@ -8298,7 +8298,7 @@
       "proof_id": "OLP-9391BF3D5653",
       "clv_percent": "",
       "beat_close": "",
-      "auto_result_match_confidence": 0.6,
+      "auto_result_match_confidence": 0.55,
       "auto_result_status": "needs_review_no_match",
       "matched_event": NaN,
       "home_score": NaN,
