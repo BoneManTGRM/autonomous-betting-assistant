@@ -15,7 +15,7 @@ It is designed for sports analysts, betting-market researchers, prediction revie
 The app is organized around a no-password commercial workflow:
 
 ```text
-Deployment Health -> Scanner Pro -> ABA Signal Pro -> What Are the Odds -> Odds Lock Pro -> Daily Workflow -> Auto Result Grading -> Public Proof Dashboard -> Monthly License Readiness -> Learning Memory
+Deployment Health -> Scanner Pro -> ABA Signal Pro -> Pro Predictor / Pro Predictor Volume -> Odds Lock Pro -> Auto Result Grading -> Public Proof Dashboard -> Learning Memory
 ```
 
 | Tool | Main job |
@@ -23,7 +23,9 @@ Deployment Health -> Scanner Pro -> ABA Signal Pro -> What Are the Odds -> Odds 
 | **Deployment Health** | Checks integration status, page/file presence, persistent ledger health, proof quality, monthly-license readiness, and action items. |
 | **Scanner Pro** | Scans live odds feeds, normalizes markets, ranks market quality, and sends clean rows forward. |
 | **ABA Signal Pro** | Builds model probabilities, applies learned memory, scores agent decisions, and produces prediction-ready rows. |
-| **What Are the Odds** | Runs the market/value command board: edge, agent decision, scanner strength, CLV, loss review, sport routing, and lock-ready review. |
+| **Pro Predictor** | Scans live Odds API feeds, applies model probability, adaptive learning, scanner strength, and sends ranked prediction rows forward. |
+| **Pro Predictor Volume** | High-volume workflow using safer volume defaults plus the Pattern Points ranking layer for learned-pattern discovery. |
+| **What Are the Odds** | Runs manual/uploaded market/value review, including a price-safety gate for uploaded CSV rows. |
 | **Odds Lock Pro** | Creates timestamped proof ledgers, client-safe reports, bankroll controls, persistent-ledger saves, and audit-ready proof IDs. |
 | **One-Click Daily Workflow** | Takes current/session/uploaded rows, locks qualified rows, optionally saves them, and generates report output in one guided flow. |
 | **Auto Result Grading** | Grades the persistent proof ledger from finished-result CSV uploads or an explicit one-click score fetch. |
@@ -33,6 +35,121 @@ Deployment Health -> Scanner Pro -> ABA Signal Pro -> What Are the Odds -> Odds 
 | **Learning Memory** | Trains durable calibration and pattern memory from finished, graded results. |
 
 Older duplicate scanner, market-finder, league-specific, and legacy self-learning pages were removed or consolidated.
+
+## Current safety and scoring updates
+
+The current recommended testing path is:
+
+```text
+Pro Predictor Volume -> Odds Lock Pro -> Public Proof Dashboard -> Auto Result Grading -> Learning Memory
+```
+
+Recent updates added three important protections and ranking layers:
+
+1. **Consensus odds normalization**: live odds summaries now normalize Pro Predictor outputs toward the market average/consensus price instead of trusting a single outlier best-book price. This prevents a favorite from being exported with a suspicious long-shot price when the average market price says otherwise.
+2. **Price-safety audit**: `autonomous_betting_agent/odds_quality.py` defines an `audit_prices()` layer that uses the average price as the proof-safe price and flags suspicious price patterns.
+3. **Pattern Points**: `pages/pro_predictor_volume.py` adds a dedicated learned-pattern score so the system can rank both obvious high-confidence picks and lower-confidence rows that match historically profitable patterns.
+
+## Odds safety rules
+
+The system separates proof-safe prices from diagnostic prices:
+
+| Field | Purpose |
+| --- | --- |
+| `decimal_price` | Proof-safe decimal price used for implied probability, edge, EV, and proof exports. |
+| `odds_at_pick` | Same proof-safe price used when the row is locked. |
+| `best_price` | Diagnostic/reference price only. It should not be trusted as proof if it is far away from average market price. |
+| `average_price` | Market consensus price. This is preferred for proof. |
+| `worst_price` / `_robust_decimal_price` | Conservative price reference used for risk and robust EV checks. |
+| `odds_audit_status` | `pass`, `quarantine`, or `fail` depending on price quality. |
+| `odds_audit_reason` | Explanation for why a row passed or was flagged. |
+
+A row should be reviewed or blocked when any of these appear:
+
+- `best_price` is far above `average_price`.
+- Average odds are below about `1.75`, but best price is `3.00+`.
+- Price range across books is very wide.
+- Average price is `3.00+` for a high-confidence proof row.
+- Favorite probability is paired with underdog-style odds, or underdog probability is paired with favorite-style odds.
+- Unsupported markets such as tennis/ATP/WTA/ITF/challenger enter the workflow.
+
+This does not mean the pick is automatically bad. It means the **proof price is not trusted** until the market mapping is verified.
+
+## Pattern Points scoring
+
+`pattern_points` is a 0-100 score added by Pro Predictor Volume after Adaptive Learning runs. It is designed to answer this question:
+
+> Does this row match patterns that have historically performed well, even if the raw model confidence is not extremely high?
+
+Pattern Points is not a guarantee. It is a ranking and review score. It should be used to prioritize rows for testing and locking, not to claim certainty.
+
+### Pattern Points tiers
+
+| Tier | Score range | Meaning |
+| --- | ---: | --- |
+| **A+ Pattern Lock** | `85+` | Strongest learned-pattern profile. Candidate for strict review/locking if all odds and proof checks pass. |
+| **A High Confidence** | `75-84` | High-confidence pattern edge. Strong candidate for lock-ready review. |
+| **B Strong Pattern** | `65-74` | Good learned-pattern signal. Useful for research and selected proof testing. |
+| **C Research Edge** | `55-64` | Research/watch candidate. Needs more results before trusting. |
+| **D Review Only** | `<55` | Weak pattern profile or risk penalty. Usually do not lock without manual reason. |
+
+### How Pattern Points is calculated
+
+The score combines multiple signals:
+
+| Component | Effect |
+| --- | --- |
+| `learned_agent_score` | Base learned ranking from the existing Adaptive Learning system. |
+| `learned_model_probability` | Rewards higher learned probability, but does not require only high-confidence rows. |
+| `model_market_edge` | Rewards positive model edge and penalizes negative edge. |
+| `scanner_strength_score` | Rewards stronger scanner/signal agreement. |
+| `books` / `bookmaker_count` | Rewards broader book coverage because one-book rows are less reliable. |
+| Odds band | Rewards the most useful proof zones, especially roughly `1.30-1.89`, gives smaller bonus around `1.90-2.24`, and penalizes extreme or suspicious prices. |
+| `learning_pattern_count` | Rewards rows that match multiple learned historical patterns. |
+| `learning_adjustment_score` | Rewards positive learned pattern adjustment and penalizes negative learned adjustment. |
+| `odds_audit_status` | Applies a large penalty if the price audit did not pass. |
+
+The current formula in Pro Predictor Volume is:
+
+```text
+pattern_points =
+    learned_agent_score * 0.35
+  + learned_model_probability * 25
+  + clipped_model_market_edge * 130
+  + scanner_strength_score * 0.12
+  + min(book_count, 10) * 0.8
+  + odds_band_bonus
+  + clipped_learning_pattern_count * 4.0
+  + clipped_learning_adjustment_score * 1.4
+  - odds_audit_penalty
+```
+
+The final score is clipped to `0-100`.
+
+### Low-confidence pattern detection
+
+The system marks a row as `low_confidence_pattern_candidate = True` when:
+
+```text
+learned_model_probability < 0.58
+pattern_points >= 65
+learning_pattern_count >= 2
+learning_adjustment_score > 0
+```
+
+This is meant to find rows that do not look elite by raw confidence alone, but match historically favorable conditions. These rows should be treated as research/test candidates first until the sample grows.
+
+### Pattern output columns
+
+Pro Predictor Volume adds these columns:
+
+| Column | Meaning |
+| --- | --- |
+| `pattern_points` | 0-100 learned-pattern score. |
+| `pattern_confidence_tier` | A+/A/B/C/D tier based on Pattern Points. |
+| `pattern_edge_label` | Human-readable reason class such as `low_confidence_pattern_edge` or `high_confidence_pattern_edge`. |
+| `pattern_high_confidence` | `True` when Pattern Points is `75+`. |
+| `low_confidence_pattern_candidate` | `True` when lower-confidence probability is supported by strong learned patterns. |
 
 ## No-password commercial mode
 
@@ -57,14 +174,14 @@ This is not a full password-protected client portal yet. Login, paid accounts, S
 ## Recommended daily workflow
 
 1. Open **Deployment Health** and confirm the deployment is usable.
-2. Use **Scanner Pro** and/or **ABA Signal Pro** to create rows.
-3. Use **What Are the Odds** for market/value review.
-4. Use **One-Click Daily Workflow** to lock qualified rows and generate reports.
+2. Use **Pro Predictor Volume** for the main high-volume scan.
+3. Review `pattern_points`, `pattern_confidence_tier`, `odds_audit_status`, `decimal_price`, and `average_price` before locking.
+4. Use **Odds Lock Pro** to lock only rows that are future events and pass proof checks.
 5. Save locked rows into the persistent proof ledger.
 6. Use **Auto Result Grading** when finished results are available.
 7. Use **Public Proof Dashboard** to review public metrics, proof audit, CLV, report cards, and exports.
-8. Use **Monthly License Readiness** before pitching monthly clients or raising prices.
-9. Use **Learning Memory** after results are graded and probabilities/prices are available.
+8. Use **Learning Memory** after results are graded and probabilities/prices are available.
+9. Use **Monthly License Readiness** before pitching monthly clients or raising prices.
 
 ## Data proof rules
 
@@ -75,6 +192,8 @@ A future prediction is strongest when it has event name, sport, market type, pre
 A row does not count as a public proof row unless it has both `proof_id` and `locked_at_utc`.
 
 A high hit rate alone is not enough. ROI, average price, CLV, book coverage, sample size, duplicate control, and prospective timestamped proof matter more than headline accuracy.
+
+For public proof, never advertise rows that are only research candidates as official +EV proof. Keep official proof, research/test proof, and quarantine/review rows separated.
 
 ## Monthly license readiness
 
@@ -186,5 +305,7 @@ The repository is public for limited review and evaluation, but the code is gove
 - Fallback probability rows are useful for rough learning, not serious validation.
 - Result-only rows are not enough for calibration.
 - A model can have a high hit rate and still perform poorly if the prices are too short.
+- Pattern Points are a ranking signal, not a guarantee.
+- Price audit flags data-quality risk; it does not prove the pick itself is wrong.
 - API outages, missing keys, low quota, unsupported sports, or bad market coverage can reduce output quality.
 - This software does not execute transactions or provide guarantees.
