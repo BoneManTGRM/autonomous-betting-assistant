@@ -24,8 +24,7 @@ LANGUAGE_KEYS = [
 ]
 TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
-    ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor.py'),
-    ('Pro Predictor Volume', 'Predictor Pro Volumen', 'pages/pro_predictor_volume.py'),
+    ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
     ('Simulation Lab', 'Laboratorio de Simulación', 'pages/simulation_lab.py'),
     ('Threshold Optimizer', 'Optimizador de Umbral', 'pages/threshold_optimizer.py'),
     ('What Are the Odds', 'Cuáles Son las Cuotas', 'pages/what_are_the_odds.py'),
@@ -81,107 +80,34 @@ def _current_language(st: Any) -> str:
     return 'English'
 
 
-def _sync_language(st: Any, value: str, *, current_key: str | None = None) -> None:
-    if value not in ('English', 'Español'):
-        value = 'English'
-    for key in LANGUAGE_KEYS:
-        if key == current_key:
-            continue
-        try:
-            st.session_state[key] = value
-        except Exception:
-            pass
+def _label(item: tuple[str, str, str], language: str) -> str:
+    return item[1] if normalize_language(language) == 'es' else item[0]
 
 
-def _tool_label(english: str, spanish: str, lang: str) -> str:
-    return spanish if lang == 'es' else english
-
-
-def _install_safe_download_button(st_module: Any) -> None:
-    try:
-        if getattr(st_module, '_aba_safe_download_button_installed', False):
-            return
-        original = getattr(st_module, 'download_button', None)
-
-        def safe_download_button(label: str, data: Any = '', file_name: str | None = None, mime: str | None = None, *args: Any, **kwargs: Any) -> bool:
-            name = file_name or 'download.csv'
-            media_type = mime or 'text/csv'
-            if isinstance(data, bytes):
-                payload = data
-            else:
-                payload = str(data or '').encode('utf-8')
-            if len(payload) > 1_500_000:
-                st_module.warning('Download is too large for the mobile-safe link. Reduce rows or copy from the table.')
-                return False
-            encoded = base64.b64encode(payload).decode('ascii')
-            safe_label = html.escape(str(label))
-            safe_name = html.escape(str(name), quote=True)
-            safe_mime = html.escape(str(media_type), quote=True)
-            st_module.markdown(
-                f'<a class="aba-safe-download" download="{safe_name}" href="data:{safe_mime};base64,{encoded}">{safe_label}</a>',
-                unsafe_allow_html=True,
-            )
-            return False
-
-        setattr(st_module, '_aba_original_download_button', original)
-        setattr(st_module, 'download_button', safe_download_button)
-        setattr(st_module, '_aba_safe_download_button_installed', True)
-    except Exception:
-        pass
-
-
-def _apply_page_defaults(st: Any, page_key: str) -> None:
-    _install_safe_download_button(st)
-    if page_key != 'pro_predictor':
-        return
-    try:
-        for key, value in PRO_PREDICTOR_LARGE_LIST_70_DEFAULTS.items():
-            st.session_state[key] = value
-        st.session_state['_large_list_70_defaults_forced_v4'] = True
-    except Exception:
-        pass
-    try:
-        from .pro_predictor_defaults_patch import apply_large_list_70_defaults
-        apply_large_list_70_defaults(st)
-    except Exception:
-        pass
-
-
-def render_tools_only(st: Any, lang: str) -> None:
-    st.markdown('---')
-    st.markdown('### ' + ('Herramientas' if lang == 'es' else 'Tools'))
-    for english, spanish, path in TOOLS:
-        try:
-            st.page_link(path, label=_tool_label(english, spanish, lang))
-        except Exception:
-            st.caption(_tool_label(english, spanish, lang))
-
-
-def render_app_sidebar(page_key: str, *, language_key: str | None = None, selector: str = 'radio') -> str:
+def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'selectbox') -> str:
     import streamlit as st
 
-    _apply_page_defaults(st, page_key)
-    key = language_key or f'{page_key}_language'
-    current = _current_language(st)
-    index = 1 if current == 'Español' else 0
     with st.sidebar:
-        st.session_state['_aba_sidebar_rendered_clean_v1'] = True
         st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
-        st.markdown('### :green[ABA] Signal :red[Pro]')
-        lang_preview = normalize_language(current)
-        st.caption(APP_TAGLINE_ES if lang_preview == 'es' else APP_TAGLINE)
+        st.markdown(f'### ABA Signal Pro')
+        st.caption(APP_TAGLINE if _current_language(st) == 'English' else APP_TAGLINE_ES)
+        if selector == 'radio':
+            language = st.radio('Language / Idioma', ['English', 'Español'], key=language_key, horizontal=True)
+        else:
+            language = st.selectbox('Language / Idioma', ['English', 'Español'], key=language_key)
         st.markdown('---')
-        value = st.radio('Idioma' if lang_preview == 'es' else 'Language', ['English', 'Español'], index=index, key=key, horizontal=True)
-        _sync_language(st, value, current_key=key)
-        lang = normalize_language(value)
-        render_tools_only(st, lang)
-    return lang
+        for item in TOOLS:
+            label = _label(item, language)
+            path = item[2]
+            safe_label = html.escape(label)
+            href = '/' + path.replace('.py', '').replace('pages/', '')
+            if current_page and current_page in path:
+                st.markdown(f'**● {safe_label}**')
+            else:
+                st.page_link(path, label=label)
+    return normalize_language(language)
 
 
-def render_sidebar_nav(language: Any = 'en', *, show_workflow: bool = False) -> None:
-    import streamlit as st
-
-    _install_safe_download_button(st)
-    lang = normalize_language(language)
-    st.sidebar.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
-    render_tools_only(st.sidebar, lang)
+def safe_csv_download(label: str, csv_text: str, filename: str) -> str:
+    payload = base64.b64encode(str(csv_text or '').encode('utf-8')).decode('ascii')
+    return f'<a class="aba-safe-download" download="{html.escape(filename)}" href="data:text/csv;base64,{payload}">{html.escape(label)}</a>'
