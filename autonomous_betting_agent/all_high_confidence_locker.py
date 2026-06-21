@@ -29,7 +29,7 @@ def _stable_pick_key(row: Mapping[str, Any]) -> str:
 
 
 def _stable_proof_id(row: Mapping[str, Any]) -> str:
-    return f'AHC-{_stable_pick_key(row)[:12].upper()}'
+    return f'OLP-{_stable_pick_key(row)[:12].upper()}'
 
 
 def is_unsupported_market(row: Mapping[str, Any]) -> bool:
