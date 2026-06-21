@@ -20,7 +20,7 @@ def test_main_shell_uses_shared_sidebar_and_current_entrypoint() -> None:
 def test_streamlit_config_hides_native_sidebar_but_keeps_toolbar() -> None:
     config = (repo_root() / '.streamlit' / 'config.toml').read_text(encoding='utf-8')
     assert 'showSidebarNavigation = false' in config
-    assert 'toolbarMode = "auto"' in config
+    assert 'toolbarMode = "developer"' in config
     assert 'toolbarMode = "minimal"' not in config
 
 
