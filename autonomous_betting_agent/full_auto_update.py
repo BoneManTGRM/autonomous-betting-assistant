@@ -38,6 +38,13 @@ def sport_keys_from_ledger(frame: pd.DataFrame | list[dict[str, Any]]) -> list[s
     return sorted(keys)
 
 
+def _public_error(exc: Exception) -> str:
+    text = str(exc)
+    if 'apiKey=' in text:
+        text = text.split('apiKey=', 1)[0] + 'apiKey=<hidden>'
+    return text[:240]
+
+
 def fetch_completed_scores_for_ledger(
     ledger: pd.DataFrame | list[dict[str, Any]],
     *,
@@ -52,11 +59,15 @@ def fetch_completed_scores_for_ledger(
     for key in keys:
         if not key:
             continue
-        payload = _get_json(f'/v4/sports/{key}/scores/', {'apiKey': api_key, 'daysFrom': int(days_from), 'dateFormat': 'iso'})
-        frame = odds_scores_to_result_frame_v2(payload)
-        stats.append({'sport_key': key, 'result_rows': int(len(frame))})
-        if not frame.empty:
-            frames.append(frame)
+        try:
+            payload = _get_json(f'/v4/sports/{key}/scores/', {'apiKey': api_key, 'daysFrom': int(days_from), 'dateFormat': 'iso'})
+            frame = odds_scores_to_result_frame_v2(payload)
+            stats.append({'sport_key': key, 'result_rows': int(len(frame)), 'status': 'ok'})
+            if not frame.empty:
+                frames.append(frame)
+        except Exception as exc:
+            stats.append({'sport_key': key, 'result_rows': 0, 'status': 'skipped_error', 'error': _public_error(exc)})
+            continue
     results = pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
     return results, stats
 
@@ -69,16 +80,34 @@ def full_update_and_sync(
     sport_key: str = '',
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     ledger = load_persistent_ledger(workspace_id=workspace_id)
-    if ledger.empty:
-        return pd.DataFrame(), {'updated_rows': 0, 'reason': 'empty_ledger'}
+    locked = filter_locked_proof_rows(ledger)
+    if locked.empty:
+        return pd.DataFrame(), {'updated_rows': 0, 'reason': 'empty_ledger', 'locked_rows': 0}
     results, sport_stats = fetch_completed_scores_for_ledger(
-        ledger,
+        locked,
         api_key=get_api_key(api_key_override),
         days_from=days_from,
         sport_key=sport_key,
     )
-    updated, stats = apply_fuzzy_updates(ledger, results)
+    updated, stats = apply_fuzzy_updates(locked, results)
     if not updated.empty:
         updated = sync_dashboard_state(updated, workspace_id=workspace_id)
-    stats.update({'sports_checked': sport_stats, 'total_result_rows': int(len(results)), 'workspace_id': safe_text(workspace_id) or 'default'})
+    ok_sports = [item for item in sport_stats if item.get('status') == 'ok']
+    errored_sports = [item for item in sport_stats if item.get('status') != 'ok']
+    reason = ''
+    if results.empty and errored_sports and not ok_sports:
+        reason = 'all_score_feeds_failed_or_unsupported'
+    elif results.empty:
+        reason = 'no_completed_results_found'
+    elif int(stats.get('updated_rows') or 0) <= 0:
+        reason = 'completed_results_found_but_no_ledger_matches'
+    stats.update({
+        'locked_rows': int(len(locked)),
+        'sports_checked': sport_stats,
+        'score_feed_errors': errored_sports,
+        'total_result_rows': int(len(results)),
+        'workspace_id': safe_text(workspace_id) or 'default',
+    })
+    if reason:
+        stats['reason'] = reason
     return updated, stats
