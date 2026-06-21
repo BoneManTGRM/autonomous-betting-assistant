@@ -8,6 +8,7 @@ import streamlit as st
 from autonomous_betting_agent.auto_result_grading_tools import grading_summary, result_upload_template
 from autonomous_betting_agent.closing_line_tools import collect_closing_lines, collect_closing_lines_for_all_sports
 from autonomous_betting_agent.commercial_platform_tools import load_persistent_ledger, save_persistent_ledger
+from autonomous_betting_agent.dashboard_sync import sync_dashboard_state
 from autonomous_betting_agent.live_odds import _get_json, validate_api_key
 from autonomous_betting_agent.result_grading_v2 import grade_persistent_with_fuzzy, normalize_results, odds_scores_to_result_frame_v2
 from autonomous_betting_agent.tool_sidebar import render_tool_sidebar
@@ -19,7 +20,7 @@ render_tool_sidebar('auto_result_grading', 'Español' if LANG == 'es' else 'Engl
 TEXT = {
     'en': {
         'title': 'Auto Result Grading',
-        'caption': 'V2 grading is now built into this page: it re-checks pending rows, checks every sport key in the ledger, and grades h2h, spread, total, push, and cancellation outcomes.',
+        'caption': 'V2 grading is built into this page: it re-checks pending rows, checks every sport key in the ledger, grades h2h/spread/total outcomes, saves the ledger, and syncs the dashboard.',
         'warning': 'No background calls run here. API score and closing-line fetches happen only after pressing a button.',
         'upload': 'Upload finished results CSV',
         'template': 'Download result upload template',
@@ -40,11 +41,11 @@ TEXT = {
         'ledger': 'Current persistent ledger',
         'results': 'Normalized results preview',
         'summary': 'Grading summary',
-        'saved': 'Saved updated persistent ledger',
+        'saved': 'Saved and synced dashboard ledger',
     },
     'es': {
         'title': 'Autocalificación de Resultados',
-        'caption': 'V2 ya está integrado aquí: revisa pendientes, todas las sport keys y califica h2h, spreads, totals, pushes y cancelaciones.',
+        'caption': 'V2 está integrado aquí: revisa pendientes, todas las sport keys, califica resultados, guarda el ledger y sincroniza el dashboard.',
         'warning': 'Aquí no corren llamadas en segundo plano. La búsqueda API solo corre al presionar un botón.',
         'upload': 'Subir CSV de resultados finalizados',
         'template': 'Descargar plantilla de resultados',
@@ -65,7 +66,7 @@ TEXT = {
         'ledger': 'Ledger persistente actual',
         'results': 'Vista previa de resultados normalizados',
         'summary': 'Resumen de calificación',
-        'saved': 'Ledger persistente actualizado guardado',
+        'saved': 'Ledger guardado y dashboard sincronizado',
     },
 }
 
@@ -115,7 +116,7 @@ if upload is not None:
         updated, stats = grade_persistent_with_fuzzy(result_frame)
         st.json(stats)
         if not updated.empty:
-            ledger = load_persistent_ledger()
+            ledger = sync_dashboard_state(updated)
             st.success(t('saved'))
 
 with st.expander(t('fetch'), expanded=True):
@@ -142,7 +143,7 @@ with st.expander(t('fetch'), expanded=True):
             updated, stats = grade_persistent_with_fuzzy(result_frame)
             st.json(stats)
             if not updated.empty:
-                ledger = load_persistent_ledger()
+                ledger = sync_dashboard_state(updated)
                 st.success(t('saved'))
         except Exception as exc:
             st.error(str(exc))
@@ -167,7 +168,7 @@ with st.expander(t('closing'), expanded=False):
             st.json(stats)
             if not updated.empty:
                 save_persistent_ledger(updated)
-                ledger = load_persistent_ledger()
+                ledger = sync_dashboard_state(updated)
                 status_cols = [col for col in ['event', 'prediction', 'result_status', 'closing_decimal_price', 'closing_collection_status', 'closing_match_confidence'] if col in ledger.columns]
                 if status_cols:
                     st.dataframe(ledger[status_cols], use_container_width=True, hide_index=True)
