@@ -1,9 +1,13 @@
 from pathlib import Path
+import json
 
 import pandas as pd
 import streamlit as st
 
 import autonomous_betting_agent.adaptive_learning as adaptive_learning
+from autonomous_betting_agent.auto_learning_cycle import run_auto_learning_cycle
+from autonomous_betting_agent.auto_result_sync import run_auto_result_sync
+from autonomous_betting_agent.pick_hold_store import normalize_workspace_id
 
 _original_number_input = st.number_input
 if not hasattr(adaptive_learning, '_aba_original_apply_adaptive_learning'):
@@ -89,6 +93,56 @@ def apply_volume_pattern_points(frame, *args, **kwargs):
     return out
 
 
+def render_predictor_automation_panel() -> None:
+    with st.expander('Automation / Maintenance: results → learning', expanded=False):
+        st.caption('Use this after picks have been locked. It can update finished wins/losses, save the ledger, and feed new results into learning memory.')
+        workspace_input = st.text_input('Workspace ID', value=st.session_state.get('aba_test_window_id', 'test_01'), key='predictor_auto_workspace')
+        workspace_id = normalize_workspace_id(workspace_input)
+        st.session_state['aba_test_window_id'] = workspace_id
+        cols = st.columns(4)
+        days_from = cols[0].number_input('Days back for result sync', min_value=1, max_value=7, value=3, step=1, key='predictor_auto_days')
+        threshold = cols[1].number_input('Match threshold', min_value=0.70, max_value=0.98, value=0.86, step=0.01, key='predictor_auto_threshold')
+        run_learning = cols[2].toggle('Run learning after result sync', value=True, key='predictor_auto_run_learning')
+        api_key = cols[3].text_input('Optional Odds API key override', value='', type='password', key='predictor_auto_api_key')
+        actions = st.columns(3)
+        if actions[0].button('Find & update wins/losses', use_container_width=True, key='predictor_auto_result_sync'):
+            try:
+                report = run_auto_result_sync(workspace_id, api_key_override=api_key, days_from=int(days_from), threshold=float(threshold), run_learning_after=bool(run_learning))
+                st.subheader('Result sync report')
+                if report.get('status') == 'updated':
+                    st.success('Wins/losses updated.')
+                else:
+                    st.warning(f"Result sync status: {report.get('status')} / {report.get('reason', 'no reason')}")
+                st.json(report)
+                st.download_button('Download result sync report', json.dumps(report, indent=2, sort_keys=True), file_name='auto_result_sync_report.json', mime='application/json')
+            except Exception as exc:
+                st.error(f'Auto Result Sync failed: {exc}')
+        if actions[1].button('Run learning update only', use_container_width=True, key='predictor_auto_learning'):
+            try:
+                report = run_auto_learning_cycle(workspace_id, min_new_rows=1, min_total_rows=5, save_to_github=True)
+                st.subheader('Learning update report')
+                if report.get('status') == 'trained':
+                    st.success('Learning memory updated.')
+                else:
+                    st.warning(f"Learning update skipped: {report.get('reason')}")
+                st.json(report)
+                st.download_button('Download learning report', json.dumps(report, indent=2, sort_keys=True), file_name='auto_learning_cycle_report.json', mime='application/json')
+            except Exception as exc:
+                st.error(f'Auto Learning Cycle failed: {exc}')
+        if actions[2].button('Full auto update', type='primary', use_container_width=True, key='predictor_full_auto_update'):
+            try:
+                report = run_auto_result_sync(workspace_id, api_key_override=api_key, days_from=int(days_from), threshold=float(threshold), run_learning_after=True)
+                st.subheader('Full auto update report')
+                if report.get('status') == 'updated':
+                    st.success('Results and learning update completed where new results were found.')
+                else:
+                    st.warning(f"Full auto update status: {report.get('status')} / {report.get('reason', 'no reason')}")
+                st.json(report)
+                st.download_button('Download full auto update report', json.dumps(report, indent=2, sort_keys=True), file_name='full_auto_update_report.json', mime='application/json')
+            except Exception as exc:
+                st.error(f'Full auto update failed: {exc}')
+
+
 adaptive_learning.apply_adaptive_learning = apply_volume_pattern_points
 st.number_input = volume_number_input
 code = Path(__file__).with_name('pro_predictor.py').read_text(encoding='utf-8')
@@ -97,3 +151,4 @@ code = code.replace("decisions = decisions[pd.to_numeric(decisions.get('agent_sc
 code = code.replace("['learned_agent_score', 'agent_score', 'learning_adjustment_score', 'scanner_strength_score', 'model_probability_clean', 'model_market_edge']", "['pattern_points', 'learned_agent_score', 'agent_score', 'learning_adjustment_score', 'scanner_strength_score', 'model_probability_clean', 'model_market_edge']")
 code = code.replace("'event', 'sport', 'market_type', 'line_point', 'prediction',", "'event', 'sport', 'market_type', 'line_point', 'prediction', 'pattern_points', 'pattern_confidence_tier', 'pattern_edge_label', 'pattern_high_confidence', 'low_confidence_pattern_candidate',")
 exec(code, globals())
+render_predictor_automation_panel()
