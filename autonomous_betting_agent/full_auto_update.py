@@ -23,6 +23,7 @@ ESPN_SCOREBOARD_MAP = {
 }
 ODDS_API_MAX_SCORE_DAYS_FROM = 3
 PROTECTED_RESULT_FIELDS = ['result_status', 'winner', 'final_score', 'graded_at_utc', 'profit_units']
+RESULT_COMPARE_FIELDS = ['result_status', 'winner', 'final_score', 'profit_units']
 
 
 def get_api_key(override: str = '') -> str:
@@ -152,13 +153,7 @@ def _merge_result_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
     return merged.drop_duplicates(subset=dedupe_cols or None)
 
 
-def fetch_completed_scores_for_ledger(
-    ledger: pd.DataFrame | list[dict[str, Any]],
-    *,
-    api_key: str,
-    days_from: int = 7,
-    sport_key: str = '',
-) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+def fetch_completed_scores_for_ledger(ledger: pd.DataFrame | list[dict[str, Any]], *, api_key: str, days_from: int = 7, sport_key: str = '') -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     locked = filter_locked_proof_rows(ledger)
     keys = [safe_text(sport_key)] if safe_text(sport_key) else sport_keys_from_ledger(locked)
     frames: list[pd.DataFrame] = []
@@ -202,8 +197,7 @@ def fetch_completed_scores_for_ledger(
             if odds_error:
                 item['error'] = odds_error
             stats.append(item)
-    results = _merge_result_frames(frames)
-    return results, stats
+    return _merge_result_frames(frames), stats
 
 
 def _status_counts(frame: pd.DataFrame) -> dict[str, int]:
@@ -212,7 +206,7 @@ def _status_counts(frame: pd.DataFrame) -> dict[str, int]:
     status = frame['result_status'].astype(str).str.lower()
     wins = int(status.eq('win').sum())
     losses = int(status.eq('loss').sum())
-    voids = int(status.isin(['void', 'push']).sum())
+    voids = int(status.isin(['void', 'push', 'cancelled', 'canceled']).sum())
     return {'wins': wins, 'losses': losses, 'voids': voids, 'resolved': wins + losses + voids}
 
 
@@ -220,11 +214,7 @@ def _row_key(row: dict[str, Any]) -> str:
     proof_id = safe_text(row.get('proof_id'))
     if proof_id:
         return f'proof:{proof_id}'
-    return '|'.join([
-        safe_text(row.get('event')).lower(),
-        safe_text(row.get('prediction')).lower(),
-        safe_text(row.get('event_start_utc'))[:10],
-    ])
+    return '|'.join([safe_text(row.get('event')).lower(), safe_text(row.get('prediction')).lower(), safe_text(row.get('event_start_utc'))[:10]])
 
 
 def _protect_existing_wins(original: pd.DataFrame, proposed: pd.DataFrame) -> tuple[pd.DataFrame, int]:
@@ -247,52 +237,82 @@ def _protect_existing_wins(original: pd.DataFrame, proposed: pd.DataFrame) -> tu
     return pd.DataFrame(rows), protected
 
 
-def full_update_and_sync(
-    *,
-    workspace_id: Any = '',
-    api_key_override: str = '',
-    days_from: int = 7,
-    sport_key: str = '',
-) -> tuple[pd.DataFrame, dict[str, Any]]:
-    ledger_all = load_persistent_ledger(workspace_id=workspace_id)
+def _changed_rows(before: pd.DataFrame, after: pd.DataFrame) -> int:
+    if before.empty or after.empty:
+        return 0
+    before_by_key = {_row_key(row): row for row in before.to_dict(orient='records')}
+    changed = 0
+    for row in after.to_dict(orient='records'):
+        old = before_by_key.get(_row_key(row))
+        if old is None:
+            continue
+        for field in RESULT_COMPARE_FIELDS:
+            if safe_text(old.get(field)) != safe_text(row.get(field)):
+                changed += 1
+                break
+    return changed
+
+
+def _active_identity(frame: pd.DataFrame) -> dict[str, Any]:
+    if frame.empty:
+        return {'active_list_id': '', 'active_list_rows': 0}
+    out: dict[str, Any] = {'active_list_rows': int(len(frame))}
+    for col in ['active_list_id', 'ledger_batch_id', 'list_id', 'source_file']:
+        if col in frame.columns:
+            values = frame[col].map(safe_text)
+            nonempty = values[values.ne('')]
+            if not nonempty.empty:
+                out[col] = nonempty.iloc[-1]
+    if 'locked_at_utc' in frame.columns:
+        parsed = pd.to_datetime(frame['locked_at_utc'], errors='coerce', utc=True)
+        if parsed.notna().any():
+            out['locked_at_min'] = parsed.min().isoformat()
+            out['locked_at_max'] = parsed.max().isoformat()
+    return out
+
+
+def full_update_and_sync(*, workspace_id: Any = '', api_key_override: str = '', days_from: int = 7, sport_key: str = '') -> tuple[pd.DataFrame, dict[str, Any]]:
+    ledger_all = load_persistent_ledger(workspace_id=workspace_id, active_only=False)
     locked = latest_active_list(ledger_all)
     if locked.empty:
-        return pd.DataFrame(), {'updated_rows': 0, 'reason': 'empty_ledger', 'locked_rows': 0}
+        return pd.DataFrame(), {'updated_rows': 0, 'actual_changed_rows': 0, 'reason': 'empty_ledger', 'locked_rows': 0}
     before_counts = _status_counts(locked)
-    results, sport_stats = fetch_completed_scores_for_ledger(
-        locked,
-        api_key=get_api_key(api_key_override),
-        days_from=days_from,
-        sport_key=sport_key,
-    )
+    results, sport_stats = fetch_completed_scores_for_ledger(locked, api_key=get_api_key(api_key_override), days_from=days_from, sport_key=sport_key)
     updated, stats = apply_fuzzy_updates(locked, results, regrade_resolved=True)
     protected_wins = 0
+    actual_changed = 0
     if not updated.empty:
         updated, protected_wins = _protect_existing_wins(locked, updated)
-        updated = sync_dashboard_state(updated, workspace_id=workspace_id)
-    after_counts = _status_counts(updated)
+        actual_changed = _changed_rows(locked, updated)
+        if actual_changed > 0:
+            updated = sync_dashboard_state(updated, workspace_id=workspace_id)
+    after_counts = _status_counts(updated if not updated.empty else locked)
     ok_sports = [item for item in sport_stats if str(item.get('status', '')).startswith('ok')]
     errored_sports = [item for item in sport_stats if not str(item.get('status', '')).startswith('ok')]
-    reason = ''
     if results.empty and errored_sports and not ok_sports:
         reason = 'all_score_feeds_failed_or_unsupported'
     elif results.empty:
         reason = 'no_completed_results_found'
-    elif int(stats.get('updated_rows') or 0) <= 0:
+    elif int(stats.get('matched_rows') or 0) <= 0:
         reason = 'completed_results_found_but_no_ledger_matches'
+    elif actual_changed <= 0:
+        reason = 'matches_found_but_no_new_changes'
+    else:
+        reason = 'results_updated'
     stats.update({
         'locked_rows': int(len(locked)),
         'all_workspace_rows': int(len(ledger_all)),
         'active_list_only': True,
+        'active_list_identity': _active_identity(locked),
         'sports_checked': sport_stats,
         'score_feed_errors': errored_sports,
         'total_result_rows': int(len(results)),
         'workspace_id': safe_text(workspace_id) or 'default',
         'regraded_resolved_rows': True,
         'protected_existing_wins': protected_wins,
+        'actual_changed_rows': actual_changed,
         'before_counts': before_counts,
         'after_counts': after_counts,
+        'reason': reason,
     })
-    if reason:
-        stats['reason'] = reason
-    return updated, stats
+    return updated if not updated.empty else locked, stats
