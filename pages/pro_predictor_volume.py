@@ -6,7 +6,9 @@ import streamlit as st
 
 import autonomous_betting_agent.adaptive_learning as adaptive_learning
 from autonomous_betting_agent.auto_learning_cycle import run_auto_learning_cycle
+from autonomous_betting_agent.dashboard_sync import sync_dashboard_state
 from autonomous_betting_agent.full_auto_update import full_update_and_sync
+from autonomous_betting_agent.odds_lock_tools import lock_rows, now_utc
 from autonomous_betting_agent.pick_hold_store import normalize_workspace_id
 from autonomous_betting_agent.profit_guard import add_profit_guard, filter_profit_guard
 
@@ -95,6 +97,44 @@ def apply_volume_pattern_points(frame, *args, **kwargs):
     return out
 
 
+def publish_predictor_handoff_to_dashboard(handoff: pd.DataFrame | list[dict], workspace_id: str) -> dict:
+    """Single pipeline: Predictor output -> proof locks -> dashboard active list.
+
+    This removes the manual gap that kept the dashboard blank or stale. It only publishes rows that are still
+    future lockable, creates proof_id/locked_at_utc, and syncs the active dashboard stores.
+    """
+    frame = pd.DataFrame(handoff) if isinstance(handoff, list) else handoff
+    if frame is None or frame.empty:
+        return {'status': 'empty_handoff', 'input_rows': 0, 'locked_rows': 0}
+    frame = frame.copy()
+    input_rows = int(len(frame))
+    if 'lock_ready' in frame.columns:
+        frame = frame[frame['lock_ready'].astype(bool)].copy()
+    if frame.empty:
+        return {'status': 'no_future_lock_ready_rows', 'input_rows': input_rows, 'locked_rows': 0}
+    locked = lock_rows(frame, analyst='ABA Signal Pro · Powered by Reparodynamics', max_units=1.0, include_watch=True, strict=False, require_future=True)
+    if locked.empty:
+        return {'status': 'lock_rows_empty', 'input_rows': input_rows, 'future_rows': int(len(frame)), 'locked_rows': 0}
+    if 'proof_status' in locked.columns:
+        locked = locked[locked['proof_status'].astype(str).eq('locked_before_start')].copy()
+    if locked.empty:
+        return {'status': 'no_locked_before_start_rows', 'input_rows': input_rows, 'future_rows': int(len(frame)), 'locked_rows': 0}
+    active_id = f'{normalize_workspace_id(workspace_id)}:predictor:{now_utc()}'
+    locked['test_window_id'] = normalize_workspace_id(workspace_id)
+    locked['ledger_batch_id'] = active_id
+    locked['active_list_id'] = active_id
+    locked['source_file'] = 'pro_predictor_volume_auto_lock'
+    synced = sync_dashboard_state(locked, workspace_id=workspace_id)
+    return {
+        'status': 'synced',
+        'input_rows': input_rows,
+        'future_rows': int(len(frame)),
+        'locked_rows': int(len(locked)),
+        'synced_rows': int(len(synced)),
+        'active_list_id': active_id,
+    }
+
+
 def run_predictor_full_update(workspace_id: str, *, api_key_override: str, days_from: int, run_learning_after: bool) -> dict:
     updated, stats = full_update_and_sync(workspace_id=workspace_id, api_key_override=api_key_override, days_from=int(days_from))
     actual_changed = int(stats.get('actual_changed_rows') or 0)
@@ -130,7 +170,7 @@ def render_predictor_automation_panel() -> None:
         threshold = cols[1].number_input('Match threshold', min_value=0.70, max_value=0.98, value=0.82, step=0.01, key='predictor_auto_threshold')
         run_learning = cols[2].toggle('Run learning after result sync', value=True, key='predictor_auto_run_learning')
         api_key = cols[3].text_input('Optional Odds API key override', value='', type='password', key='predictor_auto_api_key')
-        st.caption(f'Active full-auto matcher: V2 workspace-aware sync. Threshold display: {float(threshold):.2f}.')
+        st.caption(f'Active full-auto matcher: V3 actual-change-aware workspace sync. Threshold display: {float(threshold):.2f}.')
         actions = st.columns(3)
         if actions[0].button('Find & update wins/losses', use_container_width=True, key='predictor_auto_result_sync'):
             try:
@@ -183,6 +223,8 @@ code = Path(__file__).with_name('pro_predictor.py').read_text(encoding='utf-8')
 code = _replace_required(code, "latest_event_date = st.date_input(t('latest_date'), value=next_sunday())", "latest_event_date = st.date_input(t('latest_date'), value=date.today() + timedelta(days=14))", 'latest_event_date_14_day_default')
 code = _replace_required(code, "min_agent = h3.number_input(t('min_agent'), min_value=0.0, max_value=100.0, value=DEFAULTS['min_agent'], step=1.0)", "min_agent = h3.number_input(t('min_agent'), min_value=0.0, max_value=100.0, value=DEFAULTS['min_agent'], step=1.0)\n    pattern_mode = st.selectbox('Pattern Points mode', ['Research learning 55+', 'Strong test 65+', 'Official proof 75+', 'Elite proof 85+', 'Low-confidence pattern candidates'], index=0)\n    profit_mode = st.selectbox('Profit Protection mode', ['Research no profit guard', 'Volume-safe profit guard', 'Balanced ROI guard', 'Official ROI guard', 'Elite ROI guard'], index=1, help='Volume-safe only blocks obvious bad prices. Balanced and above are stricter for proof/ROI.')", 'pattern_mode_insert')
 code = _replace_required(code, "decisions = decisions[pd.to_numeric(decisions.get('agent_score'), errors='coerce').fillna(0) >= float(min_agent)]", "decisions = decisions[pd.to_numeric(decisions.get('agent_score'), errors='coerce').fillna(0) >= float(min_agent)]\n    decisions = filter_profit_guard(decisions, profit_mode)\n    pp = pd.to_numeric(decisions.get('pattern_points'), errors='coerce').fillna(0)\n    if pattern_mode.startswith('Research'):\n        decisions = decisions[pp >= 55]\n    elif pattern_mode.startswith('Strong'):\n        decisions = decisions[pp >= 65]\n    elif pattern_mode.startswith('Official'):\n        decisions = decisions[pp >= 75]\n    elif pattern_mode.startswith('Elite'):\n        decisions = decisions[pp >= 85]\n    else:\n        decisions = decisions[decisions.get('low_confidence_pattern_candidate', pd.Series(False, index=decisions.index)).astype(bool)]", 'pattern_mode_filter')
+code = _replace_required(code, "persist_handoff(decisions=decisions, large=large, handoff=handoff)", "persist_handoff(decisions=decisions, large=large, handoff=handoff)\n    dashboard_sync_report = publish_predictor_handoff_to_dashboard(handoff, str(st.session_state.get('aba_test_window_id', 'test_01') or 'test_01'))\n    st.session_state['predictor_dashboard_sync_report'] = dashboard_sync_report", 'auto_dashboard_sync')
+code = _replace_required(code, "st.success(t('saved'))", "st.success(t('saved'))\n    if st.session_state.get('predictor_dashboard_sync_report', {}).get('status') == 'synced':\n        st.success(f\"Dashboard proof ledger synced: {st.session_state['predictor_dashboard_sync_report'].get('synced_rows', 0)} locked rows.\")\n    else:\n        st.warning(f\"Dashboard proof ledger sync: {st.session_state.get('predictor_dashboard_sync_report', {}).get('status', 'unknown')}\")", 'auto_dashboard_sync_message')
 code = _replace_required(code, "['learned_agent_score', 'agent_score', 'learning_adjustment_score', 'scanner_strength_score', 'model_probability_clean', 'model_market_edge']", "['portfolio_priority_score', 'profit_protection_score', 'pattern_points', 'learned_agent_score', 'agent_score', 'learning_adjustment_score', 'scanner_strength_score', 'model_probability_clean', 'model_market_edge']", 'pattern_sort_columns')
 code = _replace_required(code, "'event', 'sport', 'market_type', 'line_point', 'prediction',", "'event', 'sport', 'market_type', 'line_point', 'prediction', 'pattern_points', 'pattern_confidence_tier', 'pattern_edge_label', 'profit_lane', 'profit_guard_status', 'portfolio_priority_score', 'portfolio_group_rank', 'suggested_stake_units', 'profit_protection_score', 'profit_expected_value', 'profit_volume_safe', 'profit_balanced_ok', 'pattern_high_confidence', 'low_confidence_pattern_candidate',", 'pattern_display_columns')
 exec(code, globals())
