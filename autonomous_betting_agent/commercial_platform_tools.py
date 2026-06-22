@@ -61,7 +61,33 @@ def save_persistent_ledger(frame,path:Path=DEFAULT_LEDGER_PATH,workspace_id:Any=
   p=persistent_ledger_path(workspace_id,path); ensure_data_dir(p); out.to_csv(p,index=False)
  except Exception: pass
  return out
-def apply_result_updates(ledger, results): return latest_active_list(ledger), {'updated_rows':0,'matched_by_proof_id':0,'matched_by_event_pick':0,'unmatched_results':0}
+def _key_text(v:Any)->str: return ' '.join(str(v or '').lower().replace('-',' ').replace('_',' ').split())
+def _match_key(row)->str: return '|'.join([_key_text(row.get(k)) for k in ['event','prediction','market_type','event_start_utc']])
+def _result_from_row(row,pick:str='')->str:
+ s=result_status(row)
+ if s in {'win','loss','void'}: return s
+ w=_key_text(row.get('winner') or row.get('actual_winner') or row.get('final_winner'))
+ return ('win' if w==_key_text(pick) else 'loss') if w and pick else (s or 'pending')
+def apply_result_updates(ledger, results):
+ locked=latest_active_list(ledger); result_frame=normalize_frame(pd.DataFrame(results) if isinstance(results,list) else results)
+ if locked.empty: return pd.DataFrame(), {'updated_rows':0,'matched_by_proof_id':0,'matched_by_event_pick':0,'unmatched_results':int(len(result_frame)) if result_frame is not None else 0}
+ if result_frame.empty: return locked, {'updated_rows':0,'matched_by_proof_id':0,'matched_by_event_pick':0,'unmatched_results':0}
+ proof_lookup={safe_text(r.get('proof_id')):r for r in result_frame.to_dict('records') if safe_text(r.get('proof_id'))}
+ key_lookup={_match_key(r):r for r in result_frame.to_dict('records') if _match_key(r).strip('|')}
+ rows=[]; updated=pm=km=0; matched=set()
+ for row in locked.to_dict('records'):
+  item=dict(row); match=None; pid=safe_text(item.get('proof_id'))
+  if pid and pid in proof_lookup:
+   match=proof_lookup[pid]; pm+=1; matched.add('p:'+pid)
+  else:
+   key=_match_key(item)
+   if key in key_lookup: match=key_lookup[key]; km+=1; matched.add('k:'+key)
+  if match:
+   r=_result_from_row(match,safe_text(item.get('prediction')))
+   if r in {'win','loss','void'}:
+    item['result_status']=r; item['winner']=safe_text(match.get('winner') or match.get('actual_winner') or match.get('final_winner') or item.get('winner')); item['final_score']=safe_text(match.get('final_score') or match.get('score') or item.get('final_score')); item['graded_at_utc']=pd.Timestamp.utcnow().isoformat(); updated+=1
+  rows.append(item)
+ return filter_locked_proof_rows(pd.DataFrame(rows)), {'updated_rows':updated,'matched_by_proof_id':pm,'matched_by_event_pick':km,'unmatched_results':max(0,len(result_frame)-len(matched))}
 def proof_audit_frame(frame):
  locked=latest_active_list(frame); rows=[]
  for r in locked.to_dict('records'):
