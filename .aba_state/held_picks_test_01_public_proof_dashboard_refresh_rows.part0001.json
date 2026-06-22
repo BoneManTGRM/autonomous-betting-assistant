@@ -175,7 +175,8 @@
       "best_result_event": "Saudi Arabia at Spain",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.4230769230769231, 'sport': 1.0, 'date': 0.0, 'pick': 0.25806451612903225}"
+      "best_match_components": "{'event': 0.4230769230769231, 'sport': 1.0, 'date': 0.0, 'pick': 0.25806451612903225}",
+      "review_reason": NaN
     },
     {
       "event": "Haiti at Morocco",
@@ -347,7 +348,8 @@
       "best_result_event": "Haiti at Brazil",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.6451612903225806, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.6451612903225806, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Chicago Cubs at New York Mets",
@@ -519,7 +521,8 @@
       "best_result_event": "New York Mets at Cincinnati Reds",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.7222222222222222, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.7222222222222222, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Minnesota Twins at Arizona Diamondbacks",
@@ -685,13 +688,14 @@
       "matched_event": "Minnesota Twins at Arizona Diamondbacks",
       "home_score": 8.0,
       "away_score": 16.0,
-      "graded_at_utc": "2026-06-22T00:40:41.192563+00:00",
+      "graded_at_utc": "2026-06-22T01:04:58.087938+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 1.0,
       "best_result_event": NaN,
       "matched_result_event": "Minnesota Twins at Arizona Diamondbacks",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "DR Congo at Colombia",
@@ -863,7 +867,8 @@
       "best_result_event": "Morocco at Scotland",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5641025641025641, 'sport': 1.0, 'date': 0.0, 'pick': 0.25}"
+      "best_match_components": "{'event': 0.5641025641025641, 'sport': 1.0, 'date': 0.0, 'pick': 0.25}",
+      "review_reason": NaN
     },
     {
       "event": "England at Panama",
@@ -1035,7 +1040,8 @@
       "best_result_event": "Saudi Arabia at Spain",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.47368421052631576, 'sport': 1.0, 'date': 0.0, 'pick': 0.29411764705882354}"
+      "best_match_components": "{'event': 0.47368421052631576, 'sport': 1.0, 'date': 0.0, 'pick': 0.29411764705882354}",
+      "review_reason": NaN
     },
     {
       "event": "Argentina at Jordan",
@@ -1207,7 +1213,8 @@
       "best_result_event": "Saudi Arabia at Spain",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5, 'sport': 1.0, 'date': 0.0, 'pick': 0.3157894736842105}"
+      "best_match_components": "{'event': 0.5, 'sport': 1.0, 'date': 0.0, 'pick': 0.3157894736842105}",
+      "review_reason": NaN
     },
     {
       "event": "Belgium at New Zealand",
@@ -1379,7 +1386,8 @@
       "best_result_event": "Iran at Belgium",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.6333333333333333, 'sport': 1.0, 'date': 0.0, 'pick': 0.25806451612903225}"
+      "best_match_components": "{'event': 0.6333333333333333, 'sport': 1.0, 'date': 0.0, 'pick': 0.25806451612903225}",
+      "review_reason": NaN
     },
     {
       "event": "Cleveland Guardians at Chicago White Sox",
@@ -1551,7 +1559,8 @@
       "best_result_event": "Chicago White Sox at Detroit Tigers",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.6212121212121212, 'sport': 1.0, 'date': 0.65, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.6212121212121212, 'sport': 1.0, 'date': 0.65, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Qatar at Bosnia & Herzegovina",
@@ -1723,7 +1732,8 @@
       "best_result_event": "Saudi Arabia at Spain",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.4230769230769231, 'sport': 1.0, 'date': 0.0, 'pick': 0.2857142857142857}"
+      "best_match_components": "{'event': 0.4230769230769231, 'sport': 1.0, 'date': 0.0, 'pick': 0.2857142857142857}",
+      "review_reason": NaN
     },
     {
       "event": "Senegal at Norway",
@@ -1895,7 +1905,8 @@
       "best_result_event": "Sweden at Netherlands",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5263157894736842, 'sport': 1.0, 'date': 0.0, 'pick': 0.3225806451612903}"
+      "best_match_components": "{'event': 0.5263157894736842, 'sport': 1.0, 'date': 0.0, 'pick': 0.3225806451612903}",
+      "review_reason": NaN
     },
     {
       "event": "Jean Matsumoto at Bekzat Almakhan",
@@ -2067,7 +2078,8 @@
       "best_result_event": "Seattle Storm at Portland Fire",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.4444444444444444, 'sport': 0.3783783783783784, 'date': 0.0, 'pick': 0.375}"
+      "best_match_components": "{'event': 0.4444444444444444, 'sport': 0.3783783783783784, 'date': 0.0, 'pick': 0.375}",
+      "review_reason": NaN
     },
     {
       "event": "Ghana at England",
@@ -2239,7 +2251,8 @@
       "best_result_event": "Sweden at Netherlands",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5405405405405406, 'sport': 1.0, 'date': 0.0, 'pick': 0.4}"
+      "best_match_components": "{'event': 0.5405405405405406, 'sport': 1.0, 'date': 0.0, 'pick': 0.4}",
+      "review_reason": NaN
     },
     {
       "event": "Uzbekistan at Portugal",
@@ -2411,7 +2424,8 @@
       "best_result_event": "Australia at USA",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5263157894736842, 'sport': 1.0, 'date': 0.0, 'pick': 0.23529411764705882}"
+      "best_match_components": "{'event': 0.5263157894736842, 'sport': 1.0, 'date': 0.0, 'pick': 0.23529411764705882}",
+      "review_reason": NaN
     },
     {
       "event": "New York Yankees at Detroit Tigers",
@@ -2583,7 +2597,8 @@
       "best_result_event": "Chicago White Sox at Detroit Tigers",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.6086956521739131, 'sport': 1.0, 'date': 0.65, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.6086956521739131, 'sport': 1.0, 'date': 0.65, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Austria at Algeria",
@@ -2755,7 +2770,8 @@
       "best_result_event": "Australia at USA",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.7058823529411765, 'sport': 1.0, 'date': 0.0, 'pick': 0.27586206896551724}"
+      "best_match_components": "{'event': 0.7058823529411765, 'sport': 1.0, 'date': 0.0, 'pick': 0.27586206896551724}",
+      "review_reason": NaN
     },
     {
       "event": "Netherlands at Tunisia",
@@ -2927,7 +2943,8 @@
       "best_result_event": "Sweden at Netherlands",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5769230769230769, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.5769230769230769, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Minnesota Twins at Arizona Diamondbacks",
@@ -3093,13 +3110,14 @@
       "matched_event": "Minnesota Twins at Arizona Diamondbacks",
       "home_score": 8.0,
       "away_score": 16.0,
-      "graded_at_utc": "2026-06-22T00:40:47.710812+00:00",
+      "graded_at_utc": "2026-06-22T01:05:04.676130+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 0.8382,
       "best_result_event": NaN,
       "matched_result_event": "Minnesota Twins at Arizona Diamondbacks",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 0.35294117647058826}",
+      "review_reason": NaN
     },
     {
       "event": "Boston Red Sox at Seattle Mariners",
@@ -3265,13 +3283,14 @@
       "matched_event": "Boston Red Sox at Seattle Mariners",
       "home_score": 1.0,
       "away_score": 5.0,
-      "graded_at_utc": "2026-06-22T00:40:48.043607+00:00",
+      "graded_at_utc": "2026-06-22T01:05:04.979020+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 0.8357,
       "best_result_event": NaN,
       "matched_result_event": "Boston Red Sox at Seattle Mariners",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 0.34285714285714286}",
+      "review_reason": NaN
     },
     {
       "event": "Ivory Coast at Curaçao",
@@ -3443,7 +3462,8 @@
       "best_result_event": "Curaçao at Ecuador",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.6666666666666666, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.6666666666666666, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Iran at Belgium",
@@ -3609,13 +3629,14 @@
       "matched_event": "Iran at Belgium",
       "home_score": 0.0,
       "away_score": 0.0,
-      "graded_at_utc": "2026-06-22T00:40:49.117780+00:00",
+      "graded_at_utc": "2026-06-22T01:05:06.012993+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 1.0,
       "best_result_event": NaN,
       "matched_result_event": "Iran at Belgium",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Pittsburgh Pirates at Colorado Rockies",
@@ -3787,7 +3808,8 @@
       "best_result_event": "Pittsburgh Pirates at Colorado Rockies",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 0.15789473684210525}"
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 0.15789473684210525}",
+      "review_reason": NaN
     },
     {
       "event": "Brazil at Scotland",
@@ -3959,7 +3981,8 @@
       "best_result_event": "Morocco at Scotland",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.7027027027027027, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.7027027027027027, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "San Diego Padres at Texas Rangers",
@@ -4125,13 +4148,14 @@
       "matched_event": "San Diego Padres at Texas Rangers",
       "home_score": 4.0,
       "away_score": 3.0,
-      "graded_at_utc": "2026-06-22T00:40:50.280643+00:00",
+      "graded_at_utc": "2026-06-22T01:05:07.170950+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 1.0,
       "best_result_event": NaN,
       "matched_result_event": "San Diego Padres at Texas Rangers",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Washington Mystics at Minnesota Lynx",
@@ -4298,12 +4322,13 @@
       "home_score": NaN,
       "away_score": NaN,
       "graded_at_utc": "2026-06-22T00:40:50.745377+00:00",
-      "grading_match_status": "matched",
+      "grading_match_status": "matched_loss_needs_review",
       "grading_match_confidence": 0.8357,
       "best_result_event": "Minnesota Lynx at Golden State Valkyries",
       "matched_result_event": "Washington Mystics at Minnesota Lynx",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 0.34285714285714286}",
+      "review_reason": "auto_loss_below_strict_confidence"
     },
     {
       "event": "Iraq at France",
@@ -4475,7 +4500,8 @@
       "best_result_event": "Saudi Arabia at Spain",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5142857142857142, 'sport': 1.0, 'date': 0.65, 'pick': 0.26666666666666666}"
+      "best_match_components": "{'event': 0.5142857142857142, 'sport': 1.0, 'date': 0.65, 'pick': 0.26666666666666666}",
+      "review_reason": NaN
     },
     {
       "event": "Iran at Egypt",
@@ -4647,7 +4673,8 @@
       "best_result_event": "Iran at Belgium",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.7142857142857143, 'sport': 1.0, 'date': 0.0, 'pick': 0.16666666666666666}"
+      "best_match_components": "{'event': 0.7142857142857143, 'sport': 1.0, 'date': 0.0, 'pick': 0.16666666666666666}",
+      "review_reason": NaN
     },
     {
       "event": "DR Congo at Colombia",
@@ -4819,7 +4846,8 @@
       "best_result_event": "Morocco at Scotland",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5641025641025641, 'sport': 1.0, 'date': 0.0, 'pick': 0.30303030303030304}"
+      "best_match_components": "{'event': 0.5641025641025641, 'sport': 1.0, 'date': 0.0, 'pick': 0.30303030303030304}",
+      "review_reason": NaN
     },
     {
       "event": "France at Norway",
@@ -4991,7 +5019,8 @@
       "best_result_event": "Curaçao at Ecuador",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.47058823529411764, 'sport': 1.0, 'date': 0.0, 'pick': 0.3448275862068966}"
+      "best_match_components": "{'event': 0.47058823529411764, 'sport': 1.0, 'date': 0.0, 'pick': 0.3448275862068966}",
+      "review_reason": NaN
     },
     {
       "event": "Houston Astros at Toronto Blue Jays",
@@ -5163,7 +5192,8 @@
       "best_result_event": "Cleveland Guardians at Houston Astros",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5833333333333334, 'sport': 1.0, 'date': 0.65, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.5833333333333334, 'sport': 1.0, 'date': 0.65, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Argentina at Jordan",
@@ -5335,7 +5365,8 @@
       "best_result_event": "Australia at USA",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5142857142857142, 'sport': 1.0, 'date': 0.0, 'pick': 0.2857142857142857}"
+      "best_match_components": "{'event': 0.5142857142857142, 'sport': 1.0, 'date': 0.0, 'pick': 0.2857142857142857}",
+      "review_reason": NaN
     },
     {
       "event": "Boston Red Sox at Seattle Mariners",
@@ -5501,13 +5532,14 @@
       "matched_event": "Boston Red Sox at Seattle Mariners",
       "home_score": 1.0,
       "away_score": 5.0,
-      "graded_at_utc": "2026-06-22T00:40:53.987291+00:00",
+      "graded_at_utc": "2026-06-22T01:05:10.752876+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 1.0,
       "best_result_event": NaN,
       "matched_result_event": "Boston Red Sox at Seattle Mariners",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Algeria at Jordan",
@@ -5679,7 +5711,8 @@
       "best_result_event": "Australia at USA",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5454545454545454, 'sport': 1.0, 'date': 0.0, 'pick': 0.36363636363636365}"
+      "best_match_components": "{'event': 0.5454545454545454, 'sport': 1.0, 'date': 0.0, 'pick': 0.36363636363636365}",
+      "review_reason": NaN
     },
     {
       "event": "Egypt at New Zealand",
@@ -5851,7 +5884,8 @@
       "best_result_event": "Sweden at Netherlands",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5853658536585366, 'sport': 1.0, 'date': 0.0, 'pick': 0.18181818181818182}"
+      "best_match_components": "{'event': 0.5853658536585366, 'sport': 1.0, 'date': 0.0, 'pick': 0.18181818181818182}",
+      "review_reason": NaN
     },
     {
       "event": "Haiti at Morocco",
@@ -6023,7 +6057,8 @@
       "best_result_event": "Morocco at Scotland",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5769230769230769, 'sport': 1.0, 'date': 0.0, 'pick': 0.35714285714285715}"
+      "best_match_components": "{'event': 0.5769230769230769, 'sport': 1.0, 'date': 0.0, 'pick': 0.35714285714285715}",
+      "review_reason": NaN
     },
     {
       "event": "Australia at Paraguay",
@@ -6195,7 +6230,8 @@
       "best_result_event": "Australia at USA",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.7567567567567568, 'sport': 1.0, 'date': 0.0, 'pick': 0.2857142857142857}"
+      "best_match_components": "{'event': 0.7567567567567568, 'sport': 1.0, 'date': 0.0, 'pick': 0.2857142857142857}",
+      "review_reason": NaN
     },
     {
       "event": "South Korea at South Africa",
@@ -6363,11 +6399,12 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.7242,
-      "best_result_event": "South Korea at Mexico",
+      "grading_match_confidence": 0.4325,
+      "best_result_event": "Saudi Arabia at Spain",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.7083333333333334, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.5, 'sport': 1.0, 'date': 0.0, 'pick': 0.25}",
+      "review_reason": NaN
     },
     {
       "event": "Ivory Coast at Curaçao",
@@ -6539,7 +6576,8 @@
       "best_result_event": "Ivory Coast at Germany",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.7727272727272727, 'sport': 1.0, 'date': 0.0, 'pick': 0.2222222222222222}"
+      "best_match_components": "{'event': 0.7727272727272727, 'sport': 1.0, 'date': 0.0, 'pick': 0.2222222222222222}",
+      "review_reason": NaN
     },
     {
       "event": "Australia at Paraguay",
@@ -6711,7 +6749,8 @@
       "best_result_event": "Paraguay at Turkey",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.6333333333333333, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.6333333333333333, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Cape Verde at Uruguay",
@@ -6877,13 +6916,14 @@
       "matched_event": NaN,
       "home_score": NaN,
       "away_score": NaN,
-      "graded_at_utc": "2026-06-22T00:40:57.875017+00:00",
+      "graded_at_utc": "2026-06-22T01:05:14.521859+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 0.8333,
       "best_result_event": NaN,
       "matched_result_event": "Cape Verde at Uruguay",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 0.3333333333333333}",
+      "review_reason": NaN
     },
     {
       "event": "Netherlands at Tunisia",
@@ -7055,7 +7095,8 @@
       "best_result_event": "Japan at Tunisia",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.6842105263157895, 'sport': 1.0, 'date': 0.0, 'pick': 0.24}"
+      "best_match_components": "{'event': 0.6842105263157895, 'sport': 1.0, 'date': 0.0, 'pick': 0.24}",
+      "review_reason": NaN
     },
     {
       "event": "Senegal at Norway",
@@ -7227,7 +7268,8 @@
       "best_result_event": "Paraguay at Turkey",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.45714285714285713, 'sport': 1.0, 'date': 0.0, 'pick': 0.3333333333333333}"
+      "best_match_components": "{'event': 0.45714285714285713, 'sport': 1.0, 'date': 0.0, 'pick': 0.3333333333333333}",
+      "review_reason": NaN
     },
     {
       "event": "DR Congo at Colombia",
@@ -7399,7 +7441,8 @@
       "best_result_event": "Morocco at Scotland",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5641025641025641, 'sport': 1.0, 'date': 0.0, 'pick': 0.35714285714285715}"
+      "best_match_components": "{'event': 0.5641025641025641, 'sport': 1.0, 'date': 0.0, 'pick': 0.35714285714285715}",
+      "review_reason": NaN
     },
     {
       "event": "Cape Verde at Uruguay",
@@ -7565,13 +7608,14 @@
       "matched_event": NaN,
       "home_score": NaN,
       "away_score": NaN,
-      "graded_at_utc": "2026-06-22T00:40:59.942232+00:00",
+      "graded_at_utc": "2026-06-22T01:05:16.471170+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 1.0,
       "best_result_event": NaN,
       "matched_result_event": "Cape Verde at Uruguay",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Netherlands at Tunisia",
@@ -7743,7 +7787,8 @@
       "best_result_event": "Japan at Tunisia",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.6842105263157895, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.6842105263157895, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Qatar at Bosnia & Herzegovina",
@@ -7915,7 +7960,8 @@
       "best_result_event": "Saudi Arabia at Spain",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.4230769230769231, 'sport': 1.0, 'date': 0.0, 'pick': 0.22857142857142856}"
+      "best_match_components": "{'event': 0.4230769230769231, 'sport': 1.0, 'date': 0.0, 'pick': 0.22857142857142856}",
+      "review_reason": NaN
     },
     {
       "event": "Ivory Coast at Curaçao",
@@ -8082,12 +8128,13 @@
       "home_score": NaN,
       "away_score": NaN,
       "graded_at_utc": "2026-06-22T00:41:01.435433+00:00",
-      "grading_match_status": "matched",
+      "grading_match_status": "matched_loss_needs_review",
       "grading_match_confidence": 0.86,
       "best_result_event": "Ivory Coast at Germany",
       "matched_result_event": "Ivory Coast at Germany",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 0.7727272727272727, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}",
+      "review_reason": "auto_loss_below_strict_confidence"
     },
     {
       "event": "England at Panama",
@@ -8259,7 +8306,8 @@
       "best_result_event": "Saudi Arabia at Spain",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.47368421052631576, 'sport': 1.0, 'date': 0.0, 'pick': 0.2777777777777778}"
+      "best_match_components": "{'event': 0.47368421052631576, 'sport': 1.0, 'date': 0.0, 'pick': 0.2777777777777778}",
+      "review_reason": NaN
     },
     {
       "event": "USA at Turkey",
@@ -8431,7 +8479,8 @@
       "best_result_event": "Paraguay at Turkey",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.7741935483870968, 'sport': 1.0, 'date': 0.0, 'pick': 0.14814814814814814}"
+      "best_match_components": "{'event': 0.7741935483870968, 'sport': 1.0, 'date': 0.0, 'pick': 0.14814814814814814}",
+      "review_reason": NaN
     },
     {
       "event": "Canada at Switzerland",
@@ -8603,7 +8652,8 @@
       "best_result_event": "Morocco at Scotland",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.55, 'sport': 1.0, 'date': 0.0, 'pick': 0.35714285714285715}"
+      "best_match_components": "{'event': 0.55, 'sport': 1.0, 'date': 0.0, 'pick': 0.35714285714285715}",
+      "review_reason": NaN
     }
   ]
 }
