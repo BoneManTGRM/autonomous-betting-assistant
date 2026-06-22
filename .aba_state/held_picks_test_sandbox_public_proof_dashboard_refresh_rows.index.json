@@ -1,0 +1,9 @@
+{
+  "version": "held-picks-v8-deduped",
+  "format": "chunked",
+  "workspace_id": "test_sandbox",
+  "key": "public_proof_dashboard_refresh_rows",
+  "parts": 3,
+  "rows_count": 145,
+  "chunk_size": 50
+}
