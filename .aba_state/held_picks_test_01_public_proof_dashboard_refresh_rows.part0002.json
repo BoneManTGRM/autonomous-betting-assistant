@@ -175,7 +175,8 @@
       "best_result_event": "Sweden at Netherlands",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5714285714285714, 'sport': 1.0, 'date': 0.0, 'pick': 0.42105263157894735}"
+      "best_match_components": "{'event': 0.5714285714285714, 'sport': 1.0, 'date': 0.0, 'pick': 0.42105263157894735}",
+      "review_reason": NaN
     },
     {
       "event": "Ghana at England",
@@ -347,7 +348,8 @@
       "best_result_event": "Sweden at Netherlands",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.5405405405405406, 'sport': 1.0, 'date': 0.0, 'pick': 0.3125}"
+      "best_match_components": "{'event': 0.5405405405405406, 'sport': 1.0, 'date': 0.0, 'pick': 0.3125}",
+      "review_reason": NaN
     },
     {
       "event": "Belgium at New Zealand",
@@ -519,7 +521,8 @@
       "best_result_event": "Iran at Belgium",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.6333333333333333, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}"
+      "best_match_components": "{'event': 0.6333333333333333, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Los Angeles Angels at Athletics",
@@ -685,13 +688,14 @@
       "matched_event": "Los Angeles Angels at Athletics",
       "home_score": 0.0,
       "away_score": 7.0,
-      "graded_at_utc": "2026-06-22T00:41:04.897267+00:00",
+      "graded_at_utc": "2026-06-22T01:05:21.580670+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 1.0,
       "best_result_event": NaN,
       "matched_result_event": "Los Angeles Angels at Athletics",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Cape Verde at Uruguay",
@@ -857,13 +861,14 @@
       "matched_event": NaN,
       "home_score": NaN,
       "away_score": NaN,
-      "graded_at_utc": "2026-06-22T00:41:05.367367+00:00",
+      "graded_at_utc": "2026-06-22T01:05:22.008237+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 0.8611,
       "best_result_event": NaN,
       "matched_result_event": "Cape Verde at Uruguay",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 0.4444444444444444}",
+      "review_reason": NaN
     },
     {
       "event": "Australia at Paraguay",
@@ -1030,12 +1035,13 @@
       "home_score": NaN,
       "away_score": NaN,
       "graded_at_utc": "2026-06-22T00:41:05.842665+00:00",
-      "grading_match_status": "matched",
+      "grading_match_status": "matched_loss_needs_review",
       "grading_match_confidence": 0.86,
       "best_result_event": "Australia at USA",
       "matched_result_event": "Australia at USA",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 0.7567567567567568, 'sport': 1.0, 'date': 0.0, 'pick': 1.0}",
+      "review_reason": "auto_loss_below_strict_confidence"
     },
     {
       "event": "Australia at Paraguay",
@@ -1207,7 +1213,8 @@
       "best_result_event": "Australia at USA",
       "matched_result_event": NaN,
       "matched_result_source": NaN,
-      "best_match_components": "{'event': 0.7567567567567568, 'sport': 1.0, 'date': 0.0, 'pick': 0.2962962962962963}"
+      "best_match_components": "{'event': 0.7567567567567568, 'sport': 1.0, 'date': 0.0, 'pick': 0.2962962962962963}",
+      "review_reason": NaN
     },
     {
       "event": "Minnesota Twins at Arizona Diamondbacks",
@@ -1373,13 +1380,14 @@
       "matched_event": "Minnesota Twins at Arizona Diamondbacks",
       "home_score": 8.0,
       "away_score": 16.0,
-      "graded_at_utc": "2026-06-22T00:41:06.710138+00:00",
+      "graded_at_utc": "2026-06-22T01:05:23.358784+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 1.0,
       "best_result_event": NaN,
       "matched_result_event": "Minnesota Twins at Arizona Diamondbacks",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Pittsburgh Pirates at Colorado Rockies",
@@ -1545,13 +1553,14 @@
       "matched_event": "Pittsburgh Pirates at Colorado Rockies",
       "home_score": 2.0,
       "away_score": 1.0,
-      "graded_at_utc": "2026-06-22T00:41:07.055002+00:00",
+      "graded_at_utc": "2026-06-22T01:05:23.720476+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 1.0,
       "best_result_event": NaN,
       "matched_result_event": "Pittsburgh Pirates at Colorado Rockies",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 1.0}",
+      "review_reason": NaN
     },
     {
       "event": "Minnesota Twins at Arizona Diamondbacks",
@@ -1718,12 +1727,13 @@
       "home_score": 8.0,
       "away_score": 16.0,
       "graded_at_utc": "2026-06-22T00:41:07.395267+00:00",
-      "grading_match_status": "matched",
+      "grading_match_status": "matched_loss_needs_review",
       "grading_match_confidence": 0.8472,
       "best_result_event": NaN,
       "matched_result_event": "Minnesota Twins at Arizona Diamondbacks",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 0.3888888888888889}",
+      "review_reason": "auto_loss_below_strict_confidence"
     },
     {
       "event": "Boston Red Sox at Seattle Mariners",
@@ -1889,13 +1899,14 @@
       "matched_event": "Boston Red Sox at Seattle Mariners",
       "home_score": 1.0,
       "away_score": 5.0,
-      "graded_at_utc": "2026-06-22T00:41:07.736555+00:00",
+      "graded_at_utc": "2026-06-22T01:05:24.407558+00:00",
       "grading_match_status": "matched",
       "grading_match_confidence": 1.0,
       "best_result_event": NaN,
       "matched_result_event": "Boston Red Sox at Seattle Mariners",
       "matched_result_source": "",
-      "best_match_components": NaN
+      "best_match_components": "{'event': 1.0, 'sport': 1.0, 'date': 1.0, 'pick': 1.0}",
+      "review_reason": NaN
     }
   ]
 }
