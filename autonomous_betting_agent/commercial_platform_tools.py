@@ -279,6 +279,7 @@ def report_card_markdown(frame, **kw):
     hit = 'N/A' if m.get('hit_rate') is None else f"{m['hit_rate'] * 100:.1f}%"
     roi = 'N/A' if m.get('roi') is None else f"{m['roi'] * 100:.1f}%"
     clv = 'N/A' if m.get('avg_clv_percent') is None else f"{m['avg_clv_percent'] * 100:.2f}%"
+    beat_close = 'N/A' if m.get('beat_close_rate') is None else f"{m['beat_close_rate'] * 100:.1f}%"
     return '\n'.join([
         f'# {title}',
         f'**{brand}**',
@@ -286,7 +287,7 @@ def report_card_markdown(frame, **kw):
         f"Record: {m['wins']}-{m['losses']} | Pushes/Voids: {m.get('pushes', m.get('voids', 0))}",
         f"Locked pick rows: {m.get('locked_picks', 0)} | Unique events: {m.get('unique_events', 0)} | Completed events: {m.get('completed_events', 0)}",
         f"Hit rate: {hit} | ROI: {roi} | Units: {m.get('profit_units', 0)}",
-        f"Avg CLV: {clv} | Beat close: {'N/A' if m.get('beat_close_rate') is None else f'{m['beat_close_rate'] * 100:.1f}%'}",
+        f"Avg CLV: {clv} | Beat close: {beat_close}",
         f"Proof quality: {m.get('proof_quality_score', 0)}/100",
     ])
 
