@@ -14,10 +14,7 @@ DEFAULT_LEDGER_PATH = REPO_ROOT / 'data' / 'odds_lock_pro_ledger.csv'
 LOCKED_STORE_KEY = 'odds_lock_pro_locked_rows'
 REFRESH_STORE_KEY = 'public_proof_dashboard_refresh_rows'
 PROOF_REQUIRED_COLUMNS = {'proof_id', 'locked_at_utc'}
-CLOSING_VALUE_FIELDS = [
-    'closing_decimal_price', 'close_decimal_price', 'closing_price', 'market_close_decimal_price',
-    'final_decimal_price', 'closing_odds_decimal', 'close_odds_decimal',
-]
+CLOSING_VALUE_FIELDS = ['closing_decimal_price', 'close_decimal_price', 'closing_price', 'market_close_decimal_price', 'final_decimal_price', 'closing_odds_decimal', 'close_odds_decimal']
 LOCKED_VALUE_FIELDS = ['locked_decimal_price', 'lock_decimal_price', 'decimal_price']
 CLV_VALUE_FIELDS = ['clv_percent', 'closing_line_value_percent', 'clv']
 BEAT_CLOSE_FIELDS = ['beat_close', 'beat_closing_line', 'beat_closing_price']
@@ -212,7 +209,7 @@ def proof_audit_summary(frame):
 
 
 def _series_first_numeric(frame: pd.DataFrame, fields: list[str]) -> pd.Series:
-    out = pd.Series(pd.NA, index=frame.index, dtype='float64')
+    out = pd.Series(float('nan'), index=frame.index, dtype='float64')
     for field in fields:
         if field in frame.columns:
             values = pd.to_numeric(frame[field], errors='coerce')
@@ -234,23 +231,17 @@ def _series_first_bool(frame: pd.DataFrame, fields: list[str]) -> pd.Series:
 def clv_metrics(frame: pd.DataFrame) -> dict[str, Any]:
     c = latest_active_list(frame)
     if c.empty:
-        return {'avg_clv_percent': None, 'beat_close_rate': None, 'clv_sample_size': 0}
+        return {'avg_clv_percent': None, 'beat_close_rate': None, 'clv_sample_size': 0, 'beat_close_sample_size': 0}
     explicit_clv = _series_first_numeric(c, CLV_VALUE_FIELDS)
     locked_price = _series_first_numeric(c, LOCKED_VALUE_FIELDS)
     close_price = _series_first_numeric(c, CLOSING_VALUE_FIELDS)
     computed_clv = (locked_price / close_price) - 1.0
     clv = explicit_clv.where(explicit_clv.notna(), computed_clv)
-    clv = clv.where(clv.abs().le(1.0), clv / 100.0)
-    clv = clv.dropna()
+    clv = clv.where(clv.abs().le(1.0), clv / 100.0).dropna()
     explicit_beat = _series_first_bool(c, BEAT_CLOSE_FIELDS)
     computed_beat = locked_price.gt(close_price).where(locked_price.notna() & close_price.notna())
     beat = explicit_beat.where(explicit_beat.notna(), computed_beat).dropna()
-    return {
-        'avg_clv_percent': None if clv.empty else round(float(clv.mean()), 6),
-        'beat_close_rate': None if beat.empty else round(float(beat.astype(bool).mean()), 6),
-        'clv_sample_size': int(len(clv)),
-        'beat_close_sample_size': int(len(beat)),
-    }
+    return {'avg_clv_percent': None if clv.empty else round(float(clv.mean()), 6), 'beat_close_rate': None if beat.empty else round(float(beat.astype(bool).mean()), 6), 'clv_sample_size': int(len(clv)), 'beat_close_sample_size': int(len(beat))}
 
 
 def dashboard_metrics(frame):
