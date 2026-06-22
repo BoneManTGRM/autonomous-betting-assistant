@@ -21,7 +21,7 @@ from autonomous_betting_agent.commercial_platform_tools import (
 )
 from autonomous_betting_agent.odds_lock_tools import performance_by_group, update_profit_columns
 from autonomous_betting_agent.pick_hold_store import load_first_available, save_held_rows
-from autonomous_betting_agent.row_normalizer import normalize_frame
+from autonomous_betting_agent.row_normalizer import normalize_frame, safe_text
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
 st.set_page_config(page_title='Public Proof Dashboard', layout='wide')
@@ -32,54 +32,118 @@ TEXT = {
         'title': 'Public Proof Dashboard',
         'caption': 'Client-safe proof dashboard for locked picks, result uploads, report cards, and historical tracker review.',
         'info': 'Official proof mode uses rows locked before start with proof_id and locked_at_utc. Historical tracker rows can be reviewed, but they are not official proof.',
-        'test_window': 'Test Window ID', 'test_window_help': 'Use the same ID as Odds Lock Pro, such as test_01.',
-        'active_test_window': 'Active test ledger', 'use_demo': 'Show demo ledger if no real ledger exists',
-        'use_db': 'Use full saved database', 'use_session': 'Use current synced dashboard rows',
-        'upload_ledger': 'Upload locked ledger or historical tracker CSV', 'upload_results': 'Upload finished results CSV for auto-grading',
-        'save_db': 'Save current dashboard ledger to this test ledger', 'apply_results': 'Apply result updates',
-        'source': 'Source', 'rows': 'Locked', 'resolved': 'Resolved', 'record': 'Record', 'hit_rate': 'Hit rate',
-        'roi': 'ROI', 'units': 'Units', 'pending': 'Pending', 'clv': 'Avg CLV', 'proof_quality': 'Proof quality',
-        'valid': 'Valid proof rows', 'ignored_nonproof': 'Ignored raw/non-proof rows', 'filtered': 'Filtered rows',
-        'filters': 'Dashboard filters', 'sport_filter': 'Sport filter', 'market_filter': 'Market filter', 'status_filter': 'Result status filter',
-        'table': 'Public ledger table', 'dashboard': 'Breakdowns', 'audit': 'Proof audit', 'cards': 'Report cards',
-        'brand': 'Brand name', 'card_title': 'Card title', 'markdown_card': 'Markdown card', 'html_card': 'HTML card',
-        'daily_report': 'Daily report', 'download_public': 'Download public proof CSV', 'download_private': 'Download private audit CSV',
-        'download_audit': 'Download proof audit CSV', 'download_markdown': 'Download Markdown card', 'download_html': 'Download HTML card',
-        'download_report': 'Download daily report TXT', 'download_tracker': 'Download normalized tracker CSV',
-        'no_rows': 'No current dashboard rows loaded. Run/lock a list, upload the current locked CSV, or enable the full saved database intentionally.',
-        'updated': 'Result update summary', 'tracker_mode': 'Historical tracker mode — not official proof',
-        'tracker_warning': 'This file can be reviewed for record tracking, but it is not official proof because it lacks proof_id and locked_at_utc. Use Odds Lock Pro before games start for official monthly-license proof.',
+        'test_window': 'Test Window ID',
+        'active_test_window': 'Active test ledger',
+        'use_db': 'Use full saved database',
+        'use_session': 'Use current synced dashboard rows',
+        'use_demo': 'Show demo ledger if no real ledger exists',
+        'upload_ledger': 'Upload locked ledger or historical tracker CSV',
+        'upload_results': 'Upload finished results CSV for auto-grading',
+        'save_db': 'Save current dashboard ledger to this test ledger',
+        'apply_results': 'Apply result updates',
+        'source': 'Source',
+        'active_source': 'Active proof source',
+        'rows': 'Locked',
+        'resolved': 'Resolved',
+        'record': 'Record',
+        'hit_rate': 'Hit rate',
+        'roi': 'ROI',
+        'units': 'Units',
+        'pending': 'Pending',
+        'clv': 'Avg CLV',
+        'proof_quality': 'Proof quality',
+        'valid': 'Valid proof rows',
+        'ignored_nonproof': 'Ignored raw/non-proof rows',
+        'filtered': 'Filtered rows',
+        'filters': 'Dashboard filters',
+        'sport_filter': 'Sport filter',
+        'market_filter': 'Market filter',
+        'status_filter': 'Result status filter',
+        'table': 'Public ledger table',
+        'dashboard': 'Breakdowns',
+        'audit': 'Proof audit',
+        'cards': 'Report cards',
+        'brand': 'Brand name',
+        'card_title': 'Card title',
+        'markdown_card': 'Markdown card',
+        'html_card': 'HTML card',
+        'daily_report': 'Daily report',
+        'download_public': 'Download public proof CSV',
+        'download_private': 'Download private audit CSV',
+        'download_audit': 'Download proof audit CSV',
+        'download_markdown': 'Download Markdown card',
+        'download_html': 'Download HTML card',
+        'download_report': 'Download daily report TXT',
+        'download_tracker': 'Download normalized tracker CSV',
+        'no_rows': 'No current proof rows loaded. Run Pro Predictor Volume, upload the locked CSV, or intentionally enable full saved database.',
+        'updated': 'Result update summary',
+        'tracker_mode': 'Historical tracker mode — not official proof',
+        'tracker_warning': 'This file can be reviewed for record tracking, but it is not official proof because it lacks proof_id and locked_at_utc. Use Pro Predictor Volume/Odds Lock Pro before games start for official proof.',
     },
     'es': {
-        'title': 'Dashboard Público de Prueba', 'caption': 'Dashboard para clientes con picks bloqueados, carga de resultados, tarjetas y revisión histórica.',
-        'info': 'El modo de prueba oficial usa filas bloqueadas antes del inicio con proof_id y locked_at_utc. Las filas históricas se pueden revisar, pero no son prueba oficial.',
-        'test_window': 'ID de ventana de prueba', 'test_window_help': 'Usa el mismo ID que Odds Lock Pro, como test_01.',
-        'active_test_window': 'Ledger de prueba activo', 'use_demo': 'Mostrar ledger demo si no hay ledger real',
-        'use_db': 'Usar base guardada completa', 'use_session': 'Usar filas actuales sincronizadas',
-        'upload_ledger': 'Subir CSV de ledger bloqueado o tracker histórico', 'upload_results': 'Subir CSV de resultados finalizados para autocalificar',
-        'save_db': 'Guardar ledger actual en esta prueba', 'apply_results': 'Aplicar resultados',
-        'source': 'Fuente', 'rows': 'Bloqueados', 'resolved': 'Resueltos', 'record': 'Récord', 'hit_rate': 'Acierto',
-        'roi': 'ROI', 'units': 'Unidades', 'pending': 'Pendientes', 'clv': 'CLV prom.', 'proof_quality': 'Calidad prueba',
-        'valid': 'Filas de prueba válidas', 'ignored_nonproof': 'Filas crudas/no-prueba ignoradas', 'filtered': 'Filas filtradas',
-        'filters': 'Filtros del dashboard', 'sport_filter': 'Filtro de deporte', 'market_filter': 'Filtro de mercado', 'status_filter': 'Filtro de resultado',
-        'table': 'Tabla pública del ledger', 'dashboard': 'Desgloses', 'audit': 'Auditoría de prueba', 'cards': 'Tarjetas de reporte',
-        'brand': 'Nombre de marca', 'card_title': 'Título de tarjeta', 'markdown_card': 'Tarjeta Markdown', 'html_card': 'Tarjeta HTML',
-        'daily_report': 'Reporte diario', 'download_public': 'Descargar CSV público', 'download_private': 'Descargar CSV privado',
-        'download_audit': 'Descargar CSV de auditoría', 'download_markdown': 'Descargar tarjeta Markdown', 'download_html': 'Descargar tarjeta HTML',
-        'download_report': 'Descargar reporte diario TXT', 'download_tracker': 'Descargar tracker normalizado CSV',
-        'no_rows': 'No hay filas actuales cargadas. Ejecuta/bloquea una lista, sube el CSV bloqueado actual o activa la base completa manualmente.',
-        'updated': 'Resumen de actualización de resultados', 'tracker_mode': 'Modo tracker histórico — no es prueba oficial',
-        'tracker_warning': 'Este archivo sirve para revisar récord, pero no es prueba oficial porque no tiene proof_id and locked_at_utc.',
+        'title': 'Dashboard Público de Prueba',
+        'caption': 'Dashboard para clientes con picks bloqueados, carga de resultados, tarjetas y revisión histórica.',
+        'info': 'El modo oficial usa filas bloqueadas antes del inicio con proof_id y locked_at_utc.',
+        'test_window': 'ID de ventana de prueba',
+        'active_test_window': 'Ledger activo',
+        'use_db': 'Usar base guardada completa',
+        'use_session': 'Usar filas sincronizadas actuales',
+        'use_demo': 'Mostrar demo',
+        'upload_ledger': 'Subir CSV bloqueado o tracker histórico',
+        'upload_results': 'Subir CSV de resultados',
+        'save_db': 'Guardar ledger actual',
+        'apply_results': 'Aplicar resultados',
+        'source': 'Fuente',
+        'active_source': 'Fuente activa',
+        'rows': 'Bloqueados',
+        'resolved': 'Resueltos',
+        'record': 'Récord',
+        'hit_rate': 'Acierto',
+        'roi': 'ROI',
+        'units': 'Unidades',
+        'pending': 'Pendientes',
+        'clv': 'CLV prom.',
+        'proof_quality': 'Calidad prueba',
+        'valid': 'Filas válidas',
+        'ignored_nonproof': 'Filas ignoradas/no-prueba',
+        'filtered': 'Filas filtradas',
+        'filters': 'Filtros',
+        'sport_filter': 'Deporte',
+        'market_filter': 'Mercado',
+        'status_filter': 'Estado',
+        'table': 'Tabla pública',
+        'dashboard': 'Desgloses',
+        'audit': 'Auditoría',
+        'cards': 'Tarjetas',
+        'brand': 'Marca',
+        'card_title': 'Título',
+        'markdown_card': 'Markdown',
+        'html_card': 'HTML',
+        'daily_report': 'Reporte',
+        'download_public': 'Descargar CSV público',
+        'download_private': 'Descargar CSV privado',
+        'download_audit': 'Descargar auditoría',
+        'download_markdown': 'Descargar Markdown',
+        'download_html': 'Descargar HTML',
+        'download_report': 'Descargar reporte TXT',
+        'download_tracker': 'Descargar tracker',
+        'no_rows': 'No hay filas actuales.',
+        'updated': 'Actualización',
+        'tracker_mode': 'Tracker histórico — no prueba oficial',
+        'tracker_warning': 'Este archivo no es prueba oficial porque no tiene proof_id y locked_at_utc.',
     },
 }
 
-SESSION_KEYS = ['public_proof_dashboard_refresh_rows', 'odds_lock_pro_locked_rows', 'ara_latest_predictions']
+SESSION_KEYS = ['public_proof_dashboard_refresh_rows', 'odds_lock_pro_locked_rows']
+
 
 def t(key: str) -> str:
     return TEXT[LANG].get(key, TEXT['en'].get(key, key))
 
+
 def pct(value: float | None, digits: int = 1) -> str:
     return 'N/A' if value is None else f'{value * 100:.{digits}f}%'
+
 
 def load_saved_session_rows(workspace_id: str) -> tuple[str, pd.DataFrame]:
     for key in SESSION_KEYS:
@@ -91,6 +155,7 @@ def load_saved_session_rows(workspace_id: str) -> tuple[str, pd.DataFrame]:
         st.session_state[key] = rows
         return f'local:{key}', pd.DataFrame(rows)
     return '', pd.DataFrame()
+
 
 def read_sources(workspace_id: str, *, use_db: bool, use_session: bool, use_demo: bool, uploads: list | None) -> tuple[str, pd.DataFrame, pd.DataFrame, int]:
     raw_frames: list[pd.DataFrame] = []
@@ -115,7 +180,8 @@ def read_sources(workspace_id: str, *, use_db: bool, use_session: bool, use_demo
         if not session_frame.empty:
             raw_frames.append(session_frame)
             locked = filter_locked_proof_rows(session_frame)
-            ledger_frames.append(locked if not locked.empty else session_frame)
+            if not locked.empty:
+                ledger_frames.append(locked)
             raw_count += len(session_frame)
             names.append(label)
     if use_db:
@@ -133,6 +199,51 @@ def read_sources(workspace_id: str, *, use_db: bool, use_session: bool, use_demo
     raw_all = pd.concat(raw_frames, ignore_index=True, sort=False)
     ledger = merge_ledgers(*ledger_frames) if ledger_frames else pd.DataFrame()
     return ', '.join(names), ledger, raw_all, raw_count
+
+
+def active_source_summary(frame: pd.DataFrame, source: str, workspace_id: str) -> dict[str, str | int]:
+    if frame.empty:
+        return {'source': source or 'none', 'workspace_id': workspace_id, 'rows': 0}
+    def unique_text(col: str) -> str:
+        if col not in frame.columns:
+            return ''
+        values = [safe_text(v) for v in frame[col].dropna().unique() if safe_text(v)]
+        if not values:
+            return ''
+        return values[0] if len(values) == 1 else f'{values[0]} (+{len(values)-1} more)'
+    status = frame.get('result_status', pd.Series(dtype=str)).astype(str).str.lower()
+    locked = pd.to_datetime(frame.get('locked_at_utc', pd.Series(dtype=str)), errors='coerce', utc=True)
+    starts = pd.to_datetime(frame.get('event_start_utc', pd.Series(dtype=str)), errors='coerce', utc=True)
+    return {
+        'source': source or 'none',
+        'workspace_id': workspace_id,
+        'source_file': unique_text('source_file'),
+        'active_list_id': unique_text('active_list_id'),
+        'ledger_batch_id': unique_text('ledger_batch_id'),
+        'rows': int(len(frame)),
+        'wins': int(status.eq('win').sum()),
+        'losses': int(status.eq('loss').sum()),
+        'voids': int(status.isin(['void', 'push', 'cancelled', 'canceled']).sum()),
+        'pending': int(status.isin(['', 'pending', 'unknown', 'scheduled', 'live', 'needs_review']).sum()),
+        'locked_at_min': '' if locked.dropna().empty else locked.min().isoformat(),
+        'locked_at_max': '' if locked.dropna().empty else locked.max().isoformat(),
+        'event_start_min': '' if starts.dropna().empty else starts.min().isoformat(),
+        'event_start_max': '' if starts.dropna().empty else starts.max().isoformat(),
+    }
+
+
+def show_source_summary(frame: pd.DataFrame, source: str, workspace_id: str) -> None:
+    info = active_source_summary(frame, source, workspace_id)
+    st.subheader(t('active_source'))
+    c = st.columns(5)
+    c[0].metric('Rows', info.get('rows', 0))
+    c[1].metric('Wins', info.get('wins', 0))
+    c[2].metric('Losses', info.get('losses', 0))
+    c[3].metric('Voids', info.get('voids', 0))
+    c[4].metric('Pending', info.get('pending', 0))
+    with st.expander('Active source identity', expanded=True):
+        st.json(info)
+
 
 def filter_dashboard(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
@@ -154,6 +265,7 @@ def filter_dashboard(frame: pd.DataFrame) -> pd.DataFrame:
         st.caption(f"{t('filtered')}: {len(filtered)}")
         return filtered
 
+
 def tracker_metrics(frame: pd.DataFrame) -> dict[str, int | float | None]:
     normalized = normalize_frame(frame)
     if normalized.empty:
@@ -165,6 +277,7 @@ def tracker_metrics(frame: pd.DataFrame) -> dict[str, int | float | None]:
     pending = int(status.isin(['pending', 'unknown', 'scheduled', 'live', '']).sum())
     return {'rows': int(len(normalized)), 'resolved': resolved, 'wins': wins, 'losses': losses, 'pending': pending, 'hit_rate': None if resolved == 0 else round(wins / resolved, 6)}
 
+
 def show_tracker_mode(frame: pd.DataFrame) -> None:
     normalized = normalize_frame(frame)
     if normalized.empty:
@@ -173,7 +286,7 @@ def show_tracker_mode(frame: pd.DataFrame) -> None:
     metrics = tracker_metrics(normalized)
     st.warning(t('tracker_warning'))
     cols = st.columns(6)
-    cols[0].metric('Rows' if LANG == 'en' else 'Filas', metrics['rows'])
+    cols[0].metric('Rows', metrics['rows'])
     cols[1].metric(t('resolved'), metrics['resolved'])
     cols[2].metric(t('record'), f"{metrics['wins']}-{metrics['losses']}")
     cols[3].metric(t('hit_rate'), pct(metrics['hit_rate']))
@@ -184,22 +297,23 @@ def show_tracker_mode(frame: pd.DataFrame) -> None:
     st.download_button(t('download_tracker'), normalized.to_csv(index=False), file_name='historical_tracker_non_proof.csv', mime='text/csv')
     st.stop()
 
+
 st.title(t('title'))
 st.caption(t('caption'))
 st.info(t('info'))
-st.caption('Default loads current synced dashboard rows only. Full saved database stays OFF unless intentionally enabled.')
+st.caption('The active source box below shows exactly which file/list is being counted. Raw predictor CSVs without proof_id are shown as tracker rows, not official proof.')
 
 with st.expander(t('active_test_window'), expanded=True):
-    workspace_input = st.text_input(t('test_window'), value=st.session_state.get('aba_test_window_id', 'test_01'), help=t('test_window_help'))
-    use_db = st.checkbox(t('use_db'), value=False, help='OFF by default to prevent all historical rows from showing in the public record.')
-    use_session = st.checkbox(t('use_session'), value=True, help='ON by default so the dashboard shows the current list synced by Odds Lock Pro / Full Auto Update.')
+    workspace_input = st.text_input(t('test_window'), value=st.session_state.get('aba_test_window_id', 'test_01'))
+    use_db = st.checkbox(t('use_db'), value=False, help='OFF by default so historical rows do not silently replace the active list.')
+    use_session = st.checkbox(t('use_session'), value=True, help='ON by default so the dashboard shows the current list synced by Pro Predictor Volume / Full Auto Update.')
     use_demo = st.checkbox(t('use_demo'), value=False, key='public_proof_use_demo')
     uploads = st.file_uploader(t('upload_ledger'), type=['csv'], accept_multiple_files=True)
 
 workspace_id = normalize_workspace_id(workspace_input)
 st.session_state['aba_test_window_id'] = workspace_id
-st.caption(f"{t('active_test_window')}: {workspace_id}")
 source, ledger, raw_input, raw_count = read_sources(workspace_id, use_db=use_db, use_session=use_session, use_demo=use_demo, uploads=uploads)
+st.caption(f"{t('active_test_window')}: {workspace_id}")
 st.caption(f"{t('source')}: {source or 'none'}")
 
 results_upload = st.file_uploader(t('upload_results'), type=['csv'], accept_multiple_files=False, key='proof_results_upload')
@@ -235,9 +349,11 @@ if ledger.empty:
     st.stop()
 
 ledger = update_profit_columns(ledger)
+show_source_summary(ledger, source, workspace_id)
 filtered_ledger = filter_dashboard(ledger)
 metrics = dashboard_metrics(filtered_ledger)
 audit_summary = proof_audit_summary(filtered_ledger)
+
 raw_cols = st.columns(3)
 raw_cols[0].metric(t('valid'), len(ledger))
 raw_cols[1].metric(t('ignored_nonproof'), max(0, raw_count - len(ledger)))
