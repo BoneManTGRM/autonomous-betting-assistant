@@ -110,6 +110,19 @@ class CommercialPlatformToolsTests(unittest.TestCase):
         self.assertIn('Avg CLV', markdown)
         self.assertIn('<div', html)
 
+    def test_dashboard_metrics_separate_unique_events_from_pick_rows(self):
+        locked = lock_rows(pd.DataFrame([
+            {'event_id': 'event-1', 'event': 'A at B', 'market_type': 'spreads', 'line_point': 1.5, 'prediction': 'A +1.5', 'model_probability': 0.64, 'decimal_price': 1.91, 'agent_decision': 'play_small', 'result_status': 'win'},
+            {'event_id': 'event-1', 'event': 'A at B', 'market_type': 'totals', 'line_point': 2.5, 'prediction': 'Under 2.5', 'model_probability': 0.61, 'decimal_price': 1.85, 'agent_decision': 'play_small', 'result_status': 'loss'},
+        ]))
+        metrics = dashboard_metrics(locked)
+        self.assertEqual(metrics['pick_rows'], 2)
+        self.assertEqual(metrics['unique_events'], 1)
+        self.assertEqual(metrics['completed_events'], 1)
+        self.assertEqual(metrics['events_with_multiple_pick_rows'], 1)
+        self.assertEqual(metrics['extra_same_event_pick_rows'], 1)
+        self.assertEqual(metrics['row_level_record'], '1-1')
+
 
 if __name__ == '__main__':
     unittest.main()
