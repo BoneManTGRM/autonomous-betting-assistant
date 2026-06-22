@@ -171,7 +171,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.6062
+      "grading_match_confidence": 0.5673,
+      "best_result_event": "Australia at USA",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "France at Norway",
@@ -339,7 +342,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4557
+      "grading_match_confidence": 0.4359,
+      "best_result_event": "Curaçao at Ecuador",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Iraq at France",
@@ -507,7 +513,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4889
+      "grading_match_confidence": 0.5262,
+      "best_result_event": "Saudi Arabia at Spain",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Liam Paro at Lewis Crocker",
@@ -675,7 +684,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.3579
+      "grading_match_confidence": 0.3658,
+      "best_result_event": "Baltimore Orioles at Los Angeles Dodgers",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Iran at Belgium",
@@ -843,7 +855,10 @@
       "away_score": 0.0,
       "graded_at_utc": "2026-06-21T21:12:55+00:00",
       "grading_match_status": "skipped_resolved",
-      "grading_match_confidence": NaN
+      "grading_match_confidence": NaN,
+      "best_result_event": NaN,
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Germany at Ecuador",
@@ -1011,7 +1026,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5832
+      "grading_match_confidence": 0.5436,
+      "best_result_event": "Curaçao at Ecuador",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Austria at Algeria",
@@ -1179,7 +1197,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5982
+      "grading_match_confidence": 0.5759,
+      "best_result_event": "Australia at USA",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Cape Verde at Uruguay",
@@ -1215,7 +1236,7 @@
       "fusion_warning": "",
       "match_score": "100%",
       "prediction_timestamp": "2026-06-21T18:26:17Z",
-      "result_status": "pending",
+      "result_status": "void",
       "odds_api_source_used": "yes",
       "sportsdataio_source_used": "no",
       "sportsdataio_status": "error: SportsDataIO request failed with HTTP 401: { \"statusCode\": 401, \"message\": \"Access denied due to invalid subscription key. Make sure to provide a valid key for an active subscription.\" }",
@@ -1305,9 +1326,9 @@
       "american_odds": "",
       "odds_timestamp": "",
       "winner": "",
-      "final_score": "",
+      "final_score": "Cape Verde 2 - 2 Uruguay",
       "stake_units": 1.0,
-      "profit_units": NaN,
+      "profit_units": 0.0,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -1345,9 +1366,12 @@
       "matched_event": NaN,
       "home_score": NaN,
       "away_score": NaN,
-      "graded_at_utc": NaN,
-      "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5618
+      "graded_at_utc": "2026-06-22T00:08:18.765155+00:00",
+      "grading_match_status": "matched",
+      "grading_match_confidence": 0.8534,
+      "best_result_event": NaN,
+      "matched_result_event": "Cape Verde at Uruguay",
+      "matched_result_source": ""
     },
     {
       "event": "Egypt at New Zealand",
@@ -1515,7 +1539,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.508
+      "grading_match_confidence": 0.4752,
+      "best_result_event": "Sweden at Netherlands",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Sweden at Japan",
@@ -1683,7 +1710,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5621
+      "grading_match_confidence": 0.6585,
+      "best_result_event": "Japan at Tunisia",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "South Korea at South Africa",
@@ -1851,7 +1881,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5896
+      "grading_match_confidence": 0.5595,
+      "best_result_event": "South Korea at Mexico",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Iran at Egypt",
@@ -2019,7 +2052,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5659
+      "grading_match_confidence": 0.5171,
+      "best_result_event": "Iran at Belgium",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Iran at Egypt",
@@ -2187,7 +2223,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5651
+      "grading_match_confidence": 0.5156,
+      "best_result_event": "Iran at Belgium",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Netherlands at Tunisia",
@@ -2355,7 +2394,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5503
+      "grading_match_confidence": 0.5038,
+      "best_result_event": "Japan at Tunisia",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Mexico at Czech Republic",
@@ -2523,7 +2565,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4467
+      "grading_match_confidence": 0.7,
+      "best_result_event": "South Korea at Mexico",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Egypt at New Zealand",
@@ -2691,7 +2736,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5232
+      "grading_match_confidence": 0.5002,
+      "best_result_event": "Sweden at Netherlands",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Austria at Argentina",
@@ -2859,7 +2907,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5595
+      "grading_match_confidence": 0.5638,
+      "best_result_event": "Saudi Arabia at Spain",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Senegal at Norway",
@@ -3027,7 +3078,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4755
+      "grading_match_confidence": 0.4461,
+      "best_result_event": "Cape Verde at Uruguay",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Algeria at Jordan",
@@ -3195,7 +3249,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4929
+      "grading_match_confidence": 0.4668,
+      "best_result_event": "Australia at USA",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Germany at Ecuador",
@@ -3363,7 +3420,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5859
+      "grading_match_confidence": 0.6756,
+      "best_result_event": "Ivory Coast at Germany",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Australia at Paraguay",
@@ -3531,7 +3591,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.7162
+      "grading_match_confidence": 0.7484,
+      "best_result_event": "Australia at USA",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Argentina at Jordan",
@@ -3699,7 +3762,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4729
+      "grading_match_confidence": 0.4461,
+      "best_result_event": "Australia at USA",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Croatia at Panama",
@@ -3867,7 +3933,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5071
+      "grading_match_confidence": 0.4761,
+      "best_result_event": "Saudi Arabia at Spain",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Canada at Switzerland",
@@ -4035,7 +4104,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5143
+      "grading_match_confidence": 0.4914,
+      "best_result_event": "Sweden at Netherlands",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Baltimore Orioles at Los Angeles Dodgers",
@@ -4203,7 +4275,10 @@
       "away_score": 3.0,
       "graded_at_utc": "2026-06-21T18:26:47+00:00",
       "grading_match_status": "skipped_resolved",
-      "grading_match_confidence": NaN
+      "grading_match_confidence": NaN,
+      "best_result_event": NaN,
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Algeria at Jordan",
@@ -4371,7 +4446,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.48
+      "grading_match_confidence": 0.4526,
+      "best_result_event": "Saudi Arabia at Spain",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "DR Congo at Colombia",
@@ -4539,7 +4617,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4956
+      "grading_match_confidence": 0.4627,
+      "best_result_event": "Morocco at Scotland",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "San Diego Padres at Texas Rangers",
@@ -4707,7 +4788,10 @@
       "away_score": 3.0,
       "graded_at_utc": "2026-06-21T21:12:55+00:00",
       "grading_match_status": "skipped_resolved",
-      "grading_match_confidence": NaN
+      "grading_match_confidence": NaN,
+      "best_result_event": NaN,
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Ivory Coast at Curaçao",
@@ -4875,7 +4959,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.6083
+      "grading_match_confidence": 0.5641,
+      "best_result_event": "Ivory Coast at Germany",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Haiti at Morocco",
@@ -5043,7 +5130,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5288
+      "grading_match_confidence": 0.4842,
+      "best_result_event": "Haiti at Brazil",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Boston Red Sox at Seattle Mariners",
@@ -5211,7 +5301,10 @@
       "away_score": 5.0,
       "graded_at_utc": "2026-06-21T18:26:47+00:00",
       "grading_match_status": "skipped_resolved",
-      "grading_match_confidence": NaN
+      "grading_match_confidence": NaN,
+      "best_result_event": NaN,
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Houston Astros at Toronto Blue Jays",
@@ -5379,7 +5472,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.575
+      "grading_match_confidence": 0.7814,
+      "best_result_event": "Toronto Blue Jays at Chicago Cubs",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Croatia at Panama",
@@ -5547,7 +5643,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.509
+      "grading_match_confidence": 0.4789,
+      "best_result_event": "Saudi Arabia at Spain",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "USA at Turkey",
@@ -5715,7 +5814,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.6294
+      "grading_match_confidence": 0.6867,
+      "best_result_event": "Australia at USA",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Spain at Uruguay",
@@ -5883,7 +5985,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5029
+      "grading_match_confidence": 0.6943,
+      "best_result_event": "Cape Verde at Uruguay",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Charles Johnson at Asu Almabaev",
@@ -6051,7 +6156,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.3459
+      "grading_match_confidence": 0.3522,
+      "best_result_event": "Los Angeles Angels at Athletics",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Austria at Argentina",
@@ -6219,7 +6327,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5767
+      "grading_match_confidence": 0.5783,
+      "best_result_event": "Saudi Arabia at Spain",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Michel Pereira at Shara Magomedov",
@@ -6387,7 +6498,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.3467
+      "grading_match_confidence": 0.3737,
+      "best_result_event": "Atlanta Dream at Indiana Fever",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Canada at Switzerland",
@@ -6555,7 +6669,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5057
+      "grading_match_confidence": 0.4771,
+      "best_result_event": "Sweden at Netherlands",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Brazil at Scotland",
@@ -6723,7 +6840,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.592
+      "grading_match_confidence": 0.5675,
+      "best_result_event": "Morocco at Scotland",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Uzbekistan at Portugal",
@@ -6891,7 +7011,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4809
+      "grading_match_confidence": 0.4546,
+      "best_result_event": "Australia at USA",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Los Angeles Angels at Athletics",
@@ -7059,7 +7182,10 @@
       "away_score": 7.0,
       "graded_at_utc": "2026-06-21T18:26:47+00:00",
       "grading_match_status": "skipped_resolved",
-      "grading_match_confidence": NaN
+      "grading_match_confidence": NaN,
+      "best_result_event": NaN,
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Mexico at Czech Republic",
@@ -7227,7 +7353,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4217
+      "grading_match_confidence": 0.5152,
+      "best_result_event": "South Korea at Mexico",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "England at Panama",
@@ -7395,7 +7524,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.448
+      "grading_match_confidence": 0.4214,
+      "best_result_event": "Saudi Arabia at Spain",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Ghana at Croatia",
@@ -7563,7 +7695,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4994
+      "grading_match_confidence": 0.4658,
+      "best_result_event": "Japan at Tunisia",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Belgium at New Zealand",
@@ -7731,7 +7866,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.4957
+      "grading_match_confidence": 0.4751,
+      "best_result_event": "Iran at Belgium",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Sweden at Japan",
@@ -7899,7 +8037,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5527
+      "grading_match_confidence": 0.5158,
+      "best_result_event": "Sweden at Netherlands",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Ghana at England",
@@ -8067,7 +8208,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.486
+      "grading_match_confidence": 0.4569,
+      "best_result_event": "Sweden at Netherlands",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "USA at Turkey",
@@ -8235,7 +8379,10 @@
       "away_score": NaN,
       "graded_at_utc": NaN,
       "grading_match_status": "no_match",
-      "grading_match_confidence": 0.598
+      "grading_match_confidence": 0.5456,
+      "best_result_event": "Paraguay at Turkey",
+      "matched_result_event": NaN,
+      "matched_result_source": NaN
     },
     {
       "event": "Cape Verde at Uruguay",
@@ -8271,7 +8418,7 @@
       "fusion_warning": "",
       "match_score": "100%",
       "prediction_timestamp": "2026-06-21T18:26:17Z",
-      "result_status": "pending",
+      "result_status": "void",
       "odds_api_source_used": "yes",
       "sportsdataio_source_used": "no",
       "sportsdataio_status": "error: SportsDataIO request failed with HTTP 401: { \"statusCode\": 401, \"message\": \"Access denied due to invalid subscription key. Make sure to provide a valid key for an active subscription.\" }",
@@ -8361,9 +8508,9 @@
       "american_odds": "",
       "odds_timestamp": "",
       "winner": "",
-      "final_score": "",
+      "final_score": "Cape Verde 2 - 2 Uruguay",
       "stake_units": 1.0,
-      "profit_units": NaN,
+      "profit_units": 0.0,
       "decision": "play_small",
       "confidence_tier": "HIGH",
       "volume_tier": "",
@@ -8401,9 +8548,12 @@
       "matched_event": NaN,
       "home_score": NaN,
       "away_score": NaN,
-      "graded_at_utc": NaN,
-      "grading_match_status": "no_match",
-      "grading_match_confidence": 0.5628
+      "graded_at_utc": "2026-06-22T00:08:25.183029+00:00",
+      "grading_match_status": "matched",
+      "grading_match_confidence": 1.0,
+      "best_result_event": NaN,
+      "matched_result_event": "Cape Verde at Uruguay",
+      "matched_result_source": ""
     }
   ]
 }
