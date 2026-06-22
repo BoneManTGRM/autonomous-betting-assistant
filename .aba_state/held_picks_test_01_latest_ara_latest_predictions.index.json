@@ -4,6 +4,6 @@
   "workspace_id": "test_01",
   "key": "latest_ara_latest_predictions",
   "parts": 3,
-  "rows_count": 148,
+  "rows_count": 145,
   "chunk_size": 50
 }
