@@ -95,8 +95,19 @@ jobs:
           else:
               lines = [line for line in log.splitlines() if 'FAILED' in line or 'ERROR' in line or 'AssertionError' in line or 'ImportError' in line or 'ModuleNotFoundError' in line]
               summary = ' | '.join(lines[-10:]) if lines else 'pytest failed; inspect pytest failure tail'
-          summary = summary.replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
-          print(f'::error title=pytest failed::{summary}')
+          annotation = summary.replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
+          Path('pytest-failure-summary.txt').write_text(summary + '\n\n--- tail ---\n' + '\n'.join(log.splitlines()[-120:]), encoding='utf-8')
+          print(f'::error title=pytest failed::{annotation}')
           PY
             exit "$status"
           fi
+
+      - name: Upload pytest failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-failure-diagnostics
+          path: |
+            pytest-output.log
+            pytest-failure-summary.txt
+          if-no-files-found: warn
