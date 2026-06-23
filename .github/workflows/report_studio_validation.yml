@@ -24,7 +24,7 @@ jobs:
           pip install playwright
           python -m playwright install --with-deps chromium
       - name: Compile files
-        run: python -m py_compile pages/report_studio.py autonomous_betting_agent/report_studio_service.py autonomous_betting_agent/report_feed_service.py autonomous_betting_agent/report_export_service.py autonomous_betting_agent/report_image_export_service.py autonomous_betting_agent/report_magazine_pdf_service.py autonomous_betting_agent/pdf_report.py scripts/report_product_layer_smoke_test.py scripts/learning_layer_smoke_test.py scripts/report_services_smoke_test.py scripts/report_studio_service_smoke_test.py scripts/report_image_export_smoke_test.py scripts/report_magazine_pdf_smoke_test.py scripts/report_studio_regression_check.py scripts/report_studio_browser_smoke.py scripts/wait_for_streamlit_port.py
+        run: python -m py_compile pages/report_studio.py autonomous_betting_agent/report_studio_service.py autonomous_betting_agent/report_feed_service.py autonomous_betting_agent/report_export_service.py autonomous_betting_agent/report_image_export_service.py autonomous_betting_agent/report_background_image_service.py autonomous_betting_agent/report_magazine_pdf_service.py autonomous_betting_agent/pdf_report.py scripts/report_product_layer_smoke_test.py scripts/learning_layer_smoke_test.py scripts/report_services_smoke_test.py scripts/report_studio_service_smoke_test.py scripts/report_image_export_smoke_test.py scripts/report_magazine_pdf_smoke_test.py scripts/report_studio_regression_check.py scripts/report_studio_browser_smoke.py scripts/wait_for_streamlit_port.py
       - name: Product layer smoke test
         run: python -m scripts.report_product_layer_smoke_test
       - name: Learning layer smoke test
