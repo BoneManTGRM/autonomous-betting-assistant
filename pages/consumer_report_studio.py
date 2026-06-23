@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import html
+from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -206,32 +207,57 @@ def status_series(frame: pd.DataFrame) -> pd.Series:
     return frame.apply(lambda row: result_status(row.to_dict()), axis=1)
 
 
-def _probability_float(value: object) -> float | None:
+def _safe_float(value: Any) -> float | None:
     try:
         parsed = float(value)
     except (TypeError, ValueError):
         return None
     if pd.isna(parsed):
         return None
+    return parsed
+
+
+def _probability_float(value: Any) -> float | None:
+    parsed = _safe_float(value)
+    if parsed is None:
+        return None
     if parsed > 1.0:
         parsed /= 100.0
-    return parsed if 0.0 < parsed < 1.0 else None
+    return parsed if 0.0 <= parsed <= 1.0 else None
+
+
+def _pct_label(value: float | None, *, signed: bool = False) -> str:
+    if value is None:
+        return '-'
+    return f'{value * 100:+.1f}%' if signed else f'{value * 100:.1f}%'
+
+
+def _market_probability_from_odds(odds: Any) -> float | None:
+    decimal_odds = _safe_float(odds)
+    if decimal_odds is None or decimal_odds <= 1.0:
+        return None
+    return 1.0 / decimal_odds
+
+
+def _consumer_status(row: pd.Series, language: str) -> str:
+    status = safe_text(row.get('publish_status')).lower()
+    confidence = safe_text(row.get('confidence')).lower()
+    proof_id = safe_text(row.get('proof_id'))
+    spanish = language == 'es'
+
+    if 'official' in status or 'oficial' in status:
+        return 'Pick oficial' if spanish else 'Official Pick'
+    if 'research' in status or 'investigación' in status or 'investigacion' in status:
+        return 'Lean del modelo' if spanish else 'Research Lean'
+    if proof_id or 'locked' in status or 'bloqueado' in status:
+        return 'Pick trackeado' if spanish else 'Tracked Pick'
+    if 'high' in confidence or 'alta' in confidence:
+        return 'Señal alta' if spanish else 'High Signal'
+    return 'Sin prueba' if spanish else 'Unverified'
 
 
 def _premium_verdict(row: pd.Series, language: str) -> str:
-    status = safe_text(row.get('publish_status')).lower()
-    confidence = safe_text(row.get('confidence')).lower()
-    has_proof = bool(safe_text(row.get('proof_id')))
-    spanish = language == 'es'
-    if 'official' in status or 'oficial' in status:
-        return 'Pick oficial con prueba' if spanish else 'Official proof pick'
-    if 'research' in status or 'investigación' in status or 'investigacion' in status:
-        return 'Lean del modelo' if spanish else 'Model lean'
-    if has_proof:
-        return 'Pick trackeado' if spanish else 'Tracked pick'
-    if 'high' in confidence or 'alta' in confidence:
-        return 'Alta señal' if spanish else 'High signal'
-    return 'Revisión del modelo' if spanish else 'Model review'
+    return _consumer_status(row, language)
 
 
 def _consumer_bullets(row: pd.Series, language: str) -> list[str]:
@@ -240,8 +266,10 @@ def _consumer_bullets(row: pd.Series, language: str) -> list[str]:
     market = safe_text(row.get('market'))
     odds = safe_text(row.get('decimal_price')) or '-'
     probability = safe_text(row.get('probability_label'))
+    market_probability = safe_text(row.get('market_probability_label'))
+    edge = safe_text(row.get('edge_label'))
     proof_id = safe_text(row.get('proof_id'))
-    status = safe_text(row.get('publish_status'))
+    status = safe_text(row.get('consumer_status'))
     raw_bullets = [safe_text(row.get(f'bullet_{index}')) for index in range(1, 5)]
     banned_terms = (
         'no clear price edge', 'estimated ev per unit: -0.0', 'estimated ev per unit: 0.0',
@@ -261,12 +289,15 @@ def _consumer_bullets(row: pd.Series, language: str) -> list[str]:
     fallback: list[str] = []
     if probability and not already_has_probability:
         fallback.append(f'El modelo estima {probability} para {pick}.' if spanish else f'Model probability is {probability} for {pick}.')
-    if market or odds:
+    if market_probability and edge:
+        fallback.append(f'Prob. mercado: {market_probability} | Edge: {edge}.' if spanish else f'Market probability: {market_probability} | Edge: {edge}.')
+    elif market or odds:
         fallback.append(f'Mercado: {market} | Cuota: {odds}.' if spanish else f'Market: {market} | Odds: {odds}.')
     if proof_id:
         fallback.append(f'Registrado con Proof ID {proof_id}.' if spanish else f'Tracked with Proof ID {proof_id}.')
-    if status:
+    elif status:
         fallback.append(f'Estado: {status}.' if spanish else f'Status: {status}.')
+
     for item in fallback:
         if len(clean) >= 3:
             break
@@ -275,18 +306,83 @@ def _consumer_bullets(row: pd.Series, language: str) -> list[str]:
     return clean[:3]
 
 
+def enrich_value_columns(cards: pd.DataFrame, language: str) -> pd.DataFrame:
+    if cards is None or cards.empty:
+        return pd.DataFrame() if cards is None else cards
+    out = cards.copy()
+
+    model_probs: list[float | None] = []
+    market_probs: list[float | None] = []
+    edges: list[float | None] = []
+    statuses: list[str] = []
+
+    for _, row in out.iterrows():
+        model_prob = _probability_float(row.get('model_probability'))
+        market_prob = _market_probability_from_odds(row.get('decimal_price'))
+        edge = model_prob - market_prob if model_prob is not None and market_prob is not None else None
+        model_probs.append(model_prob)
+        market_probs.append(market_prob)
+        edges.append(edge)
+        statuses.append(_consumer_status(row, language))
+
+    out['model_probability'] = model_probs
+    out['probability_label'] = [_pct_label(value) for value in model_probs]
+    out['market_probability'] = market_probs
+    out['market_probability_label'] = [_pct_label(value) for value in market_probs]
+    out['edge'] = edges
+    out['edge_label'] = [_pct_label(value, signed=True) for value in edges]
+    out['consumer_status'] = statuses
+    return out
+
+
 def render_premium_cards_html(cards: pd.DataFrame, brand: BrandSettings) -> str:
     brand = brand.normalized()
     language = brand.language
     spanish = language == 'es'
     if cards is None or cards.empty:
         return '<p>No hay picks disponibles.</p>' if spanish else '<p>No picks available.</p>'
+
     title = brand.report_title or ('Reporte de Tendencias' if spanish else 'Trend Report')
     subtitle = 'Vista ejecutiva para consumidores' if spanish else 'Executive consumer view'
-    model_prob_label = 'Prob. modelo' if spanish else 'Model Prob.'
+    labels = {
+        'recommendation': 'Recomendación' if spanish else 'Recommendation',
+        'odds': 'Cuota' if spanish else 'Odds',
+        'model_prob': 'Prob. modelo' if spanish else 'Model Prob.',
+        'market_prob': 'Prob. mercado' if spanish else 'Market Prob.',
+        'edge': 'Edge',
+        'status': 'Estado' if spanish else 'Status',
+        'match': 'Partido' if spanish else 'Match',
+        'source': 'Fuente' if spanish else 'Source',
+        'proof_pending': 'Proof pendiente' if spanish else 'Proof pending',
+    }
+
     css = '''
     <style>
-    .aba-premium-wrap{margin:1rem 0 1.5rem 0}.aba-premium-hero{border:1px solid rgba(125,125,125,.35);border-radius:24px;padding:1.1rem 1.25rem;margin-bottom:1rem;background:linear-gradient(135deg,rgba(255,255,255,.10),rgba(255,255,255,.035))}.aba-premium-hero h2{margin:.1rem 0 .25rem 0;font-size:1.55rem}.aba-premium-hero p{margin:.15rem 0;opacity:.82}.aba-premium-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:1.05rem}.aba-premium-card{position:relative;overflow:hidden;border:1px solid rgba(125,125,125,.38);border-radius:24px;padding:1.05rem 1.08rem;background:radial-gradient(circle at top right,rgba(255,255,255,.12),rgba(255,255,255,.035) 38%,rgba(255,255,255,.025));box-shadow:0 10px 28px rgba(0,0,0,.18)}.aba-premium-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:rgba(255,255,255,.42)}.aba-card-top{display:flex;justify-content:space-between;gap:.75rem;align-items:flex-start}.aba-card-league{font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;opacity:.68;font-weight:750}.aba-verdict{display:inline-block;border:1px solid rgba(125,125,125,.45);border-radius:999px;padding:.22rem .55rem;font-size:.76rem;font-weight:800;white-space:nowrap}.aba-premium-card h3{font-size:1.55rem;line-height:1.08;margin:.52rem 0 .7rem 0}.aba-recommendation{border-radius:18px;padding:.82rem .9rem;background:rgba(255,255,255,.07);margin:.4rem 0 .85rem 0}.aba-recommendation .label{font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;opacity:.67;font-weight:850}.aba-recommendation .pick{font-size:1.22rem;font-weight:900;margin:.2rem 0 0 0}.aba-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.45rem;margin:.7rem 0}.aba-metric{border:1px solid rgba(125,125,125,.33);border-radius:16px;padding:.48rem .55rem}.aba-metric .k{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;opacity:.62;font-weight:800}.aba-metric .v{font-size:.93rem;font-weight:850;margin-top:.08rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.aba-meter{height:8px;border-radius:999px;background:rgba(125,125,125,.25);overflow:hidden;margin:.65rem 0 .75rem 0}.aba-meter span{display:block;height:100%;border-radius:999px;background:rgba(255,255,255,.58)}.aba-proof{font-size:.83rem;opacity:.82;margin:.35rem 0 .2rem 0}.aba-why{margin:.72rem 0 0 0;padding-left:1.15rem}.aba-why li{margin:.35rem 0;line-height:1.35}.aba-card-foot{font-size:.78rem;opacity:.62;margin-top:.65rem}@media(max-width:640px){.aba-premium-grid{grid-template-columns:1fr}.aba-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.aba-premium-card h3{font-size:1.35rem}}
+    .aba-premium-wrap{margin:1rem 0 1.5rem 0}
+    .aba-premium-hero{border:1px solid rgba(125,125,125,.35);border-radius:24px;padding:1.1rem 1.25rem;margin-bottom:1rem;background:linear-gradient(135deg,rgba(255,255,255,.10),rgba(255,255,255,.035))}
+    .aba-premium-hero h2{margin:.1rem 0 .25rem 0;font-size:1.55rem}
+    .aba-premium-hero p{margin:.15rem 0;opacity:.82}
+    .aba-premium-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:1.05rem}
+    .aba-premium-card{position:relative;overflow:hidden;border:1px solid rgba(125,125,125,.38);border-radius:24px;padding:1.05rem 1.08rem;background:radial-gradient(circle at top right,rgba(255,255,255,.12),rgba(255,255,255,.035) 38%,rgba(255,255,255,.025));box-shadow:0 10px 28px rgba(0,0,0,.18)}
+    .aba-premium-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:rgba(255,255,255,.42)}
+    .aba-card-top{display:flex;justify-content:space-between;gap:.75rem;align-items:flex-start}
+    .aba-card-league{font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;opacity:.68;font-weight:750}
+    .aba-verdict{display:inline-block;border:1px solid rgba(125,125,125,.45);border-radius:999px;padding:.22rem .55rem;font-size:.76rem;font-weight:800;white-space:nowrap}
+    .aba-premium-card h3{font-size:1.55rem;line-height:1.08;margin:.52rem 0 .7rem 0}
+    .aba-recommendation{border-radius:18px;padding:.82rem .9rem;background:rgba(255,255,255,.07);margin:.4rem 0 .85rem 0}
+    .aba-recommendation .label{font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;opacity:.67;font-weight:850}
+    .aba-recommendation .pick{font-size:1.22rem;font-weight:900;margin:.2rem 0 0 0}
+    .aba-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.45rem;margin:.7rem 0}
+    .aba-metric{border:1px solid rgba(125,125,125,.33);border-radius:16px;padding:.48rem .55rem}
+    .aba-metric .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.055em;opacity:.62;font-weight:800}
+    .aba-metric .v{font-size:.9rem;font-weight:850;margin-top:.08rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .aba-meter{height:8px;border-radius:999px;background:rgba(125,125,125,.25);overflow:hidden;margin:.65rem 0 .75rem 0}
+    .aba-meter span{display:block;height:100%;border-radius:999px;background:rgba(255,255,255,.58)}
+    .aba-proof{font-size:.83rem;opacity:.82;margin:.35rem 0 .2rem 0}
+    .aba-why{margin:.72rem 0 0 0;padding-left:1.15rem}
+    .aba-why li{margin:.35rem 0;line-height:1.35}
+    .aba-card-foot{font-size:.78rem;opacity:.62;margin-top:.65rem}
+    @media(max-width:760px){.aba-premium-grid{grid-template-columns:1fr}.aba-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.aba-premium-card h3{font-size:1.35rem}}
     </style>
     '''
     parts = [
@@ -299,6 +395,7 @@ def render_premium_cards_html(cards: pd.DataFrame, brand: BrandSettings) -> str:
         '</section>',
         '<div class="aba-premium-grid">',
     ]
+
     for _, row in cards.fillna('').iterrows():
         probability = _probability_float(row.get('model_probability'))
         width = 0 if probability is None else max(0, min(100, int(round(probability * 100))))
@@ -306,42 +403,47 @@ def render_premium_cards_html(cards: pd.DataFrame, brand: BrandSettings) -> str:
         event = safe_text(row.get('event'))
         pick = safe_text(row.get('tendency') or row.get('prediction'))
         odds = safe_text(row.get('decimal_price')) or '-'
-        confidence = safe_text(row.get('confidence')) or '-'
-        risk = safe_text(row.get('risk')) or '-'
-        probability_label = safe_text(row.get('probability_label')) or '-'
+        model_probability = safe_text(row.get('probability_label')) or '-'
+        market_probability = safe_text(row.get('market_probability_label')) or '-'
+        edge = safe_text(row.get('edge_label')) or '-'
+        status = safe_text(row.get('consumer_status')) or _consumer_status(row, language)
         proof_id = safe_text(row.get('proof_id'))
-        verdict = _premium_verdict(row, language)
         bullets = _consumer_bullets(row, language)
-        proof_line = f'Proof ID: {proof_id}' if proof_id else ('Proof pending' if not spanish else 'Proof pendiente')
+        proof_line = f'Proof ID: {proof_id}' if proof_id else labels['proof_pending']
+
         parts += [
             '<article class="aba-premium-card">',
             '<div class="aba-card-top">',
-            f'<div class="aba-card-league">{html.escape(league or ("Match" if not spanish else "Partido"))}</div>',
-            f'<div class="aba-verdict">{html.escape(verdict)}</div>',
+            f'<div class="aba-card-league">{html.escape(league or labels["match"])}</div>',
+            f'<div class="aba-verdict">{html.escape(status)}</div>',
             '</div>',
             f'<h3>{html.escape(event)}</h3>',
             '<div class="aba-recommendation">',
-            f'<div class="label">{html.escape("Recommendation" if not spanish else "Recomendación")}</div>',
+            f'<div class="label">{html.escape(labels["recommendation"])}</div>',
             f'<div class="pick">{html.escape(pick)}</div>',
             '</div>',
             '<div class="aba-metrics">',
-            f'<div class="aba-metric"><div class="k">{html.escape("Odds" if not spanish else "Cuota")}</div><div class="v">{html.escape(odds)}</div></div>',
-            f'<div class="aba-metric"><div class="k">{html.escape(model_prob_label)}</div><div class="v">{html.escape(probability_label)}</div></div>',
-            f'<div class="aba-metric"><div class="k">{html.escape("Confidence" if not spanish else "Confianza")}</div><div class="v">{html.escape(confidence)}</div></div>',
-            f'<div class="aba-metric"><div class="k">{html.escape("Risk" if not spanish else "Riesgo")}</div><div class="v">{html.escape(risk)}</div></div>',
+            f'<div class="aba-metric"><div class="k">{html.escape(labels["odds"])}</div><div class="v">{html.escape(odds)}</div></div>',
+            f'<div class="aba-metric"><div class="k">{html.escape(labels["model_prob"])}</div><div class="v">{html.escape(model_probability)}</div></div>',
+            f'<div class="aba-metric"><div class="k">{html.escape(labels["market_prob"])}</div><div class="v">{html.escape(market_probability)}</div></div>',
+            f'<div class="aba-metric"><div class="k">{html.escape(labels["edge"])}</div><div class="v">{html.escape(edge)}</div></div>',
+            f'<div class="aba-metric"><div class="k">{html.escape(labels["status"])}</div><div class="v">{html.escape(status)}</div></div>',
             '</div>',
             f'<div class="aba-meter"><span style="width:{width}%"></span></div>',
             f'<div class="aba-proof">{html.escape(proof_line)}</div>',
         ]
+
         if bullets:
             parts.append('<ul class="aba-why">')
             for bullet in bullets:
                 parts.append(f'<li>{html.escape(bullet)}</li>')
             parts.append('</ul>')
+
         source = safe_text(row.get('source'))
         if source:
-            parts.append(f'<div class="aba-card-foot">{html.escape("Source" if not spanish else "Fuente")}: {html.escape(source)}</div>')
+            parts.append(f'<div class="aba-card-foot">{html.escape(labels["source"])}: {html.escape(source)}</div>')
         parts.append('</article>')
+
     parts += ['</div>', '</div>']
     disclaimer = brand.disclaimer or ('Contenido informativo. No garantiza resultados.' if spanish else 'Informational content only. Results are not guaranteed.')
     if disclaimer:
@@ -427,7 +529,7 @@ report_rows = prepare_report_frame(
     pending_only=bool(pending_only),
     max_rows=int(max_rows),
 )
-cards = consumer_cards(report_rows, brand)
+cards = enrich_value_columns(consumer_cards(report_rows, brand), LANG)
 st.session_state['consumer_report_latest_cards'] = cards.to_dict('records') if not cards.empty else []
 
 proof_rows = int(cards.get('proof_id', pd.Series(dtype=str)).map(safe_text).ne('').sum()) if not cards.empty and 'proof_id' in cards.columns else 0
@@ -491,7 +593,8 @@ with tabs[5]:
     cols = [
         col for col in [
             'event', 'sport', 'market', 'prediction', 'decimal_price', 'probability_label',
-            'confidence', 'risk', 'publish_status', 'proof_id', 'quality_flags',
+            'market_probability_label', 'edge_label', 'consumer_status', 'confidence', 'risk',
+            'publish_status', 'proof_id', 'quality_flags',
         ] + bullet_cols if col in cards.columns
     ]
     st.caption(t('preview_cols'))
