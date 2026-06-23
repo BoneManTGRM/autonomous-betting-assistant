@@ -36,6 +36,52 @@ def _num(frame: pd.DataFrame, col: str, default: float = 0.0) -> pd.Series:
     return pd.to_numeric(frame[col], errors='coerce').fillna(default)
 
 
+def _prob_series(frame: pd.DataFrame, primary: str, fallback: str = 'model_probability_clean') -> pd.Series:
+    primary_values = _num(frame, primary, 0.0)
+    fallback_values = _num(frame, fallback, 0.0)
+    values = primary_values.where(primary_values.gt(0), fallback_values)
+    return values.where(values <= 1.0, values / 100.0).clip(0.0, 1.0)
+
+
+def _implied_from_price(frame: pd.DataFrame) -> pd.Series:
+    odds = _num(frame, 'decimal_price', 0.0)
+    implied = _num(frame, 'market_implied_probability', 0.0)
+    implied = implied.where(implied.gt(0), 1.0 / odds.where(odds.gt(1.0)))
+    return implied.replace([float('inf'), -float('inf')], pd.NA).fillna(0.0).clip(0.0, 1.0)
+
+
+def _recompute_learned_probability_edge(frame: pd.DataFrame) -> pd.DataFrame:
+    """Use learned/model probability as the model side and Odds API price as the market side.
+
+    The base predictor creates `model_probability` from market-implied odds when no independent model signal
+    has been applied. Adaptive learning later creates `learned_model_probability`, but older volume exports left
+    `model_market_edge` at 0.0. This repair recalculates all public edge/EV fields from the learned probability.
+    """
+    if frame is None or frame.empty:
+        return frame
+    out = frame.copy()
+    raw_market_prob = _num(out, 'market_implied_probability', 0.0).where(
+        _num(out, 'market_implied_probability', 0.0).gt(0), _num(out, 'market_probability', 0.0)
+    )
+    model_prob = _prob_series(out, 'learned_model_probability')
+    market_implied = _implied_from_price(out).where(lambda s: s.gt(0), raw_market_prob)
+    odds = _num(out, 'decimal_price', 0.0)
+    valid_market = odds.gt(1.0) & market_implied.gt(0.0)
+
+    if 'raw_market_probability' not in out.columns:
+        out['raw_market_probability'] = raw_market_prob.round(6)
+    out['market_implied_probability'] = market_implied.where(valid_market, pd.NA).round(6)
+    out['model_probability'] = model_prob.round(6)
+    out['model_probability_clean'] = model_prob.round(6)
+    out['model_probability_source'] = 'adaptive_learning_model_probability'
+    out.loc[_num(out, 'learned_model_probability', 0.0).le(0), 'model_probability_source'] = 'base_market_probability_no_learning_adjustment'
+    out['model_market_edge'] = (model_prob - market_implied).where(valid_market, pd.NA).round(6)
+    out['expected_value_per_unit'] = (model_prob * odds - 1.0).where(valid_market, pd.NA).round(6)
+    out['edge_status'] = 'computed_from_model_probability_vs_odds_api_price'
+    out.loc[~valid_market, 'edge_status'] = 'odds_unavailable_no_edge'
+    return out
+
+
 def _pattern_tier(score: float) -> str:
     if score >= 85:
         return 'A+ Pattern Lock'
@@ -62,9 +108,8 @@ def apply_volume_pattern_points(frame, *args, **kwargs):
     out = _original_apply_adaptive_learning(frame, *args, **kwargs)
     if out is None or out.empty:
         return out
-    out = out.copy()
-    prob = _num(out, 'learned_model_probability', 0.0)
-    prob = prob.where(prob <= 1.0, prob / 100.0)
+    out = _recompute_learned_probability_edge(out)
+    prob = _prob_series(out, 'model_probability')
     base_score = _num(out, 'learned_agent_score', 0.0)
     adjust = _num(out, 'learning_adjustment_score', 0.0)
     patterns = _num(out, 'learning_pattern_count', 0.0)
@@ -92,8 +137,16 @@ def apply_volume_pattern_points(frame, *args, **kwargs):
     out['pattern_high_confidence'] = pattern_score.ge(75)
     out['low_confidence_pattern_candidate'] = (prob.lt(0.58) & pattern_score.ge(65) & patterns.ge(2) & adjust.gt(0))
     out = add_profit_guard(out)
+
+    # Avoid every row permanently saying play_small. Internal decisions now reflect edge/profit lanes.
+    out['agent_decision'] = 'watch_only'
+    out.loc[out.get('profit_volume_safe', pd.Series(False, index=out.index)).astype(bool) & pattern_score.ge(55), 'agent_decision'] = 'research_watch'
+    out.loc[out.get('profit_balanced_ok', pd.Series(False, index=out.index)).astype(bool) & pattern_score.ge(65), 'agent_decision'] = 'play_small'
+    out.loc[out.get('profit_official_ok', pd.Series(False, index=out.index)).astype(bool) & edge.ge(0.015) & pattern_score.ge(75), 'agent_decision'] = 'play_strong'
+    out['decision_rank'] = out['agent_decision'].map({'play_strong': 1, 'play_small': 2, 'research_watch': 3, 'watch_only': 4}).fillna(5)
+
     if 'decision_signals' in out.columns:
-        out['decision_signals'] = out['decision_signals'].astype(str) + '; pattern_points_v1; profit_guard_v2'
+        out['decision_signals'] = out['decision_signals'].astype(str) + '; pattern_points_v2; learned_edge_recomputed; profit_guard_v2'
     return out
 
 
