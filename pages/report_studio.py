@@ -10,6 +10,7 @@ from autonomous_betting_agent.commercial_platform_tools import load_persistent_l
 from autonomous_betting_agent.pick_hold_store import load_first_available
 from autonomous_betting_agent.report_feed_service import save_report_feed
 from autonomous_betting_agent.report_image_export_service import card_image_filename, render_card_deck_png, render_card_png, render_magazine_summary_png
+from autonomous_betting_agent.report_magazine_pdf_service import render_vintage_magazine_pdf
 from autonomous_betting_agent.report_product_layer import MagazineBrand, safe_text
 from autonomous_betting_agent.report_studio_service import ReportStudioFilters, build_report_studio_state, report_studio_summary
 from autonomous_betting_agent.report_studio_ui import render_premium_card_deck, render_status_dashboard
@@ -30,7 +31,7 @@ TEXT = {
         'brand_name': 'Brand / tipster name', 'tagline': 'Tagline', 'report_title': 'Report title', 'logo_url': 'Logo URL', 'disclaimer': 'Disclaimer',
         'mode': 'Report mode', 'risk': 'Risk preference', 'sports': 'Sport / League Filter', 'max_rows': 'Max rows', 'visibility': 'Feed visibility',
         'cards': 'Premium Cards', 'magazine': 'Magazine Report', 'copy': 'WhatsApp / Telegram', 'audit': 'Learning Audit', 'proof': 'Analyst Proof', 'exports': 'Exports', 'images': 'Images', 'profile_json': 'Profile JSON', 'feed_json': 'App Feed', 'diagnostics': 'Diagnostics',
-        'pdf': 'Download PDF', 'html': 'Download HTML', 'md': 'Download Markdown', 'json': 'Download JSON', 'csv': 'Download CSV', 'copy_download': 'Download WhatsApp copy',
+        'pdf': 'Download PDF', 'magazine_pdf': 'Download Magazine PDF', 'html': 'Download HTML', 'md': 'Download Markdown', 'json': 'Download JSON', 'csv': 'Download CSV', 'copy_download': 'Download WhatsApp copy',
         'deck_png': 'Download full card deck PNG', 'magazine_png': 'Download Magazine PNG', 'card_png': 'Download Card Image', 'images_note': 'Server-rendered PNG images for saving and sharing.',
         'feed_saved': 'Unified and legacy app feeds saved.', 'copy_label': 'Short copy', 'no_audit': 'No graded calibration data available yet.',
     },
@@ -43,7 +44,7 @@ TEXT = {
         'brand_name': 'Marca / tipster', 'tagline': 'Lema', 'report_title': 'Título del reporte', 'logo_url': 'URL del logo', 'disclaimer': 'Aviso legal',
         'mode': 'Modo de reporte', 'risk': 'Preferencia de riesgo', 'sports': 'Filtro deporte / liga', 'max_rows': 'Máximo de filas', 'visibility': 'Visibilidad del feed',
         'cards': 'Tarjetas premium', 'magazine': 'Reporte revista', 'copy': 'WhatsApp / Telegram', 'audit': 'Auditoría de aprendizaje', 'proof': 'Prueba técnica', 'exports': 'Exportaciones', 'images': 'Imágenes', 'profile_json': 'JSON del perfil', 'feed_json': 'Feed de app', 'diagnostics': 'Diagnóstico',
-        'pdf': 'Descargar PDF', 'html': 'Descargar HTML', 'md': 'Descargar Markdown', 'json': 'Descargar JSON', 'csv': 'Descargar CSV', 'copy_download': 'Descargar copy WhatsApp',
+        'pdf': 'Descargar PDF', 'magazine_pdf': 'Descargar PDF revista', 'html': 'Descargar HTML', 'md': 'Descargar Markdown', 'json': 'Descargar JSON', 'csv': 'Descargar CSV', 'copy_download': 'Descargar copy WhatsApp',
         'deck_png': 'Descargar PNG de tarjetas', 'magazine_png': 'Descargar PNG de revista', 'card_png': 'Descargar imagen de tarjeta', 'images_note': 'Imágenes PNG generadas por servidor para guardar y compartir.',
         'feed_saved': 'Feed unificado y feed legado guardados.', 'copy_label': 'Copy corto', 'no_audit': 'Aún no hay datos gradados para calibración.',
     },
@@ -189,11 +190,14 @@ st.markdown(render_status_dashboard(cards, language=LANG), unsafe_allow_html=Tru
 st.caption(state.context_note)
 
 safe_workspace = safe_workspace_name(workspace_id)
+magazine_pdf_bytes = render_vintage_magazine_pdf(cards, brand)
 tabs = st.tabs([t('cards'), t('magazine'), t('copy'), t('audit'), t('proof'), t('exports'), t('images'), t('profile_json'), t('feed_json'), t('diagnostics')])
 with tabs[0]:
     st.markdown(render_premium_card_deck(cards, language=LANG), unsafe_allow_html=True)
 with tabs[1]:
-    st.download_button(t('magazine_png'), data=render_magazine_summary_png(cards, brand), file_name=f'magazine_report_{safe_workspace}.png', mime='image/png', key='report_studio_magazine_tab_png')
+    m1, m2 = st.columns(2)
+    m1.download_button(t('magazine_pdf'), data=magazine_pdf_bytes, file_name=f'magazine_report_{safe_workspace}.pdf', mime='application/pdf', key='report_studio_magazine_pdf')
+    m2.download_button(t('magazine_png'), data=render_magazine_summary_png(cards, brand), file_name=f'magazine_report_{safe_workspace}.png', mime='image/png', key='report_studio_magazine_tab_png')
     st.markdown(bundle.html, unsafe_allow_html=True)
 with tabs[2]:
     st.text_area(t('copy_label'), value=bundle.whatsapp, height=420, key='report_studio_whatsapp_copy_text')
@@ -215,6 +219,7 @@ with tabs[4]:
     st.dataframe(cards[cols] if cols else cards, use_container_width=True, hide_index=True)
 with tabs[5]:
     st.download_button(t('pdf'), data=bundle.pdf_bytes, file_name=f'report_{safe_workspace}.pdf', mime='application/pdf', key='report_studio_export_pdf')
+    st.download_button(t('magazine_pdf'), data=magazine_pdf_bytes, file_name=f'magazine_report_{safe_workspace}.pdf', mime='application/pdf', key='report_studio_export_magazine_pdf')
     st.download_button(t('html'), data=bundle.html, file_name=f'report_{safe_workspace}.html', mime='text/html', key='report_studio_export_html')
     st.download_button(t('md'), data=bundle.markdown, file_name=f'report_{safe_workspace}.md', mime='text/markdown', key='report_studio_export_md')
     st.download_button(t('copy_download'), data=bundle.whatsapp, file_name=f'whatsapp_copy_{safe_workspace}.txt', mime='text/plain', key='report_studio_export_whatsapp')
