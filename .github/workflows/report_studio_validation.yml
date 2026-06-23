@@ -24,13 +24,13 @@ jobs:
           pip install playwright
           python -m playwright install chromium
       - name: Compile files
-        run: python -m py_compile pages/report_studio.py autonomous_betting_agent/report_studio_service.py autonomous_betting_agent/report_feed_service.py autonomous_betting_agent/report_export_service.py autonomous_betting_agent/pdf_report.py scripts/report_studio_browser_smoke.py
+        run: python -m py_compile pages/report_studio.py autonomous_betting_agent/report_studio_service.py autonomous_betting_agent/report_feed_service.py autonomous_betting_agent/report_export_service.py autonomous_betting_agent/pdf_report.py scripts/report_studio_browser_smoke.py scripts/wait_for_streamlit_port.py
       - name: Run Report Studio validation
         run: python -m scripts.report_studio_full_validation
       - name: Start Streamlit
         run: streamlit run app.py --server.headless true --server.address 127.0.0.1 --server.port 8501 > streamlit.log 2>&1 &
       - name: Wait for local app
-        run: python -c "import socket,time; end=time.time()+90;\nwhile time.time()<end:\n s=socket.socket(); s.settimeout(2);\n try: s.connect(('127.0.0.1',8501)); print('ready'); raise SystemExit(0)\n except OSError: time.sleep(2)\n finally: s.close()\nraise SystemExit('app did not start')"
+        run: python scripts/wait_for_streamlit_port.py 127.0.0.1 8501 90
       - name: Browser smoke
         run: python scripts/report_studio_browser_smoke.py
       - name: Print Streamlit log on failure
