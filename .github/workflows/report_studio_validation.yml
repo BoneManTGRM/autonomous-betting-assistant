@@ -36,7 +36,10 @@ jobs:
       - name: Image export smoke test
         run: python -m scripts.report_image_export_smoke_test
       - name: Custom background PNG smoke test
-        run: python -m scripts.report_background_export_smoke_test
+        run: |
+          set -o pipefail
+          mkdir -p diagnostics
+          python -m scripts.report_background_export_smoke_test 2>&1 | tee diagnostics/report_background_export_smoke_test.log
       - name: Magazine PDF smoke test
         run: python -m scripts.report_magazine_pdf_smoke_test
       - name: Report Studio regression check
