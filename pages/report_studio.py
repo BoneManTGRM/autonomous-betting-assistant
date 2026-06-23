@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from dataclasses import asdict
 
 import pandas as pd
@@ -32,7 +31,7 @@ TEXT = {
         'caption': 'Unified consumer magazine, tipster, client-safe, and analyst-proof reporting.',
         'input': 'Input rows', 'workspace': 'Client / Workspace ID', 'use_saved': 'Use saved workspace rows', 'upload': 'Upload CSV rows', 'source': 'Source',
         'empty': 'No rows found. Use Pro Predictor / Odds Lock Pro first or upload a CSV.',
-        'profile': 'White-label profile', 'profile_id': 'Profile ID', 'load_profile': 'Load profile', 'save_profile': 'Save profile',
+        'profile': 'White-label profile', 'profile_id': 'Profile ID', 'profile_key': 'Profile key', 'load_profile': 'Load profile', 'save_profile': 'Save profile',
         'brand_name': 'Brand / tipster name', 'tagline': 'Tagline', 'report_title': 'Report title', 'logo_url': 'Logo URL', 'disclaimer': 'Disclaimer',
         'mode': 'Report mode', 'risk': 'Risk preference', 'sports': 'Sports', 'max_rows': 'Max rows', 'visibility': 'Feed visibility',
         'best': 'Best Plays', 'watch': 'Watchlist', 'no_play': 'No Play', 'avg': 'Avg model probability', 'publish': 'Publish-ready', 'warnings': 'Warnings',
@@ -45,7 +44,7 @@ TEXT = {
         'caption': 'Reportes unificados para consumidor, tipster, cliente y prueba técnica.',
         'input': 'Filas de entrada', 'workspace': 'ID de cliente / workspace', 'use_saved': 'Usar filas guardadas', 'upload': 'Subir CSV', 'source': 'Fuente',
         'empty': 'No hay filas. Usa Pro Predictor / Odds Lock Pro primero o sube un CSV.',
-        'profile': 'Perfil white-label', 'profile_id': 'ID del perfil', 'load_profile': 'Cargar perfil', 'save_profile': 'Guardar perfil',
+        'profile': 'Perfil white-label', 'profile_id': 'ID del perfil', 'profile_key': 'Clave del perfil', 'load_profile': 'Cargar perfil', 'save_profile': 'Guardar perfil',
         'brand_name': 'Marca / tipster', 'tagline': 'Lema', 'report_title': 'Título del reporte', 'logo_url': 'URL del logo', 'disclaimer': 'Aviso legal',
         'mode': 'Modo de reporte', 'risk': 'Preferencia de riesgo', 'sports': 'Deportes', 'max_rows': 'Máximo de filas', 'visibility': 'Visibilidad del feed',
         'best': 'Mejores jugadas', 'watch': 'Seguimiento', 'no_play': 'No jugar', 'avg': 'Probabilidad media del modelo', 'publish': 'Listas para publicar', 'warnings': 'Alertas',
@@ -127,13 +126,14 @@ if raw.empty:
     st.stop()
 
 normalized = normalize_frame(raw)
+all_sport_options = sport_options(normalized)
 
 with st.expander(t('profile'), expanded=True):
     profile_rows = list_profiles()
     profile_ids = sorted({safe_text(row.get('profile_id')) for row in profile_rows if safe_text(row.get('profile_id'))}) or ['default']
     p1, p2, p3 = st.columns([2, 1, 1])
     selected_profile = p1.selectbox(t('profile_id'), profile_ids, index=0)
-    profile_id = p1.text_input('Profile key' if LANG == 'en' else 'Clave del perfil', value=selected_profile)
+    profile_id = p1.text_input(t('profile_key'), value=selected_profile)
     if p2.button(t('load_profile'), use_container_width=True):
         profile = load_profile(profile_id)
         st.session_state['report_studio_profile'] = asdict(profile)
@@ -146,11 +146,18 @@ with st.expander(t('profile'), expanded=True):
     report_title = b1.text_input(t('report_title'), value=loaded.report_title)
     logo_url = b2.text_input(t('logo_url'), value=loaded.logo_url)
     mode_options = ['Consumer Magazine', 'Tipster Report', 'Client-Safe Summary', 'Analyst Proof Report'] if LANG == 'en' else ['Revista consumidor', 'Reporte tipster', 'Resumen cliente', 'Reporte técnico']
-    report_mode = b1.selectbox(t('mode'), mode_options, index=0)
-    risk_preference = b2.selectbox(t('risk'), ['Balanced', 'Conservative', 'Aggressive'] if LANG == 'en' else ['Balanceado', 'Conservador', 'Agresivo'], index=0)
-    visibility = b2.selectbox(t('visibility'), ['private', 'public'], index=0)
+    default_mode_index = mode_options.index(loaded.preferred_report_mode) if loaded.preferred_report_mode in mode_options else 0
+    report_mode = b1.selectbox(t('mode'), mode_options, index=default_mode_index)
+    risk_values = ['Balanced', 'Conservative', 'Aggressive'] if LANG == 'en' else ['Balanceado', 'Conservador', 'Agresivo']
+    risk_index = risk_values.index(loaded.risk_preference) if loaded.risk_preference in risk_values else 0
+    risk_preference = b2.selectbox(t('risk'), risk_values, index=risk_index)
+    visibility_values = ['private', 'public']
+    loaded_visibility = safe_text((loaded.delivery_settings or {}).get('visibility')) or 'private'
+    visibility = b2.selectbox(t('visibility'), visibility_values, index=visibility_values.index(loaded_visibility) if loaded_visibility in visibility_values else 0)
+    preferred_sports = st.multiselect(t('sports'), all_sport_options, default=[sport for sport in list(loaded.preferred_sports or []) if sport in all_sport_options], key='report_profile_sports')
     disclaimer_default = 'Informational content only. Results are not guaranteed.' if LANG == 'en' else 'Contenido informativo. No garantiza resultados.'
     disclaimer = st.text_area(t('disclaimer'), value=loaded.disclaimer or disclaimer_default, height=80)
+    technical = 'Analyst' in report_mode or 'técnico' in report_mode.lower()
     if p3.button(t('save_profile'), use_container_width=True):
         saved = save_profile(WhiteLabelProfile(
             profile_id=profile_id,
@@ -162,21 +169,20 @@ with st.expander(t('profile'), expanded=True):
             report_title=report_title,
             disclaimer=disclaimer,
             preferred_report_mode=report_mode,
-            preferred_sports=list(loaded.preferred_sports or []),
+            preferred_sports=list(preferred_sports),
             risk_preference=risk_preference,
-            show_technical_fields='Analyst' in report_mode or 'técnico' in report_mode.lower(),
-            default_audience='analyst' if 'Analyst' in report_mode or 'técnico' in report_mode.lower() else 'consumer',
+            show_technical_fields=technical,
+            default_audience='analyst' if technical else 'consumer',
             delivery_settings={'save_latest_feed': True, 'visibility': visibility},
         ))
         st.session_state['report_studio_profile'] = asdict(saved)
         st.success(t('save_profile'))
 
-sports = st.multiselect(t('sports'), sport_options(normalized), default=list(loaded.preferred_sports or []))
 max_rows = st.number_input(t('max_rows'), min_value=1, max_value=500, value=75, step=1)
 
 filtered = normalized.copy()
-if sports and 'sport' in filtered.columns:
-    filtered = filtered[filtered['sport'].map(safe_text).isin(sports)].copy()
+if preferred_sports and 'sport' in filtered.columns:
+    filtered = filtered[filtered['sport'].map(safe_text).isin(preferred_sports)].copy()
 filtered = filtered.head(int(max_rows)).copy()
 filtered = enrich_sports_context(filtered, language=LANG)
 
@@ -196,7 +202,6 @@ if 'sports_context_summary' in cards.columns:
     cards.loc[has_context, 'game_preview'] = cards.loc[has_context, 'sports_context_summary']
 
 groups = grouped_report(cards)
-technical = 'Analyst' in report_mode or 'técnico' in report_mode.lower()
 mode_key = 'analyst' if technical else 'consumer'
 html_report = render_consumer_magazine_html(cards, brand, mode=mode_key)
 markdown_report = render_markdown_summary(cards, brand, mode=mode_key)
@@ -229,7 +234,7 @@ with tabs[2]:
     st.download_button(t('json'), data=json_report, file_name=f'report_{safe_workspace}.json', mime='application/json')
     st.download_button(t('csv'), data=csv_payload, file_name=f'report_{safe_workspace}.csv', mime='text/csv')
 with tabs[3]:
-    st.json(asdict(WhiteLabelProfile(profile_id=profile_id, workspace_id=workspace_id, brand_name=brand_name, logo_url=logo_url, tagline=tagline, language=LANG, report_title=report_title, disclaimer=disclaimer, preferred_report_mode=report_mode, preferred_sports=sports, risk_preference=risk_preference, show_technical_fields=technical, default_audience='analyst' if technical else 'consumer')))
+    st.json(asdict(WhiteLabelProfile(profile_id=profile_id, workspace_id=workspace_id, brand_name=brand_name, logo_url=logo_url, tagline=tagline, language=LANG, report_title=report_title, disclaimer=disclaimer, preferred_report_mode=report_mode, preferred_sports=preferred_sports, risk_preference=risk_preference, show_technical_fields=technical, default_audience='analyst' if technical else 'consumer')))
 with tabs[4]:
     st.success(t('feed_saved'))
     st.json(feed)
