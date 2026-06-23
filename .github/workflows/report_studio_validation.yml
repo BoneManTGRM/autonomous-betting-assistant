@@ -24,7 +24,7 @@ jobs:
           pip install playwright
           python -m playwright install chromium
       - name: Compile files
-        run: python -m py_compile pages/report_studio.py autonomous_betting_agent/report_studio_service.py autonomous_betting_agent/report_feed_service.py autonomous_betting_agent/report_export_service.py autonomous_betting_agent/pdf_report.py scripts/report_studio_browser_smoke.py scripts/wait_for_streamlit_port.py
+        run: python -m py_compile pages/report_studio.py autonomous_betting_agent/report_studio_service.py autonomous_betting_agent/report_feed_service.py autonomous_betting_agent/report_export_service.py autonomous_betting_agent/report_image_export_service.py autonomous_betting_agent/pdf_report.py scripts/report_image_export_smoke_test.py scripts/report_studio_browser_smoke.py scripts/wait_for_streamlit_port.py
       - name: Run Report Studio validation
         run: python -m scripts.report_studio_full_validation
       - name: Start Streamlit
