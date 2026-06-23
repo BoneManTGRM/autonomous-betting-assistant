@@ -69,7 +69,8 @@ TEXT = {
 }
 
 HANDOFF_KEYS = ('odds_lock_pro_locked_rows', 'public_proof_dashboard_refresh_rows', 'pro_predictor_high_confidence_rows', 'pro_predictor_latest_rows', 'what_are_the_odds_latest_rows', 'ara_latest_predictions')
-UNVERIFIED_SOURCE_TOKENS = ('.csv', 'session:', 'saved:', 'persistent', 'ledger', 'storage', 'upload', 'export', 'model', 'model_only', 'high_confidence', 'pro_predictor', 'consensus_average', 'fallback', 'unavailable', 'missing', 'no odds', 'no_odds', 'api limit', 'limit reached', 'quota', 'maxed', 'rate limit', 'offline', 'simulated', 'research', 'test')
+UNVERIFIED_SOURCE_TOKENS = ('.csv', 'session:', 'saved:', 'persistent', 'ledger', 'storage', 'upload', 'export', 'model_only', 'high_confidence', 'pro_predictor', 'fallback', 'unavailable', 'missing', 'no odds', 'no_odds', 'api limit', 'limit reached', 'quota', 'maxed', 'rate limit', 'offline', 'simulated', 'research', 'test')
+INTERNAL_BULLET_TOKENS = ('internal decision', 'decisión interna', 'decision interna', 'play small', 'play_small', 'play strong', 'play_strong', 'watch only', 'watch_only', 'play_', 'watch_')
 ODDS_BLOCKER_TEXT = 'Missing valid odds'
 ODDS_BLOCKER_TEXT_ES = 'Falta cuota válida'
 
@@ -169,7 +170,8 @@ def _decimal_price(row: Mapping[str, Any]) -> float | None:
 
 
 def _market_source(row: Mapping[str, Any]) -> str:
-    return safe_text(row.get('bookmaker')) or safe_text(row.get('sportsbook')) or safe_text(row.get('book')) or safe_text(row.get('odds_source'))
+    # Prefer odds_source. A row can use bookmaker='consensus_average' while still having real Odds API prices.
+    return safe_text(row.get('odds_source')) or safe_text(row.get('bookmaker')) or safe_text(row.get('sportsbook')) or safe_text(row.get('book'))
 
 
 def has_verified_market_odds(row: Mapping[str, Any]) -> bool:
@@ -184,6 +186,23 @@ def _append_semicolon(value: Any, addition: str) -> str:
     if addition not in items:
         items.append(addition)
     return '; '.join(items)
+
+
+def _hide_internal_bullets(out: pd.DataFrame, idx: Any) -> None:
+    bullet_cols = [f'bullet_{i}' for i in range(1, 5) if f'bullet_{i}' in out.columns]
+    public_bullets: list[str] = []
+    for col in bullet_cols:
+        bullet = safe_text(out.at[idx, col])
+        if not bullet:
+            continue
+        lower = bullet.lower()
+        if any(token in lower for token in INTERNAL_BULLET_TOKENS):
+            continue
+        public_bullets.append(bullet)
+    for pos, col in enumerate(bullet_cols):
+        out.at[idx, col] = public_bullets[pos] if pos < len(public_bullets) else ''
+    if 'short_summary' in out.columns and any(token in safe_text(out.at[idx, 'short_summary']).lower() for token in INTERNAL_BULLET_TOKENS):
+        out.at[idx, 'short_summary'] = public_bullets[0] if public_bullets else ''
 
 
 def sanitize_model_only_rows(frame: pd.DataFrame, *, require_verified_odds: bool) -> tuple[pd.DataFrame, int]:
@@ -217,7 +236,7 @@ def enrich_card_values(cards: pd.DataFrame, source_rows: pd.DataFrame) -> pd.Dat
         return pd.DataFrame() if cards is None else cards
     out = cards.copy()
     source_records = source_rows.to_dict('records') if source_rows is not None and not source_rows.empty else []
-    for col in ['decimal_price', 'odds_label', 'market_probability', 'market_probability_label', 'edge', 'edge_label', 'value_rating', 'probability_audit', 'odds_status', 'consumer_status', 'quality_flags']:
+    for col in ['decimal_price', 'odds_label', 'market_probability', 'market_probability_label', 'edge', 'edge_label', 'value_rating', 'probability_audit', 'odds_status', 'consumer_status', 'quality_flags', 'short_summary'] + [f'bullet_{i}' for i in range(1, 5)]:
         if col not in out.columns:
             out[col] = None
         out[col] = out[col].astype('object')
@@ -251,6 +270,7 @@ def enrich_card_values(cards: pd.DataFrame, source_rows: pd.DataFrame) -> pd.Dat
             if 'publish_status' in out.columns and 'official' in safe_text(out.at[idx, 'publish_status']).lower():
                 out.at[idx, 'publish_status'] = 'Research / test' if LANG == 'en' else 'Investigación / prueba'
             out.at[idx, 'consumer_status'] = 'Model-only / odds unavailable' if LANG == 'en' else 'Solo modelo / sin cuotas'
+        _hide_internal_bullets(out, idx)
     return out
 
 
