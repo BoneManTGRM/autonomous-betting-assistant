@@ -29,6 +29,17 @@ class ReportExportBundle:
     feed: dict[str, Any]
 
 
+def clean_legacy_report_labels(text: str) -> str:
+    return (
+        str(text or "")
+        .replace("No Play / Removed", "Research / Learning")
+        .replace("No Play", "Research / Learning")
+        .replace("No play", "Research / Learning")
+        .replace("No jugar / removidas", "Investigación / aprendizaje")
+        .replace("No jugar", "Investigación / aprendizaje")
+    )
+
+
 def render_whatsapp_report(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *, max_items: int = 8) -> str:
     brand_obj = brand if isinstance(brand, MagazineBrand) else MagazineBrand(**{key: value for key, value in dict(brand).items() if key in MagazineBrand.__dataclass_fields__})
     es = str(brand_obj.language or "en").lower().startswith("es")
@@ -62,13 +73,13 @@ def render_whatsapp_report(cards: pd.DataFrame, brand: MagazineBrand | Mapping[s
         lines.append("")
     if brand_obj.disclaimer:
         lines.append(brand_obj.disclaimer)
-    return "\n".join(lines).strip()
+    return clean_legacy_report_labels("\n".join(lines).strip())
 
 
 def build_report_export_bundle(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *, mode: str = "consumer", public: bool = False) -> ReportExportBundle:
     cards = apply_learning_layer_compat(cards)
-    html = render_consumer_magazine_html(cards, brand, mode=mode)
-    markdown = render_markdown_summary(cards, brand, mode=mode)
+    html = clean_legacy_report_labels(render_consumer_magazine_html(cards, brand, mode=mode))
+    markdown = clean_legacy_report_labels(render_markdown_summary(cards, brand, mode=mode))
     whatsapp = render_whatsapp_report(cards, brand)
     json_text = cards_to_json(cards)
     csv_text = cards.to_csv(index=False)
