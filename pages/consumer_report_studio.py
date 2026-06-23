@@ -45,7 +45,7 @@ TEXT = {
         'settings_json': 'Current brand payload', 'preview_cols': 'Preview columns', 'quality_summary': 'Quality summary',
         'require_odds': 'Require verified sportsbook odds for publish-ready status',
         'odds_warning': 'Odds are unavailable or not verified on {count} selected row(s). These rows are model-only, edge is N/A, and they are not publish-ready.',
-        'edge_note': 'Edge requires verified sportsbook odds. Missing or API-limited odds display as N/A and block publish-ready status.',
+        'edge_note': 'Model uses learned/adjusted model probability when available. Market uses sportsbook implied probability from odds. Exact matches mean no independent model adjustment was found.',
     },
     'es': {
         'title': 'Estudio de Reportes para Consumidores', 'caption': 'Convierte filas ABA en tarjetas, reportes, feeds y copy.',
@@ -64,7 +64,7 @@ TEXT = {
         'settings_json': 'Payload actual de marca', 'preview_cols': 'Columnas de vista previa', 'quality_summary': 'Resumen de calidad',
         'require_odds': 'Requerir cuotas verificadas para marcar listo para publicar',
         'odds_warning': 'No hay cuotas verificadas en {count} fila(s). Estas filas son solo modelo, el edge es N/A y no están listas para publicar.',
-        'edge_note': 'El edge requiere cuotas verificadas. Si faltan cuotas o la API está limitada, se muestra N/A y no se puede publicar.',
+        'edge_note': 'El modelo usa la probabilidad aprendida/ajustada si existe. El mercado usa la probabilidad implícita de la cuota. Si son iguales, no hubo ajuste independiente del modelo.',
     },
 }
 
@@ -73,6 +73,8 @@ UNVERIFIED_SOURCE_TOKENS = ('.csv', 'session:', 'saved:', 'persistent', 'ledger'
 INTERNAL_BULLET_TOKENS = ('internal decision', 'decisión interna', 'decision interna', 'play small', 'play_small', 'play strong', 'play_strong', 'watch only', 'watch_only', 'play_', 'watch_')
 ODDS_BLOCKER_TEXT = 'Missing valid odds'
 ODDS_BLOCKER_TEXT_ES = 'Falta cuota válida'
+NEGATIVE_EDGE_TEXT = 'No positive edge'
+NEGATIVE_EDGE_TEXT_ES = 'Sin edge positivo'
 
 
 def t(key: str) -> str:
@@ -140,8 +142,11 @@ def _safe_float(value: Any) -> float | None:
             return None
     except (TypeError, ValueError):
         pass
+    text = str(value or '').strip().replace(',', '').replace('%', '')
+    if not text or text.lower() in {'none', 'null', 'nan', 'n/a'}:
+        return None
     try:
-        parsed = float(value)
+        parsed = float(text)
     except (TypeError, ValueError):
         return None
     return None if pd.isna(parsed) else parsed
@@ -162,7 +167,7 @@ def _pct_label(value: float | None, *, signed: bool = False) -> str:
 
 
 def _decimal_price(row: Mapping[str, Any]) -> float | None:
-    for name in ('decimal_price', 'best_price', 'average_price', 'avg_price', 'sportsbook_odds', 'odds_decimal'):
+    for name in ('decimal_price', 'best_price', 'average_price', 'avg_price', 'sportsbook_odds', 'odds_decimal', 'odds_at_pick'):
         value = _safe_float(row.get(name))
         if value is not None and value > 1.0:
             return value
@@ -188,6 +193,28 @@ def _append_semicolon(value: Any, addition: str) -> str:
     return '; '.join(items)
 
 
+def _prob_from_first(row: Mapping[str, Any], columns: tuple[str, ...]) -> float | None:
+    for column in columns:
+        value = _probability_float(row.get(column))
+        if value is not None and value > 0:
+            return value
+    return None
+
+
+def _model_probability(source_row: Mapping[str, Any], card_row: Mapping[str, Any]) -> tuple[float | None, str]:
+    learned = _prob_from_first(source_row, ('learned_model_probability', 'final_adjusted_probability', 'adjusted_model_probability'))
+    if learned is not None:
+        return learned, 'learned_model_probability'
+    source_label = safe_text(source_row.get('model_probability_source')).lower()
+    if 'base_market_probability' in source_label or 'market_probability_no_learning' in source_label:
+        return None, 'market_baseline_only'
+    model = _prob_from_first(source_row, ('model_probability_clean', 'model_probability', 'probability'))
+    if model is not None:
+        return model, 'model_probability'
+    card_model = _prob_from_first(card_row, ('model_probability', 'probability'))
+    return (card_model, 'card_model_probability') if card_model is not None else (None, 'missing_model_probability')
+
+
 def _hide_internal_bullets(out: pd.DataFrame, idx: Any) -> None:
     bullet_cols = [f'bullet_{i}' for i in range(1, 5) if f'bullet_{i}' in out.columns]
     public_bullets: list[str] = []
@@ -198,11 +225,37 @@ def _hide_internal_bullets(out: pd.DataFrame, idx: Any) -> None:
         lower = bullet.lower()
         if any(token in lower for token in INTERNAL_BULLET_TOKENS):
             continue
+        if 'estimated probability' in lower or 'probabilidad estimada' in lower:
+            continue
         public_bullets.append(bullet)
     for pos, col in enumerate(bullet_cols):
         out.at[idx, col] = public_bullets[pos] if pos < len(public_bullets) else ''
     if 'short_summary' in out.columns and any(token in safe_text(out.at[idx, 'short_summary']).lower() for token in INTERNAL_BULLET_TOKENS):
         out.at[idx, 'short_summary'] = public_bullets[0] if public_bullets else ''
+
+
+def _set_public_bullets(out: pd.DataFrame, idx: Any, *, model_prob: float | None, market_prob: float | None, edge: float | None, odds_valid: bool) -> None:
+    _hide_internal_bullets(out, idx)
+    bullet_cols = [f'bullet_{i}' for i in range(1, 5) if f'bullet_{i}' in out.columns]
+    if not bullet_cols:
+        return
+    if not odds_valid:
+        first = 'Odds unavailable; this is model-only research.' if LANG == 'en' else 'Cuotas no disponibles; solo investigación del modelo.'
+    elif model_prob is None:
+        first = 'Market odds loaded, but no independent model probability was found.' if LANG == 'en' else 'Cuotas cargadas, pero no hay probabilidad independiente del modelo.'
+    else:
+        first = (
+            f'Model estimate: {_pct_label(model_prob)} vs market-implied {_pct_label(market_prob)}; edge {_pct_label(edge, signed=True)}.'
+            if LANG == 'en'
+            else f'Estimación del modelo: {_pct_label(model_prob)} vs mercado {_pct_label(market_prob)}; edge {_pct_label(edge, signed=True)}.'
+        )
+    existing = [safe_text(out.at[idx, col]) for col in bullet_cols if safe_text(out.at[idx, col])]
+    combined: list[str] = [first]
+    for item in existing:
+        if item.lower() != first.lower() and len(combined) < len(bullet_cols):
+            combined.append(item)
+    for pos, col in enumerate(bullet_cols):
+        out.at[idx, col] = combined[pos] if pos < len(combined) else ''
 
 
 def sanitize_model_only_rows(frame: pd.DataFrame, *, require_verified_odds: bool) -> tuple[pd.DataFrame, int]:
@@ -226,6 +279,7 @@ def sanitize_model_only_rows(frame: pd.DataFrame, *, require_verified_odds: bool
     out.loc[invalid_mask, 'odds_status'] = 'odds_unavailable'
     out.loc[invalid_mask, 'official_lock_ready'] = False
     out.loc[invalid_mask, 'official_ev_pick'] = False
+    out.loc[invalid_mask, 'publish_ready'] = False
     out.loc[invalid_mask, 'ledger_type'] = 'research_model_only'
     out.loc[invalid_mask, 'lock_blockers'] = out.loc[invalid_mask, 'lock_blockers'].map(lambda value: _append_semicolon(value, 'odds_unavailable'))
     return out, invalid_count
@@ -236,19 +290,22 @@ def enrich_card_values(cards: pd.DataFrame, source_rows: pd.DataFrame) -> pd.Dat
         return pd.DataFrame() if cards is None else cards
     out = cards.copy()
     source_records = source_rows.to_dict('records') if source_rows is not None and not source_rows.empty else []
-    for col in ['decimal_price', 'odds_label', 'market_probability', 'market_probability_label', 'edge', 'edge_label', 'value_rating', 'probability_audit', 'odds_status', 'consumer_status', 'quality_flags', 'short_summary'] + [f'bullet_{i}' for i in range(1, 5)]:
+    for col in ['decimal_price', 'odds_label', 'market_probability', 'market_probability_label', 'edge', 'edge_label', 'value_rating', 'probability_audit', 'odds_status', 'consumer_status', 'quality_flags', 'short_summary', 'publish_ready', 'publish_status'] + [f'bullet_{i}' for i in range(1, 5)]:
         if col not in out.columns:
             out[col] = None
         out[col] = out[col].astype('object')
 
     for pos, idx in enumerate(out.index):
         source_row = source_records[pos] if pos < len(source_records) else out.loc[idx].to_dict()
-        model_prob = _probability_float(out.at[idx, 'model_probability'] if 'model_probability' in out.columns else None)
+        model_prob, model_source = _model_probability(source_row, out.loc[idx].to_dict())
         odds_valid = has_verified_market_odds(source_row)
         price = _decimal_price(source_row) if odds_valid else None
         market_prob = None if price is None else 1.0 / price
         edge = None if model_prob is None or market_prob is None else model_prob - market_prob
+        ev = None if model_prob is None or price is None else model_prob * price - 1.0
+
         out.at[idx, 'model_probability'] = model_prob
+        out.at[idx, 'model_probability_source'] = model_source
         out.at[idx, 'probability_label'] = _pct_label(model_prob)
         out.at[idx, 'decimal_price'] = f'{price:.2f}' if price is not None else 'N/A'
         out.at[idx, 'odds_label'] = f'{price:.2f}' if price is not None else 'N/A'
@@ -256,21 +313,37 @@ def enrich_card_values(cards: pd.DataFrame, source_rows: pd.DataFrame) -> pd.Dat
         out.at[idx, 'market_probability_label'] = _pct_label(market_prob)
         out.at[idx, 'edge'] = edge
         out.at[idx, 'edge_label'] = _pct_label(edge, signed=True)
+        out.at[idx, 'expected_value_per_unit'] = ev
         out.at[idx, 'odds_status'] = 'verified' if odds_valid else 'unavailable'
-        if odds_valid:
-            out.at[idx, 'value_rating'] = 'Strong Value' if edge is not None and edge >= 0.05 else ('Positive Value' if edge is not None and edge >= 0.02 else 'Neutral')
-            out.at[idx, 'probability_audit'] = 'Verified sportsbook odds loaded'
-            out.at[idx, 'consumer_status'] = 'Official Pick' if safe_text(out.at[idx, 'proof_id'] if 'proof_id' in out.columns else '') else 'Tracked Pick'
-        else:
+
+        if not odds_valid:
             out.at[idx, 'publish_ready'] = False
             flag = ODDS_BLOCKER_TEXT if LANG == 'en' else ODDS_BLOCKER_TEXT_ES
             out.at[idx, 'quality_flags'] = _append_semicolon(out.at[idx, 'quality_flags'], flag)
             out.at[idx, 'value_rating'] = 'Odds unavailable' if LANG == 'en' else 'Cuotas no disponibles'
             out.at[idx, 'probability_audit'] = 'Odds unavailable/API limit; model-only, not publish-ready' if LANG == 'en' else 'Cuotas no disponibles/límite API; solo modelo, no publicar'
-            if 'publish_status' in out.columns and 'official' in safe_text(out.at[idx, 'publish_status']).lower():
-                out.at[idx, 'publish_status'] = 'Research / test' if LANG == 'en' else 'Investigación / prueba'
+            out.at[idx, 'publish_status'] = 'Research / test' if LANG == 'en' else 'Investigación / prueba'
             out.at[idx, 'consumer_status'] = 'Model-only / odds unavailable' if LANG == 'en' else 'Solo modelo / sin cuotas'
-        _hide_internal_bullets(out, idx)
+        elif model_prob is None:
+            out.at[idx, 'publish_ready'] = False
+            out.at[idx, 'value_rating'] = 'Market baseline only' if LANG == 'en' else 'Solo línea de mercado'
+            out.at[idx, 'probability_audit'] = 'Odds loaded, but model probability equals market baseline/no independent model adjustment.' if LANG == 'en' else 'Cuotas cargadas, pero no hay ajuste independiente del modelo.'
+            out.at[idx, 'publish_status'] = 'Research / test' if LANG == 'en' else 'Investigación / prueba'
+            out.at[idx, 'consumer_status'] = 'Research / market baseline only' if LANG == 'en' else 'Investigación / solo mercado'
+            out.at[idx, 'quality_flags'] = _append_semicolon(out.at[idx, 'quality_flags'], 'No independent model probability')
+        elif edge is not None and edge <= 0:
+            out.at[idx, 'publish_ready'] = False
+            flag = NEGATIVE_EDGE_TEXT if LANG == 'en' else NEGATIVE_EDGE_TEXT_ES
+            out.at[idx, 'quality_flags'] = _append_semicolon(out.at[idx, 'quality_flags'], flag)
+            out.at[idx, 'value_rating'] = 'No positive edge' if LANG == 'en' else 'Sin edge positivo'
+            out.at[idx, 'probability_audit'] = 'Verified odds loaded; model is not above market at this price.' if LANG == 'en' else 'Cuotas verificadas; el modelo no supera al mercado con esta cuota.'
+            out.at[idx, 'publish_status'] = 'Research / test' if LANG == 'en' else 'Investigación / prueba'
+            out.at[idx, 'consumer_status'] = 'Research / no positive edge' if LANG == 'en' else 'Investigación / sin edge positivo'
+        else:
+            out.at[idx, 'value_rating'] = 'Strong Value' if edge >= 0.05 else ('Positive Value' if edge >= 0.02 else 'Thin Positive Edge')
+            out.at[idx, 'probability_audit'] = 'Verified sportsbook odds loaded; edge computed from model vs market.' if LANG == 'en' else 'Cuotas verificadas; edge calculado modelo vs mercado.'
+            out.at[idx, 'consumer_status'] = 'Official Pick' if safe_text(out.at[idx, 'proof_id'] if 'proof_id' in out.columns else '') else 'Tracked Pick'
+        _set_public_bullets(out, idx, model_prob=model_prob, market_prob=market_prob, edge=edge, odds_valid=odds_valid)
     return out
 
 
@@ -414,7 +487,7 @@ with tabs[4]:
 with tabs[5]:
     st.json(quality)
     st.caption(t('quality_summary'))
-    preview_cols = ['event', 'sport', 'market', 'prediction', 'decimal_price', 'odds_status', 'probability_label', 'market_probability_label', 'edge_label', 'value_rating', 'consumer_status', 'probability_audit', 'confidence', 'risk', 'publish_status', 'proof_id', 'quality_flags', 'lock_blockers']
+    preview_cols = ['event', 'sport', 'market', 'prediction', 'decimal_price', 'odds_status', 'model_probability_source', 'probability_label', 'market_probability_label', 'edge_label', 'expected_value_per_unit', 'value_rating', 'consumer_status', 'probability_audit', 'confidence', 'risk', 'publish_status', 'proof_id', 'quality_flags', 'lock_blockers']
     cols = [col for col in preview_cols if col in cards.columns]
     st.caption(t('preview_cols'))
     st.dataframe(cards[cols] if cols else cards, use_container_width=True, hide_index=True)
