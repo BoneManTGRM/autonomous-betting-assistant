@@ -74,15 +74,49 @@ def first(row: Mapping[str, Any], names: tuple[str, ...]) -> str:
     return ''
 
 
-def card_text(row: Mapping[str, Any]) -> tuple[str, str, str, str]:
+def pretty_market(value: str) -> str:
+    text = safe_text(value).replace('_', ' ').strip()
+    lower = text.lower()
+    if lower in {'totals', 'total', 'game total'}:
+        return 'Game Total'
+    if lower in {'h2h', 'moneyline', 'money line'}:
+        return 'Moneyline'
+    if lower in {'spreads', 'spread'}:
+        return 'Spread'
+    return text.title() if text else 'Market'
+
+
+def pretty_pick(raw_pick: str, market: str, sport: str) -> str:
+    pick = safe_text(raw_pick)
+    lower = pick.lower().strip()
+    market_clean = pretty_market(market)
+    sport_lower = safe_text(sport).lower()
+    if lower.startswith('game total:'):
+        pick = pick.split(':', 1)[1].strip()
+    if market_clean == 'Game Total':
+        suffix = 'Total Goals' if 'soccer' in sport_lower or 'fifa' in sport_lower or 'cup' in sport_lower else 'Game Total'
+        if 'over' in pick.lower() or 'under' in pick.lower():
+            return f'{pick} {suffix}'
+    return pick or 'Research / Learning'
+
+
+def card_text(row: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
     event = safe_text(row.get('event') or row.get('matchup')) or 'Matchup'
-    pick = first(row, ('public_pick', 'prediction', 'consumer_action', 'recommended_action')) or 'Research / Learning'
+    raw_pick = first(row, ('public_pick', 'prediction', 'consumer_action', 'recommended_action')) or 'Research / Learning'
     status = first(row, ('consumer_action', 'recommended_action', 'official_status_label', 'price_value_label')) or 'Research'
     sport = first(row, ('public_sport', 'sport', 'league')) or 'Sports'
-    market = first(row, ('market_type', 'market')) or 'Market'
-    price = safe_text(row.get('decimal_price') or row.get('best_price') or row.get('odds_decimal')) or 'N/A'
-    detail = f'{sport}  |  {market}  |  Price {price}'
-    return event, pick, status, detail
+    market_raw = first(row, ('market_type', 'market')) or 'Market'
+    market = pretty_market(market_raw)
+    pick = pretty_pick(raw_pick, market, sport)
+    price = safe_text(row.get('decimal_price') or row.get('best_price') or row.get('odds_decimal'))
+    detail_parts = [sport, f'Market: {market}']
+    if price:
+        detail_parts.append(f'Odds: {price}')
+    explainer = ''
+    if market == 'Game Total' and ('over' in pick.lower() or 'under' in pick.lower()):
+        explainer = 'Total goals by both teams'
+    detail = '  |  '.join(detail_parts)
+    return event, pick, status, detail, explainer
 
 
 def panel(image: Image.Image, box: tuple[int, int, int, int], *, alpha: int = 132) -> None:
@@ -133,7 +167,7 @@ def render_mobile_png(
     frame = all_rows.iloc[start:start + count].copy()
     if frame.empty:
         frame = pd.DataFrame([{'event': 'No rows available', 'prediction': 'Research / Learning'}])
-    card_h = 305
+    card_h = 330
     header_h = 285
     gap = 34
     height = header_h + len(frame) * (card_h + gap) + 78
@@ -154,14 +188,16 @@ def render_mobile_png(
 
     y = header_h
     for row_number, (_, row) in enumerate(frame.iterrows(), start=start + 1):
-        event, pick, status, detail = card_text(row.to_dict())
+        event, pick, status, detail, explainer = card_text(row.to_dict())
         panel(img, (58, y, W - 58, y + card_h), alpha=132)
         draw = ImageDraw.Draw(img)
         write_wrap(draw, 96, y + 24, f'{row_number}. {event}', bold(42), 38, 2, WHITE, gap=5)
         draw.text((96, y + 116), 'PICK', font=bold(30), fill=SOFT)
-        write_wrap(draw, 188, y + 106, pick, bold(48), 29, 2, GOLD, gap=4)
+        write_wrap(draw, 188, y + 106, pick, bold(46), 30, 2, GOLD, gap=4)
         draw.text((96, y + 206), status[:32], font=bold(34), fill=GREEN)
-        write_wrap(draw, 96, y + 252, detail, bold(29), 48, 1, SOFT)
+        write_wrap(draw, 96, y + 250, detail, bold(27), 55, 1, SOFT)
+        if explainer:
+            write_wrap(draw, 96, y + 286, explainer, font(26), 55, 1, SOFT)
         y += card_h + gap
 
     out = BytesIO()
