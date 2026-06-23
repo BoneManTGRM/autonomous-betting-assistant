@@ -41,6 +41,9 @@ def run_smoke_test() -> None:
     assert bundle.pdf_bytes.startswith(b"%PDF")
     assert bundle.feed["counts"]["total_cards"] == 4
     assert "Price Watch" in bundle.whatsapp or "Research" in bundle.whatsapp
+    assert "No Play" not in bundle.html
+    assert "No Play" not in bundle.markdown
+    assert "No Play" not in bundle.whatsapp
 
 
 if __name__ == "__main__":
