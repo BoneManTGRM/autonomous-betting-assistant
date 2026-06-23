@@ -5,7 +5,7 @@ from typing import Any
 
 import pandas as pd
 
-from .report_learning_layer import apply_learning_layer
+from .report_learning_layer_compat import apply_learning_layer_compat as apply_learning_layer
 from .report_product_layer import safe_text
 
 
@@ -82,7 +82,7 @@ def _section_rows(cards: pd.DataFrame, section: str) -> pd.DataFrame:
     if section == 'price_watch':
         return cards[cards['report_lane_v2'].isin({'strong_prediction_price_watch', 'learning_candidate', 'research_play'})].copy()
     if section == 'graded':
-        return cards[cards['report_lane_v2'].isin({'graded_winner', 'graded_loss'})].copy()
+        return cards[cards['report_lane_v2'].isin({'graded_winner', 'graded_loss'}) & ~cards['data_issue_reason'].map(lambda x: bool(safe_text(x)))].copy()
     if section == 'blocked':
         return cards[cards['data_issue_reason'].map(lambda x: bool(safe_text(x)))].copy()
     return pd.DataFrame()
