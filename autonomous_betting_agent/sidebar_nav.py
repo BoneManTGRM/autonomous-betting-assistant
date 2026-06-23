@@ -16,7 +16,6 @@ TOOLS: tuple[tuple[str, str, str], ...] = (
     ('What Are the Odds', 'Cuáles Son las Cuotas', 'pages/what_are_the_odds.py'),
     ('Odds Lock Pro', 'Bloqueo de Cuotas Pro', 'pages/odds_lock_pro.py'),
     ('Report Studio', 'Estudio de Reportes', 'pages/report_studio.py'),
-    ('Mobile Report Studio', 'Estudio móvil de reportes', 'pages/mobile_report_studio.py'),
     ('Proof Control Center', 'Centro de Control de Prueba', 'pages/proof_control_center.py'),
     ('Public Proof Dashboard', 'Panel Público de Prueba', 'pages/public_proof_dashboard.py'),
     ('CLV Sandbox Tester', 'Probador CLV Sandbox', 'pages/clv_sandbox_tester.py'),
