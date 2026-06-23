@@ -55,7 +55,7 @@ def _pdf_lines(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *,
 
     section_names = (
         {'best_plays': 'Mejores jugadas', 'watchlist': 'Price Watch', 'no_play': 'Investigación / aprendizaje'}
-        if es else {'best_plays': 'Today\'s Official +EV', 'watchlist': 'Price Watch', 'no_play': 'Research / Learning'}
+        if es else {'best_plays': "Today's Official +EV", 'watchlist': 'Price Watch', 'no_play': 'Research / Learning'}
     )
     labels = {'pick': 'Selección', 'action': 'Acción', 'confidence': 'Confianza', 'risk': 'Riesgo', 'market': 'Mercado'} if es else {'pick': 'Pick', 'action': 'Action', 'confidence': 'Confidence', 'risk': 'Risk', 'market': 'Market'}
     lines = [title, f'{brand_name} - {tagline}', f'Workspace: {workspace}', f'Generated: {generated}', '']
