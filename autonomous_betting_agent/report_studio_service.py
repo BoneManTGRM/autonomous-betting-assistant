@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 import pandas as pd
@@ -78,14 +78,18 @@ def _filter_sports(frame: pd.DataFrame, selected_sports: Sequence[str]) -> pd.Da
 def _apply_context(frame: pd.DataFrame, *, language: str, enabled: bool) -> pd.DataFrame:
     if frame.empty or not enabled:
         return frame.copy()
-    cards = enrich_sports_context(frame.copy(), language=language)
-    if "sports_context_summary" not in cards.columns:
+    return enrich_sports_context(frame.copy(), language=language)
+
+
+def _apply_context_preview(cards: pd.DataFrame, *, language: str) -> pd.DataFrame:
+    if cards.empty or "sports_context_summary" not in cards.columns:
         return cards
+    result = cards.copy()
     unavailable = CONTEXT_UNAVAILABLE.get(language, CONTEXT_UNAVAILABLE["en"])
-    has_context = cards["sports_context_summary"].map(safe_text).ne("").astype(bool) & cards["sports_context_summary"].ne(unavailable)
-    if "game_preview" in cards.columns:
-        cards.loc[has_context, "game_preview"] = cards.loc[has_context, "sports_context_summary"]
-    return cards
+    has_context = result["sports_context_summary"].map(safe_text).ne("").astype(bool) & result["sports_context_summary"].ne(unavailable)
+    if "game_preview" in result.columns:
+        result.loc[has_context, "game_preview"] = result.loc[has_context, "sports_context_summary"]
+    return result
 
 
 def _bool_count(frame: pd.DataFrame, column: str) -> int:
@@ -111,6 +115,7 @@ def build_report_studio_cards(raw_rows: pd.DataFrame | Sequence[Mapping[str, Any
     contextual = _apply_context(filtered, language=filters.language, enabled=filters.include_sports_context)
     enriched = enrich_rows(contextual, language=filters.language)
     cards = apply_learning_layer_compat(enriched)
+    cards = _apply_context_preview(cards, language=filters.language)
     return raw, normalized, filtered, cards
 
 
