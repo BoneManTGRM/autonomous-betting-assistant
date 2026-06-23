@@ -48,10 +48,10 @@ def _bool_count(frame: pd.DataFrame, column: str) -> int:
     return int(frame[column].astype(bool).sum())
 
 
-def _issue_count(frame: pd.DataFrame) -> int:
+def _issue_mask(frame: pd.DataFrame) -> pd.Series:
     if frame is None or frame.empty or "data_issue_reason" not in frame.columns:
-        return 0
-    return int(frame["data_issue_reason"].map(lambda value: bool(safe_text(value))).sum())
+        return pd.Series(False, index=frame.index if frame is not None else None)
+    return frame["data_issue_reason"].map(lambda value: bool(safe_text(value)))
 
 
 def _records(frame: pd.DataFrame, *, include_technical: bool = False) -> list[dict[str, Any]]:
@@ -75,10 +75,13 @@ def build_report_feed(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, A
     generated_at = datetime.now(timezone.utc).isoformat()
     feed_id = hashlib.sha256(f"{workspace_id}|{mode}|{generated_at}|{public}".encode("utf-8")).hexdigest()[:20]
     include_technical = safe_text(mode).lower() in {"analyst", "proof", "analyst_proof"}
+    issue_mask = _issue_mask(cards)
     official = cards[cards.get("official_publish_ready", pd.Series(False, index=cards.index)).astype(bool)].copy() if not cards.empty else pd.DataFrame()
     price_watch = _lane(cards, {"strong_prediction_price_watch", "learning_candidate", "research_play"})
     graded = _lane(cards, {"graded_winner", "graded_loss"})
-    data_blocked = cards[cards.get("data_issue_reason", pd.Series("", index=cards.index)).map(lambda value: bool(safe_text(value)))].copy() if not cards.empty else pd.DataFrame()
+    if not graded.empty:
+        graded = graded[~_issue_mask(graded)].copy()
+    data_blocked = cards[issue_mask].copy() if not cards.empty else pd.DataFrame()
     return {
         "schema_version": "aba-report-feed-v2",
         "feed_id": feed_id,
@@ -92,7 +95,7 @@ def build_report_feed(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, A
             "official_publish_ready": _bool_count(cards, "official_publish_ready"),
             "client_report_ready": _bool_count(cards, "client_report_ready"),
             "learning_ready": _bool_count(cards, "learning_ready"),
-            "data_issues": _issue_count(cards),
+            "data_issues": int(issue_mask.sum()) if not cards.empty else 0,
             "price_watch_research": int(len(price_watch)),
             "graded_results": int(len(graded)),
         },
