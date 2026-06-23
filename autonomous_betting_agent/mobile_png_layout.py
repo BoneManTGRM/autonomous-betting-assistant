@@ -131,7 +131,7 @@ def render_mobile_png(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, A
     name = brand_value(brand, 'brand_name', 'ABA Signal Pro')
     draw.text((82, 70), name.upper()[:30], font=bold(44), fill=GOLD)
     draw.text((82, 130), title[:32], font=bold(54), fill=WHITE)
-    draw.text((82, 196), 'Mobile readable report • 3 cards per image', font=font(30), fill=SOFT)
+    draw.text((82, 196), 'Mobile readable report - 3 cards per image', font=font(30), fill=SOFT)
 
     y = header_h
     for idx, (_, row) in enumerate(frame.iterrows(), start=1):
