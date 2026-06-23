@@ -7,6 +7,7 @@ import pandas as pd
 from autonomous_betting_agent.app_feed_delivery import build_app_feed
 from autonomous_betting_agent.report_export_service import build_report_export_bundle
 from autonomous_betting_agent.report_feed_service import build_report_feed
+from autonomous_betting_agent.report_image_export_service import PNG_HEADER, render_card_deck_png, render_card_png, render_magazine_summary_png
 from autonomous_betting_agent.report_product_layer import MagazineBrand
 from autonomous_betting_agent.report_studio_service import ReportStudioFilters, build_report_studio_state, report_studio_summary
 from autonomous_betting_agent.report_studio_ui import render_premium_card_deck, render_status_dashboard
@@ -31,12 +32,19 @@ def _sample_rows() -> pd.DataFrame:
 
 def check_static_page_contract() -> None:
     page = _read("pages/report_studio.py")
+    image_service = _read("autonomous_betting_agent/report_image_export_service.py")
     required_tokens = [
         "build_report_studio_state",
         "render_status_dashboard",
         "render_premium_card_deck",
         "save_app_feed",
         "save_report_feed",
+        "report_image_export_service",
+        "render_card_png",
+        "render_card_deck_png",
+        "render_magazine_summary_png",
+        "card_image_filename",
+        "Images",
         "Learning Audit",
         "Diagnostics",
         "official_publish_ready",
@@ -49,11 +57,16 @@ def check_static_page_contract() -> None:
         "report_studio_export_md",
         "report_studio_export_json",
         "report_studio_export_csv",
+        "report_studio_image_deck_png",
+        "report_studio_image_magazine_png",
+        "report_studio_image_card_",
     ]
     for token in required_tokens:
         assert token in page, f"Report Studio missing required token: {token}"
-    download_button_count = page.count("st.download_button")
-    download_key_count = page.count("key='report_studio_")
+    for token in ("render_card_png", "render_card_deck_png", "render_magazine_summary_png", "card_image_filename"):
+        assert token in image_service, f"image export service missing {token}"
+    download_button_count = page.count("download_button")
+    download_key_count = page.count("key='report_studio_") + page.count("key=f'report_studio_")
     assert download_key_count >= download_button_count, "Every Report Studio download button needs a stable unique key"
 
 
@@ -96,6 +109,11 @@ def check_functional_contract() -> None:
     assert bundle.pdf_bytes.startswith(b"%PDF")
     for text in (bundle.html, bundle.markdown, bundle.whatsapp):
         assert "No Play" not in text
+
+    first_card = state.cards.iloc[0].to_dict()
+    for payload in (render_card_png(first_card, brand), render_card_deck_png(state.cards, brand), render_magazine_summary_png(state.cards, brand)):
+        assert payload.startswith(PNG_HEADER)
+        assert len(payload) > 5000
 
 
 def run_regression_check() -> None:
