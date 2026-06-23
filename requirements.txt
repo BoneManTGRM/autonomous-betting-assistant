@@ -1,4 +1,4 @@
-# deploy trigger: force-streamlit-rebuild-sidebar-v11
+# deploy trigger: force-streamlit-rebuild-report-studio-v12
 numpy
 pandas
 python-dateutil
