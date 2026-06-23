@@ -114,6 +114,7 @@ def apply_volume_pattern_points(frame, *args, **kwargs):
     adjust = _num(out, 'learning_adjustment_score', 0.0)
     patterns = _num(out, 'learning_pattern_count', 0.0)
     edge = _num(out, 'model_market_edge', 0.0)
+    ev = _num(out, 'expected_value_per_unit', 0.0)
     signal = _num(out, 'scanner_strength_score', 0.0)
     books = _num(out, 'books', 0.0).where(_num(out, 'books', 0.0).gt(0), _num(out, 'bookmaker_count', 0.0))
     odds = _num(out, 'decimal_price', 0.0)
@@ -138,15 +139,15 @@ def apply_volume_pattern_points(frame, *args, **kwargs):
     out['low_confidence_pattern_candidate'] = (prob.lt(0.58) & pattern_score.ge(65) & patterns.ge(2) & adjust.gt(0))
     out = add_profit_guard(out)
 
-    # Avoid every row permanently saying play_small. Internal decisions now reflect edge/profit lanes.
+    # Keep negative-EV rows out of play states. They can still be tracked as research/watch rows.
     out['agent_decision'] = 'watch_only'
     out.loc[out.get('profit_volume_safe', pd.Series(False, index=out.index)).astype(bool) & pattern_score.ge(55), 'agent_decision'] = 'research_watch'
-    out.loc[out.get('profit_balanced_ok', pd.Series(False, index=out.index)).astype(bool) & pattern_score.ge(65), 'agent_decision'] = 'play_small'
-    out.loc[out.get('profit_official_ok', pd.Series(False, index=out.index)).astype(bool) & edge.ge(0.015) & pattern_score.ge(75), 'agent_decision'] = 'play_strong'
+    out.loc[out.get('profit_balanced_ok', pd.Series(False, index=out.index)).astype(bool) & pattern_score.ge(65) & edge.ge(0.0) & ev.ge(0.0), 'agent_decision'] = 'play_small'
+    out.loc[out.get('profit_official_ok', pd.Series(False, index=out.index)).astype(bool) & edge.ge(0.015) & ev.ge(0.015) & pattern_score.ge(75), 'agent_decision'] = 'play_strong'
     out['decision_rank'] = out['agent_decision'].map({'play_strong': 1, 'play_small': 2, 'research_watch': 3, 'watch_only': 4}).fillna(5)
 
     if 'decision_signals' in out.columns:
-        out['decision_signals'] = out['decision_signals'].astype(str) + '; pattern_points_v2; learned_edge_recomputed; profit_guard_v2'
+        out['decision_signals'] = out['decision_signals'].astype(str) + '; pattern_points_v3; learned_edge_recomputed; nonnegative_ev_decisions; profit_guard_v2'
     return out
 
 
