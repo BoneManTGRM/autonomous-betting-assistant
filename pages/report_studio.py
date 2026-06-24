@@ -254,7 +254,7 @@ with tabs[5]:
     st.download_button(t('csv'), data=bundle.csv_text, file_name=f'report_{safe_workspace}.csv', mime='text/csv', key='report_studio_export_csv')
 with tabs[6]:
     st.caption(t('images_note'))
-    st.info('Download the full magazine book for the complete report, or download a full magazine-style page for each individual game below.')
+    st.info('Download the full magazine book for the complete report, or prepare a full magazine-style page for each individual game below.')
     background_upload = st.file_uploader(t('background_upload'), type=['png', 'jpg', 'jpeg'], key='report_studio_image_background_upload')
     background_bytes = background_upload.getvalue() if background_upload is not None else report_background_bytes
     if background_bytes:
@@ -265,48 +265,40 @@ with tabs[6]:
         st.image(magazine_png, caption=t('magazine_preview'), use_container_width=True)
     cards_as_rows = [row.to_dict() for _, row in cards.iterrows()]
 
-    full_book_png = render_full_magazine_book_png(
-        cards_as_rows,
-        background_image=background_bytes,
-        report_name=full_magazine_book_name,
-    )
+    book_cache_key = 'report_studio_full_book_export_cache'
+    if st.button('Prepare Full Magazine Book', key='report_studio_prepare_full_book'):
+        with st.spinner('Building full magazine book...'):
+            st.session_state[book_cache_key] = {
+                'png': render_full_magazine_book_png(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name),
+                'pdf': render_full_magazine_book_pdf(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name),
+                'zip': render_full_magazine_zip(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name),
+            }
+    full_book_cache = st.session_state.get(book_cache_key)
+    if full_book_cache:
+        book1, book2, book3 = st.columns(3)
+        book1.download_button(
+            "Download Full Magazine Book PNG",
+            data=full_book_cache['png'],
+            file_name=sanitize_image_filename(full_magazine_book_name, extension="png"),
+            mime="image/png",
+            key="report_studio_full_book_png",
+        )
 
-    full_book_pdf = render_full_magazine_book_pdf(
-        cards_as_rows,
-        background_image=background_bytes,
-        report_name=full_magazine_book_name,
-    )
+        book2.download_button(
+            "Download Full Magazine Book PDF",
+            data=full_book_cache['pdf'],
+            file_name=sanitize_image_filename(full_magazine_book_name, extension="pdf"),
+            mime="application/pdf",
+            key="report_studio_full_book_pdf",
+        )
 
-    full_book_zip = render_full_magazine_zip(
-        cards_as_rows,
-        background_image=background_bytes,
-        report_name=full_magazine_book_name,
-    )
-
-    book1, book2, book3 = st.columns(3)
-    book1.download_button(
-        "Download Full Magazine Book PNG",
-        data=full_book_png,
-        file_name=sanitize_image_filename(full_magazine_book_name, extension="png"),
-        mime="image/png",
-        key="report_studio_full_book_png",
-    )
-
-    book2.download_button(
-        "Download Full Magazine Book PDF",
-        data=full_book_pdf,
-        file_name=sanitize_image_filename(full_magazine_book_name, extension="pdf"),
-        mime="application/pdf",
-        key="report_studio_full_book_pdf",
-    )
-
-    book3.download_button(
-        "Download Full Magazine ZIP",
-        data=full_book_zip,
-        file_name=sanitize_image_filename(full_magazine_book_name, extension="zip"),
-        mime="application/zip",
-        key="report_studio_full_book_zip",
-    )
+        book3.download_button(
+            "Download Full Magazine ZIP",
+            data=full_book_cache['zip'],
+            file_name=sanitize_image_filename(full_magazine_book_name, extension="zip"),
+            mime="application/zip",
+            key="report_studio_full_book_zip",
+        )
     st.download_button(t('magazine_png'), data=magazine_png, file_name=f'magazine_summary_{safe_workspace}.png', mime='image/png', key='report_studio_image_magazine_png')
 
     st.markdown('---')
@@ -314,22 +306,27 @@ with tabs[6]:
         rowd = row.to_dict()
         event = safe_text(rowd.get('event')) or f'Game {idx + 1}'
         action = safe_text(rowd.get('consumer_action') or rowd.get('recommended_action')) or 'Full magazine analysis'
-        full_page_png = render_full_pick_magazine_page_png(
-            rowd,
-            background_image=background_bytes,
-            report_name=full_magazine_book_name,
-            page_number=idx + 1,
-            total_pages=len(cards_as_rows),
-        )
+        page_cache_key = f'report_studio_full_page_cache_{idx}'
         left, right = st.columns([3, 1])
         left.markdown(f'**{idx + 1}. {event}**  \n{action}')
-        right.download_button(
-            "Download Full Magazine Page",
-            data=full_page_png,
-            file_name=pick_full_page_filename(rowd, idx),
-            mime="image/png",
-            key=f"report_studio_image_full_page_{idx}",
-        )
+        if right.button('Prepare Magazine Page', key=f'report_studio_prepare_full_page_{idx}'):
+            with st.spinner(f'Building magazine page {idx + 1}...'):
+                st.session_state[page_cache_key] = render_full_pick_magazine_page_png(
+                    rowd,
+                    background_image=background_bytes,
+                    report_name=full_magazine_book_name,
+                    page_number=idx + 1,
+                    total_pages=len(cards_as_rows),
+                )
+        full_page_png = st.session_state.get(page_cache_key)
+        if full_page_png:
+            right.download_button(
+                "Download Full Magazine Page",
+                data=full_page_png,
+                file_name=pick_full_page_filename(rowd, idx),
+                mime="image/png",
+                key=f"report_studio_image_full_page_{idx}",
+            )
 with tabs[7]:
     st.json(asdict(WhiteLabelProfile(profile_id=profile_id, workspace_id=workspace_id, brand_name=brand_name, logo_url=logo_url, tagline=tagline, language=LANG, report_title=report_title, disclaimer=disclaimer, preferred_report_mode=report_mode, preferred_sports=preferred_sports, risk_preference=risk_preference, show_technical_fields=technical, default_audience='analyst' if technical else 'consumer')))
 with tabs[8]:
