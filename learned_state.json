@@ -1,13 +1,13 @@
 {
-  "accuracy_after": 0.7333333333333333,
-  "accuracy_before": 0.7333333333333333,
-  "brier_after": 0.19583333333333333,
-  "brier_before": 0.19583333333333333,
+  "accuracy_after": 0.7472527472527473,
+  "accuracy_before": 0.7472527472527473,
+  "brier_after": 0.19041208791208783,
+  "brier_before": 0.19041208791208783,
   "calibration_strength": 0.0,
-  "events_trained": 75,
+  "events_trained": 91,
   "intercept": 0.0,
-  "log_loss_after": 0.580645349429943,
-  "log_loss_before": 0.580645349429943,
+  "log_loss_after": 0.5691988339717262,
+  "log_loss_before": 0.5691988339717262,
   "notes": [
     "Learns probability calibration from graded historical predictions.",
     "Uses sample-size shrinkage to reduce overfitting on small datasets.",
@@ -15,11 +15,11 @@
     "This does not prove betting profitability; use untouched forward tests before making performance claims."
   ],
   "slope": 1.0,
-  "source": "zero_tennis_learning_compatible_RESOLVED_ONLY_55W_20L_2026-06-23.csv",
-  "trained_at_utc": "2026-06-24T04:55:47+00:00",
-  "training_strategy": "cross_validated_logistic_calibration_l2=0.03_identity_fallback",
-  "validation_brier_after": 0.20340135489177114,
-  "validation_brier_before": 0.19583333333333333,
-  "validation_log_loss_after": 0.5996500428077157,
-  "validation_log_loss_before": 0.580645349429943
+  "source": "learning_import_safe_13W_3L_no_bom.csv",
+  "trained_at_utc": "2026-06-24T05:05:24+00:00",
+  "training_strategy": "cross_validated_logistic_calibration_l2=0.01_identity_fallback",
+  "validation_brier_after": 0.1993773153050302,
+  "validation_brier_before": 0.19041208791208789,
+  "validation_log_loss_after": 0.5927594477241723,
+  "validation_log_loss_before": 0.5691988339717259
 }
