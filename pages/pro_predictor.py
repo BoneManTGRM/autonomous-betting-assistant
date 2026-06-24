@@ -197,7 +197,7 @@ def api_coverage_fields(api_context: dict[str, Any], *, odds: bool, sports: bool
     return {'configured_api_sources': ','.join(configured), 'api_sources_used': ','.join(used), 'api_coverage_score': score, 'api_coverage_percent': pct(score)}
 
 
-def build_rows(events: list[Any], sport: Any, *, context_builder: LiveAPIContextBuilder, odds_key: str, sports_key: str, weather_key: str, api_football_key: str = '', perplexity_key: str = '', newsapi_key: str = '', team_filter: str, latest_event_date: date, min_books: int) -> list[dict[str, Any]]:
+def build_rows(events: list[Any], sport: Any, *, context_builder: LiveAPIContextBuilder, odds_key: str, sports_key: str, weather_key: str, team_filter: str, latest_event_date: date, min_books: int, api_football_key: str = '', perplexity_key: str = '', newsapi_key: str = '') -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for event in events:
         sport_title = getattr(event, 'sport_title', getattr(sport, 'title', ''))
@@ -360,7 +360,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
         except Exception as exc:
             skipped.append(f'{getattr(sport, "title", sport.key)}: {str(exc)[:180]}')
             events = []
-        rows.extend(build_rows(events, sport, context_builder=context_builder, odds_key=odds_key, sports_key=sports_key, weather_key=weather_key, api_football_key=api_football_key, perplexity_key=perplexity_key, newsapi_key=newsapi_key, team_filter=team_filter, latest_event_date=latest_event_date, min_books=int(min_books)))
+        rows.extend(build_rows(events, sport, context_builder=context_builder, odds_key=odds_key, sports_key=sports_key, weather_key=weather_key, team_filter=team_filter, latest_event_date=latest_event_date, min_books=int(min_books), api_football_key=api_football_key, perplexity_key=perplexity_key, newsapi_key=newsapi_key))
         progress.progress((index + 1) / max(1, len(selected_sports)))
     progress.empty()
     raw = pd.DataFrame(rows)
