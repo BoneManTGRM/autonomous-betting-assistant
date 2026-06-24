@@ -19,6 +19,7 @@ from autonomous_betting_agent.live_odds import list_sports, scan_market
 from autonomous_betting_agent.multi_source_fusion import fuse_row
 from autonomous_betting_agent.pick_hold_store import save_held_rows
 from autonomous_betting_agent.scanner_strength import score_scanner_frame, scanner_strength_summary
+from autonomous_betting_agent.source_key_panel import render_optional_context_source_panel
 
 APP_VERSION = 'pro-predictor-v22-volume-safe-defaults'
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +78,9 @@ def get_secret(*names: str) -> str:
         value = os.getenv(name, '').strip()
         if value:
             return value
+        session_value = str(st.session_state.get(name, '') or '').strip()
+        if session_value:
+            return session_value
     return ''
 
 
@@ -278,6 +282,7 @@ s1, s2, s3 = st.columns(3)
 s1.metric('Odds API', t('enabled') if odds_key else t('missing'))
 s2.metric('SportsDataIO', t('enabled') if sports_key else t('missing'))
 s3.metric('WeatherAPI', t('enabled') if weather_key else t('missing'))
+render_optional_context_source_panel(st, expanded=False)
 
 st.subheader(t('setup'))
 st.caption(t('profile_note'))
