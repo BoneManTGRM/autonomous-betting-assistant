@@ -26,9 +26,23 @@ def _streamlit_secret(name: str) -> str:
         return ""
 
 
+def _streamlit_session_secret(name: str) -> str:
+    try:
+        import streamlit as st  # type: ignore
+
+        value: Any = st.session_state.get(name, "") or st.session_state.get(f"optional_{name}", "")
+        return str(value or "")
+    except Exception:
+        return ""
+
+
 def get_secret(name: str, default: str = "") -> str:
-    """Return a secret from Streamlit first, then environment variables."""
-    value = _streamlit_secret(name) or os.getenv(name, "")
+    """Return a key from Streamlit secrets, environment, or session state.
+
+    Session state support lets the predictor page accept temporary test keys
+    without requiring redeploying Streamlit secrets. Values are never printed.
+    """
+    value = _streamlit_secret(name) or os.getenv(name, "") or _streamlit_session_secret(name)
     return str(value or default)
 
 
