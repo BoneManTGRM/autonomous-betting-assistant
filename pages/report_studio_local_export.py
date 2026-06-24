@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from autonomous_betting_agent.local_access import require_streamlit_access
-from autonomous_betting_agent.report_exports import render_html_report, render_markdown_report, render_messenger_report
+from autonomous_betting_agent.report_exports import PRINT_TO_PDF_NOTE, render_html_report, render_markdown_report, render_messenger_report
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 from autonomous_betting_agent.storage import LocalStorage
 
@@ -12,7 +12,8 @@ render_app_sidebar("report_studio_local_export", language_key="report_studio_loc
 require_streamlit_access(st, allow_roles={"admin", "client"})
 
 st.title("Report Studio Local Export")
-st.caption("Generate client-ready Markdown, HTML, and copy/paste report output from local proof rows. No cloud server required.")
+st.caption("Generate client-ready Markdown, print-to-PDF-ready HTML, and copy/paste report output from local proof rows. No cloud server required.")
+st.info(PRINT_TO_PDF_NOTE)
 
 store = LocalStorage()
 rows = store.load_rows()
@@ -44,9 +45,9 @@ st.download_button(
 )
 st.text_area("Markdown preview", markdown_report, height=360)
 
-st.subheader("HTML report")
+st.subheader("HTML / print-to-PDF report")
 st.download_button(
-    "Download HTML report",
+    "Download HTML report for print/save as PDF",
     html_report.encode("utf-8"),
     file_name="aba_signal_pro_report.html",
     mime="text/html",
