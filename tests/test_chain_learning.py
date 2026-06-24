@@ -75,7 +75,8 @@ def test_detects_target_payout_filler_leg():
     result = grade_chain_result(chain)
     assert result.target_payout_chase_detected is True
     signal = build_chain_learning_signal(result)
-    assert signal.signal_type in {"target_payout_chase", "straight_bet_better"}
+    assert signal.signal_type in {"target_payout_chase", "straight_bet_better", "failed_leg_pattern"}
+    assert "filler" in signal.reason.lower() or signal.leg_type == "filler"
 
 
 def test_failed_underdog_corner_leg_signal():
