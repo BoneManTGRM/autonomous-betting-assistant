@@ -25,6 +25,8 @@ def test_core_pick_passes_65_catalog_when_analysis_and_odds_value_pass():
     assert pick.game == "Dodgers vs Padres"
     assert "Dodgers Moneyline" in pick.exact_bet
     assert pick.edge is not None and pick.edge > 0
+    assert pick.why_pick_bullets
+    assert "Final Confidence" in pick.evidence_scores
     assert build_bet_catalog([row])["Best 65%+ Singles"]
 
 
@@ -67,4 +69,33 @@ def test_chain_probability_uses_combined_adjusted_probability_and_magazine_label
     assert pick.passes_65_filter is False
     assert pick.chain_combined_probability == 0.432
     assert "Chain Combined Adjusted Probability: 43.2%" in magazine
-    assert "Final Recommendation: SMALL BET" in magazine
+    assert "Final Recommendation" in magazine
+    assert "SMALL BET" in magazine
+
+
+def test_magazine_pro_evidence_uses_sport_specific_fields():
+    row = {
+        "game": "Yankees vs Red Sox",
+        "sport": "MLB Baseball",
+        "bet_type": "Moneyline",
+        "exact_bet": "Yankees ML",
+        "sportsbook": "Caliente",
+        "decimal_odds": 1.72,
+        "model_probability": 0.69,
+        "injury_report": "Opponent cleanup hitter out",
+        "starting_lineups": "Projected starters confirmed",
+        "pitcher_handedness": "LHP vs RHB-heavy lineup",
+        "bullpen_fatigue": "Boston used top relievers yesterday",
+        "wind_speed": "12 mph blowing out",
+        "market_movement": "Moved -125 to -135",
+        "line_shopping_score": 82,
+    }
+
+    pick = build_catalog_pick(row)
+    card = render_betting_magazine([row])
+
+    assert any("Injury edge" in bullet for bullet in pick.why_pick_bullets)
+    assert any("L/R split" in bullet for bullet in pick.why_pick_bullets)
+    assert "Why We Picked It" in card
+    assert "Evidence Scores" in card
+    assert "Pro Notes" in card
