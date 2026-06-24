@@ -16,6 +16,260 @@ Pro Predictor Volume -> Odds Lock Pro -> LocalStorage -> Public Proof Dashboard 
 
 No cloud server is required for the local-first layer. The app keeps no-login mode as the default and can run locally or on Streamlit.
 
+## Phase 1 Cloud and Subscriber Roadmap
+
+ABA Signal Pro Phase 1 will expand the current local-first proof, grading, bankroll, and report system into a subscriber-ready sports betting intelligence platform.
+
+The goal is to support personalized betting intelligence, sportsbook-specific opportunity detection, transparent proof tracking, bankroll-aware recommendations, and scalable subscriber delivery.
+
+### Phase 1 Core Technology Stack
+
+Required APIs:
+
+1. The Odds API
+2. SportsDataIO
+3. Weather API
+4. Supabase
+5. Telegram Bot API
+6. Mercado Pago API
+
+High-value additions:
+
+7. API-Football
+8. NewsAPI
+9. X/Twitter API
+10. Google Sheets API
+
+### Important Build Rule
+
+Do not add extra APIs, delivery channels, or future-stack services unless explicitly requested.
+
+Phase 1 should not include WhatsApp, OpenAI, Discord, Twilio, Firebase, Airtable, Sportradar, Reddit, Perplexity, Stripe, PayPal, or Wise unless they are moved into a later roadmap phase.
+
+### Phase 1 Objectives
+
+#### 1. Personalized Betting Intelligence
+
+Each subscriber should have:
+
+- Individual bankroll profile
+- Risk tolerance profile
+- Preferred sportsbooks
+- Preferred sports
+- Preferred bet types
+- Unit sizing preferences
+- Daily, weekly, and monthly performance tracking
+- Custom filtering options
+
+Every report, recommendation, and alert should be personalized for that specific subscriber.
+
+#### 2. Multi-Sportsbook Line Shopping
+
+Monitor and compare odds from:
+
+- Caliente
+- Playdoit
+- Codere
+- Bet365 Mexico
+- Betcris
+- 1xBet
+- Betway
+- RushBet
+- Novibet
+
+Identify:
+
+- Best available line
+- Best available odds
+- Positive EV opportunities
+- Market inefficiencies
+- Closing Line Value opportunities
+
+#### 3. Advanced Betting Analysis Engine
+
+Analyze:
+
+- Team statistics
+- Player statistics
+- Injury reports
+- Suspensions
+- Weather conditions
+- Travel schedules
+- Rest advantages
+- Historical matchups
+- Market movement
+- Line movement behavior
+
+Generate:
+
+- Confidence Score from 0 to 100
+- Expected Value
+- Edge Percentage
+- Fair Odds
+- Implied Probability
+- Risk Rating
+
+#### 4. Market Intelligence Layer
+
+Use NewsAPI and X/Twitter API to track:
+
+- Injury reports
+- Breaking news
+- Lineup announcements
+- Suspensions
+- Coaching changes
+- Late developments
+
+Detect:
+
+- Sudden market shifts
+- Injury-related opportunities
+- Market overreactions
+- Undervalued betting positions
+
+#### 5. Subscriber Report Studio
+
+Generate:
+
+- Daily reports
+- Weekly reports
+- Sport-specific reports
+- Personalized reports
+- Bankroll reports
+- Risk reports
+
+Support:
+
+- PDF export
+- CSV export
+- Google Sheets export
+- Custom branding
+- Custom backgrounds
+- White-label reports
+
+#### 6. Smart Bankroll Management
+
+Calculate:
+
+- Flat-bet recommendations
+- Kelly Criterion
+- Fractional Kelly
+- Unit sizing
+- Risk exposure
+- Portfolio diversification
+
+Warn users when:
+
+- Risk exposure is excessive
+- User exceeds bankroll guidelines
+- User is over-concentrated in a single sport or market
+
+#### 7. Learning System
+
+Store in Supabase:
+
+- Every prediction
+- Every result
+- Closing Line Value
+- Edge calculations
+- Confidence scores
+- Market conditions
+
+Continuously evaluate:
+
+- Best-performing sports
+- Best-performing bet types
+- Most accurate confidence ranges
+- Best-performing sportsbooks
+- Highest ROI market conditions
+
+Use historical performance to improve future weighting and recommendations.
+
+#### 8. Official Performance Tracking
+
+Track:
+
+- Wins
+- Losses
+- Pushes
+- ROI
+- Units won
+- Yield
+- Hit rate
+- Closing Line Value
+
+Generate:
+
+- Locked proof reports
+- Public proof dashboards
+- Subscriber proof dashboards
+
+#### 9. Notification System
+
+Deliver through Telegram:
+
+- Instant alerts
+- Daily reports
+- Weekly reports
+- High-confidence alerts
+- Closing line movement alerts
+
+Allow subscriber-specific delivery preferences.
+
+#### 10. Mexican Market Optimization
+
+Prioritize:
+
+- Liga MX
+- International Soccer
+- NBA
+- MLB
+- NFL
+- UFC
+
+Optimize specifically for:
+
+- Caliente
+- Playdoit
+- Codere
+- Bet365 Mexico
+- Betcris
+
+#### 11. Betting Selection Logic
+
+Never recommend a wager solely because a team is favored.
+
+Every recommendation must meet:
+
+- Positive EV threshold
+- Verified statistical edge
+- Market confirmation
+- Risk assessment requirements
+- Supporting analytical evidence
+
+Prioritize:
+
+- Mispriced lines
+- Market inefficiencies
+- Positive EV opportunities
+- Long-term profitability
+
+### Ultimate Goal
+
+Create the most accurate, personalized, data-driven sports betting intelligence platform possible.
+
+Focus on:
+
+- Long-term profitability
+- Sustainable bankroll growth
+- Accurate grading
+- Personalized recommendations
+- Continuous learning
+- Sportsbook-specific optimization
+- Professional subscriber experience
+- Transparent performance tracking
+- Scalable delivery to hundreds of subscribers
+
 ## Main tools and pages
 
 | Tool/page | Main job |
@@ -198,8 +452,3 @@ docs/local_first_upgrade_status.md
 - Short samples can look excellent by luck and should not be sold as proof.
 - Result-only rows are not enough for calibration.
 - A model can have a high hit rate and still perform poorly if the prices are too short.
-- Pattern Points are a ranking and review signal, not a guarantee.
-- Price audit flags data-quality risk; it does not prove the pick itself is wrong.
-- API outages, missing keys, low quota, unsupported sports, or bad market coverage can reduce output quality.
-- Local SQLite/CSV storage protects against cloud dependency but is not a replacement for backups.
-- This software does not execute transactions or provide guarantees.
