@@ -84,8 +84,7 @@ def pick_full_page_filename(pick:Any,index:int,extension:str='png')->str:
 
 def _wrap(d,t,f,w,m=2):
     out=[]; cur=''
-    for word in str(t or '').replace('
-',' ').split():
+    for word in str(t or '').replace(chr(10),' ').split():
         trial=word if not cur else cur+' '+word
         if d.textbbox((0,0),trial,font=f)[2]<=w: cur=trial
         else:
@@ -101,11 +100,9 @@ def _txt(d,x,y,t,f,fill,w,m=2):
         d.text((x,y),line,font=f,fill=fill); y+=f.size+7
     return y
 
-def _split(v): return [p.strip(' -•	') for p in str(v or '').replace('•','
-').replace(';','
-').replace('|','
-').split('
-') if p.strip(' -•	')]
+def _split(v):
+    nl=chr(10)
+    return [p.strip(' -•') for p in str(v or '').replace('•',nl).replace(';',nl).replace('|',nl).split(nl) if p.strip(' -•')]
 def _src(s,t): return f'{t} · Source: {s}'
 
 def _items(r,specs,fb,limit):
