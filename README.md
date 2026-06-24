@@ -15,7 +15,7 @@ It is designed for sports analysts, betting-market researchers, prediction revie
 The app is organized around a no-password commercial workflow:
 
 ```text
-Deployment Health -> Scanner Pro -> ABA Signal Pro -> Pro Predictor / Pro Predictor Volume -> Odds Lock Pro -> Auto Result Grading -> Public Proof Dashboard -> Learning Memory
+Deployment Health -> Scanner Pro -> ABA Signal Pro -> Pro Predictor / Pro Predictor Volume -> Odds Lock Pro -> Auto Result Grading -> Public Proof Dashboard -> Report Studio -> Learning Memory
 ```
 
 | Tool | Main job |
@@ -30,6 +30,7 @@ Deployment Health -> Scanner Pro -> ABA Signal Pro -> Pro Predictor / Pro Predic
 | **One-Click Daily Workflow** | Takes current/session/uploaded rows, locks qualified rows, optionally saves them, and generates report output in one guided flow. |
 | **Auto Result Grading** | Grades the persistent proof ledger from finished-result CSV uploads or an explicit one-click score fetch. |
 | **Public Proof Dashboard** | Displays no-login proof metrics, demo mode, proof audit, CLV, result uploads, persistent ledger storage, and report cards. |
+| **Report Studio** | Generates client-ready performance reports with win/loss tracking, ROI summaries, filters, branded layouts, and custom background images. |
 | **Monthly License Readiness** | Scores whether the product is ready for private beta, operator licensing, or white-label licensing, then produces pricing and offer copy. |
 | **Buyer Demo Mode** | Shows a polished buyer-ready dashboard with demo locked rows, audit, proof table, and report cards without API keys. |
 | **Learning Memory** | Trains durable calibration and pattern memory from finished, graded results. |
@@ -151,6 +152,23 @@ Pro Predictor Volume adds these columns:
 | `pattern_high_confidence` | `True` when Pattern Points is `75+`. |
 | `low_confidence_pattern_candidate` | `True` when lower-confidence probability is supported by strong learned patterns. |
 
+## Report Studio
+
+Report Studio is the dedicated reporting and presentation layer for ABA Signal Pro. It turns locked predictions, graded results, proof data, and performance metrics into cleaner client-facing reports.
+
+Core Report Studio capabilities:
+
+- Generate professional reports from locked proof rows and graded results.
+- Show win/loss record, pending rows, ROI, units, performance summaries, and proof metrics.
+- Filter report output by sport, league, market, date range, confidence level, and proof status when those fields are available.
+- Build public-facing summaries for clients while keeping private audit details separate.
+- Use custom branding and presentation layouts for sales, buyer demos, client updates, and internal review.
+- Add nearly any user-selected image as the report background so reports can match a brand, theme, client, or campaign.
+- Support export-ready report output for sharing, proof tracking, and record keeping.
+- Connect reporting with Odds Lock Pro, Public Proof Dashboard, Auto Result Grading, and One-Click Daily Workflow.
+
+Report Studio should be treated as a presentation and proof-reporting tool, not as a guarantee engine. It can make results easier to explain, but claims should still be based on timestamped locked proof, clean grading, ROI, sample size, and audit quality.
+
 ## No-password commercial mode
 
 The app now includes the most valuable platform upgrades without requiring users to log in every time:
@@ -160,14 +178,15 @@ The app now includes the most valuable platform upgrades without requiring users
 3. **Optional explicit score fetch** for one sport key at a time from Auto Result Grading; this runs only when the button is pressed.
 4. **Public proof dashboard** for record, ROI, units, pending picks, sport breakdowns, market breakdowns, and client-safe ledgers.
 5. **Report-card generator** for Markdown, HTML, and daily copy/paste reports.
-6. **Proof audit layer** that checks proof hashes and pre-start lock status.
-7. **Proof quality score** for buyer/demo review.
-8. **CLV tracking** from locked price vs closing price when closing odds are supplied.
-9. **Demo ledger mode** so a buyer can see the dashboard without an API key or real locked picks.
-10. **Deployment Health** so the operator can see readiness and blockers before daily use.
-11. **One-Click Daily Workflow** so non-technical users can run the daily lock/report process.
-12. **Monthly License Readiness** so the operator can package private beta, analyst, operator, or white-label offers.
-13. **Public-safe exports** and private audit exports.
+6. **Report Studio** for client-ready reports, performance summaries, branded layouts, and custom background images.
+7. **Proof audit layer** that checks proof hashes and pre-start lock status.
+8. **Proof quality score** for buyer/demo review.
+9. **CLV tracking** from locked price vs closing price when closing odds are supplied.
+10. **Demo ledger mode** so a buyer can see the dashboard without an API key or real locked picks.
+11. **Deployment Health** so the operator can see readiness and blockers before daily use.
+12. **One-Click Daily Workflow** so non-technical users can run the daily lock/report process.
+13. **Monthly License Readiness** so the operator can package private beta, analyst, operator, or white-label offers.
+14. **Public-safe exports** and private audit exports.
 
 This is not a full password-protected client portal yet. Login, paid accounts, Stripe, and client roles can be added later.
 
@@ -180,8 +199,9 @@ This is not a full password-protected client portal yet. Login, paid accounts, S
 5. Save locked rows into the persistent proof ledger.
 6. Use **Auto Result Grading** when finished results are available.
 7. Use **Public Proof Dashboard** to review public metrics, proof audit, CLV, report cards, and exports.
-8. Use **Learning Memory** after results are graded and probabilities/prices are available.
-9. Use **Monthly License Readiness** before pitching monthly clients or raising prices.
+8. Use **Report Studio** to generate branded client-ready reports with custom background images and filtered performance summaries.
+9. Use **Learning Memory** after results are graded and probabilities/prices are available.
+10. Use **Monthly License Readiness** before pitching monthly clients or raising prices.
 
 ## Data proof rules
 
@@ -207,8 +227,8 @@ Minimum readiness for a private beta license:
 | Resolved proof rows | 20+ |
 | Proof quality | 90/100+ preferred |
 | Hash mismatches | 0 |
-| Product pages | Deployment Health, Odds Lock Pro, Public Proof Dashboard, Daily Workflow, Auto Result Grading, Buyer Demo Mode, Monthly License Readiness |
-| Client outputs | public dashboard, daily report, proof card, private audit export |
+| Product pages | Deployment Health, Odds Lock Pro, Public Proof Dashboard, Report Studio, Daily Workflow, Auto Result Grading, Buyer Demo Mode, Monthly License Readiness |
+| Client outputs | public dashboard, Report Studio output, daily report, proof card, branded background report, private audit export |
 | Positioning | analytics/research only; no guaranteed wins or returns |
 
 Suggested pricing path:
@@ -294,7 +314,7 @@ A green badge or workflow run should be checked directly in GitHub before claimi
 
 ## Commercial positioning
 
-This project is intended to become a licensable product, not a free open-source prediction bot. It can support private sports-betting analysis dashboards, paid research tools, white-label prediction-review systems, client-facing sports analytics reports, internal research workflows, custom API integrations, private deployment, support, and model-tuning packages.
+This project is intended to become a licensable product, not a free open-source prediction bot. It can support private sports-betting analysis dashboards, paid research tools, white-label prediction-review systems, Report Studio client-facing sports analytics reports, custom branded report backgrounds, internal research workflows, custom API integrations, private deployment, support, and model-tuning packages.
 
 The repository is public for limited review and evaluation, but the code is governed by a proprietary evaluation license. Commercial use, resale, sublicensing, hosting, paid access, SaaS deployment, API access, white-label use, competing-product use, model-training use, or monetized derivative use requires written permission from Reparodynamics.
 
