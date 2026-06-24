@@ -302,6 +302,23 @@ def build_chain_learning_signal(chain_result: ChainResultBreakdown) -> ChainLear
         script_type = "script_correct"
     elif chain_result.game_script_correct is False:
         script_type = "script_wrong"
+    if failed:
+        direction = "decrease"
+        strength = 0.55
+        reason = failed.failed_reason or "Failed chain leg."
+        if "corner" in failed.market.lower() or "corner" in failed.selection.lower():
+            reason = "Reduce underdog corner add-ons unless pressure data supports it."
+            strength = 0.65
+        return ChainLearningSignal(
+            signal_type="failed_leg_pattern",
+            market_type=failed.market,
+            script_type=script_type,
+            leg_type="main_read" if failed.was_main_read else "add_on",
+            adjustment_direction=direction,
+            adjustment_strength=strength,
+            reason=reason,
+            confidence=0.50 if failed.status != UNKNOWN else 0.1,
+        )
     if chain_result.straight_bet_would_have_won and chain_result.chain_status == LOSS:
         return ChainLearningSignal(
             signal_type="straight_bet_better",
@@ -323,23 +340,6 @@ def build_chain_learning_signal(chain_result: ChainResultBreakdown) -> ChainLear
             adjustment_strength=0.7,
             reason="Target payout chase or filler leg detected.",
             confidence=0.55,
-        )
-    if failed:
-        direction = "decrease"
-        strength = 0.55
-        reason = failed.failed_reason or "Failed chain leg."
-        if "corner" in failed.market.lower() or "corner" in failed.selection.lower():
-            reason = "Reduce underdog corner add-ons unless pressure data supports it."
-            strength = 0.65
-        return ChainLearningSignal(
-            signal_type="failed_leg_pattern",
-            market_type=failed.market,
-            script_type=script_type,
-            leg_type="main_read" if failed.was_main_read else "add_on",
-            adjustment_direction=direction,
-            adjustment_strength=strength,
-            reason=reason,
-            confidence=0.50 if failed.status != UNKNOWN else 0.1,
         )
     if chain_result.chain_status == WIN and chain_result.failed_leg_count == 0:
         return ChainLearningSignal(
