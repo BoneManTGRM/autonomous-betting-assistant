@@ -327,7 +327,7 @@ with tabs[6]:
         left, right = st.columns([3, 1])
         left.markdown(f'**{idx + 1}. {event}**  \n{action}')
         right.download_button(
-            "Download Magazine Page",
+            "Download Full Magazine Page",
             data=full_page_png,
             file_name=pick_full_page_filename(rowd, idx),
             mime="image/png",
