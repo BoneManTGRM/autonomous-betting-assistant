@@ -254,6 +254,7 @@ with tabs[5]:
     st.download_button(t('csv'), data=bundle.csv_text, file_name=f'report_{safe_workspace}.csv', mime='text/csv', key='report_studio_export_csv')
 with tabs[6]:
     st.caption(t('images_note'))
+    st.info('Each game below downloads a full magazine-style page with game details, why the pick was selected, pro evidence, risk desk notes, chain-betting notes, and a final recommendation.')
     background_upload = st.file_uploader(t('background_upload'), type=['png', 'jpg', 'jpeg'], key='report_studio_image_background_upload')
     background_bytes = background_upload.getvalue() if background_upload is not None else report_background_bytes
     if background_bytes:
@@ -314,12 +315,8 @@ with tabs[6]:
     st.markdown('---')
     for idx, (_, row) in enumerate(cards.head(50).iterrows()):
         rowd = row.to_dict()
-        event = safe_text(rowd.get('event')) or f'Card {idx + 1}'
-        action = safe_text(rowd.get('consumer_action') or rowd.get('recommended_action')) or 'Research / Learning'
-        card_png = render_custom_background_card_png(rowd, brand, background_bytes=background_bytes, index=idx) if background_bytes else render_card_png(rowd, brand)
-        left, right = st.columns([3, 1])
-        left.markdown(f'**{idx + 1}. {event}**  \n{action}')
-        right.download_button(t('card_png'), data=card_png, file_name=card_image_filename(rowd, workspace=safe_workspace, index=idx), mime='image/png', key=f'report_studio_image_card_{idx}')
+        event = safe_text(rowd.get('event')) or f'Game {idx + 1}'
+        action = safe_text(rowd.get('consumer_action') or rowd.get('recommended_action')) or 'Full magazine analysis'
         full_page_png = render_full_pick_magazine_page_png(
             rowd,
             background_image=background_bytes,
@@ -327,8 +324,10 @@ with tabs[6]:
             page_number=idx + 1,
             total_pages=len(cards_as_rows),
         )
+        left, right = st.columns([3, 1])
+        left.markdown(f'**{idx + 1}. {event}**  \n{action}')
         right.download_button(
-            "Download Full Magazine Page",
+            "Download Magazine Page",
             data=full_page_png,
             file_name=pick_full_page_filename(rowd, idx),
             mime="image/png",
