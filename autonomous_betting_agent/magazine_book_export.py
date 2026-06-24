@@ -83,15 +83,10 @@ def _teams(row: Any) -> tuple[str, str]:
     event = _game(data)
     if home and away:
         return home, away
-    if " at " in event:
-        left, right = event.split(" at ", 1)
-        return left.strip(), right.strip()
-    if " vs " in event:
-        left, right = event.split(" vs ", 1)
-        return left.strip(), right.strip()
-    if " v " in event:
-        left, right = event.split(" v ", 1)
-        return left.strip(), right.strip()
+    for separator in (" at ", " vs ", " v ", " VS ", " @ "):
+        if separator in event:
+            left, right = event.split(separator, 1)
+            return left.strip(), right.strip()
     return _text(data, "team", "selection_team", default="Team / Side A"), _text(data, "opponent", default="Opponent / Side B")
 
 
@@ -120,15 +115,15 @@ def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
 
 
 def _texture(size: tuple[int, int]) -> Image.Image:
-    img = Image.new("RGB", size, (207, 188, 145))
+    img = Image.new("RGB", size, (238, 224, 190))
     draw = ImageDraw.Draw(img, "RGBA")
-    for x in range(0, size[0], 54):
-        draw.line((x, 0, x - 240, size[1]), fill=(255, 255, 255, 12), width=16)
-    for y in range(0, size[1], 46):
-        draw.line((0, y, size[0], y + 80), fill=(82, 58, 34, 10), width=10)
-    for x in range(36, size[0], 126):
-        for y in range(24, size[1], 118):
-            draw.ellipse((x, y, x + 5, y + 5), fill=(72, 50, 32, 34))
+    for x in range(-220, size[0], 58):
+        draw.line((x, 0, x + 260, size[1]), fill=(113, 66, 45, 9), width=14)
+    for y in range(0, size[1], 56):
+        draw.line((0, y, size[0], y + 34), fill=(255, 255, 255, 14), width=8)
+    for x in range(24, size[0], 92):
+        for y in range(16, size[1], 86):
+            draw.rectangle((x, y, x + 2, y + 2), fill=(56, 38, 24, 30))
     return img
 
 
@@ -151,8 +146,8 @@ def _background(background_image: Any, size: tuple[int, int]) -> Image.Image:
     left = (resized.width - size[0]) // 2
     top = (resized.height - size[1]) // 2
     cropped = resized.crop((left, top, left + size[0], top + size[1])).convert("RGBA")
-    overlay = Image.new("RGBA", size, (232, 214, 169, 160))
-    cropped.alpha_composite(overlay)
+    veil = Image.new("RGBA", size, (238, 224, 190, 125))
+    cropped.alpha_composite(veil)
     return cropped.convert("RGB")
 
 
@@ -242,9 +237,28 @@ def _pro_evidence(row: Any) -> list[str]:
     ), "Professional evidence pending from uploaded data", 5)
 
 
+def _team_stats(row: Any, team_prefix: str) -> list[tuple[str, str]]:
+    fields = (
+        ("Record", (f"{team_prefix}_record", f"{team_prefix}_season_record")),
+        ("Last 10", (f"{team_prefix}_last_10", f"{team_prefix}_recent_form")),
+        ("Avg", (f"{team_prefix}_avg", f"{team_prefix}_team_avg", f"{team_prefix}_runs_per_game", f"{team_prefix}_points_per_game")),
+        ("Offense", (f"{team_prefix}_offense", f"{team_prefix}_offense_note")),
+        ("Defense", (f"{team_prefix}_defense", f"{team_prefix}_defense_note")),
+    )
+    stats: list[tuple[str, str]] = []
+    for label, keys in fields:
+        value = _text(row, *keys)
+        if value:
+            stats.append((label, value))
+    return stats
+
+
 def _team_notes(row: Any) -> list[str]:
     team_a, team_b = _teams(row)
-    notes = [f"{team_a} snapshot: {_text(row, 'team_a_snapshot', 'home_team_snapshot', default='Data not available from uploaded row')}", f"{team_b} snapshot: {_text(row, 'team_b_snapshot', 'away_team_snapshot', default='Data not available from uploaded row')}"]
+    notes = [
+        f"{team_a}: {_text(row, 'team_a_snapshot', 'home_team_snapshot', default='Team snapshot data not available from uploaded row')}",
+        f"{team_b}: {_text(row, 'team_b_snapshot', 'away_team_snapshot', default='Team snapshot data not available from uploaded row')}",
+    ]
     notes.extend(_available_notes(row, (
         (("team_form", "recent_trend", "form_note"), "Team form"),
         (("matchup_history", "h2h", "head_to_head"), "Matchup history"),
@@ -279,11 +293,20 @@ def _risk_notes(row: Any) -> list[str]:
     return notes[:5]
 
 
+def _matchup_notes(row: Any) -> list[str]:
+    return _available_notes(row, (
+        (("matchup_note", "matchup_notes", "head_to_head", "h2h"), "Matchup"),
+        (("style_matchup", "pace_note", "total_trend"), "Style/pace"),
+        (("venue_note", "weather_note", "travel_note"), "Venue/travel"),
+        (("pitcher_matchup", "goalie_matchup", "starter_matchup"), "Starter matchup"),
+    ), "Matchup detail not available from uploaded row", 4)
+
+
 def _chain_notes(row: Any) -> list[str]:
     supplied = _bullet_text(row, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), [], 5)
     if supplied:
         return supplied[:5]
-    return ["Better as straight analysis. Do not add weak filler legs."]
+    return ["Better as individual straight analysis. Do not add weak filler legs."]
 
 
 def _recommendation(row: Any) -> tuple[str, str]:
@@ -292,80 +315,171 @@ def _recommendation(row: Any) -> tuple[str, str]:
     return action, explanation
 
 
-def _panel(draw: ImageDraw.ImageDraw, xy: tuple[int, int, int, int], fill: tuple[int, int, int, int] = (244, 229, 190, 210)) -> None:
-    draw.rounded_rectangle(xy, radius=26, fill=fill, outline=(65, 46, 28), width=3)
+def _fit_font(draw: ImageDraw.ImageDraw, text: str, max_width: int, start_size: int, min_size: int = 34, bold: bool = True) -> ImageFont.ImageFont:
+    for size in range(start_size, min_size - 1, -2):
+        font = _font(size, bold)
+        if draw.textbbox((0, 0), text, font=font)[2] <= max_width:
+            return font
+    return _font(min_size, bold)
 
 
-def _draw_section(draw: ImageDraw.ImageDraw, x: int, y: int, w: int, title: str, items: list[str], height: int, title_color: tuple[int, int, int] = (34, 95, 65)) -> int:
-    _panel(draw, (x, y, x + w, y + height))
-    draw.text((x + 28, y + 20), title, font=_font(26, True), fill=title_color)
-    line_y = y + 66
-    for item in items:
-        if line_y > y + height - 38:
-            break
-        line_y = _draw_wrapped(draw, x + 44, line_y, f"• {item}", _font(23), (28, 24, 20), w - 76, max_lines=2, gap=6)
-    return y + height + 18
+def _panel(draw: ImageDraw.ImageDraw, xy: tuple[int, int, int, int], fill: tuple[int, int, int, int] = (250, 241, 213, 238), outline: tuple[int, int, int] = (15, 23, 35)) -> None:
+    draw.rounded_rectangle(xy, radius=16, fill=fill, outline=outline, width=3)
+
+
+def _header_bar(draw: ImageDraw.ImageDraw, xy: tuple[int, int, int, int], title: str, color: tuple[int, int, int]) -> None:
+    x1, y1, x2, y2 = xy
+    draw.rounded_rectangle((x1, y1, x2, y2), radius=8, fill=color)
+    draw.text((x1 + 16, y1 + 8), title, font=_font(26, True), fill=(255, 246, 220))
+
+
+def _draw_bullet_list(draw: ImageDraw.ImageDraw, x: int, y: int, items: list[str], width: int, max_items: int, font_size: int = 22, dot_color: tuple[int, int, int] = (153, 32, 28)) -> int:
+    font = _font(font_size)
+    for item in items[:max_items]:
+        lines = _wrap(draw, item, font, width - 28, max_lines=2)
+        if not lines:
+            continue
+        draw.ellipse((x, y + 9, x + 10, y + 19), fill=dot_color)
+        text_y = y
+        for line in lines:
+            draw.text((x + 24, text_y), line, font=font, fill=(18, 21, 26))
+            text_y += font_size + 5
+        y = text_y + 8
+    return y
+
+
+def _draw_metric(draw: ImageDraw.ImageDraw, x: int, y: int, w: int, label: str, value: str, value_color: tuple[int, int, int] = (63, 214, 90)) -> None:
+    draw.rectangle((x, y, x + w, y + 86), fill=(20, 22, 23), outline=(222, 215, 196), width=1)
+    draw.text((x + 12, y + 10), label.upper(), font=_font(18, True), fill=(239, 231, 209))
+    _draw_wrapped(draw, x + 12, y + 38, value, _font(26, True), value_color, w - 24, max_lines=1, gap=2)
+
+
+def _draw_team_snapshot(draw: ImageDraw.ImageDraw, x: int, y: int, w: int, team_name: str, stats: list[tuple[str, str]], notes: list[str], accent: tuple[int, int, int]) -> None:
+    draw.text((x, y), team_name.upper(), font=_font(24, True), fill=accent)
+    stat_y = y + 38
+    shown_stats = stats[:5] or [("Snapshot", "Data not available")]
+    for label, value in shown_stats:
+        draw.text((x, stat_y), label.upper(), font=_font(18, True), fill=(22, 26, 32))
+        _draw_wrapped(draw, x + 160, stat_y - 1, value, _font(21, True), (22, 26, 32), w - 165, max_lines=1, gap=0)
+        stat_y += 30
+    draw.text((x, stat_y + 6), "NOTES", font=_font(18, True), fill=accent)
+    _draw_bullet_list(draw, x, stat_y + 36, notes[:3], w, 3, font_size=18, dot_color=accent)
+
+
+def _draw_section(draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, title: str, items: list[str], color: tuple[int, int, int], max_items: int = 5, font_size: int = 22) -> None:
+    _panel(draw, (x, y, x + w, y + h))
+    _header_bar(draw, (x, y, x + w, y + 48), title, color)
+    _draw_bullet_list(draw, x + 24, y + 70, items, w - 48, max_items=max_items, font_size=font_size, dot_color=color)
+
+
+def _draw_abstract_player(draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, sport: str) -> None:
+    draw.rounded_rectangle((x, y, x + w, y + h), radius=20, fill=(21, 40, 70, 228), outline=(255, 246, 220), width=4)
+    draw.rectangle((x + 18, y + 18, x + w - 18, y + h - 18), outline=(170, 37, 34), width=6)
+    draw.ellipse((x + w // 2 - 52, y + 48, x + w // 2 + 52, y + 152), fill=(235, 222, 190))
+    draw.rounded_rectangle((x + w // 2 - 84, y + 150, x + w // 2 + 84, y + 312), radius=38, fill=(31, 82, 147))
+    draw.line((x + w // 2 - 84, y + 190, x + 40, y + 270), fill=(235, 222, 190), width=22)
+    draw.line((x + w // 2 + 84, y + 190, x + w - 42, y + 250), fill=(235, 222, 190), width=22)
+    draw.text((x + 28, y + h - 62), sport.upper()[:14], font=_font(30, True), fill=(255, 246, 220))
 
 
 def render_full_pick_magazine_page(pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1) -> Image.Image:
     img = _background(background_image, (PAGE_WIDTH, PAGE_HEIGHT)).convert("RGBA")
     draw = ImageDraw.Draw(img, "RGBA")
-    black = (18, 15, 12)
-    red = (150, 34, 31)
-    green = (34, 104, 70)
-    gold = (176, 126, 32)
+    red = (159, 34, 30)
+    navy = (19, 54, 92)
+    black = (15, 18, 22)
+    cream = (247, 238, 211)
+    green = (42, 178, 72)
     team_a, team_b = _teams(pick)
     sport = _text(pick, "sport", "league", default="Sport N/A")
     source = _text(pick, "odds_source", "bookmaker", "sportsbook", default="Uploaded row")
+    report = report_name or "Full Pick Magazine"
 
-    draw.rectangle((0, 0, PAGE_WIDTH, 22), fill=red)
-    draw.rectangle((0, PAGE_HEIGHT - 26, PAGE_WIDTH, PAGE_HEIGHT), fill=red)
-    for x in range(18, PAGE_WIDTH, 38):
-        draw.arc((x, -22, x + 34, 40), 0, 180, fill=(235, 222, 190), width=4)
-        draw.arc((x, PAGE_HEIGHT - 42, x + 34, PAGE_HEIGHT + 22), 180, 360, fill=(235, 222, 190), width=4)
+    # Top newspaper bar
+    draw.rectangle((0, 0, PAGE_WIDTH, 58), fill=black)
+    draw.rectangle((16, 10, 228, 50), fill=red)
+    draw.text((28, 16), "ABA SIGNAL PRO", font=_font(26, True), fill=(255, 255, 255))
+    draw.text((256, 15), "DAILY SPORTS ANALYSIS", font=_font(28, True), fill=(255, 246, 220))
+    draw.rounded_rectangle((840, 8, PAGE_WIDTH - 18, 50), radius=5, fill=cream)
+    draw.text((872, 15), f"PAGE {page_number} OF {total_pages}", font=_font(24, True), fill=black)
 
-    draw.text((54, 50), "ABA SIGNAL PRO", font=_font(22, True), fill=gold)
-    _draw_wrapped(draw, 54, 86, report_name or "Full Pick Magazine", _font(24), black, 470, max_lines=1)
-    draw.text((54, 132), f"Page {page_number}/{total_pages} | {sport} | {source}", font=_font(20), fill=(55, 48, 38))
+    draw.rectangle((0, 58, PAGE_WIDTH, 98), fill=(248, 239, 214, 245))
+    meta = f"REPORT: {report}   |   SOURCE: {source}   |   SPORT: {sport}"
+    _draw_wrapped(draw, 28, 68, meta, _font(21, True), black, 800, max_lines=1)
+    draw.rounded_rectangle((900, 66, PAGE_WIDTH - 24, 128), radius=10, fill=navy)
+    draw.text((922, 82), sport.upper()[:10], font=_font(27, True), fill=(255, 255, 255))
 
-    draw.text((54, 190), team_a, font=_font(46, True), fill=black)
-    draw.text((54, 244), "VS", font=_font(40, True), fill=red)
-    _draw_wrapped(draw, 54, 292, team_b, _font(46, True), black, 560, max_lines=2)
+    # Hero headline and visual zone
+    headline_font_a = _fit_font(draw, team_a.upper(), 630, 78, 44, True)
+    headline_font_b = _fit_font(draw, team_b.upper(), 650, 64, 40, True)
+    draw.text((36, 122), team_a.upper(), font=headline_font_a, fill=red)
+    draw.text((38, 214), "VS", font=_font(38, True), fill=black)
+    draw.line((35, 260, 104, 260), fill=black, width=3)
+    draw.text((118, 218), team_b.upper(), font=headline_font_b, fill=navy)
+    draw.rectangle((34, 318, 440, 362), fill=black)
+    draw.text((48, 326), (_text(pick, "season_label", "sport_context_summary", default=f"{sport} ANALYSIS")).upper()[:28], font=_font(24, True), fill=cream)
+    _draw_wrapped(draw, 36, 382, _text(pick, "game_summary", "preview_summary", "short_reason", default="Use uploaded row data and market checks to evaluate this game before publishing."), _font(22), black, 560, max_lines=3)
+    _draw_abstract_player(draw, 668, 112, 368, 304, sport)
 
-    _panel(draw, (606, 164, PAGE_WIDTH - 50, 372), fill=(250, 240, 212, 230))
-    draw.text((638, 192), "TENDENCIA", font=_font(33, True), fill=red)
-    _draw_wrapped(draw, 638, 244, _pick(pick), _font(34, True), black, 370, max_lines=3)
-
+    # Recommendation and metrics strip
+    strip_y = 450
+    draw.rounded_rectangle((18, strip_y, PAGE_WIDTH - 18, strip_y + 94), radius=14, fill=black, outline=cream, width=3)
+    draw.text((42, strip_y + 14), "TENDENCIA", font=_font(25, True), fill=red)
+    _draw_wrapped(draw, 42, strip_y + 44, _pick(pick), _font(32, True), (255, 255, 255), 270, max_lines=1)
+    metric_x = 334
+    metric_w = 104
     metrics = [
-        f"Odds: {_text(pick, 'decimal_price', 'decimal_odds', 'odds', default='N/A')}",
-        f"Confidence: {_fmt_pct(_num(pick, 'model_probability', 'learned_model_probability', 'confidence'))}",
-        f"Edge: {_fmt_edge(_num(pick, 'model_market_edge', 'edge'))}",
-        f"EV: {_text(pick, 'expected_value_per_unit', 'expected_value', 'ev', default='N/A')}",
-        f"Units: {_text(pick, 'suggested_stake_units', 'recommended_units', default='Review manually')}",
-        f"Risk: {_text(pick, 'risk_level', 'risk_label', default='N/A')}",
-        f"Market: {_text(pick, 'market', 'bet_type', 'market_type', default='N/A')}",
+        ("Odds", _text(pick, "american_odds", "decimal_price", "decimal_odds", "odds", default="N/A"), (255, 255, 255)),
+        ("Conf", _fmt_pct(_num(pick, "model_probability", "learned_model_probability", "confidence")), green),
+        ("Edge", _fmt_edge(_num(pick, "model_market_edge", "edge")), green),
+        ("EV", _text(pick, "expected_value_per_unit", "expected_value", "ev", default="N/A"), green),
+        ("Units", _text(pick, "suggested_stake_units", "recommended_units", default="Review"), (255, 255, 255)),
+        ("Risk", _text(pick, "risk_level", "risk_label", default="N/A"), green),
+        ("Market", _text(pick, "market", "bet_type", "market_type", default="N/A"), (255, 255, 255)),
     ]
-    y = 404
-    _panel(draw, (54, y, PAGE_WIDTH - 54, y + 104), fill=(250, 240, 212, 225))
-    _draw_wrapped(draw, 84, y + 24, "  |  ".join(metrics), _font(22), black, PAGE_WIDTH - 168, max_lines=2)
-    y += 132
+    for label, value, color in metrics:
+        _draw_metric(draw, metric_x, strip_y + 4, metric_w, label, value, color)
+        metric_x += metric_w
 
-    y = _draw_section(draw, 54, y, 472, "WHY WE PICKED IT", _why_notes(pick), 276, green)
-    y_left = _draw_section(draw, 54, y, 472, "TEAM ANALYSIS", _team_notes(pick), 420, green)
-    y_left = _draw_section(draw, 54, y_left, 472, "RISK DESK", _risk_notes(pick), 290, green)
+    # Mid content grid
+    left_x = 18
+    right_x = 382
+    y = 566
+    _draw_section(draw, left_x, y, 338, 294, "WHY WE PICKED IT", _why_notes(pick), red, max_items=5, font_size=21)
+    _draw_section(draw, left_x, 876, 338, 250, "PRO BETTOR EVIDENCE", _pro_evidence(pick), navy, max_items=5, font_size=20)
 
-    y_right = 536
-    y_right = _draw_section(draw, 554, y_right, 472, "PLAYER NOTES", _player_notes(pick), 258, green)
-    y_right = _draw_section(draw, 554, y_right, 472, "PRO BETTOR EVIDENCE", _pro_evidence(pick), 308, green)
-    y_right = _draw_section(draw, 554, y_right, 472, "CHAIN BETTING NOTES", _chain_notes(pick), 214, green)
+    # Team snapshots wide panel
+    _panel(draw, (right_x, y, PAGE_WIDTH - 18, 936))
+    _header_bar(draw, (right_x, y, PAGE_WIDTH - 18, y + 48), "TEAM SNAPSHOTS", navy)
+    mid = right_x + 344
+    draw.line((mid, y + 62, mid, 920), fill=(70, 70, 70), width=2)
+    left_stats = _team_stats(pick, "team_a") or _team_stats(pick, "home_team")
+    right_stats = _team_stats(pick, "team_b") or _team_stats(pick, "away_team")
+    team_notes = _team_notes(pick)
+    _draw_team_snapshot(draw, right_x + 24, y + 70, 300, team_a, left_stats, team_notes[:3], red)
+    _draw_team_snapshot(draw, mid + 24, y + 70, 300, team_b, right_stats, team_notes[3:] or team_notes[:3], navy)
 
+    # Player notes wide panel
+    _panel(draw, (right_x, 952, PAGE_WIDTH - 18, 1126))
+    _header_bar(draw, (right_x, 952, PAGE_WIDTH - 18, 1000), "PLAYER / INJURY NOTES", navy)
+    _draw_bullet_list(draw, right_x + 24, 1020, _player_notes(pick), PAGE_WIDTH - right_x - 66, 4, font_size=20, dot_color=navy)
+
+    # Bottom three boxes
+    _draw_section(draw, 18, 1142, 338, 252, "RISK DESK", _risk_notes(pick), red, max_items=5, font_size=19)
+    _draw_section(draw, 372, 1142, 338, 252, "MATCHUP NOTES", _matchup_notes(pick), navy, max_items=4, font_size=19)
+    _draw_section(draw, 726, 1142, 336, 252, "CHAIN BETTING NOTES", _chain_notes(pick), navy, max_items=4, font_size=20)
+
+    # Final recommendation bar
     action, explanation = _recommendation(pick)
-    final_top = PAGE_HEIGHT - 202
-    _panel(draw, (54, final_top, PAGE_WIDTH - 54, PAGE_HEIGHT - 62), fill=(250, 240, 212, 235))
-    draw.text((84, final_top + 22), "FINAL RECOMMENDATION", font=_font(28, True), fill=red)
-    _draw_wrapped(draw, 84, final_top + 64, action, _font(34, True), black, 900, max_lines=1)
-    _draw_wrapped(draw, 84, final_top + 108, explanation, _font(22), black, 900, max_lines=2)
-    draw.text((72, PAGE_HEIGHT - 50), SAFETY_FOOTER, font=_font(17), fill=(42, 36, 30))
+    final_y = 1418
+    draw.rounded_rectangle((18, final_y, PAGE_WIDTH - 18, PAGE_HEIGHT - 48), radius=12, fill=black, outline=red, width=4)
+    draw.rectangle((18, final_y, 238, PAGE_HEIGHT - 48), fill=red)
+    draw.text((34, final_y + 24), "FINAL", font=_font(26, True), fill=(255, 255, 255))
+    draw.text((34, final_y + 58), "RECOMMENDATION", font=_font(22, True), fill=(255, 255, 255))
+    _draw_wrapped(draw, 268, final_y + 18, action.upper(), _font(52, True), green, 350, max_lines=1)
+    _draw_wrapped(draw, 268, final_y + 78, _pick(pick), _font(30, True), (255, 255, 255), 350, max_lines=1)
+    _draw_wrapped(draw, 640, final_y + 26, explanation, _font(23), (255, 255, 255), 380, max_lines=3)
+    draw.text((120, PAGE_HEIGHT - 34), SAFETY_FOOTER, font=_font(18), fill=(255, 246, 220))
     return img.convert("RGB")
 
 
