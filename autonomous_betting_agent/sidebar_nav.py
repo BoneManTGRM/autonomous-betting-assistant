@@ -7,7 +7,7 @@ from typing import Any
 APP_TAGLINE = 'Powered by Reparodynamics'
 APP_TAGLINE_ES = 'Impulsado por Reparodynamics'
 GLOBAL_LANGUAGE_KEY = 'aba_global_language'
-LANGUAGE_KEYS = ['global_language','signal_board_language','pro_predictor_language','threshold_optimizer_language','what_are_the_odds_language','what_are_the_odds_pro_language','odds_lock_pro_language','report_studio_language','consumer_report_studio_language','consumer_magazine_builder_language','public_proof_dashboard_language','clv_sandbox_tester_language','storage_diagnostics_language','learning_memory_language','learning_impact_report_language','simulation_lab_language','proof_control_center_language','reset_storage_language']
+LANGUAGE_KEYS = ['global_language','signal_board_language','pro_predictor_language','threshold_optimizer_language','what_are_the_odds_language','what_are_the_odds_pro_language','odds_lock_pro_language','report_studio_language','report_studio_local_export_language','consumer_report_studio_language','consumer_magazine_builder_language','public_proof_dashboard_language','proof_id_verification_language','clv_sandbox_tester_language','storage_diagnostics_language','local_first_admin_language','learning_memory_language','learning_impact_report_language','simulation_lab_language','proof_control_center_language','reset_storage_language']
 TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
@@ -16,8 +16,11 @@ TOOLS: tuple[tuple[str, str, str], ...] = (
     ('What Are the Odds', 'Cuáles Son las Cuotas', 'pages/what_are_the_odds.py'),
     ('Odds Lock Pro', 'Bloqueo de Cuotas Pro', 'pages/odds_lock_pro.py'),
     ('Report Studio', 'Estudio de Reportes', 'pages/report_studio.py'),
+    ('Report Studio Local Export', 'Exportación Local de Reportes', 'pages/report_studio_local_export.py'),
+    ('Proof ID Verification', 'Verificación de ID de Prueba', 'pages/proof_id_verification.py'),
     ('Proof Control Center', 'Centro de Control de Prueba', 'pages/proof_control_center.py'),
     ('Public Proof Dashboard', 'Panel Público de Prueba', 'pages/public_proof_dashboard.py'),
+    ('Local First Admin', 'Admin Local First', 'pages/local_first_admin.py'),
     ('CLV Sandbox Tester', 'Probador CLV Sandbox', 'pages/clv_sandbox_tester.py'),
     ('Storage Diagnostics', 'Diagnóstico de Almacenamiento', 'pages/storage_diagnostics.py'),
     ('Reset Storage', 'Reiniciar almacenamiento', 'pages/reset_storage.py'),
