@@ -5,6 +5,13 @@ import streamlit as st
 
 from autonomous_betting_agent.bet_catalog import build_bet_catalog, render_betting_magazine, render_pick_card
 from autonomous_betting_agent.chain_core import build_candidate_chains
+from autonomous_betting_agent.chain_optimizer_integration import build_chain_optimizer_results
+from autonomous_betting_agent.chain_optimizer_report import (
+    chain_optimizer_results_to_rows,
+    render_chain_optimizer_card,
+    render_chain_optimizer_magazine_section,
+    split_chain_optimizer_sections,
+)
 from autonomous_betting_agent.client_profiles import normalize_client_profile
 from autonomous_betting_agent.script_chain_core import ScriptChainResult, build_same_game_chain_from_script, build_target_payout_chain
 from autonomous_betting_agent.script_chain_report import render_game_script_chain_section, render_script_chain_card
@@ -32,6 +39,10 @@ with st.sidebar:
     target_payout = st.number_input("Target payout", min_value=0.0, value=2.0, step=1.0)
     min_chain_probability = st.slider("Minimum adjusted probability", 0.0, 1.0, 0.25, 0.01)
     max_risk_score = st.slider("Maximum chain risk score", 1.0, 10.0, 8.0, 0.5)
+    st.header("Chain Optimizer v2")
+    enable_chain_optimizer_v2 = st.checkbox("Enable Chain Optimizer v2", value=True)
+    show_chain_optimizer_cards = st.checkbox("Show Chain Optimizer v2 cards", value=True)
+    optimizer_target_payout_mode = st.checkbox("Target payout mode for optimizer", value=False)
 
 profile = normalize_client_profile({
     "name": name,
@@ -73,10 +84,22 @@ if enable_script_chains:
         if isinstance(result, ScriptChainResult):
             script_chains.append(result)
 
+optimizer_results = []
+if enable_chain_optimizer_v2:
+    optimizer_results = build_chain_optimizer_results(
+        rows,
+        target_payout=target_payout if optimizer_target_payout_mode else None,
+        stake=stake_amount if optimizer_target_payout_mode else None,
+        client_profile=profile,
+    )
+
 script_chain_rows = [chain.as_row() for chain in script_chains]
+optimizer_rows = chain_optimizer_results_to_rows(optimizer_results)
 all_rows = rows + chain_rows + script_chain_rows
 catalog = build_bet_catalog(all_rows)
 magazine = render_betting_magazine(all_rows, subscriber_name=profile.name) + "\n" + render_game_script_chain_section(script_chains)
+if enable_chain_optimizer_v2:
+    magazine += "\n" + render_chain_optimizer_magazine_section(optimizer_results)
 
 st.subheader("Catalog Sections")
 for section, picks in catalog.items():
@@ -94,6 +117,22 @@ for chain in script_chains:
     st.markdown(render_script_chain_card(chain))
     st.divider()
 
+if enable_chain_optimizer_v2:
+    st.subheader("Chain Bet Optimizer v2")
+    sections = split_chain_optimizer_sections(optimizer_results)
+    if not optimizer_results:
+        st.write("NO CHAIN RECOMMENDED TODAY")
+    for section, results in sections.items():
+        with st.expander(f"{section} ({len(results)})", expanded=section == "Best Approved Chains"):
+            if not results:
+                st.write("NO CHAIN RECOMMENDED TODAY" if section == "No Chain Recommended" else "No chains in this section.")
+            elif show_chain_optimizer_cards:
+                for result in results:
+                    st.markdown(render_chain_optimizer_card(result))
+                    st.divider()
+            else:
+                st.dataframe(pd.DataFrame(chain_optimizer_results_to_rows(results)), use_container_width=True)
+
 st.subheader("Magazine")
 st.download_button("Download Markdown", magazine, file_name="client_magazine.md", mime="text/markdown")
 st.download_button("Download HTML", "<pre>" + magazine.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;") + "</pre>", file_name="client_magazine.html", mime="text/html")
@@ -107,6 +146,9 @@ for section, picks in catalog.items():
 for chain in script_chains:
     row = chain.as_row()
     row["section"] = "Best Game-Script Chains"
+    flat_catalog.append(row)
+for row in optimizer_rows:
+    row["section"] = "Chain Bet Optimizer v2"
     flat_catalog.append(row)
 if flat_catalog:
     export_df = pd.DataFrame(flat_catalog)
