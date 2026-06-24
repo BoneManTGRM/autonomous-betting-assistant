@@ -5,6 +5,8 @@ import streamlit as st
 
 from autonomous_betting_agent.bet_catalog import build_bet_catalog, render_betting_magazine, render_pick_card
 from autonomous_betting_agent.chain_core import build_candidate_chains
+from autonomous_betting_agent.chain_learning_report import chain_learning_summary_to_rows, render_chain_learning_summary
+from autonomous_betting_agent.chain_learning_store import load_chain_learning_memory
 from autonomous_betting_agent.chain_optimizer_integration import build_chain_optimizer_results
 from autonomous_betting_agent.chain_optimizer_report import (
     chain_optimizer_results_to_rows,
@@ -43,6 +45,11 @@ with st.sidebar:
     enable_chain_optimizer_v2 = st.checkbox("Enable Chain Optimizer v2", value=True)
     show_chain_optimizer_cards = st.checkbox("Show Chain Optimizer v2 cards", value=True)
     optimizer_target_payout_mode = st.checkbox("Target payout mode for optimizer", value=False)
+    st.header("Chain Learning")
+    enable_chain_learning_notes = st.checkbox("Enable chain learning notes", value=True)
+    show_failed_leg_patterns = st.checkbox("Show failed-leg patterns", value=True)
+    show_straight_better_history = st.checkbox("Show straight-bet-better history", value=True)
+    show_target_payout_patterns = st.checkbox("Show target-payout mistake patterns", value=True)
 
 profile = normalize_client_profile({
     "name": name,
@@ -93,13 +100,18 @@ if enable_chain_optimizer_v2:
         client_profile=profile,
     )
 
+learning_memory = load_chain_learning_memory() if enable_chain_learning_notes else None
+learning_section = render_chain_learning_summary(learning_memory) if enable_chain_learning_notes else ""
 script_chain_rows = [chain.as_row() for chain in script_chains]
 optimizer_rows = chain_optimizer_results_to_rows(optimizer_results)
+learning_rows = chain_learning_summary_to_rows(learning_memory) if enable_chain_learning_notes else []
 all_rows = rows + chain_rows + script_chain_rows
 catalog = build_bet_catalog(all_rows)
 magazine = render_betting_magazine(all_rows, subscriber_name=profile.name) + "\n" + render_game_script_chain_section(script_chains)
 if enable_chain_optimizer_v2:
     magazine += "\n" + render_chain_optimizer_magazine_section(optimizer_results)
+if enable_chain_learning_notes:
+    magazine += "\n" + learning_section
 
 st.subheader("Catalog Sections")
 for section, picks in catalog.items():
@@ -133,6 +145,22 @@ if enable_chain_optimizer_v2:
             else:
                 st.dataframe(pd.DataFrame(chain_optimizer_results_to_rows(results)), use_container_width=True)
 
+if enable_chain_learning_notes:
+    st.subheader("Chain Learning Summary")
+    st.markdown(learning_section)
+    with st.expander("Chain learning pattern tables", expanded=False):
+        if learning_rows:
+            table = pd.DataFrame(learning_rows)
+            if not show_failed_leg_patterns:
+                table = table[table["chain_learning_bucket"] != "leg_failure_patterns"]
+            if not show_straight_better_history:
+                table = table[table["chain_learning_bucket"] != "straight_bet_better_patterns"]
+            if not show_target_payout_patterns:
+                table = table[table["chain_learning_bucket"] != "target_payout_chase_patterns"]
+            st.dataframe(table, use_container_width=True)
+        else:
+            st.write("No chain learning memory yet. Grade completed chains to build memory.")
+
 st.subheader("Magazine")
 st.download_button("Download Markdown", magazine, file_name="client_magazine.md", mime="text/markdown")
 st.download_button("Download HTML", "<pre>" + magazine.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;") + "</pre>", file_name="client_magazine.html", mime="text/html")
@@ -149,6 +177,9 @@ for chain in script_chains:
     flat_catalog.append(row)
 for row in optimizer_rows:
     row["section"] = "Chain Bet Optimizer v2"
+    flat_catalog.append(row)
+for row in learning_rows:
+    row["section"] = "Chain Learning"
     flat_catalog.append(row)
 if flat_catalog:
     export_df = pd.DataFrame(flat_catalog)
