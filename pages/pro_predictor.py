@@ -270,14 +270,25 @@ st.subheader(t('api_sources'))
 saved_odds = get_secret('ODDS_API_KEY', 'THE_ODDS_API_KEY')
 saved_sports = get_secret('SPORTSDATAIO_API_KEY')
 saved_weather = get_secret('WEATHERAPI_KEY', 'WEATHER_API_KEY')
+saved_api_football = get_secret('API_FOOTBALL_KEY')
+saved_perplexity = get_secret('PERPLEXITY_API_KEY')
+saved_newsapi = get_secret('NEWSAPI_KEY')
 api1, api2, api3 = st.columns(3)
 odds_key = api1.text_input(t('odds_key'), type='password', placeholder='Loaded from secrets' if saved_odds else '').strip() or saved_odds
 sports_key = api2.text_input(t('sports_key'), type='password', placeholder='Loaded from secrets' if saved_sports else '').strip() or saved_sports
 weather_key = api3.text_input(t('weather_key'), type='password', placeholder='Loaded from secrets' if saved_weather else '').strip() or saved_weather
+api4, api5, api6 = st.columns(3)
+api_football_key = api4.text_input('API-Football key', type='password', placeholder='Loaded from secrets' if saved_api_football else '').strip() or saved_api_football
+perplexity_key = api5.text_input('Perplexity API key', type='password', placeholder='Loaded from secrets' if saved_perplexity else '').strip() or saved_perplexity
+newsapi_key = api6.text_input('NewsAPI key', type='password', placeholder='Loaded from secrets' if saved_newsapi else '').strip() or saved_newsapi
 s1, s2, s3 = st.columns(3)
 s1.metric('Odds API', t('enabled') if odds_key else t('missing'))
 s2.metric('SportsDataIO', t('enabled') if sports_key else t('missing'))
 s3.metric('WeatherAPI', t('enabled') if weather_key else t('missing'))
+s4, s5, s6 = st.columns(3)
+s4.metric('API-Football', t('enabled') if api_football_key else t('missing'))
+s5.metric('Perplexity', t('enabled') if perplexity_key else t('missing'))
+s6.metric('NewsAPI', t('enabled') if newsapi_key else t('missing'))
 
 st.subheader(t('setup'))
 st.caption(t('profile_note'))
