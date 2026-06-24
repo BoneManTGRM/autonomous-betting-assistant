@@ -154,17 +154,16 @@ def grade_chain_leg(leg: Mapping[str, Any], final_score: Any = None, graded_rows
     if status == LOSS:
         if was_filler:
             failed_reason = "Target-payout or random filler leg failed."
-        elif not script_supported:
-            failed_reason = "Add-on leg failed without strong game-script support."
         elif was_main:
             failed_reason = "Main read failed."
+        elif not script_supported:
+            failed_reason = "Add-on leg failed without strong game-script support."
         else:
             failed_reason = "Add-on leg failed."
     elif status in NEUTRAL_STATUSES:
         failed_reason = "Neutral result; do not count as win/loss."
     elif status == UNKNOWN:
         failed_reason = "Unknown result; no strong learning signal."
-    learning_note = ""
     if status == LOSS and was_main:
         learning_note = "Main read was wrong; reduce confidence in this script/read type."
     elif status == LOSS and was_filler:
@@ -176,16 +175,9 @@ def grade_chain_leg(leg: Mapping[str, Any], final_score: Any = None, graded_rows
     else:
         learning_note = "Neutral or insufficient signal."
     return ChainLegResult(
-        leg_name=_leg_name(leg),
-        market=_market_type(leg),
-        selection=_selection(leg),
-        status=status,
-        was_main_read=was_main,
-        was_add_on_leg=not was_main,
-        was_filler_leg=was_filler,
-        game_script_supported=script_supported,
-        failed_reason=failed_reason,
-        learning_note=learning_note,
+        leg_name=_leg_name(leg), market=_market_type(leg), selection=_selection(leg), status=status,
+        was_main_read=was_main, was_add_on_leg=not was_main, was_filler_leg=was_filler,
+        game_script_supported=script_supported, failed_reason=failed_reason, learning_note=learning_note,
     )
 
 
@@ -211,9 +203,7 @@ def _chain_status_from_legs(legs: Sequence[ChainLegResult], explicit: str = "") 
 
 def identify_failed_chain_leg(chain_result: ChainResultBreakdown) -> ChainLegResult | None:
     failed = [leg for leg in chain_result.leg_results if leg.status == LOSS]
-    if len(failed) == 1:
-        return failed[0]
-    return None
+    return failed[0] if len(failed) == 1 else None
 
 
 def evaluate_game_script_accuracy(chain: Mapping[str, Any] | ChainResultBreakdown, final_score: Any = None, event_stats: Mapping[str, Any] | None = None) -> bool | None:
@@ -236,15 +226,12 @@ def evaluate_game_script_accuracy(chain: Mapping[str, Any] | ChainResultBreakdow
 
 
 def evaluate_target_payout_decision(chain_result: ChainResultBreakdown) -> bool:
-    if chain_result.target_payout_chase_detected:
-        return True
-    return any(leg.was_filler_leg and leg.status == LOSS for leg in chain_result.leg_results)
+    return chain_result.target_payout_chase_detected or any(leg.was_filler_leg and leg.status == LOSS for leg in chain_result.leg_results)
 
 
 def grade_chain_result(chain: Mapping[str, Any], final_score: Any = None, graded_rows: Iterable[Mapping[str, Any]] | None = None) -> ChainResultBreakdown:
     legs = tuple(grade_chain_leg(leg, final_score=final_score, graded_rows=graded_rows) for leg in _chain_legs(chain))
-    explicit_chain_status = _text(chain, "chain_status", "final_status", "result_status", "status")
-    chain_status = _chain_status_from_legs(legs, explicit_chain_status)
+    chain_status = _chain_status_from_legs(legs, _text(chain, "chain_status", "final_status", "result_status", "status"))
     straight_status = _status(_text(chain, "straight_pick_status", "straight_status"))
     failed_legs = tuple(leg.leg_name for leg in legs if leg.status == LOSS)
     main_legs = [leg for leg in legs if leg.was_main_read]
@@ -273,8 +260,7 @@ def grade_chain_result(chain: Mapping[str, Any], final_score: Any = None, graded
         learning_summary="",
     )
     script_correct = evaluate_game_script_accuracy(temp, final_score=final_score)
-    summary = _learning_summary(temp, script_correct)
-    return ChainResultBreakdown(**{**temp.__dict__, "game_script_correct": script_correct, "learning_summary": summary})
+    return ChainResultBreakdown(**{**temp.__dict__, "game_script_correct": script_correct, "learning_summary": _learning_summary(temp, script_correct)})
 
 
 def _learning_summary(result: ChainResultBreakdown, script_correct: bool | None = None) -> str:
@@ -297,82 +283,39 @@ def _learning_summary(result: ChainResultBreakdown, script_correct: bool | None 
 
 def build_chain_learning_signal(chain_result: ChainResultBreakdown) -> ChainLearningSignal:
     failed = identify_failed_chain_leg(chain_result)
-    script_type = "unknown"
-    if chain_result.game_script_correct is True:
-        script_type = "script_correct"
-    elif chain_result.game_script_correct is False:
-        script_type = "script_wrong"
+    script_type = "script_correct" if chain_result.game_script_correct is True else "script_wrong" if chain_result.game_script_correct is False else "unknown"
     if failed:
-        direction = "decrease"
-        strength = 0.55
         reason = failed.failed_reason or "Failed chain leg."
+        strength = 0.55
         if "corner" in failed.market.lower() or "corner" in failed.selection.lower():
             reason = "Reduce underdog corner add-ons unless pressure data supports it."
             strength = 0.65
+        if failed.was_filler_leg or chain_result.target_payout_chase_detected:
+            reason = "Penalize target-payout filler legs with no independent value."
+            strength = 0.70
         return ChainLearningSignal(
             signal_type="failed_leg_pattern",
             market_type=failed.market,
             script_type=script_type,
             leg_type="main_read" if failed.was_main_read else "add_on",
-            adjustment_direction=direction,
+            adjustment_direction="decrease",
             adjustment_strength=strength,
             reason=reason,
             confidence=0.50 if failed.status != UNKNOWN else 0.1,
         )
     if chain_result.straight_bet_would_have_won and chain_result.chain_status == LOSS:
-        return ChainLearningSignal(
-            signal_type="straight_bet_better",
-            market_type="chain",
-            script_type=script_type,
-            leg_type="chain",
-            adjustment_direction="watch_only",
-            adjustment_strength=0.8,
-            reason="Straight bet would have won while chain lost.",
-            confidence=0.55,
-        )
+        return ChainLearningSignal("straight_bet_better", "chain", script_type, "chain", "watch_only", 0.8, "Straight bet would have won while chain lost.", confidence=0.55)
     if chain_result.target_payout_chase_detected:
-        return ChainLearningSignal(
-            signal_type="target_payout_chase",
-            market_type="chain",
-            script_type=script_type,
-            leg_type="filler",
-            adjustment_direction="decrease",
-            adjustment_strength=0.7,
-            reason="Target payout chase or filler leg detected.",
-            confidence=0.55,
-        )
+        return ChainLearningSignal("target_payout_chase", "chain", script_type, "filler", "decrease", 0.7, "Target payout chase or filler leg detected.", confidence=0.55)
     if chain_result.chain_status == WIN and chain_result.failed_leg_count == 0:
-        return ChainLearningSignal(
-            signal_type="successful_chain_pattern",
-            market_type="chain",
-            script_type=script_type,
-            leg_type="all",
-            adjustment_direction="increase",
-            adjustment_strength=0.25,
-            reason="Chain won cleanly; keep only as weak positive signal until sample grows.",
-            confidence=0.35,
-        )
-    return ChainLearningSignal(
-        signal_type="insufficient_data",
-        market_type="unknown",
-        script_type=script_type,
-        leg_type="unknown",
-        adjustment_direction="neutral",
-        adjustment_strength=0.0,
-        reason="Unknown, push/void, or incomplete result; no strong learning.",
-        confidence=0.0,
-    )
+        return ChainLearningSignal("successful_chain_pattern", "chain", script_type, "all", "increase", 0.25, "Chain won cleanly; keep only as weak positive signal until sample grows.", confidence=0.35)
+    return ChainLearningSignal("insufficient_data", "unknown", script_type, "unknown", "neutral", 0.0, "Unknown, push/void, or incomplete result; no strong learning.", confidence=0.0)
 
 
 def summarize_chain_learning(chain_results: Iterable[ChainResultBreakdown]) -> dict[str, Any]:
     results = list(chain_results)
     failed: dict[str, int] = {}
-    wins = 0
-    losses = 0
-    straight_better = 0
-    target_chase = 0
-    script_known = 0
-    script_correct = 0
+    wins = losses = straight_better = target_chase = script_known = script_correct = 0
     for result in results:
         if result.chain_status == WIN:
             wins += 1
