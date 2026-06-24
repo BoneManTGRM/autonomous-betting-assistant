@@ -333,6 +333,9 @@ with tabs[6]:
             mime="image/png",
             key=f"report_studio_image_full_page_{idx}",
         )
+        compact_card = right.expander("Compact card image", expanded=False)
+        compact_card_png = render_custom_background_card_png(rowd, brand, background_bytes=background_bytes, index=idx) if background_bytes else render_card_png(rowd, brand)
+        compact_card.download_button(t('card_png'), data=compact_card_png, file_name=card_image_filename(rowd, workspace=safe_workspace, index=idx), mime='image/png', key=f'report_studio_image_card_{idx}')
 with tabs[7]:
     st.json(asdict(WhiteLabelProfile(profile_id=profile_id, workspace_id=workspace_id, brand_name=brand_name, logo_url=logo_url, tagline=tagline, language=LANG, report_title=report_title, disclaimer=disclaimer, preferred_report_mode=report_mode, preferred_sports=preferred_sports, risk_preference=risk_preference, show_technical_fields=technical, default_audience='analyst' if technical else 'consumer')))
 with tabs[8]:
