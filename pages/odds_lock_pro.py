@@ -33,6 +33,7 @@ from autonomous_betting_agent.odds_lock_tools import (
 from autonomous_betting_agent.pick_hold_store import load_first_available, save_held_rows
 from autonomous_betting_agent.row_normalizer import normalize_frame, safe_text
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
+from autonomous_betting_agent.storage import LocalStorage
 
 st.set_page_config(page_title='Odds Lock Pro', layout='wide')
 LANG = render_app_sidebar('odds_lock_pro', language_key='odds_lock_pro_language', selector='radio')
@@ -192,6 +193,20 @@ def csv_link(label: str, frame: pd.DataFrame, filename: str) -> None:
         f'{html.escape(label)}</a>',
         unsafe_allow_html=True,
     )
+
+
+def save_to_local_storage(frame: pd.DataFrame, *, source_label: str) -> None:
+    if frame.empty:
+        return
+    try:
+        store = LocalStorage()
+        keys = store.save_rows(frame.to_dict('records'))
+        if store.using_sqlite:
+            st.caption(f'Local SQLite proof store updated: {len(keys)} rows')
+        else:
+            st.caption(f'Local CSV fallback proof store updated: {len(keys)} rows')
+    except Exception as exc:
+        st.warning(f'Local storage save skipped for {source_label}: {exc}')
 
 
 def rows_from_sources(workspace_id: str) -> tuple[str, list[dict[str, Any]]]:
@@ -375,6 +390,7 @@ def publish_locked_rows(locked: pd.DataFrame, *, source_label: str, workspace_id
         st.session_state[key] = records
         save_held_rows(key, records, workspace_id)
     st.session_state['ara_latest_predictions_source'] = f'Odds Lock Pro {source_label}:{workspace_id}'
+    save_to_local_storage(final, source_label=source_label)
     return final
 
 
