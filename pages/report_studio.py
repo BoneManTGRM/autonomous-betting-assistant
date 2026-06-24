@@ -41,9 +41,9 @@ TEXT = {
         'mode': 'Report mode', 'risk': 'Risk preference', 'sports': 'Sport / League Filter', 'max_rows': 'Max rows', 'visibility': 'Feed visibility',
         'cards': 'Premium Cards', 'magazine': 'Magazine Report', 'copy': 'WhatsApp / Telegram', 'audit': 'Learning Audit', 'proof': 'Analyst Proof', 'exports': 'Exports', 'images': 'Images', 'profile_json': 'Profile JSON', 'feed_json': 'App Feed', 'diagnostics': 'Diagnostics',
         'pdf': 'Download PDF', 'magazine_pdf': 'Download Magazine PDF', 'html': 'Download HTML', 'md': 'Download Markdown', 'json': 'Download JSON', 'csv': 'Download CSV', 'copy_download': 'Download WhatsApp copy',
-        'magazine_png': 'Download Magazine Summary PNG', 'images_note': 'Server-rendered magazine images for saving and sharing.',
-        'background_upload': 'Optional background image for magazine exports', 'background_ready': 'Custom background enabled for Magazine Summary, Full Magazine Book, and individual Magazine Page downloads.',
-        'background_preview': 'Uploaded background preview', 'magazine_preview': 'Generated Magazine PNG preview',
+        'images_note': 'Magazine-style exports for the full report and each individual game.',
+        'background_upload': 'Optional background image for magazine exports', 'background_ready': 'Custom background enabled for Full Magazine Book and individual Magazine Page downloads.',
+        'background_preview': 'Uploaded background preview',
         'feed_saved': 'Unified and legacy app feeds saved.', 'copy_label': 'Short copy', 'no_audit': 'No graded calibration data available yet.',
     },
     'es': {
@@ -56,9 +56,9 @@ TEXT = {
         'mode': 'Modo de reporte', 'risk': 'Preferencia de riesgo', 'sports': 'Filtro deporte / liga', 'max_rows': 'Máximo de filas', 'visibility': 'Visibilidad del feed',
         'cards': 'Tarjetas premium', 'magazine': 'Reporte revista', 'copy': 'WhatsApp / Telegram', 'audit': 'Auditoría de aprendizaje', 'proof': 'Prueba técnica', 'exports': 'Exportaciones', 'images': 'Imágenes', 'profile_json': 'JSON del perfil', 'feed_json': 'Feed de app', 'diagnostics': 'Diagnóstico',
         'pdf': 'Descargar PDF', 'magazine_pdf': 'Descargar PDF revista', 'html': 'Descargar HTML', 'md': 'Descargar Markdown', 'json': 'Descargar JSON', 'csv': 'Descargar CSV', 'copy_download': 'Descargar copy WhatsApp',
-        'magazine_png': 'Descargar PNG de resumen revista', 'images_note': 'Imágenes de revista generadas por servidor para guardar y compartir.',
-        'background_upload': 'Imagen de fondo opcional para exportaciones de revista', 'background_ready': 'Fondo personalizado activo para resumen revista, libro revista completo y páginas individuales.',
-        'background_preview': 'Vista previa del fondo subido', 'magazine_preview': 'Vista previa del PNG de revista generado',
+        'images_note': 'Exportaciones estilo revista para el reporte completo y cada juego individual.',
+        'background_upload': 'Imagen de fondo opcional para exportaciones de revista', 'background_ready': 'Fondo personalizado activo para libro revista completo y páginas individuales.',
+        'background_preview': 'Vista previa del fondo subido',
         'feed_saved': 'Feed unificado y feed legado guardados.', 'copy_label': 'Copy corto', 'no_audit': 'Aún no hay datos gradados para calibración.',
     },
 }
@@ -116,6 +116,16 @@ def safe_workspace_name(value: str) -> str:
     return ''.join(ch if ch.isalnum() or ch in {'_', '-'} else '_' for ch in str(value or 'report'))
 
 
+@st.cache_data(show_spinner=False)
+def cached_render_full_pick_magazine_page_png(row_items: tuple[tuple[str, str], ...], background_bytes: bytes | None, report_name: str, page_number: int, total_pages: int) -> bytes:
+    rowd = dict(row_items)
+    return render_full_pick_magazine_page_png(rowd, background_image=background_bytes, report_name=report_name, page_number=page_number, total_pages=total_pages)
+
+
+def serializable_row(rowd: dict) -> tuple[tuple[str, str], ...]:
+    return tuple(sorted((str(key), '' if value is None else str(value)) for key, value in rowd.items()))
+
+
 st.title(t('title'))
 st.caption(t('caption'))
 profile_background_bytes = None
@@ -154,10 +164,7 @@ with st.expander(t('profile'), expanded=True):
     brand_name = b1.text_input(t('brand_name'), value=loaded.brand_name)
     tagline = b2.text_input(t('tagline'), value=loaded.tagline)
     report_title = b1.text_input(t('report_title'), value=loaded.report_title)
-    full_magazine_book_name = st.text_input(
-        "Full magazine book name",
-        "ABA Signal Pro — Full Pick Magazine"
-    )
+    full_magazine_book_name = st.text_input("Full magazine book name", "ABA Signal Pro — Full Pick Magazine")
     logo_url = b2.text_input(t('logo_url'), value=loaded.logo_url)
     background_profile_upload = st.file_uploader(t('background_upload'), type=['png', 'jpg', 'jpeg'], key='report_studio_profile_background_upload')
     profile_background_bytes = background_profile_upload.getvalue() if background_profile_upload is not None else None
@@ -178,22 +185,7 @@ with st.expander(t('profile'), expanded=True):
     disclaimer = st.text_area(t('disclaimer'), value=loaded.disclaimer or disclaimer_default, height=80)
     technical = 'Analyst' in report_mode or 'técnico' in report_mode.lower()
     if p3.button(t('save_profile'), use_container_width=True):
-        saved = save_profile(WhiteLabelProfile(
-            profile_id=profile_id,
-            workspace_id=workspace_id,
-            brand_name=brand_name,
-            logo_url=logo_url,
-            tagline=tagline,
-            language=LANG,
-            report_title=report_title,
-            disclaimer=disclaimer,
-            preferred_report_mode=report_mode,
-            preferred_sports=list(preferred_sports),
-            risk_preference=risk_preference,
-            show_technical_fields=technical,
-            default_audience='analyst' if technical else 'consumer',
-            delivery_settings={'save_latest_feed': True, 'visibility': visibility},
-        ))
+        saved = save_profile(WhiteLabelProfile(profile_id=profile_id, workspace_id=workspace_id, brand_name=brand_name, logo_url=logo_url, tagline=tagline, language=LANG, report_title=report_title, disclaimer=disclaimer, preferred_report_mode=report_mode, preferred_sports=list(preferred_sports), risk_preference=risk_preference, show_technical_fields=technical, default_audience='analyst' if technical else 'consumer', delivery_settings={'save_latest_feed': True, 'visibility': visibility}))
         st.session_state['report_studio_profile'] = asdict(saved)
         st.success(t('save_profile'))
 
@@ -222,9 +214,9 @@ with tabs[1]:
     m1, m2 = st.columns(2)
     m1.download_button(t('magazine_pdf'), data=magazine_pdf_bytes, file_name=f'magazine_report_{safe_workspace}.pdf', mime='application/pdf', key='report_studio_magazine_pdf')
     magazine_tab_png = render_custom_background_summary_png(cards, brand, background_bytes=report_background_bytes) if report_background_bytes else render_magazine_summary_png(cards, brand)
-    m2.download_button(t('magazine_png'), data=magazine_tab_png, file_name=f'magazine_report_{safe_workspace}.png', mime='image/png', key='report_studio_magazine_tab_png')
+    m2.download_button('Download Magazine Report PNG', data=magazine_tab_png, file_name=f'magazine_report_{safe_workspace}.png', mime='image/png', key='report_studio_magazine_tab_png')
     if report_background_bytes:
-        st.image(magazine_tab_png, caption=t('magazine_preview'), use_container_width=True)
+        st.image(magazine_tab_png, caption='Generated magazine report preview', use_container_width=True)
     st.markdown(bundle.html, unsafe_allow_html=True)
 with tabs[2]:
     st.text_area(t('copy_label'), value=bundle.whatsapp, height=420, key='report_studio_whatsapp_copy_text')
@@ -236,12 +228,7 @@ with tabs[3]:
         st.subheader(name.replace('_', ' ').title())
         st.dataframe(table, use_container_width=True, hide_index=True)
 with tabs[4]:
-    proof_cols = [
-        'event', 'sport', 'prediction', 'decimal_price', 'model_probability', 'market_probability', 'model_market_edge', 'expected_value_per_unit',
-        'model_lean_label', 'price_value_label', 'official_status_label', 'result_status', 'learning_status', 'official_publish_ready', 'client_report_ready', 'learning_ready',
-        'data_issue_reason', 'odds_verified', 'report_lane', 'report_lane_v2', 'publish_ready', 'tennis_blocked', 'proof_id', 'locked_at_utc', 'odds_source', 'bookmaker',
-        'model_probability_source', 'sports_context_summary', 'profit_units',
-    ]
+    proof_cols = ['event', 'sport', 'prediction', 'decimal_price', 'model_probability', 'market_probability', 'model_market_edge', 'expected_value_per_unit', 'model_lean_label', 'price_value_label', 'official_status_label', 'result_status', 'learning_status', 'official_publish_ready', 'client_report_ready', 'learning_ready', 'data_issue_reason', 'odds_verified', 'report_lane', 'report_lane_v2', 'publish_ready', 'tennis_blocked', 'proof_id', 'locked_at_utc', 'odds_source', 'bookmaker', 'model_probability_source', 'sports_context_summary', 'profit_units']
     cols = [col for col in proof_cols if col in cards.columns]
     st.dataframe(cards[cols] if cols else cards, use_container_width=True, hide_index=True)
 with tabs[5]:
@@ -254,90 +241,38 @@ with tabs[5]:
     st.download_button(t('csv'), data=bundle.csv_text, file_name=f'report_{safe_workspace}.csv', mime='text/csv', key='report_studio_export_csv')
 with tabs[6]:
     st.caption(t('images_note'))
-    st.info('Download the full magazine book for the complete report, or download a full magazine-style page for each individual game below.')
+    st.info('Download the full magazine book for the complete report, or download one full magazine-style page for each individual game below.')
     background_upload = st.file_uploader(t('background_upload'), type=['png', 'jpg', 'jpeg'], key='report_studio_image_background_upload')
     background_bytes = background_upload.getvalue() if background_upload is not None else report_background_bytes
     if background_bytes:
         st.success(t('background_ready'))
         st.image(background_bytes, caption=t('background_preview'), width=260)
-    magazine_png = render_custom_background_summary_png(cards, brand, background_bytes=background_bytes) if background_bytes else render_magazine_summary_png(cards, brand)
-    if background_bytes:
-        st.image(magazine_png, caption=t('magazine_preview'), use_container_width=True)
     cards_as_rows = [row.to_dict() for _, row in cards.iterrows()]
 
     book_cache_key = 'report_studio_full_book_export_cache'
-    if st.button('Download Full Magazine Book', key='report_studio_prepare_full_book'):
+    if st.button('Build Full Magazine Book', key='report_studio_prepare_full_book'):
         with st.spinner('Building full magazine book...'):
-            st.session_state[book_cache_key] = {
-                'png': render_full_magazine_book_png(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name),
-                'pdf': render_full_magazine_book_pdf(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name),
-                'zip': render_full_magazine_zip(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name),
-            }
+            st.session_state[book_cache_key] = {'png': render_full_magazine_book_png(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name), 'pdf': render_full_magazine_book_pdf(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name), 'zip': render_full_magazine_zip(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name)}
     full_book_cache = st.session_state.get(book_cache_key)
     if full_book_cache:
         book1, book2, book3 = st.columns(3)
-        book1.download_button(
-            "Save Full Magazine Book PNG",
-            data=full_book_cache['png'],
-            file_name=sanitize_image_filename(full_magazine_book_name, extension="png"),
-            mime="image/png",
-            key="report_studio_full_book_png",
-        )
-
-        book2.download_button(
-            "Save Full Magazine Book PDF",
-            data=full_book_cache['pdf'],
-            file_name=sanitize_image_filename(full_magazine_book_name, extension="pdf"),
-            mime="application/pdf",
-            key="report_studio_full_book_pdf",
-        )
-
-        book3.download_button(
-            "Save Full Magazine ZIP",
-            data=full_book_cache['zip'],
-            file_name=sanitize_image_filename(full_magazine_book_name, extension="zip"),
-            mime="application/zip",
-            key="report_studio_full_book_zip",
-        )
-    st.download_button(t('magazine_png'), data=magazine_png, file_name=f'magazine_summary_{safe_workspace}.png', mime='image/png', key='report_studio_image_magazine_png')
+        book1.download_button('Download Full Magazine Book PNG', data=full_book_cache['png'], file_name=sanitize_image_filename(full_magazine_book_name, extension='png'), mime='image/png', key='report_studio_full_book_png')
+        book2.download_button('Download Full Magazine Book PDF', data=full_book_cache['pdf'], file_name=sanitize_image_filename(full_magazine_book_name, extension='pdf'), mime='application/pdf', key='report_studio_full_book_pdf')
+        book3.download_button('Download Full Magazine ZIP', data=full_book_cache['zip'], file_name=sanitize_image_filename(full_magazine_book_name, extension='zip'), mime='application/zip', key='report_studio_full_book_zip')
 
     st.markdown('---')
     for idx, (_, row) in enumerate(cards.head(50).iterrows()):
         rowd = row.to_dict()
         event = safe_text(rowd.get('event')) or f'Game {idx + 1}'
         action = safe_text(rowd.get('consumer_action') or rowd.get('recommended_action')) or 'Full magazine analysis'
-        page_cache_key = f'report_studio_full_page_cache_{idx}'
+        full_page_png = cached_render_full_pick_magazine_page_png(serializable_row(rowd), background_bytes, full_magazine_book_name, idx + 1, len(cards_as_rows))
         left, right = st.columns([3, 1])
         left.markdown(f'**{idx + 1}. {event}**  \n{action}')
-        if right.button('Download Full Magazine Page', key=f'report_studio_prepare_full_page_{idx}'):
-            with st.spinner(f'Building magazine page {idx + 1}...'):
-                st.session_state[page_cache_key] = render_full_pick_magazine_page_png(
-                    rowd,
-                    background_image=background_bytes,
-                    report_name=full_magazine_book_name,
-                    page_number=idx + 1,
-                    total_pages=len(cards_as_rows),
-                )
-        full_page_png = st.session_state.get(page_cache_key)
-        if full_page_png:
-            right.download_button(
-                "Save Magazine Page PNG",
-                data=full_page_png,
-                file_name=pick_full_page_filename(rowd, idx),
-                mime="image/png",
-                key=f"report_studio_image_full_page_{idx}",
-            )
+        right.download_button('Download Full Magazine Page', data=full_page_png, file_name=pick_full_page_filename(rowd, idx), mime='image/png', key=f'report_studio_image_full_page_{idx}')
 with tabs[7]:
     st.json(asdict(WhiteLabelProfile(profile_id=profile_id, workspace_id=workspace_id, brand_name=brand_name, logo_url=logo_url, tagline=tagline, language=LANG, report_title=report_title, disclaimer=disclaimer, preferred_report_mode=report_mode, preferred_sports=preferred_sports, risk_preference=risk_preference, show_technical_fields=technical, default_audience='analyst' if technical else 'consumer')))
 with tabs[8]:
     st.success(t('feed_saved'))
     st.json(feed)
 with tabs[9]:
-    st.json({
-        'summary': summary,
-        'diagnostics': asdict(state.diagnostics),
-        'filters': asdict(state.filters),
-        'source': source_note,
-        'unified_feed_paths': unified_feed.get('saved_paths', {}),
-        'legacy_feed_paths': legacy_feed.get('saved_paths', {}),
-    })
+    st.json({'summary': summary, 'diagnostics': asdict(state.diagnostics), 'filters': asdict(state.filters), 'source': source_note, 'unified_feed_paths': unified_feed.get('saved_paths', {}), 'legacy_feed_paths': legacy_feed.get('saved_paths', {})})
