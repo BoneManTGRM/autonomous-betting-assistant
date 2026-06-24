@@ -16,6 +16,66 @@ Pro Predictor Volume -> Odds Lock Pro -> LocalStorage -> Public Proof Dashboard 
 
 No cloud server is required for the local-first layer. The app keeps no-login mode as the default and can run locally or on Streamlit.
 
+## Phase 1 Cloud and Subscriber Roadmap
+
+ABA Signal Pro Phase 1 will expand the current local-first proof, grading, bankroll, and report system into a subscriber-ready sports analytics platform.
+
+The goal is to support personalized research reports, sportsbook-specific market review, transparent proof tracking, bankroll-aware risk summaries, and scalable subscriber delivery. This roadmap does not change the core limitation: ABA Signal Pro remains an analytics and research system, does not execute transactions, does not guarantee outcomes, and does not guarantee returns.
+
+### Phase 1 Core Technology Stack
+
+Required APIs:
+
+1. The Odds API
+2. SportsDataIO
+3. Weather API
+4. Supabase
+5. Telegram Bot API
+6. Mercado Pago API
+
+High-value additions:
+
+7. API-Football
+8. NewsAPI
+9. X/Twitter API
+10. Google Sheets API
+
+### Important Build Rule
+
+Do not add extra APIs, delivery channels, or future-stack services unless explicitly requested.
+
+Phase 1 should not include WhatsApp, OpenAI, Discord, Twilio, Firebase, Airtable, Sportradar, Reddit, Perplexity, Stripe, PayPal, or Wise unless they are moved into a later roadmap phase.
+
+### Phase 1 Objectives
+
+1. Personalized subscriber analytics with individual bankroll profile, risk tolerance profile, preferred sportsbooks, preferred sports, preferred market types, unit sizing preferences, daily/weekly/monthly performance tracking, and custom filters.
+
+2. Multi-sportsbook line review for Caliente, Playdoit, Codere, Bet365 Mexico, Betcris, 1xBet, Betway, RushBet, and Novibet, including best available line, best available price, market inefficiencies, and Closing Line Value review.
+
+3. Advanced analysis engine covering team statistics, player statistics, injuries, suspensions, weather, travel, rest advantages, historical matchups, market movement, and line movement behavior.
+
+4. Research outputs including confidence score from 0 to 100, expected value estimate, edge percentage, fair odds estimate, implied probability, and risk rating.
+
+5. Market intelligence layer using NewsAPI and X/Twitter API to track injury reports, breaking news, lineup announcements, suspensions, coaching changes, and late developments.
+
+6. Subscriber Report Studio for daily reports, weekly reports, sport-specific reports, personalized reports, bankroll reports, risk reports, PDF export, CSV export, Google Sheets export, custom branding, custom backgrounds, and white-label reports.
+
+7. Smart bankroll management covering flat-stake review, Kelly-style calculations, fractional Kelly review, unit sizing, risk exposure, portfolio diversification, and warnings for excessive risk or over-concentration.
+
+8. Learning system stored in Supabase, including every prediction, every result, Closing Line Value, edge calculations, confidence scores, and market conditions.
+
+9. Official performance tracking for wins, losses, pushes, ROI, units won, yield, hit rate, and Closing Line Value, with locked proof reports, public proof dashboards, and subscriber proof dashboards.
+
+10. Telegram delivery for instant alerts, daily reports, weekly reports, high-confidence research alerts, and closing line movement alerts, with subscriber-specific delivery preferences.
+
+11. Mexican market optimization for Liga MX, international soccer, NBA, MLB, NFL, and UFC, with specific review support for Caliente, Playdoit, Codere, Bet365 Mexico, and Betcris.
+
+12. Selection logic requiring positive expected value threshold, verified statistical edge, market confirmation, risk assessment, and supporting analytical evidence. Do not surface a selection solely because a team is favored.
+
+### Ultimate Goal
+
+Create a personalized, data-driven sports analytics platform focused on long-term research quality, sustainable bankroll-aware risk review, accurate grading, continuous learning, sportsbook-specific optimization, professional subscriber experience, transparent performance tracking, and scalable delivery to hundreds of subscribers.
+
 ## Main tools and pages
 
 | Tool/page | Main job |
