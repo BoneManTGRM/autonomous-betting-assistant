@@ -33,6 +33,60 @@ FONT_ROOTS = tuple(Path(p) for p in ("/usr/share/fonts", "/usr/local/share/fonts
 BOLD_NAMES = ("DejaVuSansCondensed-Bold.ttf", "DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf", "Arial Bold.ttf")
 REG_NAMES = ("DejaVuSansCondensed.ttf", "DejaVuSans.ttf", "LiberationSans-Regular.ttf", "Arial.ttf")
 
+ES = {
+    "DAILY SPORTS ANALYSIS": "ANÁLISIS DEPORTIVO DIARIO",
+    "PAGE": "PÁGINA",
+    "OF": "DE",
+    "REGULAR SEASON": "TEMPORADA REGULAR",
+    "TREND": "TENDENCIA",
+    "ODDS": "CUOTA",
+    "CONFIDENCE": "CONFIANZA",
+    "EDGE": "VENTAJA",
+    "EV": "VE",
+    "UNITS": "UNIDADES",
+    "RISK": "RIESGO",
+    "MARKET": "MERCADO",
+    "WHY WE PICKED IT": "POR QUÉ LO ELEGIMOS",
+    "PRO BETTOR EVIDENCE": "EVIDENCIA PRO",
+    "TEAM SNAPSHOTS": "RESUMEN EQUIPOS",
+    "PLAYER / INJURY NOTES": "JUGADORES / LESIONES",
+    "RISK DESK": "RIESGO",
+    "MATCHUP NOTES": "NOTAS DEL PARTIDO",
+    "CHAIN BETTING NOTES": "NOTAS PARLAY",
+    "RECOMMENDATION": "RECOMENDACIÓN",
+    "SOURCE": "FUENTE",
+    "BOOK": "CASA",
+    "LINE": "LÍNEA",
+    "PUBLIC": "PÚBLICO",
+    "PRO": "PRO",
+    "Context unavailable.": "Contexto no disponible.",
+    "Confirm price and lineup news before entry.": "Confirma precio y alineaciones antes de entrar.",
+    TEAM_DATA_FALLBACK: "Datos del equipo no disponibles en la fila cargada",
+    PLAYER_DATA_FALLBACK: "Datos de jugadores no disponibles en la fila cargada",
+    "Use team form, injuries, and market movement before publishing.": "Usa forma del equipo, lesiones y movimiento del mercado antes de publicar.",
+    "Confirm lineup/injury news before placing the bet.": "Confirma alineaciones y lesiones antes de apostar.",
+    "Market and model evidence support this read.": "El mercado y el modelo respaldan esta lectura.",
+    "Recheck odds before entry.": "Revisa la cuota antes de entrar.",
+    "Avoid if major lineup/weather news changes.": "Evita si cambian alineaciones, clima o noticias clave.",
+    "Confirm venue and start time.": "Confirma sede y hora de inicio.",
+    "Recheck market movement before publishing.": "Revisa el movimiento del mercado antes de publicar.",
+    "Better as an individual straight analysis unless another verified edge exists.": "Mejor como análisis individual salvo que exista otra ventaja verificada.",
+    "Do not add weak legs just to increase payout.": "No agregues selecciones débiles solo para subir el pago.",
+    "Use only if the line remains playable and key news does not change.": "Usar solo si la línea sigue jugable y no cambia la información clave.",
+    SAFETY_FOOTER: "No garantizamos resultados. Apuesta responsablemente. Este análisis es solo informativo.",
+    "VOLUME OK": "VOLUMEN OK",
+    "VOLUME_OK": "VOLUMEN OK",
+    "LOW": "BAJO",
+    "MEDIUM": "MEDIO",
+    "HIGH": "ALTO",
+    "TOTALS": "TOTALES",
+    "MONEYLINE": "GANADOR",
+    "SPREAD": "HÁNDICAP",
+    "PLAY SMALL": "JUGAR PEQUEÑO",
+    "PLAY STANDARD": "JUGAR NORMAL",
+    "NO PLAY": "NO JUGAR",
+}
+
 
 def _row(v: Any) -> Mapping[str, Any]:
     if isinstance(v, Mapping):
@@ -56,6 +110,45 @@ def _get(r: Any, *keys: str, default: str = "") -> str:
         if not _bad(v):
             return str(v).strip()
     return default
+
+
+def _lang(r: Any = None, explicit: str | None = None) -> str:
+    raw = explicit or _get(r, "report_language", "language", "lang", default="")
+    text = str(raw or "").lower()
+    return "es" if text.startswith("es") or "español" in text or "espanol" in text else "en"
+
+
+def _tr(v: Any, lang: str) -> str:
+    if _bad(v):
+        return NO_VERIFIED if lang == "en" else "Dato no disponible"
+    text = str(v)
+    if lang != "es":
+        text = text.replace("TENDENCIA", "TREND")
+        text = re.sub(r"\bTOTAL DEL PARTIDO\b", "GAME TOTAL", text, flags=re.I)
+        text = re.sub(r"\bMÁS DE\b", "OVER", text, flags=re.I)
+        text = re.sub(r"\bMENOS DE\b", "UNDER", text, flags=re.I)
+        text = text.replace("Contexto no disponible.", "Context unavailable.")
+        return text
+    if text in ES:
+        return ES[text]
+    if text.startswith("PAGE ") and " OF " in text:
+        return text.replace("PAGE ", "PÁGINA ", 1).replace(" OF ", " DE ")
+    if text.endswith(" REGULAR SEASON"):
+        return text.replace(" REGULAR SEASON", " TEMPORADA REGULAR")
+    if text.startswith("Risk status:"):
+        return text.replace("Risk status:", "Estado de riesgo:").replace("VOLUME OK", "VOLUMEN OK").replace("VOLUME_OK", "VOLUMEN OK")
+    if text.startswith("Model projects "):
+        return re.sub(r"Model projects ([^ ]+) probability for (.+)\.", r"El modelo proyecta \1 de probabilidad para \2.", text)
+    if text.startswith("Market-implied probability checks at "):
+        return text.replace("Market-implied probability checks at ", "La probabilidad implícita del mercado es ")
+    if text.startswith("Measured edge:"):
+        return text.replace("Measured edge:", "Ventaja medida:")
+    if text.startswith("Expected value:"):
+        return text.replace("Expected value:", "Valor esperado:")
+    text = re.sub(r"\bGAME TOTAL\b", "TOTAL DEL PARTIDO", text, flags=re.I)
+    text = re.sub(r"\bOVER\b", "MÁS DE", text, flags=re.I)
+    text = re.sub(r"\bUNDER\b", "MENOS DE", text, flags=re.I)
+    return text
 
 
 def _clean(v: Any, upper: bool = False) -> str:
@@ -334,9 +427,9 @@ def _hero(img: Image.Image, bg: Any, mode: str, opacity: float) -> None:
         alpha = Image.new("L", (430, 350), int(255 * min(max(opacity, 0.90), 0.98)))
         slot.putalpha(alpha)
         img.alpha_composite(slot, (620, 105))
-        d.rounded_rectangle((620, 105, 1050, 455), radius=16, outline=BLACK + (205,), width=3)
+        d.rectangle((620, 105, 1050, 455), outline=BLACK + (205,), width=3)
     else:
-        d.rounded_rectangle((620, 105, 1050, 455), radius=16, fill=BLUE + (90,), outline=BLACK + (185,), width=3)
+        d.rectangle((620, 105, 1050, 455), fill=BLUE + (90,), outline=BLACK + (185,), width=3)
         for i in range(12):
             d.line((620 + i * 25, 420, 850 + i * 25, 120), fill=RED + (76,), width=9)
 
@@ -360,23 +453,17 @@ def _badge(img: Image.Image, d: ImageDraw.ImageDraw, label: str, x: int, y: int,
     d.text((x + (w - box[2] + box[0]) / 2, y + (h - box[3] + box[1]) / 2 - 2), t, font=f, fill="white")
 
 
-def _section(d: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, title: str, color: tuple[int, int, int]) -> None:
+def _section(d: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, title: str, color: tuple[int, int, int], lang: str = "en") -> None:
+    title = _tr(title, lang).upper()
     d.rounded_rectangle((x, y, x + w, y + h), radius=14, fill=CREAM + (255,), outline=BLACK + (238,), width=3)
     d.rounded_rectangle((x, y, x + w, y + 56), radius=10, fill=color)
-    d.text((x + 18, y + 11), title.upper(), font=_fit(title.upper(), w - 36, 30, 19, True), fill=CREAM)
+    d.text((x + 18, y + 11), title, font=_fit(title, w - 36, 30, 19, True), fill=CREAM)
 
 
-def _bullets(d: ImageDraw.ImageDraw, x: int, y: int, items: list[str], width: int, color: tuple[int, int, int], limit: int, fs: int = 20, lines: int = 2) -> None:
-    f = _font(fs)
-    for item in items[:limit]:
-        d.ellipse((x, y + 8, x + 12, y + 20), fill=color)
-        y = _txt(d, x + 25, y, item, f, TEXT, width - 30, lines) + 8
-
-
-def _bullets_auto(d: ImageDraw.ImageDraw, x: int, y: int, items: list[str], width: int, height: int, color: tuple[int, int, int], start: int = 18, minimum: int = 11, limit: int | None = None) -> None:
+def _bullets_auto(d: ImageDraw.ImageDraw, x: int, y: int, items: list[str], width: int, height: int, color: tuple[int, int, int], start: int = 18, minimum: int = 11, limit: int | None = None, lang: str = "en") -> None:
     chosen: ImageFont.ImageFont | None = None
     chosen_lines: list[list[str]] = []
-    data = items[:limit] if limit is not None else items
+    data = [_tr(item, lang) for item in (items[:limit] if limit is not None else items)]
     for size in range(start, minimum - 1, -1):
         f = _font(size)
         blocks = [_wrap(d, item, f, width - 30, None) for item in data]
@@ -409,45 +496,48 @@ def _items(r: Any, keys: Iterable[str], fallback: str | list[str], limit: int) -
     return (fallback if isinstance(fallback, list) else [fallback])[:limit]
 
 
-def _why(r: Any) -> list[str]:
+def _why(r: Any, lang: str = "en") -> list[str]:
     out: list[str] = []
     for k in ("why_bullets", "why_pick", "analysis_summary", "reason", "explanation"):
         out += _split(_row(r).get(k))
     if out:
-        return out[:4]
+        return [_tr(x, lang) for x in out[:4]]
     vals = []
     for v in (f"Model projects {_pct(_num(r, 'learned_model_probability', 'model_probability_clean', 'model_probability', 'final_probability'))} probability for {_pick(r)}.", f"Market-implied probability checks at {_pct(_num(r, 'market_probability', 'market_implied_probability'))}.", f"Measured edge: {_edge(_num(r, 'model_market_edge', 'edge'))}.", f"Expected value: {_fmt(_get(r, 'expected_value_per_unit', 'profit_expected_value', 'expected_value', 'ev'), 'ev')}."):
         if NO_VERIFIED not in v:
-            vals.append(v)
-    return (vals or ["Use only while the line remains playable."])[:4]
+            vals.append(_tr(v, lang))
+    return vals or [_tr("Use only while the line remains playable.", lang)]
 
 
-def _pairs(r: Any) -> list[tuple[str, str]]:
+def _pairs(r: Any, lang: str = "en") -> list[tuple[str, str]]:
     rows = [("SOURCE", _get(r, "odds_source", "data_source", default=NO_VERIFIED)), ("BOOK", _get(r, "bookmaker", "sportsbook", default=NO_VERIFIED)), ("LINE", _get(r, "line_movement", "price_movement", "market_move", default=NO_VERIFIED)), ("PUBLIC", _pct(_num(r, "public_percent", "public_bet_percent", "public_pct"))), ("PRO", _pct(_num(r, "pro_percent", "sharp_percent", "smart_money_percent")))]
-    return [(a, _clean(b)) for a, b in rows if b != NO_VERIFIED][:5]
+    return [(_tr(a, lang), _tr(_clean(b), lang)) for a, b in rows if b != NO_VERIFIED][:5]
 
 
-def _team_snapshot(img: Image.Image, d: ImageDraw.ImageDraw, x: int, y: int, width: int, team: str, color: tuple[int, int, int], use_logo: bool) -> None:
+def _team_snapshot(img: Image.Image, d: ImageDraw.ImageDraw, x: int, y: int, width: int, team: str, color: tuple[int, int, int], use_logo: bool, lang: str) -> None:
     _badge(img, d, team, x, y, 50, 50, color, use_logo)
     d.text((x + 66, y + 9), team.upper(), font=_fit(team.upper(), width - 70, 25, 16, True), fill=color)
-    _bullets_auto(d, x, y + 76, [TEAM_DATA_FALLBACK, "Use team form, injuries, and market movement before publishing."], width - 10, 165, color, 18, 11, 4)
+    _bullets_auto(d, x, y + 76, [TEAM_DATA_FALLBACK, "Use team form, injuries, and market movement before publishing."], width - 10, 165, color, 18, 11, 4, lang)
 
 
-def _player_notes(d: ImageDraw.ImageDraw, x: int, y: int, width: int, team: str, prefix: str, color: tuple[int, int, int], r: Any) -> None:
+def _player_notes(d: ImageDraw.ImageDraw, x: int, y: int, width: int, team: str, prefix: str, color: tuple[int, int, int], r: Any, lang: str) -> None:
     d.text((x, y), team.upper(), font=_fit(team.upper(), width, 20, 14, True), fill=color)
     items = _items(r, (f"{prefix}_injuries", f"{prefix}_injury_report", f"{prefix}_lineup_status", f"{prefix}_player_notes", "injury_report", "injuries", "lineup_status", "key_players"), [PLAYER_DATA_FALLBACK, "Confirm lineup/injury news before placing the bet."], 2)
-    _bullets_auto(d, x, y + 30, items, width, 58, color, 13, 7, 2)
+    _bullets_auto(d, x, y + 30, items, width, 58, color, 13, 7, 2, lang)
 
 
-def _metric(d: ImageDraw.ImageDraw, x: int, y: int, w: int, label: str, value: str, color: tuple[int, int, int]) -> None:
+def _metric(d: ImageDraw.ImageDraw, x: int, y: int, w: int, label: str, value: str, color: tuple[int, int, int], lang: str = "en") -> None:
     w = min(w, max(52, PAGE_WIDTH - 20 - x))
+    label = _tr(label, lang)
+    value = _tr(value, lang)
     d.rectangle((x, y, x + w, y + 94), fill=BLACK, outline=(230, 224, 204), width=1)
-    d.text((x + 7, y + 10), label, font=_fit(label, w - 12, 16, 12, True), fill=(232, 230, 220))
+    d.text((x + 7, y + 10), label, font=_fit(label, w - 12, 16, 10, True), fill=(232, 230, 220))
     clean = _clean(value, True)
     _txt_auto(d, x + 7, y + 43, clean, w - 12, 38, 27, 8, color, True, 1)
 
 
-def render_full_pick_magazine_page(pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True) -> Image.Image:
+def render_full_pick_magazine_page(pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> Image.Image:
+    lang = _lang(pick, language)
     away, home = _teams(pick)
     sport = _get(pick, "sport", "league", default="Sport N/A")
     source = _get(pick, "odds_source", "data_source", "bookmaker", "sportsbook", default="Agent row")
@@ -457,83 +547,90 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     d.rectangle((18, 18, PAGE_WIDTH - 18, 82), fill=BLACK)
     d.rectangle((28, 24, 308, 74), fill=RED)
     d.text((43, 31), "ABA SIGNAL PRO", font=_fit("ABA SIGNAL PRO", 250, 36, 25, True), fill="white")
-    d.text((330, 29), "DAILY SPORTS ANALYSIS", font=_fit("DAILY SPORTS ANALYSIS", 470, 36, 27, True), fill="white")
+    daily = _tr("DAILY SPORTS ANALYSIS", lang)
+    d.text((330, 29), daily, font=_fit(daily, 470, 36, 21, True), fill="white")
     d.rounded_rectangle((840, 24, 1050, 74), radius=5, fill=CREAM, outline=BLACK)
-    d.text((862, 34), f"PAGE {page_number} OF {total_pages}", font=_fit(f"PAGE {page_number} OF {total_pages}", 174, 26, 19, True), fill=BLACK)
+    page_label = _tr(f"PAGE {page_number} OF {total_pages}", lang)
+    d.text((862, 34), page_label, font=_fit(page_label, 174, 26, 17, True), fill=BLACK)
 
     d.text((36, 105), away.upper(), font=_headline_font(away, 590, 132, 66), fill=RED)
     d.text((40, 246), "VS", font=_font(46, True), fill=BLACK)
     d.line((40, 304, 104, 304), fill=BLACK, width=4)
     d.text((112, 220), home.upper(), font=_headline_font(home, 560, 104, 56), fill=BLUE)
-    season = _get(pick, "season_label", "event_stage", "competition_round", default=f"{sport} REGULAR SEASON")
+    season = _tr(_get(pick, "season_label", "event_stage", "competition_round", default=f"{sport} REGULAR SEASON"), lang)
     d.rectangle((36, 330, 506, 378), fill=BLACK)
-    _txt(d, 54, 339, season.upper(), _fit(season.upper(), 432, 28, 19, True), CREAM, 432, 1)
+    _txt(d, 54, 339, season.upper(), _fit(season.upper(), 432, 28, 16, True), CREAM, 432, 1)
     cy = 394
     ctx: list[str] = []
     for k in ("preview_summary", "game_summary", "sports_context_summary", "short_reason", "decision_reasons"):
         ctx += _split(_row(pick).get(k))
     for line in (ctx or ["Context unavailable.", "Confirm price and lineup news before entry."])[:2]:
-        cy = _txt_auto(d, 42, cy, line, 565, 28, 20, 13, TEXT, False, 1)
+        cy = _txt_auto(d, 42, cy, _tr(line, lang), 565, 28, 20, 13, TEXT, False, 1)
 
     sy = 456
     d.rounded_rectangle((20, sy, PAGE_WIDTH - 20, sy + 106), radius=13, fill=BLACK, outline=CREAM, width=3)
-    d.text((50, sy + 16), "TENDENCIA", font=_font(25, True), fill=RED)
-    pick_text = _clean(_pick(pick), True)
-    _txt_auto(d, 50, sy + 52, pick_text, 210, 38, 30, 11, CREAM, True, 1)
+    trend = _tr("TREND", lang)
+    d.text((50, sy + 16), trend, font=_fit(trend, 190, 25, 14, True), fill=RED)
+    pick_text = _tr(_clean(_pick(pick), True), lang).upper()
+    _txt_auto(d, 50, sy + 52, pick_text, 210, 38, 30, 9, CREAM, True, 1)
     _badge(img, d, home, 268, sy + 27, 58, 50, BLUE, use_team_logo)
     odds = _fmt(_get(pick, "american_odds", "odds_american", "decimal_price", "odds_at_pick", "best_price", "odds"), "odds")
     conf = _pct(_num(pick, "learned_model_probability", "model_probability_clean", "model_probability", "final_probability"))
     edge = _edge(_num(pick, "model_market_edge", "edge"))
     ev = _fmt(_get(pick, "expected_value_per_unit", "profit_expected_value", "expected_value", "ev"), "ev")
     units = _fmt(_get(pick, "recommended_stake_units", "suggested_stake_units", "units", default="1.0"), "unit")
-    risk = _clean(_get(pick, "risk", "risk_level", "risk_label", "profit_guard_status", default=NO_VERIFIED), True)
-    market = _clean(_get(pick, "market_type", "market", "bet_type", default=NO_VERIFIED), True)
+    risk = _tr(_clean(_get(pick, "risk", "risk_level", "risk_label", "profit_guard_status", default=NO_VERIFIED), True), lang)
+    market = _tr(_clean(_get(pick, "market_type", "market", "bet_type", default=NO_VERIFIED), True), lang)
     x = 344
-    for (lab, val, col), w in zip([("ODDS", odds, CREAM), ("CONFIDENCE", conf, GREEN), ("EDGE", edge, DANGER if edge.startswith("-") else GREEN), ("EV", ev, DANGER if ev.startswith("-") else GREEN), ("UNITS", units, CREAM), ("RISK", risk, GREEN), ("MARKET", market, CREAM)], [84, 126, 94, 98, 84, 94, 94]):
-        _metric(d, x, sy + 6, w, lab, val, col)
+    labels = [("ODDS", odds, CREAM), ("CONFIDENCE", conf, GREEN), ("EDGE", edge, DANGER if edge.startswith("-") else GREEN), ("EV", ev, DANGER if ev.startswith("-") else GREEN), ("UNITS", units, CREAM), ("RISK", risk, GREEN), ("MARKET", market, CREAM)]
+    for (lab, val, col), w in zip(labels, [84, 126, 94, 98, 84, 94, 94]):
+        _metric(d, x, sy + 6, w, lab, val, col, lang)
         x += w
 
-    _section(d, 20, 585, 350, 300, "WHY WE PICKED IT", RED)
-    _bullets_auto(d, 44, 655, _why(pick), 306, 210, RED, 19, 11, 4)
-    _section(d, 20, 905, 350, 225, "PRO BETTOR EVIDENCE", BLUE)
+    _section(d, 20, 585, 350, 300, "WHY WE PICKED IT", RED, lang)
+    _bullets_auto(d, 44, 655, _why(pick, lang), 306, 210, RED, 19, 11, 4, lang)
+    _section(d, 20, 905, 350, 225, "PRO BETTOR EVIDENCE", BLUE, lang)
     ry = 974
-    for lab, val in (_pairs(pick) or [("SOURCE", source), ("BOOK", NO_VERIFIED)])[:5]:
-        d.text((44, ry), f"{lab}:", font=_font(17, True), fill=BLACK)
+    for lab, val in (_pairs(pick, lang) or [(_tr("SOURCE", lang), source), (_tr("BOOK", lang), NO_VERIFIED)])[:5]:
+        d.text((44, ry), f"{lab}:", font=_fit(f"{lab}:", 86, 17, 10, True), fill=BLACK)
         _txt_auto(d, 132, ry, val, 205, 22, 17, 10, BLACK, True, 1)
         ry += 31
     d.rectangle((28, 1088, 362, 1120), fill=BLUE)
-    _txt_auto(d, 42, 1093, _get(pick, "evidence_summary", default="Market and model evidence support this read."), 304, 26, 16, 9, CREAM, True, None)
+    _txt_auto(d, 42, 1093, _tr(_get(pick, "evidence_summary", default="Market and model evidence support this read."), lang), 304, 26, 16, 8, CREAM, True, None)
 
-    _section(d, 386, 585, 674, 365, "TEAM SNAPSHOTS", BLUE)
+    _section(d, 386, 585, 674, 365, "TEAM SNAPSHOTS", BLUE, lang)
     d.line((724, 660, 724, 922), fill=BLACK + (170,), width=1)
-    _team_snapshot(img, d, 410, 675, 292, away, RED, use_team_logo)
-    _team_snapshot(img, d, 746, 675, 292, home, BLUE, use_team_logo)
+    _team_snapshot(img, d, 410, 675, 292, away, RED, use_team_logo, lang)
+    _team_snapshot(img, d, 746, 675, 292, home, BLUE, use_team_logo, lang)
 
-    _section(d, 386, 965, 674, 165, "PLAYER / INJURY NOTES", BLUE)
+    _section(d, 386, 965, 674, 165, "PLAYER / INJURY NOTES", BLUE, lang)
     d.line((724, 1028, 724, 1110), fill=BLACK + (160,), width=1)
-    _player_notes(d, 410, 1036, 292, away, "away", RED, pick)
-    _player_notes(d, 746, 1036, 292, home, "home", BLUE, pick)
+    _player_notes(d, 410, 1036, 292, away, "away", RED, pick, lang)
+    _player_notes(d, 746, 1036, 292, home, "home", BLUE, pick, lang)
 
-    _section(d, 20, 1150, 340, 205, "RISK DESK", RED)
-    _bullets_auto(d, 44, 1222, _items(pick, ("why_lose", "risk_reason", "hidden_risk", "risk_notes"), [f"Risk status: {risk}", "Recheck odds before entry.", "Avoid if major lineup/weather news changes."], 3), 292, 114, RED, 17, 10, 3)
-    _section(d, 374, 1150, 332, 205, "MATCHUP NOTES", BLUE)
-    _bullets_auto(d, 398, 1222, _items(pick, ("matchup_note", "matchup_notes", "head_to_head", "h2h", "venue_note", "weather_location", "sports_context_summary"), ["Context unavailable.", "Confirm venue and start time.", "Recheck market movement before publishing."], 3), 284, 114, BLUE, 17, 9, 3)
-    _section(d, 720, 1150, 340, 205, "CHAIN BETTING NOTES", BLUE)
-    _bullets_auto(d, 744, 1222, _items(pick, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), ["Better as an individual straight analysis unless another verified edge exists.", "Do not add weak legs just to increase payout."], 2), 292, 114, BLUE, 17, 10, 2)
+    _section(d, 20, 1150, 340, 205, "RISK DESK", RED, lang)
+    _bullets_auto(d, 44, 1222, _items(pick, ("why_lose", "risk_reason", "hidden_risk", "risk_notes"), [f"Risk status: {risk}", "Recheck odds before entry.", "Avoid if major lineup/weather news changes."], 3), 292, 114, RED, 17, 9, 3, lang)
+    _section(d, 374, 1150, 332, 205, "MATCHUP NOTES", BLUE, lang)
+    _bullets_auto(d, 398, 1222, _items(pick, ("matchup_note", "matchup_notes", "head_to_head", "h2h", "venue_note", "weather_location", "sports_context_summary"), ["Context unavailable.", "Confirm venue and start time.", "Recheck market movement before publishing."], 3), 284, 114, BLUE, 17, 9, 3, lang)
+    _section(d, 720, 1150, 340, 205, "CHAIN BETTING NOTES", BLUE, lang)
+    _bullets_auto(d, 744, 1222, _items(pick, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), ["Better as an individual straight analysis unless another verified edge exists.", "Do not add weak legs just to increase payout."], 2), 292, 114, BLUE, 17, 9, 2, lang)
 
-    action = _clean(_get(pick, "final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action", default="PLAY STANDARD"), True)
-    expl = _get(pick, "final_explanation", "action_reason", "recommendation_reason", "decision_reasons", default="Use only if the line remains playable and key news does not change.")
+    action = _tr(_clean(_get(pick, "final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action", default="PLAY STANDARD"), True), lang)
+    expl = _tr(_get(pick, "final_explanation", "action_reason", "recommendation_reason", "decision_reasons", default="Use only if the line remains playable and key news does not change."), lang)
     fy = 1380
     d.rounded_rectangle((20, fy, PAGE_WIDTH - 20, 1562), radius=14, fill=BLACK, outline=RED, width=3)
     d.rectangle((20, fy, 250, 1562), fill=RED)
-    d.text((40, fy + 36), "FINAL", font=_font(30, True), fill=CREAM)
-    d.text((40, fy + 84), "RECOMMENDATION", font=_fit("RECOMMENDATION", 190, 25, 18, True), fill=CREAM)
-    d.text((284, fy + 25), action, font=_fit(action, 340, 56, 30, True), fill=GREEN)
-    _txt_auto(d, 284, fy + 100, pick_text, 360, 42, 36, 14, CREAM, True, 1)
-    _txt_auto(d, 670, fy + 44, expl, 340, 94, 21, 13, CREAM, False, None)
+    d.text((40, fy + 36), _tr("FINAL", lang), font=_font(30, True), fill=CREAM)
+    rec = _tr("RECOMMENDATION", lang)
+    d.text((40, fy + 84), rec, font=_fit(rec, 190, 25, 16, True), fill=CREAM)
+    d.text((284, fy + 25), action, font=_fit(action, 340, 56, 24, True), fill=GREEN)
+    _txt_auto(d, 284, fy + 100, pick_text, 360, 42, 36, 12, CREAM, True, 1)
+    _txt_auto(d, 670, fy + 44, expl, 340, 94, 21, 10, CREAM, False, None)
     d.rectangle((20, 1568, PAGE_WIDTH - 20, 1606), fill=BLACK)
-    box = d.textbbox((0, 0), SAFETY_FOOTER, font=_font(16))
-    d.text(((PAGE_WIDTH - (box[2] - box[0])) / 2, 1578), SAFETY_FOOTER, font=_font(16), fill=CREAM)
+    footer = _tr(SAFETY_FOOTER, lang)
+    f = _fit(footer, PAGE_WIDTH - 70, 16, 10, False)
+    box = d.textbbox((0, 0), footer, font=f)
+    d.text(((PAGE_WIDTH - (box[2] - box[0])) / 2, 1578), footer, font=f, fill=CREAM)
     return img.convert("RGB")
 
 
@@ -543,37 +640,37 @@ def _png(image: Image.Image) -> bytes:
     return out.getvalue()
 
 
-def render_full_pick_magazine_page_png(pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True) -> bytes:
-    return _png(render_full_pick_magazine_page(pick, background_image, report_name, page_number, total_pages, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo))
+def render_full_pick_magazine_page_png(pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
+    return _png(render_full_pick_magazine_page(pick, background_image, report_name, page_number, total_pages, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
 
 
-def render_full_magazine_book_pages(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True) -> list[Image.Image]:
+def render_full_magazine_book_pages(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> list[Image.Image]:
     rows = list(picks) or [{"event": "No Picks", "prediction": "NO PICK"}]
-    return [render_full_pick_magazine_page(row, background_image, report_name, i + 1, len(rows), logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo) for i, row in enumerate(rows)]
+    return [render_full_pick_magazine_page(row, background_image, report_name, i + 1, len(rows), logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language) for i, row in enumerate(rows)]
 
 
-def render_full_magazine_book_png(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True) -> bytes:
-    pages = render_full_magazine_book_pages(picks, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo)
+def render_full_magazine_book_png(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
+    pages = render_full_magazine_book_pages(picks, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
     book = Image.new("RGB", (PAGE_WIDTH, PAGE_HEIGHT * len(pages)), PAPER)
     for i, page in enumerate(pages):
         book.paste(page, (0, PAGE_HEIGHT * i))
     return _png(book)
 
 
-def render_full_magazine_book_pdf(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True) -> bytes:
-    pages = [p.convert("RGB") for p in render_full_magazine_book_pages(picks, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo)]
+def render_full_magazine_book_pdf(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
+    pages = [p.convert("RGB") for p in render_full_magazine_book_pages(picks, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)]
     out = BytesIO()
     pages[0].save(out, format="PDF", save_all=True, append_images=pages[1:], resolution=100.0)
     return out.getvalue()
 
 
-def render_full_magazine_zip(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True) -> bytes:
+def render_full_magazine_zip(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
     rows = list(picks)
-    pages = render_full_magazine_book_pages(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo)
+    pages = render_full_magazine_book_pages(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
     out = BytesIO()
     with ZipFile(out, "w", compression=ZIP_DEFLATED) as z:
-        z.writestr("full_magazine_book.png", render_full_magazine_book_png(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo))
-        z.writestr("full_magazine_book.pdf", render_full_magazine_book_pdf(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo))
+        z.writestr("full_magazine_book.png", render_full_magazine_book_png(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
+        z.writestr("full_magazine_book.pdf", render_full_magazine_book_pdf(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
         for i, page in enumerate(pages):
             z.writestr(pick_full_page_filename(rows[i] if i < len(rows) else {"event": "No Picks"}, i), _png(page))
     return out.getvalue()
