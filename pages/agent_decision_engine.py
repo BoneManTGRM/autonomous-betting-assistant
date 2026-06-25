@@ -12,8 +12,8 @@ from autonomous_betting_agent.agent_decision_engine import (
     playable_candidates,
 )
 
-st.set_page_config(page_title='Agent Decision Engine', layout='wide')
-st.title('Agent Decision Engine')
+st.set_page_config(page_title='Assistant Decision Engine', layout='wide')
+st.title('Assistant Decision Engine')
 st.caption('Evaluates rows and recommends play_strong, play_small, watch_only, no_action, or review_needed using edge, odds, field coverage, line movement, and event timing safety.')
 
 min_edge = st.slider('Minimum model-vs-market edge', min_value=0.0, max_value=0.20, value=0.035, step=0.005)
@@ -32,7 +32,7 @@ else:
     source_label = ''
 
 if raw.empty:
-    st.warning('Upload or paste a CSV to run agent decisions.')
+    st.warning('Upload or paste a CSV to run assistant decisions.')
     st.stop()
 
 decisions = build_agent_decisions(raw, min_edge=float(min_edge), strong_edge=float(strong_edge))
@@ -75,7 +75,7 @@ priority_cols = [
 ]
 view_cols = [col for col in priority_cols if col in decisions.columns]
 
-tab_all, tab_plays, tab_lock_ready = st.tabs(['All Decisions', 'Playable Candidates', 'Lock-Ready Candidates'])
+tab_all, tab_plays, tab_lock_ready = st.tabs(['All Assistant Decisions', 'Playable Candidates', 'Lock-Ready Candidates'])
 with tab_all:
     st.dataframe(decisions[view_cols].head(500) if view_cols else decisions.head(500), use_container_width=True, hide_index=True)
 with tab_plays:
@@ -83,6 +83,6 @@ with tab_plays:
 with tab_lock_ready:
     st.dataframe(lock_ready[view_cols].head(500) if not lock_ready.empty and view_cols else lock_ready.head(500), use_container_width=True, hide_index=True)
 
-st.download_button('Download all agent decisions CSV', decisions.to_csv(index=False), file_name='agent_decisions.csv', mime='text/csv')
-st.download_button('Download playable candidates CSV', plays.to_csv(index=False), file_name='agent_playable_candidates.csv', mime='text/csv')
-st.download_button('Download lock-ready candidates CSV', lock_ready.to_csv(index=False), file_name='agent_lock_ready_candidates.csv', mime='text/csv')
+st.download_button('Download all assistant decisions CSV', decisions.to_csv(index=False), file_name='assistant_decisions.csv', mime='text/csv')
+st.download_button('Download playable candidates CSV', plays.to_csv(index=False), file_name='assistant_playable_candidates.csv', mime='text/csv')
+st.download_button('Download lock-ready candidates CSV', lock_ready.to_csv(index=False), file_name='assistant_lock_ready_candidates.csv', mime='text/csv')
