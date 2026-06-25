@@ -200,6 +200,28 @@ def magazine_metric_cells(odds: str, conf: str, edge: str, ev: str, units: str, 
     return [("ODDS", odds, cream, 345, 98), ("CONFIDENCE", conf, green, 443, 145), ("EDGE", edge, danger if str(edge).startswith("-") else green, 588, 112), ("EV", ev, danger if str(ev).startswith("-") else green, 700, 112), ("UNITS", units, cream, 812, 100), ("RISK", risk, green, 912, 148)]
 
 
+def _title_fit_start(text: str, width: int, start: int, minimum: int) -> tuple[int, int] | None:
+    clean = " ".join(str(text or "").replace("\n", " ").split())
+    length = len(clean)
+    if width == 590 and start >= 120 and minimum >= 70:
+        if length <= 5:
+            return 104, 44
+        if length <= 9:
+            return 88, 40
+        if length <= 14:
+            return 72, 36
+        return 56, 32
+    if width == 560 and start >= 100 and minimum >= 60:
+        if length <= 6:
+            return 86, 38
+        if length <= 11:
+            return 72, 34
+        if length <= 17:
+            return 58, 32
+        return 46, 28
+    return None
+
+
 def apply_magazine_api_patch(module: Any) -> Any:
     if getattr(module, "_DYNAMIC_API_SOURCE_PATCHED", False):
         return module
@@ -214,6 +236,13 @@ def apply_magazine_api_patch(module: Any) -> Any:
     original_get = module._get
     original_team_label = module._team_label
     original_teams = module._teams
+
+    def patched_fit(text: str, width: int, start: int, minimum: int = 12, bold: bool = True):
+        capped = _title_fit_start(text, width, start, minimum)
+        if bold and capped is not None:
+            capped_start, capped_minimum = capped
+            return original_fit(text, width, min(start, capped_start), min(minimum, capped_minimum), bold)
+        return original_fit(text, width, start, minimum, bold)
 
     def patched_render(pick: Any, *args: Any, **kwargs: Any):
         global _CURRENT_ROW
@@ -258,6 +287,7 @@ def apply_magazine_api_patch(module: Any) -> Any:
 
     module.render_full_pick_magazine_page = patched_render
     module.render_full_pick_magazine_page_png = patched_png
+    module._fit = patched_fit
     module._pairs = patched_pairs
     module._team_snapshot = patched_team_snapshot
     module._player_items = injury_items
@@ -266,6 +296,6 @@ def apply_magazine_api_patch(module: Any) -> Any:
     module.api_provenance = api_provenance
     module.api_provenance_lines = api_provenance_lines
     module.magazine_metric_cells = lambda odds, conf, edge, ev, units, risk: magazine_metric_cells(odds, conf, edge, ev, units, risk, {"DANGER": module.DANGER, "GREEN": module.GREEN, "CREAM": module.CREAM})
-    module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_dynamic_api_sources_v1"
+    module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_dynamic_api_sources_v1_title_autosize"
     module._DYNAMIC_API_SOURCE_PATCHED = True
     return module
