@@ -9,7 +9,7 @@ from .report_export_service import ReportExportBundle, build_report_export_bundl
 from .report_feed_service import build_report_feed
 from .report_learning_layer import calibration_audit
 from .report_learning_layer_compat import apply_learning_layer_compat
-from .report_product_layer import MagazineBrand, enrich_rows, grouped_report, safe_text
+from .report_product_layer import MagazineBrand, enrich_rows, grouped_report, lang_code, safe_text
 from .row_normalizer import normalize_frame
 from .sports_context import CONTEXT_UNAVAILABLE, enrich_sports_context
 
@@ -138,7 +138,7 @@ def build_report_studio_state(raw_rows: pd.DataFrame | Sequence[Mapping[str, Any
         data_issues=_data_issues(cards),
         source_note=source_note,
     )
-    context_note = "Sports context added when fields or configured JSON context are available; unavailable context is labeled explicitly."
+    context_note = "El contexto deportivo se agrega cuando hay campos o JSON configurado disponible; el contexto no disponible se etiqueta explícitamente." if lang_code(filters.language) == "es" else "Sports context added when fields or configured JSON context are available; unavailable context is labeled explicitly."
     return ReportStudioState(
         raw=raw,
         normalized=normalized,
