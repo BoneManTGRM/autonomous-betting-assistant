@@ -74,6 +74,7 @@ COUNTRY_ES = {
     "japan": "Japón",
     "south korea": "Corea del Sur",
     "new zealand": "Nueva Zelanda",
+    "czech republic": "República Checa",
 }
 
 ES = {
@@ -89,7 +90,6 @@ ES = {
     "EV": "VE",
     "UNITS": "UNIDADES",
     "RISK": "RIESGO",
-    "MARKET": "MERCADO",
     "WHY WE PICKED IT": "POR QUÉ LO ELEGIMOS",
     "PRO BETTOR EVIDENCE": "EVIDENCIA PRO",
     "TEAM SNAPSHOTS": "RESUMEN EQUIPOS",
@@ -314,21 +314,8 @@ def _fit(text: str, width: int, start: int, minimum: int = 16, bold: bool = True
 
 def _headline_font(text: str, width: int, preferred: int, minimum: int) -> ImageFont.ImageFont:
     text = str(text or "").upper()
-    clean_len = len(text)
-    start = preferred
-    if clean_len <= 5:
-        start = preferred
-    elif clean_len <= 8:
-        start = min(preferred, preferred - 8)
-    elif clean_len <= 10:
-        start = min(preferred, 96)
-    elif clean_len <= 14:
-        start = min(preferred, 82)
-    elif clean_len <= 18:
-        start = min(preferred, 72)
-    else:
-        start = min(preferred, 62)
-    return _fit(text, width, max(minimum, start), max(38, minimum - 8), True)
+    start = preferred if len(text) <= 8 else min(preferred, 116)
+    return _fit(text, width, start, minimum, True)
 
 
 def _line_height(font: ImageFont.ImageFont) -> int:
@@ -531,10 +518,10 @@ def _section(d: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, title: str,
     title = _tr(title, lang).upper()
     d.rounded_rectangle((x, y, x + w, y + h), radius=14, fill=CREAM + (255,), outline=BLACK + (238,), width=3)
     d.rounded_rectangle((x, y, x + w, y + 56), radius=10, fill=color)
-    d.text((x + 18, y + 11), title, font=_fit(title, w - 36, 30, 18, True), fill=CREAM)
+    d.text((x + 18, y + 11), title, font=_fit(title, w - 36, 33, 21, True), fill=CREAM)
 
 
-def _bullets_auto(d: ImageDraw.ImageDraw, x: int, y: int, items: list[str], width: int, height: int, color: tuple[int, int, int], start: int = 18, minimum: int = 11, limit: int | None = None, lang: str = "en") -> None:
+def _bullets_auto(d: ImageDraw.ImageDraw, x: int, y: int, items: list[str], width: int, height: int, color: tuple[int, int, int], start: int = 22, minimum: int = 11, limit: int | None = None, lang: str = "en") -> None:
     data = [_tr(item, lang) for item in (items[:limit] if limit is not None else items)]
     chosen: ImageFont.ImageFont | None = None
     chosen_lines: list[list[str]] = []
@@ -604,16 +591,38 @@ def _team_snapshot(img: Image.Image, d: ImageDraw.ImageDraw, x: int, y: int, wid
     _bullets_auto(d, x, y + 76, [TEAM_DATA_FALLBACK, "Use team form, injuries, and market movement before publishing."], width - 10, 165, color, 18, 10, 4, lang)
 
 
+def _looks_like_combat_measurement(text: str) -> bool:
+    low = str(text or "").lower()
+    measurement_terms = ("stance:", "reach:", "height:", "weight:", "orthodox", "southpaw", "switch")
+    team_terms = ("injur", "lineup", "out", "doubtful", "questionable", "probable", "day-to-day", "suspended")
+    return any(term in low for term in measurement_terms) and not any(term in low for term in team_terms)
+
+
+def _player_items(r: Any, prefix: str) -> list[str]:
+    keys = (
+        f"{prefix}_injuries",
+        f"{prefix}_injury_report",
+        f"{prefix}_lineup_status",
+        f"{prefix}_player_notes",
+        "injury_report",
+        "injuries",
+        "lineup_status",
+        "key_players",
+    )
+    out: list[str] = []
+    for key in keys:
+        for item in _split(_row(r).get(key)):
+            if not _looks_like_combat_measurement(item):
+                out.append(item)
+    if out:
+        return out[:3]
+    return [PLAYER_DATA_FALLBACK, "Confirm lineup/injury news before placing the bet."]
+
+
 def _player_notes(d: ImageDraw.ImageDraw, x: int, y: int, width: int, team: str, prefix: str, color: tuple[int, int, int], r: Any, lang: str, note_height: int = 98) -> None:
     label = _team_label(team, lang)
     d.text((x, y), label.upper(), font=_fit(label.upper(), width, 21, 12, True), fill=color)
-    items = _items(
-        r,
-        (f"{prefix}_injuries", f"{prefix}_injury_report", f"{prefix}_lineup_status", f"{prefix}_player_notes", "injury_report", "injuries", "lineup_status", "key_players"),
-        [PLAYER_DATA_FALLBACK, "Confirm lineup/injury news before placing the bet."],
-        3,
-    )
-    _bullets_auto(d, x, y + 32, items, width, note_height, color, 15, 7, 3, lang)
+    _bullets_auto(d, x, y + 32, _player_items(r, prefix), width, note_height, color, 16, 8, 3, lang)
 
 
 def _metric(d: ImageDraw.ImageDraw, x: int, y: int, w: int, label: str, value: str, color: tuple[int, int, int], lang: str = "en") -> None:
@@ -621,9 +630,9 @@ def _metric(d: ImageDraw.ImageDraw, x: int, y: int, w: int, label: str, value: s
     label = _tr(label, lang)
     value = _tr(value, lang)
     d.rectangle((x, y, x + w, y + 94), fill=BLACK, outline=(230, 224, 204), width=1)
-    d.text((x + 7, y + 10), label, font=_fit(label, w - 12, 16, 9, True), fill=(232, 230, 220))
+    d.text((x + 7, y + 10), label, font=_fit(label, w - 12, 17, 9, True), fill=(232, 230, 220))
     clean = _clean(value, True)
-    _txt_auto(d, x + 7, y + 43, clean, w - 12, 38, 27, 8, color, True, 1)
+    _txt_auto(d, x + 7, y + 43, clean, w - 12, 38, 36, 8, color, True, 1)
 
 
 def render_full_pick_magazine_page(pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> Image.Image:
@@ -637,18 +646,17 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
 
     d.rectangle((18, 18, PAGE_WIDTH - 18, 82), fill=BLACK)
     d.rectangle((28, 24, 308, 74), fill=RED)
-    d.text((43, 31), "ABA SIGNAL PRO", font=_fit("ABA SIGNAL PRO", 250, 36, 25, True), fill="white")
+    d.text((43, 29), "ABA SIGNAL PRO", font=_fit("ABA SIGNAL PRO", 250, 38, 25, True), fill="white")
     daily = _tr("DAILY SPORTS ANALYSIS", lang)
-    d.text((330, 29), daily, font=_fit(daily, 470, 36, 20, True), fill="white")
+    d.text((330, 28), daily, font=_fit(daily, 470, 38, 20, True), fill="white")
     d.rounded_rectangle((840, 24, 1050, 74), radius=5, fill=CREAM, outline=BLACK)
     page_label = _tr(f"PAGE {page_number} OF {total_pages}", lang)
-    d.text((862, 34), page_label, font=_fit(page_label, 174, 26, 16, True), fill=BLACK)
+    d.text((862, 32), page_label, font=_fit(page_label, 174, 28, 16, True), fill=BLACK)
 
-    hero_safe_x = 610
-    d.text((36, 105), away_label.upper(), font=_headline_font(away_label, hero_safe_x - 36, 132, 58), fill=RED)
-    d.text((40, 246), "VS", font=_font(46, True), fill=BLACK)
-    d.line((40, 304, 104, 304), fill=BLACK, width=4)
-    d.text((112, 220), home_label.upper(), font=_headline_font(home_label, hero_safe_x - 112, 104, 48), fill=BLUE)
+    d.text((36, 105), away_label.upper(), font=_headline_font(away_label, 590, 140, 72), fill=RED)
+    d.text((40, 246), "VS", font=_font(50, True), fill=BLACK)
+    d.line((40, 306, 106, 306), fill=BLACK, width=4)
+    d.text((112, 220), home_label.upper(), font=_headline_font(home_label, 560, 112, 62), fill=BLUE)
     season = _tr(_get(pick, "season_label", "event_stage", "competition_round", default=f"{sport} REGULAR SEASON"), lang)
     d.rectangle((36, 330, 506, 378), fill=BLACK)
     _txt(d, 54, 339, season.upper(), _fit(season.upper(), 432, 28, 15, True), CREAM, 432, 1)
@@ -673,16 +681,15 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     ev = _fmt(_get(pick, "expected_value_per_unit", "profit_expected_value", "expected_value", "ev"), "ev")
     units = _fmt(_get(pick, "recommended_stake_units", "suggested_stake_units", "units", default="1.0"), "unit")
     risk = _tr(_clean(_get(pick, "risk", "risk_level", "risk_label", "profit_guard_status", default=NO_VERIFIED), True), lang)
-    market = _tr(_clean(_get(pick, "market_type", "market", "bet_type", default=NO_VERIFIED), True), lang)
     x = 344
-    labels = [("ODDS", odds, CREAM), ("CONFIDENCE", conf, GREEN), ("EDGE", edge, DANGER if edge.startswith("-") else GREEN), ("EV", ev, DANGER if ev.startswith("-") else GREEN), ("UNITS", units, CREAM), ("RISK", risk, GREEN), ("MARKET", market, CREAM)]
-    for (lab, val, col), w in zip(labels, [84, 126, 94, 98, 84, 94, 94]):
+    labels = [("ODDS", odds, CREAM), ("CONFIDENCE", conf, GREEN), ("EDGE", edge, DANGER if edge.startswith("-") else GREEN), ("EV", ev, DANGER if ev.startswith("-") else GREEN), ("UNITS", units, CREAM), ("RISK", risk, GREEN)]
+    for (lab, val, col), w in zip(labels, [98, 140, 108, 108, 96, 138]):
         _metric(d, x, sy + 6, w, lab, val, col, lang)
         x += w
 
     left_x, left_w, right_x, right_w = 20, 320, 352, 708
     _section(d, left_x, 585, left_w, 300, "WHY WE PICKED IT", RED, lang)
-    _bullets_auto(d, left_x + 24, 655, _why(pick, lang), left_w - 44, 210, RED, 19, 10, 4, lang)
+    _bullets_auto(d, left_x + 24, 655, _why(pick, lang), left_w - 44, 210, RED, 22, 10, 4, lang)
     _section(d, left_x, 905, left_w, 225, "PRO BETTOR EVIDENCE", BLUE, lang)
     ry = 974
     for lab, val in (_pairs(pick, lang) or [(_tr("SOURCE", lang), _tr(_get(pick, "odds_source", default="Agent row"), lang)), (_tr("BOOK", lang), NO_VERIFIED)])[:5]:
@@ -721,8 +728,8 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     d.text((40, fy + 30), _tr("FINAL", lang), font=_font(30, True), fill=CREAM)
     rec = _tr("RECOMMENDATION", lang)
     d.text((40, fy + 76), rec, font=_fit(rec, 190, 24, 14, True), fill=CREAM)
-    d.text((284, fy + 22), action.upper(), font=_fit(action.upper(), 340, 52, 22, True), fill=GREEN)
-    _txt_auto(d, 284, fy + 92, pick_text, 360, 34, 32, 10, CREAM, True, 1)
+    d.text((284, fy + 18), action.upper(), font=_fit(action.upper(), 340, 66, 22, True), fill=GREEN)
+    _txt_auto(d, 284, fy + 92, pick_text, 360, 34, 46, 10, CREAM, True, 1)
     _txt_auto(d, 670, fy + 38, expl, 340, 82, 20, 10, CREAM, False, None)
 
     footer_y, footer_b = 1542, 1581
