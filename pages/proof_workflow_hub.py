@@ -17,10 +17,10 @@ WORKFLOW_STEPS = [
     {'step': 5, 'page': 'Data Intake Gate', 'purpose': 'Check whether a CSV is ready for learning, statistics, proof, ROI, line movement, or tracking.', 'when_to_use': 'First stop for any outside CSV.'},
     {'step': 6, 'page': 'CSV Doctor', 'purpose': 'Diagnose exact column mapping and missing fields.', 'when_to_use': 'When a CSV does not behave as expected.'},
     {'step': 7, 'page': 'Quality Control Center', 'purpose': 'Check duplicates, conflicts, grading, line movement, bankroll path, and version coverage.', 'when_to_use': 'Before trusting or presenting a dataset.'},
-    {'step': 8, 'page': 'Agent Decision Engine', 'purpose': 'Recommend play_strong, play_small, watch_only, no_action, or review_needed from edge, odds, coverage, timing, and line movement.', 'when_to_use': 'Before locking new candidate rows.'},
+    {'step': 8, 'page': 'Assistant Decision Engine', 'purpose': 'Recommend play_strong, play_small, watch_only, no_action, or review_needed from edge, odds, coverage, timing, and line movement.', 'when_to_use': 'Before locking new candidate rows.'},
     {'step': 9, 'page': 'Odds Lock', 'purpose': 'Create a timestamped lock for new predictions before events start.', 'when_to_use': 'Only before games/events start.'},
     {'step': 10, 'page': 'Learning Memory', 'purpose': 'The only training page. Save durable learned_state, cumulative memory, and ARA memory patterns.', 'when_to_use': 'After results are graded and before judging what the model learned.'},
-    {'step': 11, 'page': 'Max Agent Intelligence', 'purpose': 'Run API snapshot memory, loss autopsy, CLV intelligence, walk-forward validation, and sport-specific routing together.', 'when_to_use': 'After candidate decisions or after importing resolved results.'},
+    {'step': 11, 'page': 'Max Assistant Intelligence', 'purpose': 'Run API snapshot memory, loss autopsy, CLV intelligence, walk-forward validation, and sport-specific routing together.', 'when_to_use': 'After candidate decisions or after importing resolved results.'},
     {'step': 12, 'page': 'Statistical Validation', 'purpose': 'Measure sample size, observed hit rate, confidence interval, and ROI scenarios.', 'when_to_use': 'After rows have clean win/loss results.'},
     {'step': 13, 'page': 'Proof Readiness', 'purpose': 'Separate official proof from historical learning/backfill rows.', 'when_to_use': 'Before showing results to a serious reviewer.'},
     {'step': 14, 'page': 'Forward Test Tracker', 'purpose': 'Track progress toward 25, 100, 500, and 1,000 locked rows.', 'when_to_use': 'During live forward testing.'},
@@ -73,11 +73,11 @@ st.subheader('Recommended next page')
 if report['blockers']:
     st.error('Go to CSV Doctor first. The file has blockers that should be fixed before using the rest of the app.')
 elif 'Odds lock readiness' in ready_gates and 'Official proof readiness' not in ready_gates:
-    st.success('Go to What Are the Odds, Quality Control Center, Agent Decision Engine, Odds Lock, Learning Memory, then Max Agent Intelligence.')
+    st.success('Go to What Are the Odds, Quality Control Center, Assistant Decision Engine, Odds Lock, Learning Memory, then Max Assistant Intelligence.')
 elif 'Statistical validation' in ready_gates and 'Official proof readiness' not in ready_gates:
-    st.success('Go to Learning Memory, Max Agent Intelligence, Statistical Validation, Proof Readiness, and Readiness Scorecard.')
+    st.success('Go to Learning Memory, Max Assistant Intelligence, Statistical Validation, Proof Readiness, and Readiness Scorecard.')
 elif 'Official proof readiness' in ready_gates:
-    st.success('Go to Learning Memory, Max Agent Intelligence, Forward Test Tracker, Daily Operations Report, Review Bundle Export, and Live Command Center.')
+    st.success('Go to Learning Memory, Max Assistant Intelligence, Forward Test Tracker, Daily Operations Report, Review Bundle Export, and Live Command Center.')
 else:
     st.warning('Go to Scanner Pro or Pro Predictor for fresh rows. For outside CSVs, use Data Intake Gate or CSV Doctor.')
 
