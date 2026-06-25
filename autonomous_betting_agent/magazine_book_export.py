@@ -314,8 +314,21 @@ def _fit(text: str, width: int, start: int, minimum: int = 16, bold: bool = True
 
 def _headline_font(text: str, width: int, preferred: int, minimum: int) -> ImageFont.ImageFont:
     text = str(text or "").upper()
-    start = preferred - 8 if len(text) <= 8 else min(preferred - 8, 108)
-    return _fit(text, width, max(minimum, start), max(44, minimum - 6), True)
+    clean_len = len(text)
+    start = preferred
+    if clean_len <= 5:
+        start = preferred
+    elif clean_len <= 8:
+        start = min(preferred, preferred - 8)
+    elif clean_len <= 10:
+        start = min(preferred, 96)
+    elif clean_len <= 14:
+        start = min(preferred, 82)
+    elif clean_len <= 18:
+        start = min(preferred, 72)
+    else:
+        start = min(preferred, 62)
+    return _fit(text, width, max(minimum, start), max(38, minimum - 8), True)
 
 
 def _line_height(font: ImageFont.ImageFont) -> int:
@@ -631,10 +644,11 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     page_label = _tr(f"PAGE {page_number} OF {total_pages}", lang)
     d.text((862, 34), page_label, font=_fit(page_label, 174, 26, 16, True), fill=BLACK)
 
-    d.text((36, 105), away_label.upper(), font=_headline_font(away_label, 590, 132, 62), fill=RED)
+    hero_safe_x = 610
+    d.text((36, 105), away_label.upper(), font=_headline_font(away_label, hero_safe_x - 36, 132, 58), fill=RED)
     d.text((40, 246), "VS", font=_font(46, True), fill=BLACK)
     d.line((40, 304, 104, 304), fill=BLACK, width=4)
-    d.text((112, 220), home_label.upper(), font=_headline_font(home_label, 560, 104, 52), fill=BLUE)
+    d.text((112, 220), home_label.upper(), font=_headline_font(home_label, hero_safe_x - 112, 104, 48), fill=BLUE)
     season = _tr(_get(pick, "season_label", "event_stage", "competition_round", default=f"{sport} REGULAR SEASON"), lang)
     d.rectangle((36, 330, 506, 378), fill=BLACK)
     _txt(d, 54, 339, season.upper(), _fit(season.upper(), 432, 28, 15, True), CREAM, 432, 1)
