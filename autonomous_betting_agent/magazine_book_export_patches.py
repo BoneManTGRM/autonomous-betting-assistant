@@ -7,13 +7,13 @@ import re
 def install() -> None:
     """Apply small runtime patches to the magazine renderer.
 
-    This keeps the public renderer API stable while fixing two production layout issues:
+    This keeps the public renderer API stable while fixing production layout issues:
     1. Spanish sport labels like Boxing should render as Latin American Spanish.
-    2. The top metrics strip needs a wider risk cell for longer risk labels.
+    2. Long risk labels should fit inside the top metrics strip.
     """
     from . import magazine_book_export as m
 
-    if getattr(m, "_aba_magazine_metric_patch_v1", False):
+    if getattr(m, "_aba_magazine_metric_patch_v2", False):
         return
 
     original_tr = m._tr
@@ -31,42 +31,62 @@ def install() -> None:
         "NCAA BASEBALL": "BÉISBOL NCAA",
     }
 
-    risk_es = {
-        "THIN EDGE FAVORITE": "FAVORITO DE VENTAJA DELGADA",
-        "THIN EDGE FAVOURITE": "FAVORITO DE VENTAJA DELGADA",
+    # Full text is too long for the magazine metric strip. These are public-facing
+    # compact labels, not grading logic.
+    risk_display_es = {
+        "THIN EDGE FAVORITE": "VENTAJA DELGADA",
+        "THIN EDGE FAVOURITE": "VENTAJA DELGADA",
+        "FAVORITO DE VENTAJA DELGADA": "VENTAJA DELGADA",
         "VOLUME OK": "VOLUMEN OK",
         "VOLUME_OK": "VOLUMEN OK",
     }
+    risk_display_en = {
+        "THIN EDGE FAVORITE": "THIN EDGE",
+        "THIN EDGE FAVOURITE": "THIN EDGE",
+        "VOLUME OK": "VOLUME OK",
+        "VOLUME_OK": "VOLUME OK",
+    }
+
+    def _compact_risk(value: Any, lang: str) -> str:
+        raw = str(value or "").strip().upper().replace("_", " ")
+        mapping = risk_display_es if lang == "es" else risk_display_en
+        return mapping.get(raw, raw)
 
     def patched_tr(v: Any, lang: str) -> str:
         text = original_tr(v, lang)
-        if lang != "es" or m._bad(text):
+        if m._bad(text):
             return text
         raw = str(text)
-        for src, dst in sport_es.items():
-            raw = re.sub(rf"\b{re.escape(src)}\b", dst, raw, flags=re.I)
-        for src, dst in risk_es.items():
-            raw = re.sub(rf"\b{re.escape(src)}\b", dst, raw, flags=re.I)
+        if lang == "es":
+            for src, dst in sport_es.items():
+                raw = re.sub(rf"\b{re.escape(src)}\b", dst, raw, flags=re.I)
+            for src, dst in risk_display_es.items():
+                raw = re.sub(rf"\b{re.escape(src)}\b", dst, raw, flags=re.I)
         return raw
+
+    def _metric_fit(d, x: int, y: int, w: int, label: str, value: str, color: tuple[int, int, int], lang: str) -> None:
+        label = patched_tr(label, lang)
+        value = str(value or "").upper()
+        d.rectangle((x, y, x + w, y + 94), fill=m.BLACK, outline=(230, 224, 204), width=1)
+        d.text((x + 7, y + 10), label, font=m._fit(label, w - 12, 16, 9, True), fill=(232, 230, 220))
+        # Let long values wrap to two compact lines instead of clipping into the next cell.
+        m._txt_auto(d, x + 7, y + 43, value, w - 14, 42, 20, 7, color, True, 2)
 
     def repaint_risk_market(img, pick: Any, lang: str, sy: int = 456) -> None:
         d = m.ImageDraw.Draw(img, "RGBA")
-        risk = patched_tr(
-            m._clean(
-                m._get(pick, "risk", "risk_level", "risk_label", "profit_guard_status", default=m.NO_VERIFIED),
-                True,
-            ),
-            lang,
+        risk_raw = m._clean(
+            m._get(pick, "risk", "risk_level", "risk_label", "profit_guard_status", default=m.NO_VERIFIED),
+            True,
         )
+        risk = _compact_risk(patched_tr(risk_raw, lang), lang)
         market = patched_tr(
             m._clean(m._get(pick, "market_type", "market", "bet_type", default=m.NO_VERIFIED), True),
             lang,
         )
-        # Repaint the far-right metric cells on top of the original strip.
-        # Original risk/market widths were 94/94. This gives risk 140px while
-        # preserving the overall strip boundary and keeping market readable.
-        m._metric(d, 830, sy + 6, 140, "RISK", risk, m.GREEN, lang)
-        m._metric(d, 970, sy + 6, 90, "MARKET", market, m.CREAM, lang)
+        # Repaint the far-right metric cells on top of the original strip. Risk gets
+        # more space and may wrap; market stays compact and readable.
+        _metric_fit(d, 830, sy + 6, 148, "RISK", risk, m.GREEN, lang)
+        m._metric(d, 978, sy + 6, 82, "MARKET", market, m.CREAM, lang)
 
     def patched_render_full_pick_magazine_page(
         pick: Any,
@@ -102,3 +122,4 @@ def install() -> None:
     m._tr = patched_tr
     m.render_full_pick_magazine_page = patched_render_full_pick_magazine_page
     m._aba_magazine_metric_patch_v1 = True
+    m._aba_magazine_metric_patch_v2 = True
