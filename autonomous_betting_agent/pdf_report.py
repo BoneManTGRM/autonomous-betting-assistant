@@ -6,7 +6,7 @@ from typing import Any, Iterable, Mapping
 
 import pandas as pd
 
-from .report_product_layer import MagazineBrand, grouped_report, pct, safe_text
+from .report_product_layer import MagazineBrand, event_text, grouped_report, pct, pick_text, safe_text, value_text
 
 
 def _escape_pdf_text(value: Any) -> str:
@@ -45,20 +45,21 @@ def _brand_dict(brand: MagazineBrand | Mapping[str, Any]) -> dict[str, Any]:
 def _pdf_lines(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *, mode: str = 'consumer') -> list[str]:
     brand_data = _brand_dict(brand)
     language = safe_text(brand_data.get('language')) or 'en'
-    es = language.startswith('es') or 'Español' in language
-    title = safe_text(brand_data.get('report_title')) or ('Reporte de Análisis Deportivo' if es else 'Sports Analysis Report')
+    es = language.lower().startswith('es') or 'español' in language.lower()
+    title_default = 'Reporte de Análisis Deportivo' if es else 'Sports Analysis Report'
+    title = value_text(safe_text(brand_data.get('report_title')) or title_default, language)
     brand_name = safe_text(brand_data.get('brand_name')) or 'ABA Signal Pro'
-    tagline = safe_text(brand_data.get('tagline')) or 'Powered by Reparodynamics'
+    tagline = value_text(safe_text(brand_data.get('tagline')) or 'Powered by Reparodynamics', language)
     workspace = safe_text(brand_data.get('workspace_id')) or 'workspace'
     generated = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
     technical = mode in {'analyst', 'proof'} or 'analyst' in safe_text(mode).lower()
 
     section_names = (
-        {'best_plays': 'Mejores jugadas', 'watchlist': 'Price Watch', 'no_play': 'Investigación / aprendizaje'}
+        {'best_plays': 'Mejores jugadas', 'watchlist': 'Seguimiento de precio', 'no_play': 'Investigación / aprendizaje'}
         if es else {'best_plays': "Today's Official +EV", 'watchlist': 'Price Watch', 'no_play': 'Research / Learning'}
     )
     labels = {'pick': 'Selección', 'action': 'Acción', 'confidence': 'Confianza', 'risk': 'Riesgo', 'market': 'Mercado'} if es else {'pick': 'Pick', 'action': 'Action', 'confidence': 'Confidence', 'risk': 'Risk', 'market': 'Market'}
-    lines = [title, f'{brand_name} - {tagline}', f'Workspace: {workspace}', f'Generated: {generated}', '']
+    lines = [title, f'{brand_name} - {tagline}', f"{'Workspace' if not es else 'Workspace'}: {workspace}", f"{'Generated' if not es else 'Generado'}: {generated}", '']
     groups = grouped_report(cards)
     for key in ('best_plays', 'watchlist', 'no_play'):
         section = groups.get(key, pd.DataFrame())
@@ -67,37 +68,36 @@ def _pdf_lines(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *,
             lines.append('No cards in this section.' if not es else 'Sin tarjetas en esta sección.')
         for _, row in section.iterrows():
             rowd = row.to_dict()
-            header = safe_text(rowd.get('event')) or 'Matchup'
+            header = event_text(rowd.get('public_event') or rowd.get('event') or 'Matchup', language)
             lines.append(header)
             details = [
-                f"{labels['pick']}: {safe_text(rowd.get('public_pick') or rowd.get('prediction'))}",
-                f"{labels['action']}: {safe_text(rowd.get('consumer_action') or rowd.get('recommended_action'))}",
-                f"{labels['confidence']}: {safe_text(rowd.get('confidence_tier'))} | {labels['risk']}: {safe_text(rowd.get('risk_tier'))}",
-                f"{labels['market']}: {safe_text(rowd.get('market_read'))}",
-                safe_text(rowd.get('why_it_matters')),
-                safe_text(rowd.get('game_preview')),
+                f"{labels['pick']}: {pick_text(rowd.get('public_pick') or rowd.get('prediction'), language)}",
+                f"{labels['action']}: {value_text(rowd.get('consumer_action') or rowd.get('recommended_action'), language)}",
+                f"{labels['confidence']}: {value_text(rowd.get('confidence_tier'), language)} | {labels['risk']}: {value_text(rowd.get('risk_tier'), language)}",
+                f"{labels['market']}: {value_text(rowd.get('market_read'), language)}",
+                value_text(rowd.get('why_it_matters'), language),
+                value_text(rowd.get('game_preview'), language),
             ]
             if technical:
                 details.append(
-                    'Model: ' + pct(rowd.get('model_probability'))
-                    + ' | Market: ' + pct(rowd.get('market_probability'))
+                    ('Modelo: ' if es else 'Model: ') + pct(rowd.get('model_probability'))
+                    + (' | Mercado: ' if es else ' | Market: ') + pct(rowd.get('market_probability'))
                     + ' | Edge: ' + pct(rowd.get('model_market_edge'), signed=True)
                     + ' | EV: ' + pct(rowd.get('expected_value_per_unit'), signed=True)
-                    + ' | Odds: ' + safe_text(rowd.get('decimal_price'))
-                    + ' | Proof: ' + (safe_text(rowd.get('proof_id')) or 'N/A')
+                    + (' | Momio: ' if es else ' | Odds: ') + safe_text(rowd.get('decimal_price'))
+                    + (' | Prueba: ' if es else ' | Proof: ') + (safe_text(rowd.get('proof_id')) or 'N/A')
                 )
             for detail in details:
                 for wrapped in _wrap(detail, 96):
                     lines.append('  ' + wrapped)
             lines.append('')
-    disclaimer = safe_text(brand_data.get('disclaimer'))
+    disclaimer = value_text(brand_data.get('disclaimer'), language)
     if disclaimer:
         lines += ['', disclaimer]
     return lines
 
 
 def _content_stream(page_lines: Iterable[str]) -> str:
-    y = 780
     commands = ['BT', '/F1 11 Tf', '50 800 Td']
     first = True
     for line in page_lines:
@@ -105,7 +105,6 @@ def _content_stream(page_lines: Iterable[str]) -> str:
             commands.append('0 -14 Td')
         first = False
         commands.append(f'({_escape_pdf_text(line)}) Tj')
-        y -= 14
     commands.append('ET')
     return '\n'.join(commands)
 
@@ -117,7 +116,7 @@ def render_report_pdf(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, A
     so Streamlit can offer a one-click PDF download without weakening fail-closed report logic.
     """
     all_lines = _pdf_lines(cards, brand, mode=mode)
-    pages = [all_lines[i:i + 52] for i in range(0, len(all_lines), 52)] or [['No report rows.']]
+    pages = [all_lines[i:i + 52] for i in range(0, len(all_lines), 52)] or [['Sin filas de reporte.' if safe_text(_brand_dict(brand).get('language')).lower().startswith('es') else 'No report rows.']]
     objects: list[str] = []
     objects.append('<< /Type /Catalog /Pages 2 0 R >>')
     kids = ' '.join(f'{3 + i * 2} 0 R' for i in range(len(pages)))
