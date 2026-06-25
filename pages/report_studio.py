@@ -8,6 +8,8 @@ import streamlit as st
 from autonomous_betting_agent.app_feed_delivery import save_app_feed
 from autonomous_betting_agent.commercial_platform_tools import load_persistent_ledger, normalize_workspace_id
 from autonomous_betting_agent.magazine_book_export import (
+    _team_label,
+    _tr,
     pick_full_page_filename,
     render_full_magazine_book_pdf,
     render_full_magazine_book_png,
@@ -76,9 +78,39 @@ HANDOFF_KEYS = (
     'ara_latest_predictions',
 )
 
+ACTION_ES = {
+    'Price Watch / Research': 'Seguimiento de precio / investigación',
+    'Full magazine analysis': 'Análisis completo de revista',
+    'Play Small': 'Jugar pequeño',
+    'Play Standard': 'Jugar normal',
+    'No Play': 'No jugar',
+    'Research': 'Investigación',
+    'Price Watch': 'Seguimiento de precio',
+}
+
 
 def t(key: str) -> str:
     return TEXT.get(LANG, TEXT['en']).get(key, key)
+
+
+def display_event_text(value: str, language: str) -> str:
+    text = safe_text(value)
+    if language != 'es' or not text:
+        return text
+    for sep in (' at ', ' vs ', ' VS ', ' v ', ' @ '):
+        if sep in text:
+            first, second = text.split(sep, 1)
+            return f"{_team_label(first, 'es')} vs {_team_label(second, 'es')}"
+    return _tr(text, 'es')
+
+
+def display_action_text(value: str, language: str) -> str:
+    text = safe_text(value)
+    if language != 'es' or not text:
+        return text
+    if text in ACTION_ES:
+        return ACTION_ES[text]
+    return _tr(text, 'es')
 
 
 def rows_from_saved_sources(workspace_id: str) -> tuple[str, pd.DataFrame]:
@@ -273,8 +305,8 @@ with tabs[6]:
     st.markdown('---')
     for idx, (_, row) in enumerate(cards.head(50).iterrows()):
         rowd = with_report_language(row.to_dict(), LANG)
-        event = safe_text(rowd.get('event')) or f'Game {idx + 1}'
-        action = safe_text(rowd.get('consumer_action') or rowd.get('recommended_action')) or 'Full magazine analysis'
+        event = display_event_text(safe_text(rowd.get('event')) or f'Game {idx + 1}', LANG)
+        action = display_action_text(safe_text(rowd.get('consumer_action') or rowd.get('recommended_action')) or 'Full magazine analysis', LANG)
         full_page_png = cached_render_full_pick_magazine_page_png(serializable_row(rowd), background_bytes, full_magazine_book_name, idx + 1, len(cards_as_rows), LANG)
         left, right = st.columns([3, 1])
         left.markdown(f'**{idx + 1}. {event}**  \n{action}')
