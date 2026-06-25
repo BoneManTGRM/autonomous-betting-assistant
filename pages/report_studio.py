@@ -45,6 +45,8 @@ TEXT = {
         'background_upload': 'Optional background image for magazine exports', 'background_ready': 'Custom background enabled for Full Magazine Book and individual Magazine Page downloads.',
         'background_preview': 'Uploaded background preview',
         'feed_saved': 'Unified and legacy app feeds saved.', 'copy_label': 'Short copy', 'no_audit': 'No graded calibration data available yet.',
+        'image_tab_info': 'Download the full magazine book for the complete report, or download one full magazine-style page for each individual game below.',
+        'build_book': 'Build Full Magazine Book', 'building_book': 'Building full magazine book...', 'download_book_png': 'Download Full Magazine Book PNG', 'download_book_pdf': 'Download Full Magazine Book PDF', 'download_zip': 'Download Full Magazine ZIP', 'download_page': 'Download Full Magazine Page',
     },
     'es': {
         'title': 'Estudio de Reportes',
@@ -60,6 +62,8 @@ TEXT = {
         'background_upload': 'Imagen de fondo opcional para exportaciones de revista', 'background_ready': 'Fondo personalizado activo para libro revista completo y páginas individuales.',
         'background_preview': 'Vista previa del fondo subido',
         'feed_saved': 'Feed unificado y feed legado guardados.', 'copy_label': 'Copy corto', 'no_audit': 'Aún no hay datos gradados para calibración.',
+        'image_tab_info': 'Descarga el libro revista completo del reporte o descarga una página estilo revista para cada juego individual.',
+        'build_book': 'Crear libro revista completo', 'building_book': 'Creando libro revista completo...', 'download_book_png': 'Descargar libro revista PNG', 'download_book_pdf': 'Descargar libro revista PDF', 'download_zip': 'Descargar ZIP revista', 'download_page': 'Descargar página revista',
     },
 }
 
@@ -116,9 +120,15 @@ def safe_workspace_name(value: str) -> str:
     return ''.join(ch if ch.isalnum() or ch in {'_', '-'} else '_' for ch in str(value or 'report'))
 
 
+def with_report_language(rowd: dict, language: str) -> dict:
+    data = dict(rowd or {})
+    data['report_language'] = language
+    return data
+
+
 @st.cache_data(show_spinner=False)
-def cached_render_full_pick_magazine_page_png(row_items: tuple[tuple[str, str], ...], background_bytes: bytes | None, report_name: str, page_number: int, total_pages: int) -> bytes:
-    rowd = dict(row_items)
+def cached_render_full_pick_magazine_page_png(row_items: tuple[tuple[str, str], ...], background_bytes: bytes | None, report_name: str, page_number: int, total_pages: int, language: str) -> bytes:
+    rowd = with_report_language(dict(row_items), language)
     return render_full_pick_magazine_page_png(rowd, background_image=background_bytes, report_name=report_name, page_number=page_number, total_pages=total_pages)
 
 
@@ -164,7 +174,7 @@ with st.expander(t('profile'), expanded=True):
     brand_name = b1.text_input(t('brand_name'), value=loaded.brand_name)
     tagline = b2.text_input(t('tagline'), value=loaded.tagline)
     report_title = b1.text_input(t('report_title'), value=loaded.report_title)
-    full_magazine_book_name = st.text_input("Full magazine book name", "ABA Signal Pro — Full Pick Magazine")
+    full_magazine_book_name = st.text_input('Full magazine book name', 'ABA Signal Pro — Full Pick Magazine')
     logo_url = b2.text_input(t('logo_url'), value=loaded.logo_url)
     background_profile_upload = st.file_uploader(t('background_upload'), type=['png', 'jpg', 'jpeg'], key='report_studio_profile_background_upload')
     profile_background_bytes = background_profile_upload.getvalue() if background_profile_upload is not None else None
@@ -241,34 +251,34 @@ with tabs[5]:
     st.download_button(t('csv'), data=bundle.csv_text, file_name=f'report_{safe_workspace}.csv', mime='text/csv', key='report_studio_export_csv')
 with tabs[6]:
     st.caption(t('images_note'))
-    st.info('Download the full magazine book for the complete report, or download one full magazine-style page for each individual game below.')
+    st.info(t('image_tab_info'))
     background_upload = st.file_uploader(t('background_upload'), type=['png', 'jpg', 'jpeg'], key='report_studio_image_background_upload')
     background_bytes = background_upload.getvalue() if background_upload is not None else report_background_bytes
     if background_bytes:
         st.success(t('background_ready'))
         st.image(background_bytes, caption=t('background_preview'), width=260)
-    cards_as_rows = [row.to_dict() for _, row in cards.iterrows()]
+    cards_as_rows = [with_report_language(row.to_dict(), LANG) for _, row in cards.iterrows()]
 
-    book_cache_key = 'report_studio_full_book_export_cache'
-    if st.button('Build Full Magazine Book', key='report_studio_prepare_full_book'):
-        with st.spinner('Building full magazine book...'):
+    book_cache_key = f'report_studio_full_book_export_cache_{LANG}'
+    if st.button(t('build_book'), key=f'report_studio_prepare_full_book_{LANG}'):
+        with st.spinner(t('building_book')):
             st.session_state[book_cache_key] = {'png': render_full_magazine_book_png(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name), 'pdf': render_full_magazine_book_pdf(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name), 'zip': render_full_magazine_zip(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name)}
     full_book_cache = st.session_state.get(book_cache_key)
     if full_book_cache:
         book1, book2, book3 = st.columns(3)
-        book1.download_button('Download Full Magazine Book PNG', data=full_book_cache['png'], file_name=sanitize_image_filename(full_magazine_book_name, extension='png'), mime='image/png', key='report_studio_full_book_png')
-        book2.download_button('Download Full Magazine Book PDF', data=full_book_cache['pdf'], file_name=sanitize_image_filename(full_magazine_book_name, extension='pdf'), mime='application/pdf', key='report_studio_full_book_pdf')
-        book3.download_button('Download Full Magazine ZIP', data=full_book_cache['zip'], file_name=sanitize_image_filename(full_magazine_book_name, extension='zip'), mime='application/zip', key='report_studio_full_book_zip')
+        book1.download_button(t('download_book_png'), data=full_book_cache['png'], file_name=sanitize_image_filename(f'{full_magazine_book_name}_{LANG}', extension='png'), mime='image/png', key=f'report_studio_full_book_png_{LANG}')
+        book2.download_button(t('download_book_pdf'), data=full_book_cache['pdf'], file_name=sanitize_image_filename(f'{full_magazine_book_name}_{LANG}', extension='pdf'), mime='application/pdf', key=f'report_studio_full_book_pdf_{LANG}')
+        book3.download_button(t('download_zip'), data=full_book_cache['zip'], file_name=sanitize_image_filename(f'{full_magazine_book_name}_{LANG}', extension='zip'), mime='application/zip', key=f'report_studio_full_book_zip_{LANG}')
 
     st.markdown('---')
     for idx, (_, row) in enumerate(cards.head(50).iterrows()):
-        rowd = row.to_dict()
+        rowd = with_report_language(row.to_dict(), LANG)
         event = safe_text(rowd.get('event')) or f'Game {idx + 1}'
         action = safe_text(rowd.get('consumer_action') or rowd.get('recommended_action')) or 'Full magazine analysis'
-        full_page_png = cached_render_full_pick_magazine_page_png(serializable_row(rowd), background_bytes, full_magazine_book_name, idx + 1, len(cards_as_rows))
+        full_page_png = cached_render_full_pick_magazine_page_png(serializable_row(rowd), background_bytes, full_magazine_book_name, idx + 1, len(cards_as_rows), LANG)
         left, right = st.columns([3, 1])
         left.markdown(f'**{idx + 1}. {event}**  \n{action}')
-        right.download_button('Download Full Magazine Page', data=full_page_png, file_name=pick_full_page_filename(rowd, idx), mime='image/png', key=f'report_studio_image_full_page_{idx}')
+        right.download_button(t('download_page'), data=full_page_png, file_name=pick_full_page_filename(rowd, idx), mime='image/png', key=f'report_studio_image_full_page_{LANG}_{idx}')
 with tabs[7]:
     st.json(asdict(WhiteLabelProfile(profile_id=profile_id, workspace_id=workspace_id, brand_name=brand_name, logo_url=logo_url, tagline=tagline, language=LANG, report_title=report_title, disclaimer=disclaimer, preferred_report_mode=report_mode, preferred_sports=preferred_sports, risk_preference=risk_preference, show_technical_fields=technical, default_audience='analyst' if technical else 'consumer')))
 with tabs[8]:
