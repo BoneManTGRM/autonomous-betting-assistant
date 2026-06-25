@@ -28,6 +28,7 @@ NO_VERIFIED = "Data unavailable"
 NOT_PROVIDED = "Not provided"
 TEAM_DATA_FALLBACK = "Data not available from uploaded row"
 PLAYER_DATA_FALLBACK = "Player data not available in uploaded row"
+_FONT_CACHE: dict[tuple[int, bool], ImageFont.ImageFont] = {}
 
 
 def _row(v: Any) -> Mapping[str, Any]:
@@ -105,13 +106,30 @@ def _edge(n: float | None) -> str:
 
 
 def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
-    names = ("DejaVuSansCondensed-Bold.ttf", "DejaVuSans-Bold.ttf") if bold else ("DejaVuSansCondensed.ttf", "DejaVuSans.ttf")
+    key = (int(size), bool(bold))
+    if key in _FONT_CACHE:
+        return _FONT_CACHE[key]
+    names = ("DejaVuSansCondensed-Bold.ttf", "DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf") if bold else ("DejaVuSansCondensed.ttf", "DejaVuSans.ttf", "LiberationSans-Regular.ttf")
     for name in names:
         try:
-            return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/" + name, size)
+            font = ImageFont.truetype(name, size)
+            _FONT_CACHE[key] = font
+            return font
         except Exception:
             pass
-    return ImageFont.load_default()
+    for root in (Path("/usr/share/fonts"), Path("/usr/local/share/fonts"), Path("/opt/render/project/.apt/usr/share/fonts"), Path("/app/.apt/usr/share/fonts")):
+        if not root.exists():
+            continue
+        for name in names:
+            try:
+                font = ImageFont.truetype(str(next(root.rglob(name))), size)
+                _FONT_CACHE[key] = font
+                return font
+            except Exception:
+                pass
+    font = ImageFont.load_default()
+    _FONT_CACHE[key] = font
+    return font
 
 
 def _fit(text: str, width: int, start: int, minimum: int = 16, bold: bool = True) -> ImageFont.ImageFont:
@@ -378,15 +396,18 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     d.rounded_rectangle((910, 90, 1040, 174), radius=8, fill=BLACK, outline=CREAM, width=3)
     d.text((932, 106), sport.upper()[:12], font=_font(25, True), fill=CREAM)
     _logo_or_badge(img, d, sport, 948, 136, 66, 34, BLUE, use_team_logo)
-    d.text((36, 124), away.upper(), font=_fit(away.upper(), 590, 116, 56, True), fill=RED)
-    d.text((40, 248), "VS", font=_font(46, True), fill=BLACK)
+    d.text((36, 124), away.upper(), font=_fit(away.upper(), 590, 124, 58, True), fill=RED)
+    d.text((40, 248), "VS", font=_font(48, True), fill=BLACK)
     d.line((40, 306, 104, 306), fill=BLACK, width=4)
-    d.text((112, 238), home.upper(), font=_fit(home.upper(), 560, 94, 46, True), fill=BLUE)
+    d.text((112, 236), home.upper(), font=_fit(home.upper(), 560, 100, 48, True), fill=BLUE)
     season = _get(pick, "season_label", "event_stage", "competition_round", default=f"{sport} REGULAR SEASON")
     d.rectangle((36, 330, 506, 378), fill=BLACK)
     _txt(d, 54, 339, season.upper(), _fit(season.upper(), 432, 28, 20, True), CREAM, 432, 1)
+    context: list[str] = []
+    for key in ("preview_summary", "game_summary", "sports_context_summary", "short_reason", "decision_reasons"):
+        context += _split(_row(pick).get(key))
     cy = 394
-    for line in (["Context unavailable.", "Confirm price and lineup news before entry."])[:2]:
+    for line in (context or ["Context unavailable.", "Confirm price and lineup news before entry."])[:2]:
         cy = _txt(d, 42, cy, line, _font(22), TEXT, 565, 1)
     sy = 456
     d.rounded_rectangle((20, sy, PAGE_WIDTH - 20, sy + 106), radius=13, fill=BLACK, outline=CREAM, width=3)
