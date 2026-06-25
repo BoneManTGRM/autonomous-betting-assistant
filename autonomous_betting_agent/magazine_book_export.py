@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 PAGE_WIDTH = 1080
 PAGE_HEIGHT = 1620
-MAGAZINE_STYLE_VERSION = "premium_v4_reference_compact"
+MAGAZINE_STYLE_VERSION = "premium_v4_reference_compact_no_market_v4"
 SAFETY_FOOTER = "No guarantees. Bet responsibly. This analysis is for informational purposes only."
 ASSET_DIRS = (Path("assets/team_logos"), Path("assets/report_logos"), Path("assets/licensed_logos"))
 TEAM_DATA_FALLBACK = "Data not available from uploaded row"
@@ -683,9 +683,12 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     risk = _tr(_clean(_get(pick, "risk", "risk_level", "risk_label", "profit_guard_status", default=NO_VERIFIED), True), lang)
     x = 344
     labels = [("ODDS", odds, CREAM), ("CONFIDENCE", conf, GREEN), ("EDGE", edge, DANGER if edge.startswith("-") else GREEN), ("EV", ev, DANGER if ev.startswith("-") else GREEN), ("UNITS", units, CREAM), ("RISK", risk, GREEN)]
-    for (lab, val, col), w in zip(labels, [98, 140, 108, 108, 96, 138]):
+    metric_widths = [98, 140, 108, 108, 96, (PAGE_WIDTH - 20) - (344 + 98 + 140 + 108 + 108 + 96)]
+    for (lab, val, col), w in zip(labels, metric_widths):
         _metric(d, x, sy + 6, w, lab, val, col, lang)
         x += w
+    # Defensive cleanup: the removed MARKET/TOTALS metric must never render, and the risk cell must consume the old slot.
+    d.line((PAGE_WIDTH - 20, sy + 7, PAGE_WIDTH - 20, sy + 99), fill=(230, 224, 204), width=1)
 
     left_x, left_w, right_x, right_w = 20, 320, 352, 708
     _section(d, left_x, 585, left_w, 300, "WHY WE PICKED IT", RED, lang)
