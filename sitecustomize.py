@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import builtins
+import importlib
 import os
+import sys
+from types import ModuleType
+from typing import Any
+
+_TARGET = "autonomous_betting_agent.magazine_book_export"
+_ORIGINAL_IMPORT = builtins.__import__
+_ORIGINAL_RELOAD = importlib.reload
 
 
 def get_secret(*names: str) -> str:
-    """Read a secret from Streamlit secrets first, then environment variables.
-
-    This file intentionally does not monkey-patch Streamlit widgets. Uploaders,
-    buttons, forms, text inputs, radios, and selectboxes must stay native so the
-    app remains stable on mobile and desktop.
-    """
+    """Read a secret from Streamlit secrets first, then environment variables."""
     try:
         import streamlit as st
     except Exception:
@@ -20,7 +23,8 @@ def get_secret(*names: str) -> str:
             continue
         if st is not None:
             try:
-                value = str(st.secrets.get(name, '').strip()) if hasattr(st.secrets.get(name, ''), 'strip') else str(st.secrets.get(name, '')).strip()
+                raw = st.secrets.get(name, '')
+                value = str(raw.strip()) if hasattr(raw, 'strip') else str(raw).strip()
                 if value:
                     return value
             except Exception:
@@ -31,4 +35,22 @@ def get_secret(*names: str) -> str:
     return ''
 
 
+def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
+    if module is None or getattr(module, "__name__", "") != _TARGET:
+        return module
+    try:
+        from autonomous_betting_agent.magazine_api_sources import apply_magazine_api_patch
+        return apply_magazine_api_patch(module)
+    except Exception:
+        return module
+
+
+def _patched_reload(module: ModuleType) -> ModuleType:
+    reloaded = _ORIGINAL_RELOAD(module)
+    return _apply_if_target(reloaded) or reloaded
+
+
 builtins.get_secret = get_secret
+if getattr(builtins, "_ABA_DYNAMIC_MAGAZINE_RELOAD_PATCHED", False) is not True:
+    importlib.reload = _patched_reload
+    builtins._ABA_DYNAMIC_MAGAZINE_RELOAD_PATCHED = True
