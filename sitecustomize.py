@@ -3,17 +3,19 @@ from __future__ import annotations
 import builtins
 import importlib
 import os
-import sys
 from types import ModuleType
-from typing import Any
 
 _TARGET = "autonomous_betting_agent.magazine_book_export"
-_ORIGINAL_IMPORT = builtins.__import__
 _ORIGINAL_RELOAD = importlib.reload
 
 
 def get_secret(*names: str) -> str:
-    """Read a secret from Streamlit secrets first, then environment variables."""
+    """Read a secret from Streamlit secrets first, then environment variables.
+
+    This file intentionally does not monkey-patch Streamlit widgets. Uploaders,
+    buttons, forms, text inputs, radios, and selectboxes must stay native so the
+    app remains stable on mobile and desktop.
+    """
     try:
         import streamlit as st
     except Exception:
