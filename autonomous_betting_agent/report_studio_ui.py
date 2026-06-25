@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 
 from .report_learning_layer_compat import apply_learning_layer_compat as apply_learning_layer
-from .report_product_layer import safe_text
+from .report_product_layer import event_text, pick_text, safe_text, sport_text, value_text
 
 
 def _bool_count(cards: pd.DataFrame, column: str) -> int:
@@ -50,15 +50,15 @@ def render_status_dashboard(cards: pd.DataFrame, *, language: str = 'en') -> str
     else:
         body = 'El reporte separa resultado, valor de precio, estado oficial y aprendizaje.' if es else 'The report separates result grading, price value, official status, and learning readiness.'
     metric_items: list[tuple[str, Any, str]] = [
-        ('Tarjetas totales' if es else 'Total Cards', total, 'Selected rows'),
-        ('Oficial +EV' if es else 'Official +EV Plays', official, 'Strict proof gate'),
-        ('Price Watch' if es else 'Price Watch', price_watch, 'Model lean / track'),
-        ('Investigación' if es else 'Research / Learning', research, 'Report-ready'),
-        ('Ganadoras grad.' if es else 'Graded Winners', graded_winners, 'Final results'),
-        ('Problemas de datos' if es else 'Data Issues', data_issues, 'Blocked rows'),
-        ('Publicables oficiales' if es else 'Official Publish-Ready', official, 'Paid proof'),
-        ('Listas aprendizaje' if es else 'Learning Ready', learning_ready, 'Calibration rows'),
-        ('Prob. media' if es else 'Avg Model', average_model_label(cards), 'Model average'),
+        ('Tarjetas totales' if es else 'Total Cards', total, 'Filas seleccionadas' if es else 'Selected rows'),
+        ('Oficial +EV' if es else 'Official +EV Plays', official, 'Filtro estricto de prueba' if es else 'Strict proof gate'),
+        ('Seguimiento precio' if es else 'Price Watch', price_watch, 'Lean del modelo / seguimiento' if es else 'Model lean / track'),
+        ('Investigación' if es else 'Research / Learning', research, 'Listas para reporte' if es else 'Report-ready'),
+        ('Ganadoras grad.' if es else 'Graded Winners', graded_winners, 'Resultados finales' if es else 'Final results'),
+        ('Problemas de datos' if es else 'Data Issues', data_issues, 'Filas bloqueadas' if es else 'Blocked rows'),
+        ('Publicables oficiales' if es else 'Official Publish-Ready', official, 'Prueba pagada' if es else 'Paid proof'),
+        ('Listas aprendizaje' if es else 'Learning Ready', learning_ready, 'Filas de calibración' if es else 'Calibration rows'),
+        ('Prob. media' if es else 'Avg Model', average_model_label(cards), 'Promedio del modelo' if es else 'Model average'),
     ]
     boxes = []
     for label, value, sub in metric_items:
@@ -103,7 +103,7 @@ def render_premium_card_deck(cards: pd.DataFrame, *, language: str = 'en') -> st
         return '<p>No hay tarjetas disponibles.</p>' if es else '<p>No cards available.</p>'
     sections = [
         ('official', 'Oficial +EV' if es else 'Official +EV'),
-        ('price_watch', 'Price Watch / Investigación' if es else 'Price Watch / Research'),
+        ('price_watch', 'Seguimiento de precio / investigación' if es else 'Price Watch / Research'),
         ('graded', 'Resultados gradados' if es else 'Graded Results'),
         ('blocked', 'Bloqueadas por datos' if es else 'Data Blocked'),
     ]
@@ -119,17 +119,17 @@ def render_premium_card_deck(cards: pd.DataFrame, *, language: str = 'en') -> st
         parts.append('<div class="aba-card-grid">')
         for _, row in section.iterrows():
             rowd = row.to_dict()
-            title = safe_text(rowd.get('event')) or 'Matchup'
-            sport = safe_text(rowd.get('public_sport')) or safe_text(rowd.get('sport')) or 'Sport'
-            pick = safe_text(rowd.get('public_pick')) or safe_text(rowd.get('prediction'))
-            action = safe_text(rowd.get('consumer_action'))
-            market = safe_text(rowd.get('market_read'))
-            why = safe_text(rowd.get('why_it_matters'))
-            model_lean = safe_text(rowd.get('model_lean_label'))
-            price_value = safe_text(rowd.get('price_value_label'))
-            official = safe_text(rowd.get('official_status_label'))
-            result = safe_text(rowd.get('result_status'))
-            learning = safe_text(rowd.get('learning_status'))
+            title = event_text(rowd.get('public_event') or rowd.get('event') or 'Matchup', language)
+            sport = sport_text(rowd.get('public_sport') or rowd.get('sport') or 'Sport', language)
+            pick = pick_text(rowd.get('public_pick') or rowd.get('prediction'), language)
+            action = value_text(rowd.get('consumer_action') or rowd.get('recommended_action'), language)
+            market = value_text(rowd.get('market_read'), language)
+            why = value_text(rowd.get('why_it_matters'), language)
+            model_lean = value_text(rowd.get('model_lean_label'), language)
+            price_value = value_text(rowd.get('price_value_label'), language)
+            official = value_text(rowd.get('official_status_label'), language)
+            result = value_text(rowd.get('result_status'), language)
+            learning = value_text(rowd.get('learning_status'), language)
             parts.extend([
                 '<article class="aba-mini-card">',
                 f'<div class="aba-mini-k">{html.escape(sport)}</div>',
