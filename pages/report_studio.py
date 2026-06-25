@@ -8,8 +8,6 @@ import streamlit as st
 from autonomous_betting_agent.app_feed_delivery import save_app_feed
 from autonomous_betting_agent.commercial_platform_tools import load_persistent_ledger, normalize_workspace_id
 from autonomous_betting_agent.magazine_book_export import (
-    _team_label,
-    _tr,
     pick_full_page_filename,
     render_full_magazine_book_pdf,
     render_full_magazine_book_png,
@@ -22,7 +20,7 @@ from autonomous_betting_agent.report_background_image_service import render_cust
 from autonomous_betting_agent.report_feed_service import save_report_feed
 from autonomous_betting_agent.report_image_export_service import render_magazine_summary_png
 from autonomous_betting_agent.report_magazine_pdf_service import render_vintage_magazine_pdf
-from autonomous_betting_agent.report_product_layer import MagazineBrand, safe_text
+from autonomous_betting_agent.report_product_layer import MagazineBrand, event_text, pick_text, safe_text, sport_text, value_text
 from autonomous_betting_agent.report_studio_service import ReportStudioFilters, build_report_studio_state, report_studio_summary
 from autonomous_betting_agent.report_studio_ui import render_premium_card_deck, render_status_dashboard
 from autonomous_betting_agent.row_normalizer import normalize_frame
@@ -39,13 +37,13 @@ TEXT = {
         'input': 'Input rows', 'workspace': 'Client / Workspace ID', 'use_saved': 'Use saved workspace rows', 'upload': 'Upload CSV rows', 'source': 'Source',
         'empty': 'No rows found. Use Pro Predictor / Odds Lock Pro first or upload a CSV.',
         'profile': 'White-label profile', 'profile_id': 'Profile ID', 'profile_key': 'Profile key', 'load_profile': 'Load profile', 'save_profile': 'Save profile',
-        'brand_name': 'Brand / tipster name', 'tagline': 'Tagline', 'report_title': 'Report title', 'logo_url': 'Logo URL', 'disclaimer': 'Disclaimer',
+        'brand_name': 'Brand / tipster name', 'tagline': 'Tagline', 'report_title': 'Report title', 'full_book_name': 'Full magazine book name', 'logo_url': 'Logo URL', 'disclaimer': 'Disclaimer',
         'mode': 'Report mode', 'risk': 'Risk preference', 'sports': 'Sport / League Filter', 'max_rows': 'Max rows', 'visibility': 'Feed visibility',
         'cards': 'Premium Cards', 'magazine': 'Magazine Report', 'copy': 'WhatsApp / Telegram', 'audit': 'Learning Audit', 'proof': 'Analyst Proof', 'exports': 'Exports', 'images': 'Images', 'profile_json': 'Profile JSON', 'feed_json': 'App Feed', 'diagnostics': 'Diagnostics',
-        'pdf': 'Download PDF', 'magazine_pdf': 'Download Magazine PDF', 'html': 'Download HTML', 'md': 'Download Markdown', 'json': 'Download JSON', 'csv': 'Download CSV', 'copy_download': 'Download WhatsApp copy',
+        'pdf': 'Download PDF', 'magazine_pdf': 'Download Magazine PDF', 'magazine_png': 'Download Magazine Report PNG', 'html': 'Download HTML', 'md': 'Download Markdown', 'json': 'Download JSON', 'csv': 'Download CSV', 'copy_download': 'Download WhatsApp copy',
         'images_note': 'Magazine-style exports for the full report and each individual game.',
         'background_upload': 'Optional background image for magazine exports', 'background_ready': 'Custom background enabled for Full Magazine Book and individual Magazine Page downloads.',
-        'background_preview': 'Uploaded background preview',
+        'background_preview': 'Uploaded background preview', 'generated_preview': 'Generated magazine report preview',
         'feed_saved': 'Unified and legacy app feeds saved.', 'copy_label': 'Short copy', 'no_audit': 'No graded calibration data available yet.',
         'image_tab_info': 'Download the full magazine book for the complete report, or download one full magazine-style page for each individual game below.',
         'build_book': 'Build Full Magazine Book', 'building_book': 'Building full magazine book...', 'download_book_png': 'Download Full Magazine Book PNG', 'download_book_pdf': 'Download Full Magazine Book PDF', 'download_zip': 'Download Full Magazine ZIP', 'download_page': 'Download Full Magazine Page',
@@ -56,13 +54,13 @@ TEXT = {
         'input': 'Filas de entrada', 'workspace': 'ID de cliente / workspace', 'use_saved': 'Usar filas guardadas', 'upload': 'Subir CSV', 'source': 'Fuente',
         'empty': 'No hay filas. Usa Pro Predictor / Odds Lock Pro primero o sube un CSV.',
         'profile': 'Perfil white-label', 'profile_id': 'ID del perfil', 'profile_key': 'Clave del perfil', 'load_profile': 'Cargar perfil', 'save_profile': 'Guardar perfil',
-        'brand_name': 'Marca / tipster', 'tagline': 'Lema', 'report_title': 'Título del reporte', 'logo_url': 'URL del logo', 'disclaimer': 'Aviso legal',
+        'brand_name': 'Marca / tipster', 'tagline': 'Lema', 'report_title': 'Título del reporte', 'full_book_name': 'Nombre del libro revista completo', 'logo_url': 'URL del logo', 'disclaimer': 'Aviso legal',
         'mode': 'Modo de reporte', 'risk': 'Preferencia de riesgo', 'sports': 'Filtro deporte / liga', 'max_rows': 'Máximo de filas', 'visibility': 'Visibilidad del feed',
         'cards': 'Tarjetas premium', 'magazine': 'Reporte revista', 'copy': 'WhatsApp / Telegram', 'audit': 'Auditoría de aprendizaje', 'proof': 'Prueba técnica', 'exports': 'Exportaciones', 'images': 'Imágenes', 'profile_json': 'JSON del perfil', 'feed_json': 'Feed de app', 'diagnostics': 'Diagnóstico',
-        'pdf': 'Descargar PDF', 'magazine_pdf': 'Descargar PDF revista', 'html': 'Descargar HTML', 'md': 'Descargar Markdown', 'json': 'Descargar JSON', 'csv': 'Descargar CSV', 'copy_download': 'Descargar copy WhatsApp',
+        'pdf': 'Descargar PDF', 'magazine_pdf': 'Descargar PDF revista', 'magazine_png': 'Descargar PNG reporte revista', 'html': 'Descargar HTML', 'md': 'Descargar Markdown', 'json': 'Descargar JSON', 'csv': 'Descargar CSV', 'copy_download': 'Descargar copy WhatsApp',
         'images_note': 'Exportaciones estilo revista para el reporte completo y cada juego individual.',
         'background_upload': 'Imagen de fondo opcional para exportaciones de revista', 'background_ready': 'Fondo personalizado activo para libro revista completo y páginas individuales.',
-        'background_preview': 'Vista previa del fondo subido',
+        'background_preview': 'Vista previa del fondo subido', 'generated_preview': 'Vista previa del reporte revista generado',
         'feed_saved': 'Feed unificado y feed legado guardados.', 'copy_label': 'Copy corto', 'no_audit': 'Aún no hay datos gradados para calibración.',
         'image_tab_info': 'Descarga el libro revista completo del reporte o descarga una página estilo revista para cada juego individual.',
         'build_book': 'Crear libro revista completo', 'building_book': 'Creando libro revista completo...', 'download_book_png': 'Descargar libro revista PNG', 'download_book_pdf': 'Descargar libro revista PDF', 'download_zip': 'Descargar ZIP revista', 'download_page': 'Descargar página revista',
@@ -78,14 +76,31 @@ HANDOFF_KEYS = (
     'ara_latest_predictions',
 )
 
-ACTION_ES = {
-    'Price Watch / Research': 'Seguimiento de precio / investigación',
-    'Full magazine analysis': 'Análisis completo de revista',
-    'Play Small': 'Jugar pequeño',
-    'Play Standard': 'Jugar normal',
-    'No Play': 'No jugar',
-    'Research': 'Investigación',
-    'Price Watch': 'Seguimiento de precio',
+COLUMN_ES = {
+    'event': 'evento', 'sport': 'deporte', 'league': 'liga', 'prediction': 'selección', 'public_pick': 'selección pública',
+    'decimal_price': 'cuota decimal', 'model_probability': 'probabilidad modelo', 'market_probability': 'probabilidad mercado',
+    'model_market_edge': 'ventaja modelo/mercado', 'expected_value_per_unit': 'valor esperado por unidad',
+    'model_lean_label': 'lean del modelo', 'price_value_label': 'valor de precio', 'official_status_label': 'estado oficial',
+    'result_status': 'resultado', 'learning_status': 'aprendizaje', 'official_publish_ready': 'publicable oficial',
+    'client_report_ready': 'listo para cliente', 'learning_ready': 'listo aprendizaje', 'data_issue_reason': 'problema de datos',
+    'odds_verified': 'cuotas verificadas', 'report_lane': 'carril reporte', 'report_lane_v2': 'carril reporte v2',
+    'publish_ready': 'listo para publicar', 'tennis_blocked': 'tenis bloqueado', 'proof_id': 'ID prueba', 'locked_at_utc': 'bloqueado UTC',
+    'odds_source': 'fuente de cuotas', 'bookmaker': 'casa', 'model_probability_source': 'fuente prob. modelo',
+    'sports_context_summary': 'contexto deportivo', 'profit_units': 'unidades ganancia', 'sample_size': 'muestra',
+    'wins': 'ganadas', 'losses': 'perdidas', 'pushes': 'pushes', 'win_rate': 'tasa de acierto', 'roi': 'ROI', 'suggestion': 'sugerencia',
+    'market_type': 'tipo de mercado', 'edge_bucket': 'rango de ventaja', 'model_probability_bucket': 'rango prob. modelo',
+}
+
+AUDIT_ES = {
+    'by_sport': 'Por deporte', 'by_league': 'Por liga', 'by_market_type': 'Por tipo de mercado', 'by_edge_bucket': 'Por rango de ventaja',
+    'by_model_probability_bucket': 'Por rango de probabilidad del modelo', 'by_report_lane': 'Por carril de reporte', 'negative_edge_winners': 'Ganadoras con ventaja negativa',
+}
+
+LANE_ES = {
+    'best_play': 'mejor jugada', 'watchlist': 'lista de seguimiento', 'no_play': 'investigación / aprendizaje', 'research': 'investigación',
+    'official_ev_play': 'jugada oficial +EV', 'strong_prediction_price_watch': 'seguimiento de precio', 'learning_candidate': 'candidato aprendizaje',
+    'research_play': 'jugada de investigación', 'graded_winner': 'ganadora gradada', 'graded_loss': 'pérdida gradada',
+    'unsupported_sport': 'deporte no soportado', 'data_blocked': 'bloqueado por datos',
 }
 
 
@@ -94,23 +109,35 @@ def t(key: str) -> str:
 
 
 def display_event_text(value: str, language: str) -> str:
-    text = safe_text(value)
-    if language != 'es' or not text:
-        return text
-    for sep in (' at ', ' vs ', ' VS ', ' v ', ' @ '):
-        if sep in text:
-            first, second = text.split(sep, 1)
-            return f"{_team_label(first, 'es')} vs {_team_label(second, 'es')}"
-    return _tr(text, 'es')
+    return event_text(value, language)
 
 
 def display_action_text(value: str, language: str) -> str:
-    text = safe_text(value)
-    if language != 'es' or not text:
-        return text
-    if text in ACTION_ES:
-        return ACTION_ES[text]
-    return _tr(text, 'es')
+    return value_text(value, language)
+
+
+def audit_name_text(name: str, language: str) -> str:
+    return AUDIT_ES.get(name, name.replace('_', ' ').title()) if language == 'es' else name.replace('_', ' ').title()
+
+
+def localized_dataframe(frame: pd.DataFrame, language: str) -> pd.DataFrame:
+    if language != 'es' or frame is None or frame.empty:
+        return frame
+    out = frame.copy()
+    for col in list(out.columns):
+        if col in {'event', 'public_event'}:
+            out[col] = out[col].map(lambda v: event_text(v, 'es'))
+        elif col in {'sport', 'public_sport', 'league'}:
+            out[col] = out[col].map(lambda v: sport_text(v, 'es'))
+        elif col in {'prediction', 'public_pick'}:
+            out[col] = out[col].map(lambda v: pick_text(v, 'es'))
+        elif col in {'consumer_action', 'recommended_action', 'public_action', 'model_lean_label', 'price_value_label', 'official_status_label', 'result_status', 'learning_status', 'data_issue_reason', 'suggestion', 'sports_context_summary', 'market_read', 'why_it_matters'}:
+            out[col] = out[col].map(lambda v: value_text(v, 'es'))
+        elif col in {'report_lane', 'report_lane_v2'}:
+            out[col] = out[col].map(lambda v: LANE_ES.get(safe_text(v), value_text(v, 'es')))
+        elif out[col].dtype == object:
+            out[col] = out[col].map(lambda v: value_text(v, 'es'))
+    return out.rename(columns={col: COLUMN_ES.get(col, col) for col in out.columns})
 
 
 def rows_from_saved_sources(workspace_id: str) -> tuple[str, pd.DataFrame]:
@@ -204,9 +231,9 @@ with st.expander(t('profile'), expanded=True):
 
     b1, b2 = st.columns(2)
     brand_name = b1.text_input(t('brand_name'), value=loaded.brand_name)
-    tagline = b2.text_input(t('tagline'), value=loaded.tagline)
-    report_title = b1.text_input(t('report_title'), value=loaded.report_title)
-    full_magazine_book_name = st.text_input('Full magazine book name', 'ABA Signal Pro — Full Pick Magazine')
+    tagline = b2.text_input(t('tagline'), value=value_text(loaded.tagline, LANG))
+    report_title = b1.text_input(t('report_title'), value=value_text(loaded.report_title, LANG))
+    full_magazine_book_name = st.text_input(t('full_book_name'), 'ABA Signal Pro — Full Pick Magazine')
     logo_url = b2.text_input(t('logo_url'), value=loaded.logo_url)
     background_profile_upload = st.file_uploader(t('background_upload'), type=['png', 'jpg', 'jpeg'], key='report_studio_profile_background_upload')
     profile_background_bytes = background_profile_upload.getvalue() if background_profile_upload is not None else None
@@ -256,9 +283,9 @@ with tabs[1]:
     m1, m2 = st.columns(2)
     m1.download_button(t('magazine_pdf'), data=magazine_pdf_bytes, file_name=f'magazine_report_{safe_workspace}.pdf', mime='application/pdf', key='report_studio_magazine_pdf')
     magazine_tab_png = render_custom_background_summary_png(cards, brand, background_bytes=report_background_bytes) if report_background_bytes else render_magazine_summary_png(cards, brand)
-    m2.download_button('Download Magazine Report PNG', data=magazine_tab_png, file_name=f'magazine_report_{safe_workspace}.png', mime='image/png', key='report_studio_magazine_tab_png')
+    m2.download_button(t('magazine_png'), data=magazine_tab_png, file_name=f'magazine_report_{safe_workspace}.png', mime='image/png', key='report_studio_magazine_tab_png')
     if report_background_bytes:
-        st.image(magazine_tab_png, caption='Generated magazine report preview', use_container_width=True)
+        st.image(magazine_tab_png, caption=t('generated_preview'), use_container_width=True)
     st.markdown(bundle.html, unsafe_allow_html=True)
 with tabs[2]:
     st.text_area(t('copy_label'), value=bundle.whatsapp, height=420, key='report_studio_whatsapp_copy_text')
@@ -267,12 +294,12 @@ with tabs[3]:
     if not state.audit:
         st.info(t('no_audit'))
     for name, table in state.audit.items():
-        st.subheader(name.replace('_', ' ').title())
-        st.dataframe(table, use_container_width=True, hide_index=True)
+        st.subheader(audit_name_text(name, LANG))
+        st.dataframe(localized_dataframe(table, LANG), use_container_width=True, hide_index=True)
 with tabs[4]:
     proof_cols = ['event', 'sport', 'prediction', 'decimal_price', 'model_probability', 'market_probability', 'model_market_edge', 'expected_value_per_unit', 'model_lean_label', 'price_value_label', 'official_status_label', 'result_status', 'learning_status', 'official_publish_ready', 'client_report_ready', 'learning_ready', 'data_issue_reason', 'odds_verified', 'report_lane', 'report_lane_v2', 'publish_ready', 'tennis_blocked', 'proof_id', 'locked_at_utc', 'odds_source', 'bookmaker', 'model_probability_source', 'sports_context_summary', 'profit_units']
     cols = [col for col in proof_cols if col in cards.columns]
-    st.dataframe(cards[cols] if cols else cards, use_container_width=True, hide_index=True)
+    st.dataframe(localized_dataframe(cards[cols] if cols else cards, LANG), use_container_width=True, hide_index=True)
 with tabs[5]:
     st.download_button(t('pdf'), data=bundle.pdf_bytes, file_name=f'report_{safe_workspace}.pdf', mime='application/pdf', key='report_studio_export_pdf')
     st.download_button(t('magazine_pdf'), data=magazine_pdf_bytes, file_name=f'magazine_report_{safe_workspace}.pdf', mime='application/pdf', key='report_studio_export_magazine_pdf')
@@ -305,7 +332,7 @@ with tabs[6]:
     st.markdown('---')
     for idx, (_, row) in enumerate(cards.head(50).iterrows()):
         rowd = with_report_language(row.to_dict(), LANG)
-        event = display_event_text(safe_text(rowd.get('event')) or f'Game {idx + 1}', LANG)
+        event = display_event_text(safe_text(rowd.get('public_event') or rowd.get('event')) or f'Game {idx + 1}', LANG)
         action = display_action_text(safe_text(rowd.get('consumer_action') or rowd.get('recommended_action')) or 'Full magazine analysis', LANG)
         full_page_png = cached_render_full_pick_magazine_page_png(serializable_row(rowd), background_bytes, full_magazine_book_name, idx + 1, len(cards_as_rows), LANG)
         left, right = st.columns([3, 1])
