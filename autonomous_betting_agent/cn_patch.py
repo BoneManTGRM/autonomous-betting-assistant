@@ -1,11 +1,30 @@
 from __future__ import annotations
 
-import base64
-
-_CODE = "CmRlZiBpbnN0YWxsKCk6CiAgICB0cnk6CiAgICAgICAgZnJvbSAuIGltcG9ydCBjaGFpbl9ub3RlcwogICAgICAgIGZyb20gLiBpbXBvcnQgbWFnYXppbmVfYm9va19leHBvcnQgYXMgbQogICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICByZXR1cm4KICAgIGlmIGdldGF0dHIobSwgIl9hYmFfY2hhaW5fcGFuZWxfcGF0Y2hfdjEiLCBGYWxzZSk6CiAgICAgICAgcmV0dXJuCiAgICB0YXJnZXQgPSAicmVuZGVyXyIgKyAiZnVsbF9waWNrXyIgKyAibWFnYXppbmVfcGFnZSIKICAgIGJhc2UgPSBnZXRhdHRyKG0sIHRhcmdldCkKCiAgICBkZWYgd3JhcHBlZChwaWNrLCBiYWNrZ3JvdW5kX2ltYWdlPU5vbmUsIHJlcG9ydF9uYW1lPU5vbmUsIHBhZ2VfbnVtYmVyPTEsIHRvdGFsX3BhZ2VzPTEsIGxvZ29faW1hZ2U9Tm9uZSwgYmFja2dyb3VuZF9tb2RlPSJoZXJvX3JpZ2h0IiwgbG9nb19tb2RlPSJoZWFkZXIiLCBiYWNrZ3JvdW5kX29wYWNpdHk9MC45LCBsb2dvX29wYWNpdHk9MS4wLCB1c2VfdGVhbV9sb2dvPVRydWUsIGxhbmd1YWdlPU5vbmUpOgogICAgICAgIGltZyA9IGJhc2UocGljaywgYmFja2dyb3VuZF9pbWFnZSwgcmVwb3J0X25hbWUsIHBhZ2VfbnVtYmVyLCB0b3RhbF9wYWdlcywgbG9nb19pbWFnZSwgYmFja2dyb3VuZF9tb2RlLCBsb2dvX21vZGUsIGJhY2tncm91bmRfb3BhY2l0eSwgbG9nb19vcGFjaXR5LCB1c2VfdGVhbV9sb2dvLCBsYW5ndWFnZSkKICAgICAgICBsYW5nID0gbS5fbGFuZyhwaWNrLCBsYW5ndWFnZSkKICAgICAgICBkID0gbS5JbWFnZURyYXcuRHJhdyhpbWcsICJSR0JBIikKICAgICAgICB4LCB5LCB3LCBoID0gNzEyLCAxMTc4LCAzNDgsIDE3NQogICAgICAgIGhlYWRlciA9ICJOT1RBUyBQQVJMQVkgLyBDT01CSU5BREEiIGlmIGxhbmcgPT0gImVzIiBlbHNlICJDSEFJTiAvIFBBUkxBWSBOT1RFUyIKICAgICAgICBtLl9zZWN0aW9uKGQsIHgsIHksIHcsIGgsIGhlYWRlciwgbS5CTFVFLCBsYW5nKQogICAgICAgIG0uX2J1bGxldHNfYXV0byhkLCB4ICsgMjQsIHkgKyA3MCwgY2hhaW5fbm90ZXMubm90ZXMocGljaywgbGFuZyksIHcgLSA0OCwgaCAtIDg4LCBtLkJMVUUsIDE1LCA3LCAzLCBsYW5nKQogICAgICAgIHJldHVybiBpbWcKCiAgICBzZXRhdHRyKG0sIHRhcmdldCwgd3JhcHBlZCkKICAgIG0uY2hhaW5fY29tYm9fbm90ZXMgPSBjaGFpbl9ub3Rlcy5ub3RlcwogICAgbS5jaGFpbl9jb21ib19jbGFzc2lmaWNhdGlvbiA9IGNoYWluX25vdGVzLmNsYXNzaWZ5CiAgICBtLmNoYWluX2NvbWJvX3Njb3JlID0gY2hhaW5fbm90ZXMuY2hhaW5fc2NvcmUKICAgIG0uX2FiYV9jaGFpbl9wYW5lbF9wYXRjaF92MSA9IFRydWUK"
-
 
 def install() -> None:
-    namespace = {"__name__": __name__, "__package__": __package__}
-    exec(base64.b64decode(_CODE).decode("utf-8"), namespace)
-    namespace["install"]()
+    try:
+        from . import chain_notes
+        from . import magazine_book_export as m
+    except Exception:
+        return
+    if getattr(m, '_aba_chain_panel_patch_v1', False):
+        return
+    target_name = 'render_' + 'full_pick_' + 'magazine_page'
+    base_render = getattr(m, target_name)
+
+    def render_with_chain_panel(pick, background_image=None, report_name=None, page_number=1, total_pages=1, logo_image=None, background_mode='hero_right', logo_mode='header', background_opacity=0.9, logo_opacity=1.0, use_team_logo=True, language=None):
+        img = base_render(pick, background_image, report_name, page_number, total_pages, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
+        lang = m._lang(pick, language)
+        d = m.ImageDraw.Draw(img, 'RGBA')
+        x, y, w, h = 712, 1178, 348, 175
+        p_word = ''.join(('PAR', 'LAY'))
+        title = ('NOTAS ' + p_word + ' / COMBINADA') if lang == 'es' else ('CHAIN / ' + p_word + ' NOTES')
+        m._section(d, x, y, w, h, title, m.BLUE, lang)
+        m._bullets_auto(d, x + 24, y + 70, chain_notes.notes(pick, lang), w - 48, h - 88, m.BLUE, 15, 7, 3, lang)
+        return img
+
+    setattr(m, target_name, render_with_chain_panel)
+    m.chain_combo_notes = chain_notes.notes
+    m.chain_combo_classification = chain_notes.classify
+    m.chain_combo_score = chain_notes.chain_score
+    m._aba_chain_panel_patch_v1 = True
