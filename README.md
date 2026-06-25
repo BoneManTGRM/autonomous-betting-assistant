@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BoneManTGRM/autonomous-betting-agent/actions/workflows/ci.yml)
 
-ABA Signal Pro is a proprietary, source-available sports analytics, proof-tracking, and prediction-review platform. It is designed to help operators scan data, review signals, lock proof rows, grade results, export reports, and evaluate calibration.
+ABA Signal Pro is an AI-powered sports betting intelligence assistant for analytics, proof tracking, and prediction review. It is designed to help operators scan data, review signals, lock proof rows, grade results, export reports, and evaluate calibration while keeping the user responsible for every final decision.
 
 **Important:** this software does not execute transactions, does not guarantee winners, and does not guarantee returns. It is an analytics and research system. Any real-world decision remains the responsibility of the user.
 
