@@ -8,13 +8,109 @@ name: CI
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  patch-magazine-layout:
+    name: Patch compact magazine layout
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch magazine renderer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('autonomous_betting_agent/magazine_book_export.py')
+          text = p.read_text(encoding='utf-8')
+          replacements = {
+              'MAGAZINE_STYLE_VERSION = "premium_v4_reference_readable"': 'MAGAZINE_STYLE_VERSION = "premium_v4_reference_compact"',
+              'background_opacity: float = 0.65': 'background_opacity: float = 0.9',
+              'for _ in range(260):': 'for _ in range(120):',
+              'for _ in range(30):': 'for _ in range(10):',
+              'slot = _cover(loaded, (430, 340))': 'slot = _cover(loaded, (430, 350))',
+              'slot = ImageEnhance.Color(slot).enhance(0.75)': 'slot = ImageEnhance.Color(slot).enhance(0.86)',
+              'slot = ImageEnhance.Contrast(slot).enhance(1.05)': 'slot = ImageEnhance.Contrast(slot).enhance(1.08)',
+              'alpha = int(255 * min(max(opacity, 0.55), 0.75))': 'alpha = int(255 * min(max(opacity, 0.82), 0.95))',
+              'mask = Image.new("L", (430, 340), alpha)': 'mask = Image.new("L", (430, 350), alpha)',
+              'rounded = Image.new("L", (430, 340), 0)': 'rounded = Image.new("L", (430, 350), 0)',
+              'ImageDraw.Draw(rounded).rounded_rectangle((0, 0, 430, 340), radius=24, fill=255)': 'ImageDraw.Draw(rounded).rounded_rectangle((0, 0, 430, 350), radius=16, fill=255)',
+              'mask = Image.composite(mask, Image.new("L", (430, 340), 0), rounded)': 'mask = Image.composite(mask, Image.new("L", (430, 350), 0), rounded)',
+              'base.alpha_composite(slot, (620, 112))': 'base.alpha_composite(slot, (620, 105))',
+              'draw.rounded_rectangle((620, 112, 1050, 452), radius=24, outline=BLACK + (180,), width=2)': 'draw.rounded_rectangle((620, 105, 1050, 455), radius=16, outline=BLACK + (185,), width=2)',
+              'draw.rectangle((30, 26, 292, 74), fill=RED)': 'draw.rectangle((28, 24, 308, 74), fill=RED)',
+              'draw.text((43, 34), "ABA SIGNAL PRO", font=_fit("ABA SIGNAL PRO", 232, 31, 24, True), fill="white")': 'draw.text((43, 33), "ABA SIGNAL PRO", font=_fit("ABA SIGNAL PRO", 250, 34, 25, True), fill="white")',
+              'draw.text((328, 35), "DAILY SPORTS ANALYSIS", font=_font(31, True), fill="white")': 'draw.text((330, 31), "DAILY SPORTS ANALYSIS", font=_font(34, True), fill="white")',
+              'draw.rounded_rectangle((854, 26, PAGE_WIDTH - 38, 74), radius=5, fill=CREAM, outline=BLACK)': 'draw.rounded_rectangle((840, 24, 1050, 74), radius=5, fill=CREAM, outline=BLACK)',
+              'draw.text((890, 36), f"PAGE {page} OF {total}", font=_font(26, True), fill=BLACK)': 'draw.text((872, 35), f"PAGE {page} OF {total}", font=_font(27, True), fill=BLACK)',
+              'font=_fit(away.upper(), 600, 98, 56, True)': 'font=_fit(away.upper(), 590, 116, 56, True)',
+              'font=_fit(home.upper(), 560, 78, 46, True)': 'font=_fit(home.upper(), 560, 94, 46, True)',
+              'strip_y = 470': 'strip_y = 456',
+              'strip_y + 104': 'strip_y + 106',
+              'font=_font(26, True), fill=RED)': 'font=_font(27, True), fill=RED)',
+              'font=_fit(pick_text, 220, 33, 20, True)': 'font=_fit(pick_text, 220, 36, 20, True)',
+              '_metric(draw, x, strip_y + 5, width, label, value, color)': '_metric(draw, x, strip_y + 6, width, label, value, color)',
+              '_section(draw, 20, 600, 350, 282, "WHY WE PICKED IT", RED, "★")': '_section(draw, 20, 585, 350, 300, "WHY WE PICKED IT", RED)',
+              '_bullets(draw, 44, 668, _why(pick), 306, RED, 4, 20, 2)': '_bullets(draw, 44, 655, _why(pick), 306, RED, 4, 21, 2)',
+              '_section(draw, 20, 902, 350, 218, "PRO BETTOR EVIDENCE", BLUE, "●")': '_section(draw, 20, 905, 350, 225, "PRO BETTOR EVIDENCE", BLUE)',
+              'row_y = 970': 'row_y = 974',
+              '_section(draw, 386, 600, 674, 336, "TEAM SNAPSHOTS", BLUE, "♟")': '_section(draw, 386, 585, 674, 365, "TEAM SNAPSHOTS", BLUE)',
+              'draw.line((724, 670, 724, 914), fill=BLACK + (170,), width=1)': 'draw.line((724, 660, 724, 922), fill=BLACK + (170,), width=1)',
+              '_team_snapshot(image, draw, 410, 680, 292, away, "away", RED, pick, use_team_logo)': '_team_snapshot(image, draw, 410, 675, 292, away, "away", RED, pick, use_team_logo)',
+              '_team_snapshot(image, draw, 746, 680, 292, home, "home", BLUE, pick, use_team_logo)': '_team_snapshot(image, draw, 746, 675, 292, home, "home", BLUE, pick, use_team_logo)',
+              '_section(draw, 386, 956, 674, 164, "PLAYER / INJURY NOTES", BLUE, "♟")': '_section(draw, 386, 965, 674, 165, "PLAYER / INJURY NOTES", BLUE)',
+              '_section(draw, 20, 1142, 340, 204, "RISK DESK", RED, "♢")': '_section(draw, 20, 1150, 340, 205, "RISK DESK", RED)',
+              '_section(draw, 374, 1142, 332, 204, "MATCHUP NOTES", BLUE, "●")': '_section(draw, 374, 1150, 332, 205, "MATCHUP NOTES", BLUE)',
+              '_section(draw, 720, 1142, 340, 204, "CHAIN BETTING NOTES", BLUE, "↗")': '_section(draw, 720, 1150, 340, 205, "CHAIN BETTING NOTES", BLUE)',
+              'font=_fit(action_text, 320, 56, 34, True)': 'font=_fit(action_text, 320, 60, 36, True)',
+              '_fit(pick_text, 340, 36, 24, True)': '_fit(pick_text, 340, 40, 26, True)',
+              '_font(22), CREAM, 350, 3)': '_font(23), CREAM, 350, 3)',
+          }
+          for old, new in replacements.items():
+              text = text.replace(old, new)
+          old_section = '''def _section(draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, title: str, color: tuple[int, int, int], icon: str = "★") -> None:
+    draw.rounded_rectangle((x, y, x + w, y + h), radius=14, fill=CREAM + (252,), outline=BLACK + (235,), width=3)
+    draw.rounded_rectangle((x, y, x + w, y + 54), radius=10, fill=color)
+    draw.text((x + 18, y + 12), icon, font=_font(24, True), fill=CREAM)
+    header_font = _fit(title.upper(), w - 66, 27, 18, True)
+    draw.text((x + 54, y + 11), title.upper(), font=header_font, fill=CREAM)
+'''
+          new_section = '''def _section(draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, title: str, color: tuple[int, int, int]) -> None:
+    draw.rounded_rectangle((x, y, x + w, y + h), radius=14, fill=CREAM + (255,), outline=BLACK + (238,), width=3)
+    draw.rounded_rectangle((x, y, x + w, y + 56), radius=10, fill=color)
+    header_font = _fit(title.upper(), w - 36, 31, 20, True)
+    draw.text((x + 18, y + 10), title.upper(), font=header_font, fill=CREAM)
+'''
+          text = text.replace(old_section, new_section)
+          if 'MAGAZINE_STYLE_VERSION = "premium_v4_reference_compact"' not in text:
+              raise SystemExit('compact version token not applied')
+          if 'TEAM_DATA_FALLBACK = "Data not available from uploaded row"' not in text:
+              raise SystemExit('team fallback token missing')
+          if 'PLAYER_DATA_FALLBACK = "Player data not available in uploaded row"' not in text:
+              raise SystemExit('player fallback token missing')
+          p.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit magazine patch if needed
+        run: |
+          if git diff --quiet autonomous_betting_agent/magazine_book_export.py; then
+            echo "No magazine patch needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add autonomous_betting_agent/magazine_book_export.py
+          git commit -m "Tighten magazine layout to match reference sheet"
+          git push
+
   test:
     name: Python checks
     runs-on: ubuntu-latest
