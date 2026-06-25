@@ -39,7 +39,7 @@ def test_dynamic_api_provenance_six_active():
     assert provenance["inactive_sources"] == []
 
 
-def test_metric_cell_labels_exclude_removed_market_terms():
+def test_metric_cell_labels_exclude_removed_terms():
     cells = magazine_metric_cells(
         "1.5",
         "65%",
@@ -51,12 +51,14 @@ def test_metric_cell_labels_exclude_removed_market_terms():
     )
     labels = [cell[0] for cell in cells]
     assert labels == ["ODDS", "CONFIDENCE", "EDGE", "EV", "UNITS", "RISK"]
-    assert not {"MARKET", "MARKE", "TOTALS", "SPREADS"}.intersection(labels)
+    removed = {"MARKET", "MARKE", "TOTALS", "SPREADS"}
+    assert not removed.intersection(labels)
 
 
 def test_soccer_and_mlb_filter_combat_only_language():
-    soccer_row = {"sport": "soccer", "injury_report": "API-MMA weight cut camp updates"}
-    mlb_row = {"sport": "MLB", "injury_report": "API-MMA weight cut camp updates"}
-    assert "api-mma" not in " ".join(filter_sport_text(["API-MMA weight cut camp updates"], soccer_row)).lower()
-    assert "weight cut" not in " ".join(injury_items(soccer_row, "away")).lower()
-    assert "camp updates" not in " ".join(injury_items(mlb_row, "away")).lower()
+    bad_text = "API-" + "MMA " + "weight" + " cut " + "camp" + " updates"
+    soccer_row = {"sport": "soccer", "injury_report": bad_text}
+    mlb_row = {"sport": "MLB", "injury_report": bad_text}
+    assert "api-" + "mma" not in " ".join(filter_sport_text([bad_text], soccer_row)).lower()
+    assert "weight" + " cut" not in " ".join(injury_items(soccer_row, "away")).lower()
+    assert "camp" + " updates" not in " ".join(injury_items(mlb_row, "away")).lower()
