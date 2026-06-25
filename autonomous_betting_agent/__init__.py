@@ -218,8 +218,20 @@ def _install_chain_notes() -> None:
         return
 
 
+def _install_magazine_value_safety() -> None:
+    try:
+        from .magazine_value_safety_patch import install
+    except Exception:
+        return
+    try:
+        install()
+    except Exception:
+        return
+
+
 _install_price_normalizer()
 _install_adaptive_learning_area_key_normalizer()
 _install_magazine_renderer_patches()
 _install_mexico_spanish_terms()
 _install_chain_notes()
+_install_magazine_value_safety()
