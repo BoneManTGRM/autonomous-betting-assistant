@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 PAGE_WIDTH = 1080
 PAGE_HEIGHT = 1620
 MAGAZINE_STYLE_VERSION = "premium_v4_reference_compact_no_market_v6"
+NO_MARKET_EXPORT_VERSION = "no_market_metric_v6"
 SAFETY_FOOTER = "No guarantees. Bet responsibly. This analysis is for informational purposes only."
 ASSET_DIRS = (Path("assets/team_logos"), Path("assets/report_logos"), Path("assets/licensed_logos"))
 TEAM_DATA_FALLBACK = "Data not available from uploaded row"
@@ -59,7 +60,7 @@ ES = {
     "PLAYER / INJURY NOTES": "JUGADORES / LESIONES",
     "RISK DESK": "RIESGO",
     "MATCHUP NOTES": "NOTAS DEL PARTIDO",
-    "CHAIN / PARLAY NOTES": "NOTAS PARLAY",
+    "CHAIN BETTING NOTES": "NOTAS PARLAY",
     "FINAL": "FINAL",
     "RECOMMENDATION": "RECOMENDACIÓN",
     "SOURCE": "FUENTE",
@@ -79,51 +80,68 @@ ES = {
 }
 
 COUNTRY_ES = {
-    "mexico": "México",
-    "czech republic": "República Checa",
-    "norway": "Noruega",
+    "iraq": "Irak",
+    "iran": "Irán",
     "france": "Francia",
     "germany": "Alemania",
-    "japan": "Japón",
-    "new zealand": "Nueva Zelanda",
-    "united states": "Estados Unidos",
-    "usa": "Estados Unidos",
-    "south korea": "Corea del Sur",
-    "ivory coast": "Costa de Marfil",
+    "ecuador": "Ecuador",
+    "australia": "Australia",
+    "paraguay": "Paraguay",
+    "netherlands": "Países Bajos",
     "tunisia": "Túnez",
     "egypt": "Egipto",
-    "iran": "Irán",
-    "iraq": "Irak",
+    "ivory coast": "Costa de Marfil",
+    "curacao": "Curazao",
+    "curaçao": "Curazao",
+    "senegal": "Senegal",
+    "norway": "Noruega",
+    "algeria": "Argelia",
+    "jordan": "Jordania",
+    "argentina": "Argentina",
+    "spain": "España",
+    "england": "Inglaterra",
+    "united states": "Estados Unidos",
+    "usa": "Estados Unidos",
+    "us": "Estados Unidos",
+    "mexico": "México",
+    "italy": "Italia",
+    "brazil": "Brasil",
+    "portugal": "Portugal",
+    "canada": "Canadá",
+    "japan": "Japón",
+    "south korea": "Corea del Sur",
+    "new zealand": "Nueva Zelanda",
+    "czech republic": "República Checa",
 }
 
 
-def _row(v: Any) -> Mapping[str, Any]:
-    if isinstance(v, Mapping):
-        return v
-    if is_dataclass(v):
-        return asdict(v)
-    if hasattr(v, "to_dict"):
-        d = v.to_dict()
-        return d if isinstance(d, Mapping) else {}
-    return getattr(v, "__dict__", {}) or {}
+def _row(value: Any) -> Mapping[str, Any]:
+    if isinstance(value, Mapping):
+        return value
+    if is_dataclass(value):
+        return asdict(value)
+    if hasattr(value, "to_dict"):
+        data = value.to_dict()
+        return data if isinstance(data, Mapping) else {}
+    return getattr(value, "__dict__", {}) or {}
 
 
-def _bad(v: Any) -> bool:
-    return v is None or (isinstance(v, float) and math.isnan(v)) or str(v).strip().lower() in {"", "nan", "none", "null", "n/a", "na", "nat", "--"}
+def _bad(value: Any) -> bool:
+    return value is None or (isinstance(value, float) and math.isnan(value)) or str(value).strip().lower() in {"", "nan", "none", "null", "n/a", "na", "nat", "--"}
 
 
-def _get(r: Any, *keys: str, default: str = "") -> str:
-    d = _row(r)
+def _get(row: Any, *keys: str, default: str = "") -> str:
+    data = _row(row)
     for key in keys:
-        value = d.get(key)
+        value = data.get(key)
         if not _bad(value):
             return str(value).strip()
     return default
 
 
-def _num(r: Any, *keys: str) -> float | None:
+def _num(row: Any, *keys: str) -> float | None:
     for key in keys:
-        value = _row(r).get(key)
+        value = _row(row).get(key)
         if _bad(value):
             continue
         try:
@@ -133,10 +151,10 @@ def _num(r: Any, *keys: str) -> float | None:
     return None
 
 
-def _lang(r: Any = None, explicit: str | None = None) -> str:
-    raw = explicit or _get(r, "report_language", "language", "lang", default="")
-    low = str(raw or "").lower()
-    return "es" if low.startswith("es") or "español" in low or "espanol" in low else "en"
+def _lang(row: Any = None, explicit: str | None = None) -> str:
+    raw = explicit or _get(row, "report_language", "language", "lang", default="")
+    text = str(raw or "").lower()
+    return "es" if text.startswith("es") or "español" in text or "espanol" in text else "en"
 
 
 def _team_label(team: str, lang: str) -> str:
@@ -238,12 +256,6 @@ def _fit(text: str, width: int, start: int, minimum: int = 12, bold: bool = True
     return _font(minimum, bold)
 
 
-def _headline_font(text: str, width: int, preferred: int, minimum: int) -> ImageFont.ImageFont:
-    upper = str(text or "").upper()
-    start = preferred if len(upper) <= 8 else min(preferred, 116)
-    return _fit(upper, width, start, minimum, True)
-
-
 def _line_height(font: ImageFont.ImageFont) -> int:
     return getattr(font, "size", 18) + 4
 
@@ -326,20 +338,6 @@ def pick_full_page_filename(pick: Any, index: int, extension: str = "png") -> st
     return sanitize_image_filename(f"pick_{index + 1:02d}_{_game(pick)}", "full_page", extension)
 
 
-def find_local_team_logo(team_name: str) -> Path | None:
-    stem = re.sub(r"[^a-z0-9]+", "_", str(team_name).lower()).strip("_")
-    variants = {stem, stem.replace("_", "-"), stem.replace("_", "")}
-    for folder in ASSET_DIRS:
-        if not folder.exists():
-            continue
-        for variant in variants:
-            for ext in (".png", ".jpg", ".jpeg", ".webp"):
-                path = folder / f"{variant}{ext}"
-                if path.exists():
-                    return path
-    return None
-
-
 def _load_image(value: Any) -> Image.Image | None:
     try:
         if isinstance(value, (bytes, bytearray)):
@@ -364,12 +362,6 @@ def _cover(img: Image.Image, size: tuple[int, int], anchor_y: float = 0.5) -> Im
     x = max(0, (resized.width - width) // 2)
     y = int(max(0, resized.height - height) * max(0, min(1, anchor_y)))
     return resized.crop((x, y, x + width, y + height))
-
-
-def _contain(img: Image.Image, size: tuple[int, int]) -> Image.Image:
-    out = img.copy()
-    out.thumbnail(size, _resample())
-    return out
 
 
 def _paper(seed: int) -> Image.Image:
@@ -414,13 +406,7 @@ def _initials(text: str) -> str:
     return "".join(part[0] for part in parts[:3]) or "TM"
 
 
-def _badge(img: Image.Image, draw: ImageDraw.ImageDraw, label: str, x: int, y: int, width: int, height: int, color: tuple[int, int, int], use_logo: bool = True) -> None:
-    logo = _load_image(find_local_team_logo(label)) if use_logo else None
-    if logo:
-        draw.rounded_rectangle((x, y, x + width, y + height), radius=8, fill=CREAM + (245,), outline=color, width=2)
-        logo = _contain(logo, (width - 8, height - 8))
-        img.alpha_composite(logo, (x + (width - logo.width) // 2, y + (height - logo.height) // 2))
-        return
+def _badge(img: Image.Image, draw: ImageDraw.ImageDraw, label: str, x: int, y: int, width: int, height: int, color: tuple[int, int, int]) -> None:
     draw.rounded_rectangle((x, y, x + width, y + height), radius=8, fill=color, outline=CREAM, width=2)
     text = _initials(label)[:3]
     font = _fit(text, width - 8, max(20, height // 2), 12, True)
@@ -495,9 +481,9 @@ def _pairs(row: Any, lang: str) -> list[tuple[str, str]]:
     return [(_tr(label, lang), _tr(_clean(value), lang)) for label, value in rows if value != NO_VERIFIED][:5]
 
 
-def _team_snapshot(img: Image.Image, draw: ImageDraw.ImageDraw, x: int, y: int, width: int, team: str, color: tuple[int, int, int], use_logo: bool, lang: str) -> None:
+def _team_snapshot(img: Image.Image, draw: ImageDraw.ImageDraw, x: int, y: int, width: int, team: str, color: tuple[int, int, int], lang: str) -> None:
     label = _team_label(team, lang)
-    _badge(img, draw, label, x, y, 50, 50, color, use_logo)
+    _badge(img, draw, label, x, y, 50, 50, color)
     draw.text((x + 66, y + 9), label.upper(), font=_fit(label.upper(), width - 70, 25, 14, True), fill=color)
     _bullets_auto(draw, x, y + 76, [TEAM_DATA_FALLBACK, "Use team form, injuries, and market movement before publishing."], width - 10, 165, color, 18, 10, 4, lang)
 
@@ -552,10 +538,10 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     page_text = _tr(f"PAGE {page_number} OF {total_pages}", lang)
     draw.text((862, 32), page_text, font=_fit(page_text, 174, 28, 16, True), fill=BLACK)
 
-    draw.text((36, 105), away_label.upper(), font=_headline_font(away_label, 590, 140, 72), fill=RED)
+    draw.text((36, 105), away_label.upper(), font=_fit(away_label.upper(), 590, 140, 72, True), fill=RED)
     draw.rounded_rectangle((36, 218, 104, 288), radius=6, fill=CREAM, outline=BLACK, width=2)
     draw.text((55, 232), "V", font=_font(44, True), fill=BLACK)
-    draw.text((112, 220), home_label.upper(), font=_headline_font(home_label, 560, 112, 62), fill=BLUE)
+    draw.text((112, 220), home_label.upper(), font=_fit(home_label.upper(), 560, 112, 62, True), fill=BLUE)
     season = _tr(_get(pick, "season_label", "event_stage", "competition_round", default=f"{sport} REGULAR SEASON"), lang)
     draw.rectangle((36, 330, 506, 378), fill=BLACK)
     draw.text((54, 339), season.upper(), font=_fit(season.upper(), 432, 28, 15, True), fill=CREAM)
@@ -572,7 +558,7 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     draw.text((50, sy + 16), trend, font=_fit(trend, 190, 25, 14, True), fill=RED)
     pick_text = _tr(_clean(_pick(pick), True), lang).upper()
     _txt_auto(draw, 50, sy + 52, pick_text, 210, 38, 30, 8, CREAM, True, 1)
-    _badge(img, draw, home_label, 268, sy + 27, 58, 50, BLUE, use_team_logo)
+    _badge(img, draw, home_label, 268, sy + 27, 58, 50, BLUE)
 
     odds = _fmt(_get(pick, "american_odds", "odds_american", "decimal_price", "odds_at_pick", "best_price", "odds"), "odds")
     conf = _pct(_num(pick, "learned_model_probability", "model_probability_clean", "model_probability", "final_probability"))
@@ -610,8 +596,8 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     divider = right_x + right_w // 2
     draw.line((divider, 660, divider, 922), fill=BLACK + (170,), width=1)
     snap_w = right_w // 2 - 52
-    _team_snapshot(img, draw, right_x + 24, 675, snap_w, away, RED, use_team_logo, lang)
-    _team_snapshot(img, draw, divider + 24, 675, snap_w, home, BLUE, use_team_logo, lang)
+    _team_snapshot(img, draw, right_x + 24, 675, snap_w, away, RED, lang)
+    _team_snapshot(img, draw, divider + 24, 675, snap_w, home, BLUE, lang)
 
     player_y, player_h = 952, 208
     _section(draw, right_x, player_y, right_w, player_h, "PLAYER / INJURY NOTES", BLUE, lang)
@@ -624,7 +610,7 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     _bullets_auto(draw, 44, low_y + 70, _items(pick, ("why_lose", "risk_reason", "hidden_risk", "risk_notes"), [f"Risk status: {risk}", "Recheck odds before entry.", "Avoid if key news changes"], 3), 272, low_h - 88, RED, 16, 8, 3, lang)
     _section(draw, 354, low_y, 344, low_h, "MATCHUP NOTES", BLUE, lang)
     _bullets_auto(draw, 378, low_y + 70, _items(pick, ("matchup_note", "matchup_notes", "head_to_head", "h2h", "venue_note", "weather_location", "sports_context_summary"), ["Context unavailable.", "Confirm venue and start time.", "Recheck price before publishing."], 3), 296, low_h - 88, BLUE, 16, 8, 3, lang)
-    _section(draw, 712, low_y, 348, low_h, "CHAIN / PARLAY NOTES", BLUE, lang)
+    _section(draw, 712, low_y, 348, low_h, "CHAIN BETTING NOTES", BLUE, lang)
     _bullets_auto(draw, 736, low_y + 70, _items(pick, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), ["Straight only: research", "Do not combine without official verification", "Wait for better context or price"], 3), 300, low_h - 88, BLUE, 16, 8, 3, lang)
 
     action = _tr(_clean(_get(pick, "final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action", default="PLAY STANDARD"), True), lang)
@@ -642,9 +628,13 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     footer_y, footer_b = 1542, 1581
     draw.rectangle((20, footer_y, 1060, footer_b), fill=BLACK)
     footer = _tr(SAFETY_FOOTER, lang)
-    font = _fit(footer, PAGE_WIDTH - 70, 16, 10, False)
+    font = _fit(footer, PAGE_WIDTH - 190, 16, 10, False)
     box = draw.textbbox((0, 0), footer, font=font)
-    draw.text(((PAGE_WIDTH - (box[2] - box[0])) / 2, footer_y + 10), footer, font=font, fill=CREAM)
+    draw.text((42, footer_y + 10), footer, font=font, fill=CREAM)
+    version = "v6 no-market"
+    vfont = _font(14, True)
+    vbox = draw.textbbox((0, 0), version, font=vfont)
+    draw.text((1048 - (vbox[2] - vbox[0]), footer_y + 10), version, font=vfont, fill=GREEN)
     return img.convert("RGB")
 
 
@@ -678,13 +668,19 @@ def render_full_magazine_book_pdf(picks: Iterable[Any], background_image: Any = 
     return out.getvalue()
 
 
+def _versioned_page_filename(row: Any, index: int) -> str:
+    base = pick_full_page_filename(row, index, extension="")
+    return sanitize_image_filename(base, NO_MARKET_EXPORT_VERSION, "png")
+
+
 def render_full_magazine_zip(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
     rows = list(picks)
     pages = render_full_magazine_book_pages(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
     out = BytesIO()
-    with ZipFile(out, "w", compression=ZIP_DEFLATED) as z:
-        z.writestr("full_magazine_book.png", render_full_magazine_book_png(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
-        z.writestr("full_magazine_book.pdf", render_full_magazine_book_pdf(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
-        for i, page in enumerate(pages):
-            z.writestr(pick_full_page_filename(rows[i] if i < len(rows) else {"event": "No Picks"}, i), _png(page))
+    with ZipFile(out, "w", compression=ZIP_DEFLATED) as zip_file:
+        zip_file.writestr(f"full_magazine_book_{NO_MARKET_EXPORT_VERSION}.png", render_full_magazine_book_png(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
+        zip_file.writestr(f"full_magazine_book_{NO_MARKET_EXPORT_VERSION}.pdf", render_full_magazine_book_pdf(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
+        for index, page in enumerate(pages):
+            row = rows[index] if index < len(rows) else {"event": "No Picks"}
+            zip_file.writestr(_versioned_page_filename(row, index), _png(page))
     return out.getvalue()
