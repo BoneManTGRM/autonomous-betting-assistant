@@ -4,8 +4,8 @@ import base64
 import html
 from typing import Any
 
-APP_TAGLINE = 'Powered by Reparodynamics'
-APP_TAGLINE_ES = 'Impulsado por Reparodynamics'
+APP_TAGLINE = 'AI Betting Intelligence Assistant · Powered by Reparodynamics'
+APP_TAGLINE_ES = 'Asistente de inteligencia para apuestas · Impulsado por Reparodynamics'
 GLOBAL_LANGUAGE_KEY = 'aba_global_language'
 LANGUAGE_KEYS = ['global_language','signal_board_language','pro_predictor_language','odds_lock_pro_language','report_studio_language','proof_center_language','local_control_center_language','learning_memory_language','storage_diagnostics_language','reset_storage_language']
 TOOLS: tuple[tuple[str, str, str], ...] = (
