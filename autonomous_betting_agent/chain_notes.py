@@ -247,7 +247,15 @@ def detect_correlation_warning(row_like: Any, existing_legs: Sequence[Any] | Non
             return 'Advertencia de correlación: selecciones del mismo equipo/mercado pueden no ser independientes.' if lang == 'es' else 'Correlation warning: same-team/same-market legs may not be independent.'
     return ''
 
-# Backwards-compatible requested names.
+
+def install() -> None:
+    try:
+        from . import cn_patch
+    except Exception:
+        return
+    cn_patch.install()
+
+
 normalize_chain_classification = classify
 chain_betting_bullets = notes
 chain_betting_score = chain_score
