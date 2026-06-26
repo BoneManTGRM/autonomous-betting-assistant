@@ -73,7 +73,10 @@ def test_pairs_show_four_active_apis(monkeypatch):
     pairs = magazine._pairs(_row(), "en")
     pair_text = "\n".join(f"{k}: {v}" for k, v in pairs)
     assert "ODDS ROW: uploaded/cached row" in pair_text
-    assert "ACTIVE APIS: SportsDataIO · WeatherAPI · API-Football · NewsAPI" in pair_text
+    assert "ACTIVE: SDIO · Weather · API-FB · News" in pair_text
+    assert "NO LIVE: Odds" in pair_text
+    assert "INACTIVE: PPLX" in pair_text
+    assert "ACTIVE APIS" not in pair_text
     assert "ODDS ROW: " + THE_ODDS_API not in pair_text
 
 
@@ -81,8 +84,9 @@ def test_fallbacks_mention_four_active_apis(monkeypatch):
     _clear_api_env(monkeypatch)
     monkeypatch.setenv("ODDS_API_KEY", "x")
     _set_four(monkeypatch)
-    expected = "Active APIs checked: SportsDataIO · WeatherAPI · API-Football · NewsAPI."
     row = _row()
-    assert any(expected in item for item in api_sources.team_items(row, "away"))
-    assert any(expected in item for item in api_sources.injury_items(row, "home"))
-    assert any(expected in item for item in api_sources.matchup_items(row))
+    expected_sources = "SDIO · Weather · API-FB · News"
+    for section_items in (api_sources.team_items(row, "away"), api_sources.injury_items(row, "home"), api_sources.matchup_items(row)):
+        text = "\n".join(section_items)
+        assert expected_sources in text or any("checked" in item.lower() for item in section_items)
+        assert "SportsDataIO · WeatherAPI · API-Football · NewsAPI" not in text
