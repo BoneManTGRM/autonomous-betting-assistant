@@ -19,16 +19,8 @@ from typing import Any, Callable, Mapping, Sequence
 
 import pandas as pd
 
-from autonomous_betting_agent.adaptive_repair_diagnostics import (
-    CLOSING_ODDS_COLUMNS,
-    CONFIDENCE_COLUMNS,
-    EDGE_COLUMNS,
-    ODDS_COLUMNS,
-    START_COLUMNS,
-    build_enhanced_diagnostics,
-    diagnostics_to_markdown,
-)
-from autonomous_betting_agent.adaptive_repair_engine import EVENT_COLUMNS, MARKET_COLUMNS, RESULT_COLUMNS, SPORT_COLUMNS, read_csv_rows
+from autonomous_betting_agent.adaptive_repair_diagnostics import build_enhanced_diagnostics, diagnostics_to_markdown
+from autonomous_betting_agent.adaptive_repair_engine import read_csv_rows
 from autonomous_betting_agent.security import file_sha256, redact_secret_text, sanitize_filename
 
 SIMULATION_RUNS_DIR = Path("data/adaptive_repair/simulation_runs")
@@ -156,14 +148,11 @@ def _load_csvs_from_dir(directory: Path, label: str, max_files: int = 20) -> lis
     for path in sorted(directory.glob("*.csv"))[:max_files]:
         if "adaptive_repair" in str(path):
             continue
-        try:
-            for row in safe_csv_rows_from_path(path):
-                row = dict(row)
-                row.setdefault("source_file", str(path))
-                row.setdefault("source_label", label)
-                rows.append(row)
-        except Exception:
-            continue
+        for row in safe_csv_rows_from_path(path):
+            row = dict(row)
+            row.setdefault("source_file", str(path))
+            row.setdefault("source_label", label)
+            rows.append(row)
     return rows
 
 
@@ -263,7 +252,6 @@ def readiness_report(diagnostics: Mapping[str, Any], unavailable_data: Sequence[
     if unavailable_data:
         reasons.extend(str(item) for item in unavailable_data[:5])
 
-    rye_ready = not reasons
     shadow_reasons = []
     if completed < MIN_SHADOW_SAMPLE_SIZE:
         shadow_reasons.append(f"sample size below {MIN_SHADOW_SAMPLE_SIZE} completed win/loss rows")
@@ -275,7 +263,7 @@ def readiness_report(diagnostics: Mapping[str, Any], unavailable_data: Sequence[
         shadow_reasons.append("mixed-event risk present")
 
     return {
-        "RYE_ready": rye_ready,
+        "RYE_ready": not reasons,
         "Shadow_Mode_ready": not shadow_reasons,
         "reason_not_ready": reasons if reasons else [],
         "shadow_mode_reason_not_ready": shadow_reasons if shadow_reasons else [],
