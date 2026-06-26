@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
+import sys
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Mapping
 
 import pandas as pd
@@ -13,6 +16,34 @@ from .report_product_layer import MagazineBrand, grouped_report, safe_text
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FEED_ROOT = REPO_ROOT / 'data' / 'report_feeds'
+_MAGAZINE_TARGET = 'autonomous_betting_agent.magazine_book_export'
+_ORIGINAL_RELOAD = importlib.reload
+
+
+def _apply_magazine_runtime_patches(module: ModuleType | None) -> ModuleType | None:
+    if module is None or getattr(module, '__name__', '') != _MAGAZINE_TARGET:
+        return module
+    try:
+        from .magazine_api_sources import apply_magazine_api_patch
+        from .magazine_auto_sizer import apply_magazine_auto_sizer
+        from .magazine_headline_safety import install as install_headline_safety
+
+        module = apply_magazine_api_patch(module)
+        module = apply_magazine_auto_sizer(module)
+        return install_headline_safety(module)
+    except Exception:
+        return module
+
+
+def _patched_reload(module: ModuleType) -> ModuleType:
+    reloaded = _ORIGINAL_RELOAD(module)
+    return _apply_magazine_runtime_patches(reloaded) or reloaded
+
+
+if getattr(importlib, '_aba_report_studio_magazine_reload_patch_v1', False) is not True:
+    importlib.reload = _patched_reload
+    importlib._aba_report_studio_magazine_reload_patch_v1 = True
+    _apply_magazine_runtime_patches(sys.modules.get(_MAGAZINE_TARGET))
 
 CONSUMER_FIELDS = (
     'event', 'sport', 'public_sport', 'public_pick', 'recommended_action', 'confidence_tier', 'risk_tier',
