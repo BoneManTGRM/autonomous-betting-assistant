@@ -202,55 +202,121 @@ def run_predictor_full_update(workspace_id: str, *, api_key_override: str, days_
     return report
 
 
+AUTO_TEXT = {
+    'en': {
+        'title': 'Automation / Maintenance: results → learning',
+        'caption': 'Use this after picks have been locked. It can update finished wins/losses, save the ledger, and feed new results into learning memory.',
+        'workspace': 'Workspace ID', 'days': 'Days back for result sync', 'threshold': 'Match threshold', 'run_learning': 'Run learning after result sync', 'api_key': 'Optional Odds API key override',
+        'matcher': 'Active full-auto matcher: V3 actual-change-aware workspace sync. Threshold display: {threshold:.2f}.',
+        'find': 'Find & update wins/losses', 'learning_only': 'Run learning update only', 'full_auto': 'Full auto update',
+        'result_report': 'Result sync report', 'result_updated': 'Wins/losses updated and dashboard synced.', 'result_status': 'Result sync status: {status} / {reason}', 'download_result': 'Download result sync report', 'result_error': 'Auto Result Sync failed: {error}',
+        'learning_report': 'Learning update report', 'learning_updated': 'Learning memory updated.', 'learning_skipped': 'Learning update skipped: {reason}', 'download_learning': 'Download learning report', 'learning_error': 'Auto Learning Cycle failed: {error}',
+        'full_report': 'Full auto update report', 'full_updated': 'Results, dashboard sync, and learning update completed where new results were found.', 'full_status': 'Full auto update status: {status} / {reason}', 'download_full': 'Download full auto update report', 'full_error': 'Full auto update failed: {error}',
+    },
+    'es': {
+        'title': 'Automatización / mantenimiento: resultados → aprendizaje',
+        'caption': 'Úsalo después de bloquear picks. Puede actualizar ganadas/perdidas finalizadas, guardar el ledger y enviar nuevos resultados a la memoria de aprendizaje.',
+        'workspace': 'ID de workspace', 'days': 'Días atrás para sincronizar resultados', 'threshold': 'Umbral de coincidencia', 'run_learning': 'Ejecutar aprendizaje después de sincronizar resultados', 'api_key': 'Clave opcional de Odds API',
+        'matcher': 'Matcher full-auto activo: sincronización workspace V3 con cambios reales. Umbral mostrado: {threshold:.2f}.',
+        'find': 'Buscar y actualizar ganadas/perdidas', 'learning_only': 'Ejecutar solo actualización de aprendizaje', 'full_auto': 'Actualización automática completa',
+        'result_report': 'Reporte de sincronización de resultados', 'result_updated': 'Ganadas/perdidas actualizadas y dashboard sincronizado.', 'result_status': 'Estado de sincronización: {status} / {reason}', 'download_result': 'Descargar reporte de sincronización', 'result_error': 'Falló la sincronización automática de resultados: {error}',
+        'learning_report': 'Reporte de actualización de aprendizaje', 'learning_updated': 'Memoria de aprendizaje actualizada.', 'learning_skipped': 'Actualización de aprendizaje omitida: {reason}', 'download_learning': 'Descargar reporte de aprendizaje', 'learning_error': 'Falló el ciclo automático de aprendizaje: {error}',
+        'full_report': 'Reporte de actualización automática completa', 'full_updated': 'Resultados, dashboard y aprendizaje completados donde hubo nuevos resultados.', 'full_status': 'Estado de actualización automática completa: {status} / {reason}', 'download_full': 'Descargar reporte automático completo', 'full_error': 'Falló la actualización automática completa: {error}',
+    },
+}
+
+VOLUME_UI_TEXT = {
+    'en': {
+        'pattern_mode': 'Pattern Points mode',
+        'profit_mode': 'Profit Protection mode',
+        'profit_help': 'Volume-safe only blocks obvious bad prices. Balanced and above are stricter for proof/ROI.',
+        'dashboard_synced': 'Dashboard proof ledger synced: {rows} locked rows.',
+        'dashboard_status': 'Dashboard proof ledger sync: {status}',
+    },
+    'es': {
+        'pattern_mode': 'Modo de puntos de patrón',
+        'profit_mode': 'Modo de protección de ganancias',
+        'profit_help': 'Volumen seguro solo bloquea precios claramente malos. Balanceado y superiores son más estrictos para prueba/ROI.',
+        'dashboard_synced': 'Ledger de prueba del dashboard sincronizado: {rows} filas bloqueadas.',
+        'dashboard_status': 'Sincronización del ledger de prueba: {status}',
+    },
+}
+
+
+def _ui_lang() -> str:
+    candidates = [globals().get('LANG'), st.session_state.get('aba_global_language'), st.session_state.get('pro_predictor_language')]
+    for value in candidates:
+        text = str(value or '').strip().lower()
+        if text.startswith('es') or 'español' in text or 'espanol' in text or 'spanish' in text:
+            return 'es'
+    return 'en'
+
+
+def auto_t(key: str, **kwargs) -> str:
+    text = AUTO_TEXT.get(_ui_lang(), AUTO_TEXT['en']).get(key, AUTO_TEXT['en'].get(key, key))
+    return text.format(**kwargs) if kwargs else text
+
+
+def volume_ui_t(key: str, **kwargs) -> str:
+    text = VOLUME_UI_TEXT.get(_ui_lang(), VOLUME_UI_TEXT['en']).get(key, VOLUME_UI_TEXT['en'].get(key, key))
+    return text.format(**kwargs) if kwargs else text
+
+
+def localized_options(options: list[tuple[str, str]]) -> dict[str, str]:
+    if _ui_lang() == 'es':
+        return {es: en for en, es in options}
+    return {en: en for en, es in options}
+
+
 def render_predictor_automation_panel() -> None:
-    with st.expander('Automation / Maintenance: results → learning', expanded=False):
-        st.caption('Use this after picks have been locked. It can update finished wins/losses, save the ledger, and feed new results into learning memory.')
-        workspace_input = st.text_input('Workspace ID', value=st.session_state.get('aba_test_window_id', 'test_01'), key='predictor_auto_workspace')
+    with st.expander(auto_t('title'), expanded=False):
+        st.caption(auto_t('caption'))
+        workspace_input = st.text_input(auto_t('workspace'), value=st.session_state.get('aba_test_window_id', 'test_01'), key='predictor_auto_workspace')
         workspace_id = normalize_workspace_id(workspace_input)
         st.session_state['aba_test_window_id'] = workspace_id
         cols = st.columns(4)
-        days_from = cols[0].number_input('Days back for result sync', min_value=1, max_value=7, value=7, step=1, key='predictor_auto_days')
-        threshold = cols[1].number_input('Match threshold', min_value=0.70, max_value=0.98, value=0.82, step=0.01, key='predictor_auto_threshold')
-        run_learning = cols[2].toggle('Run learning after result sync', value=True, key='predictor_auto_run_learning')
-        api_key = cols[3].text_input('Optional Odds API key override', value='', type='password', key='predictor_auto_api_key')
-        st.caption(f'Active full-auto matcher: V3 actual-change-aware workspace sync. Threshold display: {float(threshold):.2f}.')
+        days_from = cols[0].number_input(auto_t('days'), min_value=1, max_value=7, value=7, step=1, key='predictor_auto_days')
+        threshold = cols[1].number_input(auto_t('threshold'), min_value=0.70, max_value=0.98, value=0.82, step=0.01, key='predictor_auto_threshold')
+        run_learning = cols[2].toggle(auto_t('run_learning'), value=True, key='predictor_auto_run_learning')
+        api_key = cols[3].text_input(auto_t('api_key'), value='', type='password', key='predictor_auto_api_key')
+        st.caption(auto_t('matcher', threshold=float(threshold)))
         actions = st.columns(3)
-        if actions[0].button('Find & update wins/losses', use_container_width=True, key='predictor_auto_result_sync'):
+        if actions[0].button(auto_t('find'), use_container_width=True, key='predictor_auto_result_sync'):
             try:
                 report = run_predictor_full_update(workspace_id, api_key_override=api_key, days_from=int(days_from), run_learning_after=bool(run_learning))
-                st.subheader('Result sync report')
+                st.subheader(auto_t('result_report'))
                 if report.get('status') == 'updated':
-                    st.success('Wins/losses updated and dashboard synced.')
+                    st.success(auto_t('result_updated'))
                 else:
-                    st.warning(f"Result sync status: {report.get('status')} / {report.get('reason', 'no reason')}")
+                    st.warning(auto_t('result_status', status=report.get('status'), reason=report.get('reason', 'no reason')))
                 st.json(report)
-                st.download_button('Download result sync report', json.dumps(report, indent=2, sort_keys=True), file_name='auto_result_sync_report.json', mime='application/json')
+                st.download_button(auto_t('download_result'), json.dumps(report, indent=2, sort_keys=True), file_name='auto_result_sync_report.json', mime='application/json')
             except Exception as exc:
-                st.error(f'Auto Result Sync failed: {exc}')
-        if actions[1].button('Run learning update only', use_container_width=True, key='predictor_auto_learning'):
+                st.error(auto_t('result_error', error=exc))
+        if actions[1].button(auto_t('learning_only'), use_container_width=True, key='predictor_auto_learning'):
             try:
                 report = run_auto_learning_cycle(workspace_id, min_new_rows=1, min_total_rows=5, save_to_github=True)
-                st.subheader('Learning update report')
+                st.subheader(auto_t('learning_report'))
                 if report.get('status') == 'trained':
-                    st.success('Learning memory updated.')
+                    st.success(auto_t('learning_updated'))
                 else:
-                    st.warning(f"Learning update skipped: {report.get('reason')}")
+                    st.warning(auto_t('learning_skipped', reason=report.get('reason')))
                 st.json(report)
-                st.download_button('Download learning report', json.dumps(report, indent=2, sort_keys=True), file_name='auto_learning_cycle_report.json', mime='application/json')
+                st.download_button(auto_t('download_learning'), json.dumps(report, indent=2, sort_keys=True), file_name='auto_learning_cycle_report.json', mime='application/json')
             except Exception as exc:
-                st.error(f'Auto Learning Cycle failed: {exc}')
-        if actions[2].button('Full auto update', type='primary', use_container_width=True, key='predictor_full_auto_update'):
+                st.error(auto_t('learning_error', error=exc))
+        if actions[2].button(auto_t('full_auto'), type='primary', use_container_width=True, key='predictor_full_auto_update'):
             try:
                 report = run_predictor_full_update(workspace_id, api_key_override=api_key, days_from=int(days_from), run_learning_after=True)
-                st.subheader('Full auto update report')
+                st.subheader(auto_t('full_report'))
                 if report.get('status') == 'updated':
-                    st.success('Results, dashboard sync, and learning update completed where new results were found.')
+                    st.success(auto_t('full_updated'))
                 else:
-                    st.warning(f"Full auto update status: {report.get('status')} / {report.get('reason', 'no reason')}")
+                    st.warning(auto_t('full_status', status=report.get('status'), reason=report.get('reason', 'no reason')))
                 st.json(report)
-                st.download_button('Download full auto update report', json.dumps(report, indent=2, sort_keys=True), file_name='full_auto_update_report.json', mime='application/json')
+                st.download_button(auto_t('download_full'), json.dumps(report, indent=2, sort_keys=True), file_name='full_auto_update_report.json', mime='application/json')
             except Exception as exc:
-                st.error(f'Full auto update failed: {exc}')
+                st.error(auto_t('full_error', error=exc))
 
 
 def _replace_required(source: str, old: str, new: str, label: str) -> str:
@@ -264,10 +330,10 @@ adaptive_learning.apply_adaptive_learning = apply_volume_pattern_points
 st.number_input = volume_number_input
 code = Path(__file__).with_name('pro_predictor.py').read_text(encoding='utf-8')
 code = _replace_required(code, "latest_event_date = st.date_input(t('latest_date'), value=next_sunday())", "latest_event_date = st.date_input(t('latest_date'), value=date.today() + timedelta(days=14))", 'latest_event_date_14_day_default')
-code = _replace_required(code, "min_agent = h3.number_input(t('min_agent'), min_value=0.0, max_value=100.0, value=DEFAULTS['min_agent'], step=1.0)", "min_agent = h3.number_input(t('min_agent'), min_value=0.0, max_value=100.0, value=DEFAULTS['min_agent'], step=1.0)\n    pattern_mode = st.selectbox('Pattern Points mode', ['Research learning 55+', 'Strong test 65+', 'Official proof 75+', 'Elite proof 85+', 'Low-confidence pattern candidates'], index=0)\n    profit_mode = st.selectbox('Profit Protection mode', ['Research no profit guard', 'Volume-safe profit guard', 'Balanced ROI guard', 'Official ROI guard', 'Elite ROI guard'], index=1, help='Volume-safe only blocks obvious bad prices. Balanced and above are stricter for proof/ROI.')", 'pattern_mode_insert')
+code = _replace_required(code, "min_agent = h3.number_input(t('min_agent'), min_value=0.0, max_value=100.0, value=DEFAULTS['min_agent'], step=1.0)", "min_agent = h3.number_input(t('min_agent'), min_value=0.0, max_value=100.0, value=DEFAULTS['min_agent'], step=1.0)\n    pattern_options = localized_options([('Research learning 55+', 'Investigación aprendizaje 55+'), ('Strong test 65+', 'Prueba fuerte 65+'), ('Official proof 75+', 'Prueba oficial 75+'), ('Elite proof 85+', 'Prueba élite 85+'), ('Low-confidence pattern candidates', 'Candidatos de patrón con baja confianza')])\n    pattern_mode_label = st.selectbox(volume_ui_t('pattern_mode'), list(pattern_options.keys()), index=0)\n    pattern_mode = pattern_options[pattern_mode_label]\n    profit_options = localized_options([('Research no profit guard', 'Investigación sin guardia de ganancias'), ('Volume-safe profit guard', 'Guardia de ganancias volumen-seguro'), ('Balanced ROI guard', 'Guardia ROI balanceada'), ('Official ROI guard', 'Guardia ROI oficial'), ('Elite ROI guard', 'Guardia ROI élite')])\n    profit_mode_labels = list(profit_options.keys())\n    profit_mode_label = st.selectbox(volume_ui_t('profit_mode'), profit_mode_labels, index=1, help=volume_ui_t('profit_help'))\n    profit_mode = profit_options[profit_mode_label]", 'pattern_mode_insert')
 code = _replace_required(code, "decisions = decisions[pd.to_numeric(decisions.get('agent_score'), errors='coerce').fillna(0) >= float(min_agent)]", "decisions = decisions[pd.to_numeric(decisions.get('agent_score'), errors='coerce').fillna(0) >= float(min_agent)]\n    decisions = filter_profit_guard(decisions, profit_mode)\n    pp = pd.to_numeric(decisions.get('pattern_points'), errors='coerce').fillna(0)\n    if pattern_mode.startswith('Research'):\n        decisions = decisions[pp >= 55]\n    elif pattern_mode.startswith('Strong'):\n        decisions = decisions[pp >= 65]\n    elif pattern_mode.startswith('Official'):\n        decisions = decisions[pp >= 75]\n    elif pattern_mode.startswith('Elite'):\n        decisions = decisions[pp >= 85]\n    else:\n        decisions = decisions[decisions.get('low_confidence_pattern_candidate', pd.Series(False, index=decisions.index)).astype(bool)]", 'pattern_mode_filter')
 code = _replace_required(code, "persist_handoff(decisions=decisions, large=large, handoff=handoff)", "persist_handoff(decisions=decisions, large=large, handoff=handoff)\n    dashboard_sync_report = publish_predictor_handoff_to_dashboard(handoff, str(st.session_state.get('aba_test_window_id', 'test_01') or 'test_01'))\n    st.session_state['predictor_dashboard_sync_report'] = dashboard_sync_report", 'auto_dashboard_sync')
-code = _replace_required(code, "st.success(t('saved'))", "st.success(t('saved'))\n    if st.session_state.get('predictor_dashboard_sync_report', {}).get('status') == 'synced':\n        st.success(f\"Dashboard proof ledger synced: {st.session_state['predictor_dashboard_sync_report'].get('synced_rows', 0)} locked rows.\")\n    else:\n        st.warning(f\"Dashboard proof ledger sync: {st.session_state.get('predictor_dashboard_sync_report', {}).get('status', 'unknown')}\")", 'auto_dashboard_sync_message')
+code = _replace_required(code, "st.success(t('saved'))", "st.success(t('saved'))\n    if st.session_state.get('predictor_dashboard_sync_report', {}).get('status') == 'synced':\n        st.success(volume_ui_t('dashboard_synced', rows=st.session_state['predictor_dashboard_sync_report'].get('synced_rows', 0)))\n    else:\n        st.warning(volume_ui_t('dashboard_status', status=st.session_state.get('predictor_dashboard_sync_report', {}).get('status', 'unknown')))", 'auto_dashboard_sync_message')
 code = _replace_required(code, "['learned_agent_score', 'agent_score', 'learning_adjustment_score', 'scanner_strength_score', 'model_probability_clean', 'model_market_edge']", "['portfolio_priority_score', 'profit_protection_score', 'pattern_points', 'learned_agent_score', 'agent_score', 'learning_adjustment_score', 'scanner_strength_score', 'model_probability_clean', 'model_market_edge']", 'pattern_sort_columns')
 code = _replace_required(code, "'event', 'sport', 'market_type', 'line_point', 'prediction',", "'event', 'sport', 'market_type', 'line_point', 'prediction', 'pattern_points', 'pattern_confidence_tier', 'pattern_edge_label', 'profit_lane', 'profit_guard_status', 'portfolio_priority_score', 'portfolio_group_rank', 'suggested_stake_units', 'profit_protection_score', 'profit_expected_value', 'profit_volume_safe', 'profit_balanced_ok', 'pattern_high_confidence', 'low_confidence_pattern_candidate',", 'pattern_display_columns')
 exec(code, globals())

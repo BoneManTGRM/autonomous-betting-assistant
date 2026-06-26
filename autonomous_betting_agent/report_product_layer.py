@@ -23,6 +23,8 @@ COUNTRY_ES = {
     "tunisia": "Túnez",
     "egypt": "Egipto",
     "ivory coast": "Costa de Marfil",
+    "cote d'ivoire": "Costa de Marfil",
+    "côte d’ivoire": "Costa de Marfil",
     "curacao": "Curazao",
     "curaçao": "Curazao",
     "senegal": "Senegal",
@@ -34,6 +36,7 @@ COUNTRY_ES = {
     "spain": "España",
     "england": "Inglaterra",
     "united states": "Estados Unidos",
+    "united states of america": "Estados Unidos",
     "usa": "Estados Unidos",
     "us": "Estados Unidos",
     "mexico": "México",
@@ -43,6 +46,40 @@ COUNTRY_ES = {
     "japan": "Japón",
     "south korea": "Corea del Sur",
     "new zealand": "Nueva Zelanda",
+    "switzerland": "Suiza",
+    "belgium": "Bélgica",
+    "czech republic": "República Checa",
+    "czechia": "Chequia",
+    "cape verde": "Cabo Verde",
+    "saudi arabia": "Arabia Saudita",
+    "morocco": "Marruecos",
+    "croatia": "Croacia",
+    "poland": "Polonia",
+    "denmark": "Dinamarca",
+    "sweden": "Suecia",
+    "finland": "Finlandia",
+    "china": "China",
+    "turkey": "Turquía",
+    "uruguay": "Uruguay",
+    "colombia": "Colombia",
+    "chile": "Chile",
+    "peru": "Perú",
+    "venezuela": "Venezuela",
+    "bolivia": "Bolivia",
+    "panama": "Panamá",
+    "costa rica": "Costa Rica",
+    "jamaica": "Jamaica",
+    "qatar": "Catar",
+    "uae": "Emiratos Árabes Unidos",
+    "united arab emirates": "Emiratos Árabes Unidos",
+    "south africa": "Sudáfrica",
+    "nigeria": "Nigeria",
+    "ghana": "Ghana",
+    "cameroon": "Camerún",
+    "austria": "Austria",
+    "scotland": "Escocia",
+    "uzbekistan": "Uzbekistán",
+    "wales": "Gales",
 }
 
 SPORT_ES = {
@@ -75,6 +112,7 @@ VALUE_ES = {
     "Watchlist / thin value": "Lista de seguimiento / valor delgado",
     "Official +EV Play": "Jugada oficial +EV",
     "Official +EV": "Oficial +EV",
+    "Full magazine analysis": "Análisis completo de revista",
     "No approved plays in this report.": "No hay jugadas aprobadas en este reporte.",
     "No approved plays.": "No hay jugadas aprobadas.",
     "No cards.": "Sin tarjetas.",
@@ -88,12 +126,18 @@ VALUE_ES = {
     "Positive": "Positivo",
     "Negative at listed odds": "Negativo con la cuota actual",
     "Unknown": "Desconocido",
+    "unknown": "desconocido",
     "UNKNOWN": "DESCONOCIDO",
     "PENDING": "PENDIENTE",
+    "pending": "pendiente",
     "WIN": "GANADO",
+    "win": "ganada",
     "LOSS": "PERDIDO",
+    "loss": "perdida",
     "PUSH": "EMPATE/PUSH",
+    "push": "push",
     "CANCELLED": "CANCELADO",
+    "cancel": "cancelada",
     "Needs grading": "Necesita calificación",
     "Included in calibration": "Incluido en calibración",
     "Excluded: data blocked": "Excluido: datos bloqueados",
@@ -114,6 +158,13 @@ VALUE_ES = {
     "Blocked rows": "Filas bloqueadas",
     "Paid proof": "Prueba pagada",
     "Calibration rows": "Filas de calibración",
+    "totals": "totales",
+    "total": "total",
+    "spreads": "hándicaps",
+    "spread": "hándicap",
+    "moneyline": "ganador",
+    "team_total": "total del equipo",
+    "game_total": "total del partido",
 }
 
 
@@ -195,10 +246,11 @@ def event_text(value: Any, language: str = "en") -> str:
     text = safe_text(value)
     if lang_code(language) != "es" or not text:
         return text
-    for sep in (" at ", " vs ", " VS ", " v ", " @ "):
-        if sep in text:
-            first, second = text.split(sep, 1)
-            return f"{team_label(first, 'es')} vs {team_label(second, 'es')}"
+    match = re.search(r"\s+(?:at|vs|v|@)\s+", text, flags=re.I)
+    if match:
+        first = text[: match.start()].strip()
+        second = text[match.end() :].strip()
+        return f"{team_label(first, 'es')} vs {team_label(second, 'es')}"
     return value_text(text, "es")
 
 

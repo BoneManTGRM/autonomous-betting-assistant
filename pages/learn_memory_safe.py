@@ -28,6 +28,7 @@ from autonomous_betting_agent.learning_memory_tools import (
 from autonomous_betting_agent.learning_memory_upload_modes import detect_upload_context
 from autonomous_betting_agent.learning_strength import learning_memory_health
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
+from autonomous_betting_agent.ui_i18n import localize_dataframe, localize_value, render_upload_css
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LEARNED_STATE_PATH = REPO_ROOT / 'learned_state.json'
@@ -38,6 +39,7 @@ DEFAULT_BRANCH = 'main'
 
 st.set_page_config(page_title='Learning Memory', layout='wide')
 LANG = render_app_sidebar('learning_memory', language_key='learning_memory_language', selector='radio')
+render_upload_css(st, LANG)
 
 TEXT = {
     'en': {
@@ -65,6 +67,30 @@ TEXT = {
         'download': 'Download ARA memory CSV',
         'source_context': 'Detected context',
         'no_usable': 'No usable resolved rows. Try High-confidence result-only mode if this file has results but no probabilities.',
+        'score': 'Score',
+        'tier': 'Tier',
+        'resolved': 'Resolved',
+        'wins': 'Wins',
+        'losses': 'Losses',
+        'markets': 'Markets',
+        'rows': 'Rows',
+        'hit_rate': 'Hit rate',
+        'roi': 'ROI',
+        'profit_units': 'Profit units',
+        'avg_predicted': 'Avg predicted',
+        'bank_version': 'Bank version',
+        'input': 'Input',
+        'usable': 'Usable',
+        'direct': 'Direct',
+        'odds_implied': 'Odds-implied',
+        'fallback_metric': 'Fallback',
+        'minimum_events': 'Minimum graded events',
+        'max_rows': 'Max stored rows',
+        'min_pattern_rows': 'Min rows per pattern',
+        'max_patterns': 'Max stored patterns',
+        'training_mode': 'Training mode',
+        'need_rows': 'Rows',
+        'need': 'Need',
     },
     'es': {
         'title': 'Memoria de Aprendizaje',
@@ -91,6 +117,30 @@ TEXT = {
         'download': 'Descargar CSV de memoria ARA',
         'source_context': 'Contexto detectado',
         'no_usable': 'No hay filas resueltas útiles. Prueba el modo de alta confianza si este archivo tiene resultados pero no probabilidades.',
+        'score': 'Puntaje',
+        'tier': 'Nivel',
+        'resolved': 'Resueltas',
+        'wins': 'Victorias',
+        'losses': 'Derrotas',
+        'markets': 'Mercados',
+        'rows': 'Filas',
+        'hit_rate': 'Tasa de acierto',
+        'roi': 'ROI',
+        'profit_units': 'Unidades ganadas',
+        'avg_predicted': 'Promedio predicho',
+        'bank_version': 'Versión del banco',
+        'input': 'Entrada',
+        'usable': 'Útiles',
+        'direct': 'Directas',
+        'odds_implied': 'Implícitas por cuota',
+        'fallback_metric': 'Fallback',
+        'minimum_events': 'Eventos calificados mínimos',
+        'max_rows': 'Filas guardadas máximas',
+        'min_pattern_rows': 'Filas mínimas por patrón',
+        'max_patterns': 'Patrones guardados máximos',
+        'training_mode': 'Modo de entrenamiento',
+        'need_rows': 'Filas',
+        'need': 'Necesarias',
     },
 }
 
@@ -148,12 +198,12 @@ def show_health(rows: list[dict[str, Any]], title: str) -> None:
     st.subheader(title)
     health = learning_memory_health(rows)
     c = st.columns(6)
-    c[0].metric('Score', health.get('learning_health_score'))
-    c[1].metric('Tier', str(health.get('learning_health_tier', '')).replace('_', ' '))
-    c[2].metric('Resolved', health.get('resolved_rows'))
-    c[3].metric('Wins', health.get('wins'))
-    c[4].metric('Losses', health.get('losses'))
-    c[5].metric('Markets', health.get('market_count'))
+    c[0].metric(t('score'), health.get('learning_health_score'))
+    c[1].metric(t('tier'), localize_value(str(health.get('learning_health_tier', '')).replace('_', ' '), LANG))
+    c[2].metric(t('resolved'), health.get('resolved_rows'))
+    c[3].metric(t('wins'), health.get('wins'))
+    c[4].metric(t('losses'), health.get('losses'))
+    c[5].metric(t('markets'), health.get('market_count'))
 
 
 st.title(t('title'))
@@ -163,12 +213,12 @@ bank = load_bank()
 existing_rows = [row for row in (valid_bank_row(row) for row in bank.get('compact_rows', [])) if row]
 existing_metrics = memory_metrics(existing_rows)
 summary = st.columns(6)
-summary[0].metric('Rows', existing_metrics['resolved'])
-summary[1].metric('Hit rate', pct(existing_metrics['hit_rate']) if existing_metrics['hit_rate'] is not None else 'N/A')
-summary[2].metric('ROI', pct(existing_metrics['roi']) if existing_metrics['roi'] is not None else 'N/A')
-summary[3].metric('Profit units', f"{float(existing_metrics.get('profit_units') or 0):.2f}")
-summary[4].metric('Avg predicted', pct(existing_metrics['avg_predicted']) if existing_metrics['avg_predicted'] is not None else 'N/A')
-summary[5].metric('Bank version', str(bank.get('version', 'unknown')))
+summary[0].metric(t('rows'), existing_metrics['resolved'])
+summary[1].metric(t('hit_rate'), pct(existing_metrics['hit_rate']) if existing_metrics['hit_rate'] is not None else 'N/A')
+summary[2].metric(t('roi'), pct(existing_metrics['roi']) if existing_metrics['roi'] is not None else 'N/A')
+summary[3].metric(t('profit_units'), f"{float(existing_metrics.get('profit_units') or 0):.2f}")
+summary[4].metric(t('avg_predicted'), pct(existing_metrics['avg_predicted']) if existing_metrics['avg_predicted'] is not None else 'N/A')
+summary[5].metric(t('bank_version'), str(bank.get('version', 'unknown')))
 
 if existing_rows:
     show_health(existing_rows, t('health'))
@@ -190,25 +240,25 @@ if uploaded is not None:
     st.caption(f"{t('source_context')}: {context[:500]}")
     uploaded_rows, parse_stats = read_compact_csv_bytes(data, context)
     cols = st.columns(7)
-    cols[0].metric('Input', parse_stats.get('input_rows', 0))
-    cols[1].metric('Usable', parse_stats.get('usable_rows', 0))
-    cols[2].metric('Wins', parse_stats.get('wins', 0))
-    cols[3].metric('Losses', parse_stats.get('losses', 0))
-    cols[4].metric('Direct', parse_stats.get('direct_probability_rows', 0))
-    cols[5].metric('Odds-implied', parse_stats.get('price_implied_probability_rows', 0))
-    cols[6].metric('Fallback', parse_stats.get('fallback_probability_rows', 0))
+    cols[0].metric(t('input'), parse_stats.get('input_rows', 0))
+    cols[1].metric(t('usable'), parse_stats.get('usable_rows', 0))
+    cols[2].metric(t('wins'), parse_stats.get('wins', 0))
+    cols[3].metric(t('losses'), parse_stats.get('losses', 0))
+    cols[4].metric(t('direct'), parse_stats.get('direct_probability_rows', 0))
+    cols[5].metric(t('odds_implied'), parse_stats.get('price_implied_probability_rows', 0))
+    cols[6].metric(t('fallback_metric'), parse_stats.get('fallback_probability_rows', 0))
     if uploaded_rows:
         show_health(uploaded_rows, t('handoff'))
-        st.dataframe(pd.DataFrame(uploaded_rows).head(200), use_container_width=True, hide_index=True)
+        st.dataframe(localize_dataframe(pd.DataFrame(uploaded_rows).head(200), LANG), use_container_width=True, hide_index=True)
     else:
         st.error(t('no_usable'))
 
 settings = st.columns(4)
-min_events = settings[0].number_input('Minimum graded events', min_value=5, max_value=500, value=5, step=1)
-max_rows = settings[1].number_input('Max stored rows', min_value=10, max_value=50000, value=10000, step=500)
-min_patterns = settings[2].number_input('Min rows per pattern', min_value=2, max_value=50, value=3, step=1)
-max_patterns = settings[3].number_input('Max stored patterns', min_value=20, max_value=2000, value=500, step=50)
-training_mode_label = st.radio('Training mode', [t('replace'), t('merge')], index=1, horizontal=False)
+min_events = settings[0].number_input(t('minimum_events'), min_value=5, max_value=500, value=5, step=1)
+max_rows = settings[1].number_input(t('max_rows'), min_value=10, max_value=50000, value=10000, step=500)
+min_patterns = settings[2].number_input(t('min_pattern_rows'), min_value=2, max_value=50, value=3, step=1)
+max_patterns = settings[3].number_input(t('max_patterns'), min_value=20, max_value=2000, value=500, step=50)
+training_mode_label = st.radio(t('training_mode'), [t('replace'), t('merge')], index=1, horizontal=False)
 save_to_github = st.toggle(t('save'), value=bool(secret('GITHUB_TOKEN', 'GH_TOKEN')))
 
 if st.button(t('train'), type='primary', use_container_width=True):
@@ -219,7 +269,7 @@ if st.button(t('train'), type='primary', use_container_width=True):
     merged_rows, duplicates_removed = merge_dedupe_rows(source_rows, uploaded_rows)
     pruned_rows, prune_report = prune_rows(merged_rows, int(max_rows))
     if len(pruned_rows) < int(min_events):
-        st.error(f"{t('too_few')} Rows={len(pruned_rows)} Need={int(min_events)}")
+        st.error(f"{t('too_few')} {t('need_rows')}={len(pruned_rows)} {t('need')}={int(min_events)}")
         st.stop()
     calibrator = fit_probability_calibrator(rows_to_graded(pruned_rows), min_events=int(min_events), source=getattr(uploaded, 'name', 'uploaded.csv'))
     segments = build_segments(pruned_rows, int(min_patterns), int(max_patterns))
@@ -244,5 +294,5 @@ if st.button(t('train'), type='primary', use_container_width=True):
     st.subheader(t('summary'))
     st.json(memory_bank['summary'])
     st.subheader(t('patterns'))
-    st.dataframe(pd.DataFrame(segments[:100]), use_container_width=True, hide_index=True)
+    st.dataframe(localize_dataframe(pd.DataFrame(segments[:100]), LANG), use_container_width=True, hide_index=True)
     st.download_button(t('download'), ara_csv, file_name='ara_learning_memory.csv', mime='text/csv')

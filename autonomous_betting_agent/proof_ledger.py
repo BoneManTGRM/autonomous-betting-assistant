@@ -116,7 +116,9 @@ def load_ledger(user_id: str = DEFAULT_USER_ID) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame(columns=LEDGER_COLUMNS)
     try:
-        frame = pd.read_csv(path)
+        # The proof ledger is small and local. Use the Python CSV engine to avoid
+        # intermittent pandas C-parser crashes seen in GitHub Actions smoke tests.
+        frame = pd.read_csv(path, engine='python')
     except Exception:
         return pd.DataFrame(columns=LEDGER_COLUMNS)
     for column in LEDGER_COLUMNS:

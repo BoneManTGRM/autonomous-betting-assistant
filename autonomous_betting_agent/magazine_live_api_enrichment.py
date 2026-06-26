@@ -10,7 +10,7 @@ from typing import Any
 from urllib.parse import quote_plus, urlencode
 from urllib.request import Request, urlopen
 
-ENRICHMENT_VERSION = "live_api_enrichment_v3_compact_display"
+ENRICHMENT_VERSION = "live_api_enrichment_v5_spanish_report_text_safe"
 _TIMEOUT_SECONDS = 3.0
 _CACHE: dict[tuple[str, str], Any] = {}
 
@@ -79,6 +79,11 @@ def _secret(*names: str) -> str:
     return ""
 
 
+def _is_spanish(row: Mapping[str, Any]) -> bool:
+    text = _get(row, "report_language", "language", "lang").lower()
+    return text.startswith("es") or "español" in text or "espanol" in text
+
+
 def _sport_kind(row: Mapping[str, Any]) -> str:
     text = " ".join(str(row.get(key, "")) for key in ("sport", "league", "event", "game", "matchup", "event_name")).lower()
     if any(token in text for token in ("mma", "ufc", "boxing", "fighter")):
@@ -142,21 +147,27 @@ def _enrich_weather(row: dict[str, Any]) -> None:
     key = _secret(*API_SECRET_DEFS["WeatherAPI"])
     if not key:
         return
+    spanish = _is_spanish(row)
     location = _candidate_location(row)
     if not location:
-        _set_if_empty(row, "weather_summary", "Weather checked; no venue/location in row.")
+        _set_if_empty(row, "weather_summary", "Clima revisado; no hay sede/ubicación en la fila." if spanish else "Weather checked; no venue/location in row.")
         return
     url = "https://api.weatherapi.com/v1/current.json?" + urlencode({"key": key, "q": location, "aqi": "no"})
     data = _request_json(url, cache_key=("weather", location.lower()))
     current = data.get("current") if isinstance(data, Mapping) else None
     place = data.get("location") if isinstance(data, Mapping) else None
     if not isinstance(current, Mapping):
-        _set_if_empty(row, "weather_summary", f"Weather checked: {location}; no live payload.")
+        _set_if_empty(row, "weather_summary", f"Clima revisado: {location}; sin datos en vivo." if spanish else f"Weather checked: {location}; no live payload.")
         return
     condition = current.get("condition") if isinstance(current.get("condition"), Mapping) else {}
-    weather = f"Weather: {condition.get('text', 'conditions available')}, {current.get('temp_c')}°C, wind {current.get('wind_kph')} kph."
+    condition_text = str(condition.get("text", "conditions available"))
+    if spanish:
+        condition_text = {"sunny": "soleado", "clear": "despejado", "cloudy": "nublado", "partly cloudy": "parcialmente nublado"}.get(condition_text.lower(), condition_text)
+        weather = f"Clima: {condition_text}, {current.get('temp_c')}°C, viento {current.get('wind_kph')} kph."
+    else:
+        weather = f"Weather: {condition_text}, {current.get('temp_c')}°C, wind {current.get('wind_kph')} kph."
     place_name = ", ".join(str(place.get(k)) for k in ("name", "region", "country") if isinstance(place, Mapping) and place.get(k))
-    summary = weather + (f" Location: {place_name}." if place_name else "")
+    summary = weather + ((f" Ubicación: {place_name}." if spanish else f" Location: {place_name}.") if place_name else "")
     _set_if_empty(row, "weather_summary", summary)
     _set_if_empty(row, "venue_weather", summary)
 
@@ -173,6 +184,7 @@ def _enrich_news(row: dict[str, Any]) -> None:
     key = _secret(*API_SECRET_DEFS["NewsAPI"])
     if not key:
         return
+    spanish = _is_spanish(row)
     query = _news_query(row)
     if not query:
         return
@@ -180,19 +192,16 @@ def _enrich_news(row: dict[str, Any]) -> None:
     data = _request_json("https://newsapi.org/v2/everything?" + urlencode(params), cache_key=("news", query.lower()))
     articles = data.get("articles") if isinstance(data, Mapping) else None
     if not isinstance(articles, list) or not articles:
-        _set_if_empty(row, "newsapi_summary", "News checked; no recent matching articles.")
-        _set_if_empty(row, "news_injury_summary", "News checked; no injury/lineup headline.")
+        _set_if_empty(row, "newsapi_summary", "Noticias revisadas; sin artículos recientes relacionados." if spanish else "News checked; no recent matching articles.")
+        _set_if_empty(row, "news_injury_summary", "Noticias revisadas; sin titular de lesiones/alineación." if spanish else "News checked; no injury/lineup headline.")
         return
     titles = [str(item.get("title", "")).strip() for item in articles if isinstance(item, Mapping) and item.get("title")]
     titles = [title for title in titles if title][:3]
     if not titles:
         return
     first = titles[0][:88].rstrip() + ("…" if len(titles[0]) > 88 else "")
-    _set_if_empty(row, "newsapi_summary", "News: " + first)
-    if any(any(token in title.lower() for token in ("injury", "injured", "lineup", "out", "questionable")) for title in titles):
-        _set_if_empty(row, "news_injury_summary", "News: " + first)
-    else:
-        _set_if_empty(row, "news_injury_summary", "News checked; no injury/lineup headline.")
+    _set_if_empty(row, "newsapi_summary", ("Noticias: " if spanish else "News: ") + first)
+    _set_if_empty(row, "news_injury_summary", ("Noticias: " if spanish else "News: ") + first)
 
 
 def _api_football_team_search(team: str, key: str) -> str:
@@ -216,14 +225,15 @@ def _enrich_api_football(row: dict[str, Any]) -> None:
     key = _secret(*API_SECRET_DEFS["API-Football"])
     if not key:
         return
+    spanish = _is_spanish(row)
     away, home = _split_teams(row)
     away_result = _api_football_team_search(away, key)
     home_result = _api_football_team_search(home, key)
     if away_result or home_result:
         matched = " / ".join(part for part in (away_result or away, home_result or home) if part)
-        summary = f"API-FB team lookup matched {matched}; fixture not verified."
+        summary = f"API-FB encontró equipos {matched}; partido no verificado." if spanish else f"API-FB team lookup matched {matched}; fixture not verified."
     else:
-        summary = f"API-FB team lookup checked {away or 'away'} / {home or 'home'}; no match returned."
+        summary = "API-FB: búsqueda revisada; sin coincidencia de partido." if spanish else f"API-FB team lookup checked {away or 'away'} / {home or 'home'}; no match returned."
     _set_if_empty(row, "api_football_team_summary", summary)
     _set_if_empty(row, "api_football_summary", summary)
 
@@ -234,9 +244,63 @@ def _enrich_sportsdataio(row: dict[str, Any]) -> None:
     existing = _get(row, "sportsdataio_team_summary", "sportsdataio_context", "sportsdataio_injury_summary", "sportsdataio_game_summary")
     if existing:
         return
-    summary = "SDIO checked; no provider event ID in row."
+    summary = "SDIO revisado; sin ID de evento del proveedor." if _is_spanish(row) else "SDIO checked; no provider event ID in row."
     _set_if_empty(row, "sportsdataio_context", summary)
     _set_if_empty(row, "sportsdataio_team_summary", summary)
+
+
+def _safe_float(value: Any) -> float | None:
+    if _bad(value):
+        return None
+    try:
+        return float(str(value).replace("%", "").replace(",", ""))
+    except Exception:
+        return None
+
+
+def _fmt_pct(value: Any, signed: bool = False) -> str:
+    parsed = _safe_float(value)
+    if parsed is None:
+        return ""
+    parsed = parsed / 100 if abs(parsed) > 1 else parsed
+    return f"{parsed:+.1%}" if signed else f"{parsed:.0%}"
+
+
+def _fmt_ev(value: Any) -> str:
+    parsed = _safe_float(value)
+    return "" if parsed is None else f"{parsed:+.3f}"
+
+
+def _spanish_text(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return text
+    exact = {"WATCHLIST": "LISTA DE SEGUIMIENTO", "uploaded/cached row": "fila cargada/en caché", "consensus average": "promedio consenso", "No lineup/injury headline returned.": "Sin titular de lesiones/alineación.", "API-FB: no fixture match.": "API-FB: sin coincidencia de partido.", "No SDIO event ID.": "Sin ID de evento SDIO.", "Price check required before entry.": "Revisar cuota antes de entrar."}
+    if text in exact:
+        return exact[text]
+    replacements = ((r"\bModel projects\b", "El modelo proyecta"), (r"\bprobability for\b", "de probabilidad para"), (r"\bMarket-implied probability checks at\b", "La probabilidad implícita del mercado es"), (r"\bMeasured edge\b", "Ventaja medida"), (r"\bExpected value\b", "Valor esperado"), (r"\bDo not chain negative-EV picks\b", "No encadenar señales con VE negativo"), (r"\bDo not play at the listed price\b", "No jugar con la cuota listada"), (r"\bRecheck only if the line improves or new information changes the edge\b", "Revisar solo si mejora la línea o nueva información cambia la ventaja"), (r"\bAPI-FB: no fixture match\b", "API-FB: sin coincidencia de partido"), (r"\bNo lineup/injury headline returned\b", "Sin titular de lesiones/alineación"))
+    for old, new in replacements:
+        text = re.sub(old, new, text, flags=re.I)
+    return text
+
+
+def _spanish_report_defaults(row: dict[str, Any]) -> None:
+    if not _is_spanish(row):
+        return
+    pick = _get(row, "public_pick", "prediction", "pick", "selection", default="esta selección")
+    if not any(_useful(row.get(k)) for k in ("why_bullets", "why_pick", "analysis_summary", "reason", "explanation")):
+        row["why_bullets"] = "\n".join([f"El modelo proyecta {_fmt_pct(_get(row, 'learned_model_probability', 'model_probability_clean', 'model_probability', 'final_probability'))} de probabilidad para {pick}.", f"La probabilidad implícita del mercado es {_fmt_pct(_get(row, 'market_probability', 'market_implied_probability'))}.", f"Ventaja medida: {_fmt_pct(_get(row, 'model_market_edge', 'edge'), signed=True)}.", f"Valor esperado: {_fmt_ev(_get(row, 'expected_value_per_unit', 'profit_expected_value', 'expected_value', 'ev'))}."])
+    if not any(_useful(row.get(k)) for k in ("why_lose", "risk_reason", "hidden_risk", "risk_notes")):
+        row["risk_reason"] = "Ventaja negativa con la cuota actual.\nUsar solo si la cuota mejora.\nRevisar cuotas y noticias clave."
+    if not any(_useful(row.get(k)) for k in ("chain_notes", "main_read", "add_on_legs", "parlay_notes")):
+        row["parlay_notes"] = "No encadenar señales con VE negativo.\nEvitar parlays salvo que la ventaja sea positiva.\nRevisar la cuota antes de incluir."
+    if not any(_useful(row.get(k)) for k in ("final_explanation", "action_reason", "recommendation_reason", "decision_reasons")):
+        row["final_explanation"] = "No jugar con la cuota listada. Revisar solo si mejora la línea o nueva información cambia la ventaja."
+    if not _useful(row.get("data_source")) and not _useful(row.get("odds_source")):
+        row["data_source"] = "fila cargada/en caché"
+    for key, value in list(row.items()):
+        if isinstance(value, str):
+            row[key] = _spanish_text(value)
 
 
 def enrich_row_with_live_api_data(row_like: Any) -> dict[str, Any]:
@@ -244,10 +308,7 @@ def enrich_row_with_live_api_data(row_like: Any) -> dict[str, Any]:
     if row.get("_live_api_enriched") == ENRICHMENT_VERSION:
         return row
     before = set(k for k, v in row.items() if _useful(v))
-    _enrich_sportsdataio(row)
-    _enrich_weather(row)
-    _enrich_api_football(row)
-    _enrich_news(row)
+    _enrich_sportsdataio(row); _enrich_weather(row); _enrich_api_football(row); _enrich_news(row); _spanish_report_defaults(row)
     after = set(k for k, v in row.items() if _useful(v))
     added = sorted(after - before)
     row["_live_api_enriched"] = ENRICHMENT_VERSION
@@ -256,47 +317,61 @@ def enrich_row_with_live_api_data(row_like: Any) -> dict[str, Any]:
     return row
 
 
+def _report_page_event_key(row: Mapping[str, Any]) -> str:
+    event = _get(row, "public_event", "event", "event_name", "matchup")
+    if not event:
+        return ""
+    key = event.lower(); key = re.sub(r"\s+(?:at|vs|v|@)\s+", " vs ", key); key = re.sub(r"[^a-z0-9áéíóúüñ]+", " ", key)
+    return re.sub(r"\s+", " ", key).strip()
+
+
+def _report_page_priority(row: Mapping[str, Any]) -> int:
+    lane = _get(row, "report_lane", "report_lane_v2").lower(); action = _get(row, "consumer_action", "recommended_action", "public_action").lower(); publish_ready = _get(row, "official_publish_ready", "publish_ready").lower() in {"true", "1", "yes"}
+    return 0 if publish_ready or "official" in action or "oficial" in action or lane in {"best_play", "best play"} else 1
+
+
+def _dedupe_report_page_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not any(_get(row, "report_language", "language", "lang") for row in rows):
+        return rows
+    unique: list[dict[str, Any]] = []; index_by_key: dict[str, int] = {}; priority_by_key: dict[str, int] = {}
+    for row in rows:
+        key = _report_page_event_key(row)
+        if not key:
+            unique.append(row); continue
+        priority = _report_page_priority(row)
+        if key in index_by_key:
+            if priority < priority_by_key[key]:
+                unique[index_by_key[key]] = row; priority_by_key[key] = priority
+            continue
+        index_by_key[key] = len(unique); priority_by_key[key] = priority; unique.append(row)
+    return unique
+
+
 def enrich_rows_with_live_api_data(rows: list[Any] | tuple[Any, ...]) -> list[dict[str, Any]]:
-    return [enrich_row_with_live_api_data(row) for row in rows]
+    return _dedupe_report_page_rows([enrich_row_with_live_api_data(row) for row in rows])
 
 
 def install(module: Any) -> Any:
     if getattr(module, "_LIVE_API_ENRICHMENT_PATCHED", False):
         return module
-    original_render = module.render_full_pick_magazine_page
-    original_png = module._png
-    original_team_snapshot = getattr(module, "_team_snapshot", None)
-
+    original_render = module.render_full_pick_magazine_page; original_png = module._png; original_team_snapshot = getattr(module, "_team_snapshot", None)
     def render(row_like: Any, *args: Any, **kwargs: Any):
         return original_render(enrich_row_with_live_api_data(row_like), *args, **kwargs)
-
     def render_png(row_like: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
         return original_png(module.render_full_pick_magazine_page(enrich_row_with_live_api_data(row_like), background_image, report_name, page_number, total_pages, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
-
     def team_snapshot(img: Any, draw: Any, x: int, y: int, width: int, team: str, color: Any, lang: str, row_arg: Any | None = None, side_arg: str = "", *extra: Any, **kwargs: Any) -> None:
         if callable(original_team_snapshot):
             try:
-                original_team_snapshot(img, draw, x, y, width, team, color, lang, row_arg, side_arg, *extra, **kwargs)
-                return
+                original_team_snapshot(img, draw, x, y, width, team, color, lang, row_arg, side_arg, *extra, **kwargs); return
             except TypeError:
-                original_team_snapshot(img, draw, x, y, width, team, color, lang)
-                return
+                original_team_snapshot(img, draw, x, y, width, team, color, lang); return
         if hasattr(module, "_badge") and hasattr(module, "_fit") and hasattr(module, "_bullets_auto"):
-            label = module._team_label(team, lang)
-            module._badge(img, draw, label, x, y, 50, 50, color)
-            draw.text((x + 66, y + 9), label.upper(), font=module._fit(label.upper(), width - 70, 25, 7, True), fill=color)
+            label = module._team_label(team, lang); module._badge(img, draw, label, x, y, 50, 50, color); draw.text((x + 66, y + 9), label.upper(), font=module._fit(label.upper(), width - 70, 25, 7, True), fill=color)
             row = enrich_row_with_live_api_data(row_arg or {})
             try:
                 items = module._team_items(row, side_arg)
             except Exception:
-                items = ["Data not returned for this event"]
+                items = ["Datos no disponibles para este evento" if lang == "es" else "Data not returned for this event"]
             module._bullets_auto(draw, x, y + 76, items, width - 10, 165, color, 18, 10, 4, lang)
-
-    module.render_full_pick_magazine_page = render
-    module.render_full_pick_magazine_page_png = render_png
-    module._team_snapshot = team_snapshot
-    module.enrich_row_with_live_api_data = enrich_row_with_live_api_data
-    module.enrich_rows_with_live_api_data = enrich_rows_with_live_api_data
-    module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_{ENRICHMENT_VERSION}"
-    module._LIVE_API_ENRICHMENT_PATCHED = True
+    module.render_full_pick_magazine_page = render; module.render_full_pick_magazine_page_png = render_png; module._team_snapshot = team_snapshot; module.enrich_row_with_live_api_data = enrich_row_with_live_api_data; module.enrich_rows_with_live_api_data = enrich_rows_with_live_api_data; module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_{ENRICHMENT_VERSION}"; module._LIVE_API_ENRICHMENT_PATCHED = True
     return module
