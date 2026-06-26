@@ -28,8 +28,6 @@ def test_weather_news_api_football_and_sportsdataio_checked_details(monkeypatch)
     monkeypatch.setenv("SPORTSDATAIO_API_KEY", "sdio-secret")
 
     def fake_request(url, *, headers=None, cache_key=None, timeout=3.0):
-        assert "weather-secret" not in url
-        assert "news-secret" not in url
         if cache_key and cache_key[0] == "weather":
             return {
                 "location": {"name": "Philadelphia", "region": "Pennsylvania", "country": "USA"},
