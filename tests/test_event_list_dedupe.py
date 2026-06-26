@@ -108,6 +108,30 @@ def test_collapse_to_event_rows_prefers_official_or_proof_backed_row():
     assert collapsed[0]["proof_id"] == "proof-123"
 
 
+def test_collapse_to_event_rows_prefers_spanish_official_action_label():
+    rows = [
+        {
+            "event": "Austria vs Algeria",
+            "event_start_utc": "2026-06-27T20:00:00Z",
+            "prediction": "Over 2.5",
+            "market_type": "totals",
+        },
+        {
+            "event": "Austria vs Algeria",
+            "event_start_utc": "2026-06-27T20:00:00Z",
+            "prediction": "Austria",
+            "market_type": "moneyline",
+            "public_action": "Jugada oficial +EV",
+        },
+    ]
+
+    collapsed = collapse_to_event_rows(rows)
+
+    assert len(collapsed) == 1
+    assert collapsed[0]["prediction"] == "Austria"
+    assert collapsed[0]["public_action"] == "Jugada oficial +EV"
+
+
 def test_collapse_to_event_rows_prefers_positive_edge_then_complete_price_probability():
     rows = [
         {
