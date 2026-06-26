@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from autonomous_betting_agent.adaptive_repair_runner import (
+    _scan_source,
     column_mapping_preview,
     create_run_id,
     list_recent_simulation_runs,
@@ -61,6 +62,18 @@ def test_runner_handles_missing_system_sources_safely(tmp_path):
     assert report.source_summary["failed_sources"] == []
     assert report.production_repairs_active is False
     assert report.live_pick_changes is False
+
+
+def test_failed_source_is_isolated_and_recorded():
+    def broken_loader():
+        raise RuntimeError("boom secret=abc123456789")
+
+    failed = _scan_source("broken_source", broken_loader, source_path="broken/path")
+
+    assert failed.available is False
+    assert failed.rows == []
+    assert "RuntimeError" in failed.error
+    assert "abc123456789" not in failed.summary()["error"]
 
 
 def test_runner_markdown_json_exports_and_recent_listing(tmp_path):
