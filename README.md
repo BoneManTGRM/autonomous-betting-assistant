@@ -43,7 +43,7 @@ The repository now has two buyer-facing validation layers:
 | **Local Calibration Dashboard** | Brier score, expected vs actual win rate, confidence buckets, and odds-band performance from local graded rows. |
 | **Local Bankroll Risk** | Conservative risk-management review, stake suggestions, and correlation warnings. |
 | **Learning Memory Safety** | Learning-safe row export, import preview, reset/version placeholders, and blocked-row review. |
-| **ABA Adaptive Repair Simulation** | Phase 0-2 simulation gate for graded-list ingestion, row-level vs unique-event protection, duplicate detection, and watchlist-only pattern discovery. |
+| **ABA Adaptive Repair Simulation** | Phase 0-2 simulation gate for graded-list ingestion, row-level vs unique-event protection, duplicate detection, data-quality scoring, column coverage, and watchlist-only pattern discovery. |
 | **Local License Admin** | Manual local client/license tracking only. No payment processing. |
 | **Buyer Demo Local** | Sample buyer walkthrough with no API keys or cloud server. |
 | **Local Admin Workflow Guide** | Operator guide for the local-first workflow. |
@@ -59,7 +59,8 @@ The repository now has two buyer-facing validation layers:
 | `autonomous_betting_agent/report_exports.py` | Markdown, print-ready HTML, and messenger report exports. |
 | `autonomous_betting_agent/grading_rules.py` | Row-level vs event-level result summaries. |
 | `autonomous_betting_agent/adaptive_repair_engine.py` | Simulation-first Adaptive Repair Engine Phase 0-2 helpers for graded-list ingestion, row/event separation, duplicate detection, and safe watchlist-only pattern discovery. |
-| `scripts/run_adaptive_repair_simulation.py` | CLI entrypoint for running an Adaptive Repair simulation on a graded CSV/export file. |
+| `autonomous_betting_agent/adaptive_repair_diagnostics.py` | Enhanced Phase 0-2 diagnostics for data-quality scoring, column coverage, exact duplicate-row detection, same-event review examples, and missing-field examples. |
+| `scripts/run_adaptive_repair_simulation.py` | CLI entrypoint for running an enhanced Adaptive Repair simulation on a graded CSV/export file. |
 | `autonomous_betting_agent/bankroll.py` | Conservative flat-stake and Kelly-style risk helpers. |
 | `autonomous_betting_agent/local_access.py` | Optional local admin/client/demo access with no-login default. |
 | `autonomous_betting_agent/local_calibration.py` | Brier score, calibration buckets, and odds-band summaries. |
@@ -73,11 +74,12 @@ The repository now has two buyer-facing validation layers:
 
 The **ABA Adaptive Repair Engine** is the simulation-first self-repair layer for ABA Signal Pro. It is designed to detect prediction drift, diagnose specific weaknesses, learn from graded files and the Learning Page, hunt for repeatable patterns, and eventually apply bounded targeted repairs only after validation.
 
-Phase 0-2 is now intentionally conservative:
+Phase 0-2 is intentionally conservative:
 
 - **Simulation Gate:** runs a safe report before production repair activation.
 - **Graded List Ingestion:** reads graded CSV/export rows and normalizes wins, losses, pushes, voids, cancels, pending, and unknown statuses.
 - **Row-level vs Unique-event Protection:** keeps individual pick rows separate from unique games/events so duplicate markets do not inflate game counts.
+- **Enhanced Data-Quality Diagnostics:** reports column coverage, exact duplicate rows, missing required fields, same-event mixed outcomes, same-event multi-market exposure, and a readiness score for future Shadow Mode.
 
 No production repairs are activated in Phase 0-2. Candidate patterns are watchlist-only until later Shadow Mode and RYE validation exist.
 
@@ -92,6 +94,19 @@ Current Phase 0-2 implementation does not activate TGRM repairs. It prepares saf
 
 Bad data can create bad learning. The Adaptive Repair Engine must exclude pushes, voids, canceled picks, pending picks, and unknowns from win/loss rates. It must detect duplicate events and keep row-level and unique-event records separate.
 
+Enhanced diagnostics now also check:
+
+- result/event/sport column coverage
+- odds, closing-odds, confidence, edge, start-time, and market column coverage
+- exact duplicate extra rows
+- same-event mixed outcomes
+- same-event multi-market groups
+- missing required field examples
+- data-quality score and status
+- whether later Shadow Mode should be allowed
+
+The data-quality score does **not** activate repairs. It only tells the operator whether the data is strong enough for later Shadow Mode.
+
 ### Current tracker simulation example
 
 The uploaded tracker baseline used for Phase 0-2 validation produced:
@@ -105,6 +120,7 @@ The uploaded tracker baseline used for Phase 0-2 validation produced:
 - 0 duplicate event names found
 - Row-level win rate: 73.33%
 - Unique-event win rate: 73.33%
+- Production repairs active: No
 
 This does not justify a full retrain because the system is performing well overall. It supports only targeted watchlist patterns such as soccer draw-trap detection and combat pick volatility detection.
 
@@ -113,15 +129,18 @@ This does not justify a full retrain because the system is performing well overa
 ```bash
 python scripts/run_adaptive_repair_simulation.py path/to/graded_tracker.csv
 python scripts/run_adaptive_repair_simulation.py path/to/graded_tracker.csv --json
+python scripts/run_adaptive_repair_simulation.py path/to/graded_tracker.csv --output reports/adaptive_repair_report.md
+python scripts/run_adaptive_repair_simulation.py path/to/graded_tracker.csv --json --output reports/adaptive_repair_report.json
+python scripts/run_adaptive_repair_simulation.py path/to/graded_tracker.csv --fail-below-quality 70
 ```
 
 ## Adaptive Repair implementation status
 
 | Stage | Status |
 | --- | --- |
-| Phase 0: Simulation Gate | Implemented for CSV/export rows. |
+| Phase 0: Simulation Gate | Implemented for CSV/export rows with enhanced diagnostics. |
 | Phase 1: Graded List Ingestion | Implemented for local CSV/export rows. |
-| Phase 2: Row-level vs unique-event tracking | Implemented with duplicate event reporting. |
+| Phase 2: Row-level vs unique-event tracking | Implemented with duplicate event, duplicate row, mixed outcome, and same-event review reporting. |
 | Phase 3: Learning Page integration | Planned. |
 | Phase 4: Pattern Library | Planned. |
 | Phase 5: RYE scoring | Planned. |
@@ -134,7 +153,7 @@ python scripts/run_adaptive_repair_simulation.py path/to/graded_tracker.csv --js
 | Phase 12: TGRM repair activation | Planned; no production activation yet. |
 | Phase 13: Admin dashboard upgrades | Planned. |
 | Phase 14: Report generator upgrades | Planned. |
-| Phase 15: README documentation update | Implemented for Phase 0-2. |
+| Phase 15: README documentation update | Implemented for Phase 0-2 enhanced diagnostics. |
 
 ## 20-update checklist
 
@@ -160,7 +179,7 @@ Complete or locally implemented:
 18. Local admin dashboard.
 19. Manual license-status placeholder with no payment dependency.
 20. README and local-first status documentation.
-21. ABA Adaptive Repair Engine Phase 0-2 simulation gate, graded-list ingestion, and row-level vs unique-event protection.
+21. ABA Adaptive Repair Engine Phase 0-2 simulation gate, graded-list ingestion, row-level vs unique-event protection, and enhanced data-quality diagnostics.
 
 Local placeholders remain for heavier future work: true generated PDF files, automated payment processing, destructive memory reset, full cooldown/drawdown automation, advanced team-level correlation modeling, Shadow Mode repair activation, full RYE scoring, Hidden Value Score activation, and TGRM production repairs.
 
@@ -264,7 +283,7 @@ Do not put real API keys, private access codes, secrets, screenshots with secret
 
 ```bash
 python -m compileall autonomous_betting_agent pages tests
-python -m py_compile autonomous_betting_agent/magazine_api_sources.py autonomous_betting_agent/magazine_live_api_enrichment.py pages/report_studio.py autonomous_betting_agent/adaptive_repair_engine.py
+python -m py_compile autonomous_betting_agent/magazine_api_sources.py autonomous_betting_agent/magazine_live_api_enrichment.py pages/report_studio.py autonomous_betting_agent/adaptive_repair_engine.py autonomous_betting_agent/adaptive_repair_diagnostics.py
 python -m scripts.report_studio_regression_check
 python scripts/magazine_autofit_stress_test.py
 python -m pytest -q tests/test_adaptive_repair_engine.py
