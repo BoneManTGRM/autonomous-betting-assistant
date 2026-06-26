@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import importlib
 import json
 import os
 import re
@@ -10,10 +11,11 @@ from typing import Any
 from urllib.parse import quote_plus, urlencode
 from urllib.request import Request, urlopen
 
-ENRICHMENT_VERSION = "live_api_enrichment_v9_renderer_fallback_es"
+ENRICHMENT_VERSION = "live_api_enrichment_v10_immediate_spanish_renderer"
 _TIMEOUT_SECONDS = 3.0
 _CACHE: dict[tuple[str, str], Any] = {}
-_SPANISH_TR_MARKER = "_aba_spanish_report_tr_v9"
+_SPANISH_TR_MARKER = "_aba_spanish_report_tr_v10"
+_RELOAD_MARKER = "_aba_magazine_reload_patch_v10"
 
 API_SECRET_DEFS = {
     "SportsDataIO": ("SPORTSDATAIO_API_KEY", "SPORTS_DATA_IO_API_KEY", "SPORTSDATA_API_KEY"),
@@ -334,7 +336,7 @@ def _renderer_spanish_fallbacks() -> dict[str, str]:
         "Risk status": "Estado de riesgo",
         "Recheck odds before entry.": "Revisar cuotas antes de entrar.",
         "Avoid if key news changes": "Evitar si cambian noticias clave",
-        "Use only if the line remains playable and key news does not change.": "Usar solo si la línea sigue jugable y las noticias clave no cambian.",
+        "Use only if the line remains playable and key news does not change.": "Usar solo si la línea sigue jugable y no cambian noticias clave.",
     }
 
 
@@ -365,14 +367,18 @@ def _spanish_report_defaults(row: dict[str, Any]) -> None:
             row[key] = _spanish_text(value)
     risk_keys = ("why_lose", "risk_reason", "hidden_risk", "risk_notes")
     parlay_keys = ("chain_notes", "main_read", "add_on_legs", "parlay_notes")
+    final_keys = ("final_explanation", "action_reason", "recommendation_reason", "decision_reasons")
     risk_text = _alias_text(row, risk_keys, "Ventaja negativa con la cuota actual.\nNo jugar salvo que la cuota mejore.\nRevisar cuotas y noticias clave.")
     parlay_text = _alias_text(row, parlay_keys, "No encadenar señales con VE negativo.\nEvitar parlays salvo que la ventaja sea positiva.\nRevisar la cuota antes de incluir.")
+    final_text = _alias_text(row, final_keys, "No jugar con la cuota listada. Revisar si mejora la línea.")
+    if "nueva información cambia" in final_text or len(final_text) > 72:
+        final_text = "No jugar con la cuota listada. Revisar si mejora la línea."
     for key in risk_keys:
         row[key] = risk_text
     for key in parlay_keys:
         row[key] = parlay_text
-    if not any(_useful(row.get(k)) for k in ("final_explanation", "action_reason", "recommendation_reason", "decision_reasons")):
-        row["final_explanation"] = "No jugar con la cuota listada. Revisar solo si mejora la línea o nueva información cambia la ventaja."
+    for key in final_keys:
+        row[key] = final_text
     if not _useful(row.get("data_source")) and not _useful(row.get("odds_source")):
         row["data_source"] = "fila cargada/en caché"
 
@@ -380,6 +386,8 @@ def _spanish_report_defaults(row: dict[str, Any]) -> None:
 def enrich_row_with_live_api_data(row_like: Any) -> dict[str, Any]:
     row = _row(row_like)
     if row.get("_live_api_enriched") == ENRICHMENT_VERSION:
+        if _is_spanish(row):
+            _spanish_report_defaults(row)
         return row
     before = set(k for k, v in row.items() if _useful(v))
     _enrich_sportsdataio(row)
@@ -501,3 +509,23 @@ def _ensure_renderer_patch() -> None:
         install(magazine_book_export)
     except Exception:
         pass
+
+
+def _patch_importlib_reload() -> None:
+    if getattr(importlib.reload, _RELOAD_MARKER, False):
+        return
+    original_reload = getattr(importlib, "_aba_original_reload", importlib.reload)
+    setattr(importlib, "_aba_original_reload", original_reload)
+
+    def reload_with_magazine_patch(module: Any) -> Any:
+        reloaded = original_reload(module)
+        if getattr(reloaded, "__name__", "") == "autonomous_betting_agent.magazine_book_export":
+            return install(reloaded)
+        return reloaded
+
+    setattr(reload_with_magazine_patch, _RELOAD_MARKER, True)
+    importlib.reload = reload_with_magazine_patch
+
+
+_patch_importlib_reload()
+_ensure_renderer_patch()
