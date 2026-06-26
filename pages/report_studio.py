@@ -27,7 +27,7 @@ magazine_book_export = install_magazine_live_api_enrichment(importlib.reload(mag
 
 st.set_page_config(page_title="Report Studio", layout="wide")
 LANG = render_app_sidebar("report_studio", language_key="report_studio_language", selector="radio")
-NO_MARKET_EXPORT_VERSION = "no_market_metric_v7"
+NO_MARKET_EXPORT_VERSION = "no_market_metric_v8"
 ACTIVE_EXPORT_VERSION = f"{magazine_book_export.MAGAZINE_STYLE_VERSION}:{NO_MARKET_EXPORT_VERSION}:{ENRICHMENT_VERSION}"
 if st.session_state.get("report_studio_active_export_version") != ACTIVE_EXPORT_VERSION:
     st.cache_data.clear()
