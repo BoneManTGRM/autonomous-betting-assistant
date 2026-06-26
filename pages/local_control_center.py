@@ -15,10 +15,11 @@ from autonomous_betting_agent.local_alerts import sqlite_fallback_alert
 from autonomous_betting_agent.local_calibration import brier_score, calibration_buckets, odds_band_summary
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 from autonomous_betting_agent.storage import LocalStorage
-from autonomous_betting_agent.ui_i18n import tr, upload_helper
+from autonomous_betting_agent.ui_i18n import localize_dataframe, localize_options, render_upload_css, tr, upload_helper
 
 st.set_page_config(page_title="Local Control Center", layout="wide")
 LANG = render_app_sidebar("local_control_center", language_key="local_control_center_language")
+render_upload_css(st, LANG)
 require_streamlit_access(st, allow_roles={"admin"})
 
 st.title(tr(LANG, "Local Control Center", "Centro de Control Local"))
@@ -45,15 +46,15 @@ tabs = st.tabs([tr(LANG, "Storage/Admin", "Almacenamiento/Admin"), tr(LANG, "Cal
 
 with tabs[0]:
     st.subheader(tr(LANG, "Local storage/admin", "Almacenamiento/Admin local"))
-    st.dataframe(pd.DataFrame([{"ledger_type": key, "rows": value} for key, value in ledger_counts.items()]), use_container_width=True)
+    st.dataframe(localize_dataframe(pd.DataFrame([{"ledger_type": key, "rows": value} for key, value in ledger_counts.items()]), LANG), use_container_width=True)
     if rows:
         visible = pd.DataFrame(rows)
-        st.dataframe(visible, use_container_width=True)
+        st.dataframe(localize_dataframe(visible, LANG), use_container_width=True)
         st.download_button(tr(LANG, "Download all local rows", "Descargar todas las filas locales"), visible.to_csv(index=False).encode("utf-8"), file_name="local_control_rows.csv", mime="text/csv")
     audit = store.load_audit_log(limit=250)
     st.subheader(tr(LANG, "Audit log", "Registro de auditoría"))
     if audit:
-        st.dataframe(pd.DataFrame(audit), use_container_width=True)
+        st.dataframe(localize_dataframe(pd.DataFrame(audit), LANG), use_container_width=True)
     else:
         st.info(tr(LANG, "No local audit events found yet.", "Todavía no hay eventos locales de auditoría."))
 
@@ -68,16 +69,18 @@ with tabs[1]:
     buckets = calibration_buckets(resolved)
     if buckets:
         bucket_df = pd.DataFrame(buckets)
-        st.dataframe(bucket_df, use_container_width=True)
+        st.dataframe(localize_dataframe(bucket_df, LANG), use_container_width=True)
         st.bar_chart(bucket_df.set_index("bucket")[["expected_win_rate", "actual_win_rate"]])
     else:
         st.info(tr(LANG, "No graded rows with usable probabilities were found.", "No se encontraron filas calificadas con probabilidades útiles."))
-    st.dataframe(pd.DataFrame(odds_band_summary(resolved)), use_container_width=True)
+    st.dataframe(localize_dataframe(pd.DataFrame(odds_band_summary(resolved)), LANG), use_container_width=True)
 
 with tabs[2]:
     st.subheader(tr(LANG, "Bankroll risk", "Riesgo de bankroll"))
     bankroll = st.number_input(tr(LANG, "Bankroll units", "Unidades de bankroll"), min_value=1.0, value=100.0, step=10.0)
-    mode = st.selectbox(tr(LANG, "Stake mode", "Modo de stake"), ["flat", "conservative_kelly"])
+    mode_options, mode_map = localize_options(["flat", "conservative_kelly"], LANG)
+    mode_label = st.selectbox(tr(LANG, "Stake mode", "Modo de stake"), mode_options)
+    mode = mode_map.get(mode_label, mode_label)
     flat_units = st.number_input(tr(LANG, "Flat stake units", "Unidades de stake fijo"), min_value=0.1, value=1.0, step=0.1)
     max_daily = st.number_input(tr(LANG, "Max daily exposure %", "Exposición diaria máxima %"), min_value=0.1, max_value=100.0, value=5.0, step=0.5) / 100.0
     max_sport = st.number_input(tr(LANG, "Max sport exposure %", "Exposición máxima por deporte %"), min_value=0.1, max_value=100.0, value=5.0, step=0.5) / 100.0
@@ -93,7 +96,7 @@ with tabs[2]:
         output["stake_reason"] = suggestion.reason
         review_rows.append(output)
     if review_rows:
-        st.dataframe(pd.DataFrame(review_rows), use_container_width=True)
+        st.dataframe(localize_dataframe(pd.DataFrame(review_rows), LANG), use_container_width=True)
     else:
         st.info(tr(LANG, "No rows available for bankroll review.", "No hay filas disponibles para revisar bankroll."))
     st.caption(tr(LANG, "Cooldown and drawdown automation remain safe placeholders.", "Cooldown y drawdown siguen como marcadores seguros."))
@@ -102,7 +105,9 @@ with tabs[3]:
     st.subheader(tr(LANG, "Manual license tracking", "Seguimiento manual de licencias"))
     with st.form("local_control_license_form"):
         client_name = st.text_input(tr(LANG, "Client name", "Nombre del cliente"))
-        client_status = st.selectbox(tr(LANG, "Client status", "Estado del cliente"), ["trial", "active", "inactive", "expired"])
+        status_options, status_map = localize_options(["trial", "active", "inactive", "expired"], LANG)
+        client_status_label = st.selectbox(tr(LANG, "Client status", "Estado del cliente"), status_options)
+        client_status = status_map.get(client_status_label, client_status_label)
         subscription_tier = st.text_input(tr(LANG, "Subscription tier", "Nivel de suscripción"), "private_beta")
         manual_payment_status = st.text_input(tr(LANG, "Manual payment status", "Estado de pago manual"), "manual")
         renewal_date = st.text_input(tr(LANG, "Renewal date", "Fecha de renovación"), "")
@@ -118,7 +123,7 @@ with tabs[3]:
     records = load_license_records()
     if records:
         df = pd.DataFrame([asdict(record) for record in records])
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(localize_dataframe(df, LANG), use_container_width=True)
         st.download_button(tr(LANG, "Download local license CSV", "Descargar CSV local de licencias"), df.to_csv(index=False).encode("utf-8"), file_name="local_license_status.csv", mime="text/csv")
     else:
         st.info(tr(LANG, "No local license records found yet.", "Todavía no hay licencias locales."))
@@ -133,13 +138,13 @@ with tabs[4]:
     c3.metric(tr(LANG, "Blocked/review rows", "Filas bloqueadas/revisión"), len(blocked_rows))
     if safe_rows:
         df = pd.DataFrame(safe_rows)
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(localize_dataframe(df, LANG), use_container_width=True)
         st.download_button(tr(LANG, "Download learning-safe CSV", "Descargar CSV seguro para aprendizaje"), df.to_csv(index=False).encode("utf-8"), file_name="learning_safe_rows.csv", mime="text/csv")
     st.caption(upload_helper(LANG))
     upload = st.file_uploader(tr(LANG, "Preview learning-safe CSV", "Vista previa de CSV seguro para aprendizaje"), type=["csv"])
     if upload is not None:
         try:
-            st.dataframe(pd.read_csv(upload).head(100), use_container_width=True)
+            st.dataframe(localize_dataframe(pd.read_csv(upload).head(100), LANG), use_container_width=True)
             st.caption(tr(LANG, "Preview only. This does not train or overwrite memory.", "Solo vista previa. Esto no entrena ni sobrescribe memoria."))
         except Exception as exc:
             st.warning(f"{tr(LANG, 'Could not preview CSV', 'No se pudo previsualizar el CSV')}: {exc}")
@@ -150,7 +155,7 @@ with tabs[4]:
         st.error(tr(LANG, "Reset confirmation entered. This page still does not delete memory automatically.", "Confirmación ingresada. Esta página todavía no elimina memoria automáticamente."))
     if blocked_rows:
         with st.expander(tr(LANG, "Blocked/review rows", "Filas bloqueadas/revisión")):
-            st.dataframe(pd.DataFrame(blocked_rows), use_container_width=True)
+            st.dataframe(localize_dataframe(pd.DataFrame(blocked_rows), LANG), use_container_width=True)
 
 with tabs[5]:
     st.subheader(tr(LANG, "Workflow guide", "Guía de flujo"))
@@ -173,9 +178,9 @@ with tabs[5]:
 with tabs[6]:
     st.subheader(tr(LANG, "Local alerts/status", "Alertas/estado local"))
     st.write({
-        "storage_mode": "sqlite" if store.using_sqlite else "csv_fallback",
-        "sqlite_error": store.sqlite_error,
-        "local_rows": len(rows),
-        "audit_events": len(store.load_audit_log(limit=250)),
-        "correlation_warnings": len(correlation_warnings(rows)),
+        tr(LANG, "storage_mode", "modo_almacenamiento"): "sqlite" if store.using_sqlite else "csv_fallback",
+        tr(LANG, "sqlite_error", "error_sqlite"): store.sqlite_error,
+        tr(LANG, "local_rows", "filas_locales"): len(rows),
+        tr(LANG, "audit_events", "eventos_auditoría"): len(store.load_audit_log(limit=250)),
+        tr(LANG, "correlation_warnings", "alertas_correlación"): len(correlation_warnings(rows)),
     })
