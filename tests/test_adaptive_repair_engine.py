@@ -67,6 +67,7 @@ def test_row_level_and_unique_event_tracking_split_duplicates():
     assert diagnostics.same_event_groups[0]["multi_market"] is True
     assert diagnostics.mixed_outcome_events == 1
     assert diagnostics.multi_market_events == 1
+    assert any("mixed-outcome unique event" in penalty for penalty in diagnostics.data_quality["penalties"])
     assert "Mixed unique events: 1" in markdown
     assert "Mixed-outcome unique events: 1" in markdown
     assert "Multi-market unique events: 1" in markdown
