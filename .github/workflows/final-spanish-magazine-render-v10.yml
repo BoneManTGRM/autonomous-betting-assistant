@@ -58,9 +58,6 @@ jobs:
           if 'test_base_magazine_renderer_spanish_fallbacks_and_version' not in existing:
               test.write_text(existing.rstrip() + addition + '\n', encoding='utf-8')
           PY
-      - name: Run targeted tests
-        run: |
-          python -m pytest tests/test_spanish_magazine_renderer_translation.py -q
       - name: Commit patch
         run: |
           git config user.name "github-actions[bot]"
@@ -69,5 +66,8 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Finalize Spanish magazine renderer v10"
           git push
+      - name: Run targeted tests after commit
+        run: |
+          python -m pytest tests/test_spanish_magazine_renderer_translation.py -q
 
-# trigger: 2026-06-26T21:45Z
+# trigger: 2026-06-26T22:10Z
