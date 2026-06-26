@@ -47,8 +47,10 @@ def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
         from autonomous_betting_agent.magazine_api_sources import apply_magazine_api_patch
         from autonomous_betting_agent.magazine_auto_sizer import apply_magazine_auto_sizer
         from autonomous_betting_agent.magazine_headline_safety import install as install_headline_safety
+        from autonomous_betting_agent.magazine_live_api_enrichment import install as install_live_api_enrichment
 
         module = apply_magazine_api_patch(module)
+        module = install_live_api_enrichment(module)
         module = apply_magazine_auto_sizer(module)
         return install_headline_safety(module)
     except Exception:
@@ -56,7 +58,7 @@ def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
 
 
 def _patched_import(name: str, globals: dict[str, Any] | None = None, locals: dict[str, Any] | None = None, fromlist: tuple[str, ...] = (), level: int = 0) -> Any:
-    imported = _ORIGINAL_IMPORT(name, globals, locals, fromlist, level)
+    imported = _ORIGINAL_IMPORT(name, globals, fromlist=fromlist, locals=locals, level=level)
     if name == _TARGET or name.startswith(f"{_TARGET}.") or (name == "autonomous_betting_agent" and "magazine_book_export" in fromlist):
         _apply_if_target(sys.modules.get(_TARGET))
     return imported
