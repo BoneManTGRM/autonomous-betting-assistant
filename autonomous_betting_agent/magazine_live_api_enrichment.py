@@ -10,10 +10,10 @@ from typing import Any
 from urllib.parse import quote_plus, urlencode
 from urllib.request import Request, urlopen
 
-ENRICHMENT_VERSION = "live_api_enrichment_v8_spanish_risk_parlay_aliases"
+ENRICHMENT_VERSION = "live_api_enrichment_v9_renderer_fallback_es"
 _TIMEOUT_SECONDS = 3.0
 _CACHE: dict[tuple[str, str], Any] = {}
-_SPANISH_TR_MARKER = "_aba_spanish_report_tr_v8"
+_SPANISH_TR_MARKER = "_aba_spanish_report_tr_v9"
 
 API_SECRET_DEFS = {
     "SportsDataIO": ("SPORTSDATAIO_API_KEY", "SPORTS_DATA_IO_API_KEY", "SPORTSDATA_API_KEY"),
@@ -319,6 +319,31 @@ def _spanish_text(value: Any) -> str:
     return text
 
 
+def _renderer_spanish_fallbacks() -> dict[str, str]:
+    return {
+        "Negative edge at current price.": "Ventaja negativa con la cuota actual.",
+        "Do not play unless price improves.": "No jugar salvo que la cuota mejore.",
+        "Recheck odds and key news.": "Revisar cuotas y noticias clave.",
+        "Do not chain negative-EV picks.": "No encadenar señales con VE negativo.",
+        "Avoid parlays unless edge turns positive.": "Evitar parlays salvo que la ventaja sea positiva.",
+        "Recheck price before including.": "Revisar la cuota antes de incluir.",
+        "Price check required before entry.": "Revisar cuota antes de entrar.",
+        "Straight only: research": "Solo directa: investigación",
+        "Do not combine without official verification": "No combinar sin verificación oficial",
+        "Wait for better context or price": "Esperar mejor contexto o mejor cuota",
+        "Risk status": "Estado de riesgo",
+        "Recheck odds before entry.": "Revisar cuotas antes de entrar.",
+        "Avoid if key news changes": "Evitar si cambian noticias clave",
+        "Use only if the line remains playable and key news does not change.": "Usar solo si la línea sigue jugable y las noticias clave no cambian.",
+    }
+
+
+def _install_renderer_es_fallbacks(module: Any) -> None:
+    es = getattr(module, "ES", None)
+    if isinstance(es, dict):
+        es.update(_renderer_spanish_fallbacks())
+
+
 def _alias_text(row: dict[str, Any], keys: tuple[str, ...], default: str) -> str:
     existing = "\n".join(str(row.get(key, "")) for key in keys if _useful(row.get(key)))
     return _spanish_text(existing) if existing else default
@@ -417,6 +442,7 @@ def enrich_rows_with_live_api_data(rows: list[Any] | tuple[Any, ...]) -> list[di
 
 
 def install(module: Any) -> Any:
+    _install_renderer_es_fallbacks(module)
     existing_tr = getattr(module, "_tr", None)
     if callable(existing_tr) and getattr(existing_tr, _SPANISH_TR_MARKER, False):
         return module
