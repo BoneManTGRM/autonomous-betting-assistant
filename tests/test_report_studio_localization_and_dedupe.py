@@ -1,6 +1,6 @@
 import pandas as pd
 
-from autonomous_betting_agent.report_product_layer import event_text
+from autonomous_betting_agent.report_product_layer import event_text, value_text
 from autonomous_betting_agent.report_studio_service import (
     ReportStudioFilters,
     _card_dedupe_key,
@@ -13,6 +13,17 @@ def test_spanish_event_text_translates_both_country_sides():
     assert event_text("Canada vs Switzerland", "es") == "Canadá vs Suiza"
     assert event_text("Belgium vs New Zealand", "es") == "Bélgica vs Nueva Zelanda"
     assert event_text("Saudi Arabia at Cape Verde", "es") == "Arabia Saudita vs Cabo Verde"
+    assert event_text("Scotland at Portugal", "es") == "Escocia vs Portugal"
+    assert event_text("Uzbekistan at Portugal", "es") == "Uzbekistán vs Portugal"
+    assert event_text("Austria at Algeria", "es") == "Austria vs Argelia"
+
+
+def test_core_value_text_translates_report_market_labels():
+    assert value_text("totals", "es") == "totales"
+    assert value_text("spreads", "es") == "hándicaps"
+    assert value_text("moneyline", "es") == "ganador"
+    assert value_text("Price Watch / Research", "es") == "Seguimiento de precio / investigación"
+    assert value_text("Full magazine analysis", "es") == "Análisis completo de revista"
 
 
 def test_shared_spanish_dataframe_localization_translates_screen_table_values():
