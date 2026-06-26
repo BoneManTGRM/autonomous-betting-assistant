@@ -250,6 +250,7 @@ def install(module: Any) -> Any:
         return module
     original_render = module.render_full_pick_magazine_page
     original_png = module._png
+    original_team_snapshot = getattr(module, "_team_snapshot", None)
 
     def render(row_like: Any, *args: Any, **kwargs: Any):
         return original_render(enrich_row_with_live_api_data(row_like), *args, **kwargs)
@@ -257,8 +258,33 @@ def install(module: Any) -> Any:
     def render_png(row_like: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
         return original_png(module.render_full_pick_magazine_page(enrich_row_with_live_api_data(row_like), background_image, report_name, page_number, total_pages, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
 
+    def team_snapshot(img: Any, draw: Any, x: int, y: int, width: int, team: str, color: Any, lang: str, row_arg: Any | None = None, side_arg: str = "", *extra: Any, **kwargs: Any) -> None:
+        # Base renderer now passes row and side to _team_snapshot, while older
+        # runtime API patches accepted only the original eight parameters. Keep
+        # both call styles working so the final render path cannot fail before
+        # live enrichment data is displayed.
+        if callable(original_team_snapshot):
+            try:
+                original_team_snapshot(img, draw, x, y, width, team, color, lang, row_arg, side_arg, *extra, **kwargs)
+                return
+            except TypeError:
+                original_team_snapshot(img, draw, x, y, width, team, color, lang)
+                return
+        if hasattr(module, "_badge") and hasattr(module, "_fit") and hasattr(module, "_bullets_auto"):
+            label = module._team_label(team, lang)
+            module._badge(img, draw, label, x, y, 50, 50, color)
+            draw.text((x + 66, y + 9), label.upper(), font=module._fit(label.upper(), width - 70, 25, 7, True), fill=color)
+            row = enrich_row_with_live_api_data(row_arg or {})
+            items = []
+            try:
+                items = module._team_items(row, side_arg)
+            except Exception:
+                items = ["Data not returned for this event"]
+            module._bullets_auto(draw, x, y + 76, items, width - 10, 165, color, 18, 10, 4, lang)
+
     module.render_full_pick_magazine_page = render
     module.render_full_pick_magazine_page_png = render_png
+    module._team_snapshot = team_snapshot
     module.enrich_row_with_live_api_data = enrich_row_with_live_api_data
     module.enrich_rows_with_live_api_data = enrich_rows_with_live_api_data
     module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_{ENRICHMENT_VERSION}"
