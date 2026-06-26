@@ -1,7 +1,15 @@
 from __future__ import annotations
 
-from autonomous_betting_agent import magazine_book_export as magazine
-from autonomous_betting_agent.report_image_export_service import PNG_HEADER
+import importlib.util
+from pathlib import Path
+
+PNG_HEADER = b"\x89PNG\r\n\x1a\n"
+
+MODULE_PATH = Path(__file__).resolve().parents[1] / "autonomous_betting_agent" / "magazine_book_export.py"
+SPEC = importlib.util.spec_from_file_location("magazine_book_export_base", MODULE_PATH)
+assert SPEC is not None and SPEC.loader is not None
+magazine = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(magazine)
 
 
 HEADLINE_CASES = [
