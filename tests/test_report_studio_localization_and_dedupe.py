@@ -25,7 +25,7 @@ def test_report_studio_cards_dedupe_duplicate_event_pick_market_rows():
             "prediction": "Iraq",
             "market": "moneyline",
             "odds_source": "verified_book",
-            "decimal_price": 2.1,
+            "decimal_price": 2.2,
             "model_probability": 0.52,
         },
         {
@@ -46,6 +46,16 @@ def test_report_studio_cards_dedupe_duplicate_event_pick_market_rows():
             "line_point": 1.5,
             "odds_source": "verified_book",
             "decimal_price": 1.91,
+            "model_probability": 0.54,
+        },
+        {
+            "sport": "Soccer",
+            "event": "Iraq vs France",
+            "prediction": "Iraq",
+            "market": "spread",
+            "line_point": 1.5,
+            "odds_source": "verified_book",
+            "decimal_price": 1.95,
             "model_probability": 0.54,
         },
         {
