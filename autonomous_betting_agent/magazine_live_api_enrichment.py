@@ -10,10 +10,10 @@ from typing import Any
 from urllib.parse import quote_plus, urlencode
 from urllib.request import Request, urlopen
 
-ENRICHMENT_VERSION = "live_api_enrichment_v7_spanish_renderer_reload_safe"
+ENRICHMENT_VERSION = "live_api_enrichment_v8_spanish_risk_parlay_aliases"
 _TIMEOUT_SECONDS = 3.0
 _CACHE: dict[tuple[str, str], Any] = {}
-_SPANISH_TR_MARKER = "_aba_spanish_report_tr_v7"
+_SPANISH_TR_MARKER = "_aba_spanish_report_tr_v8"
 
 API_SECRET_DEFS = {
     "SportsDataIO": ("SPORTSDATAIO_API_KEY", "SPORTS_DATA_IO_API_KEY", "SPORTSDATA_API_KEY"),
@@ -319,6 +319,11 @@ def _spanish_text(value: Any) -> str:
     return text
 
 
+def _alias_text(row: dict[str, Any], keys: tuple[str, ...], default: str) -> str:
+    existing = "\n".join(str(row.get(key, "")) for key in keys if _useful(row.get(key)))
+    return _spanish_text(existing) if existing else default
+
+
 def _spanish_report_defaults(row: dict[str, Any]) -> None:
     if not _is_spanish(row):
         return
@@ -330,17 +335,21 @@ def _spanish_report_defaults(row: dict[str, Any]) -> None:
             f"Ventaja medida: {_fmt_pct(_get(row, 'model_market_edge', 'edge'), signed=True)}.",
             f"Valor esperado: {_fmt_ev(_get(row, 'expected_value_per_unit', 'profit_expected_value', 'expected_value', 'ev'))}.",
         ])
-    if not any(_useful(row.get(k)) for k in ("why_lose", "risk_reason", "hidden_risk", "risk_notes")):
-        row["risk_reason"] = "Ventaja negativa con la cuota actual.\nNo jugar salvo que la cuota mejore.\nRevisar cuotas y noticias clave."
-    if not any(_useful(row.get(k)) for k in ("chain_notes", "main_read", "add_on_legs", "parlay_notes")):
-        row["parlay_notes"] = "No encadenar señales con VE negativo.\nEvitar parlays salvo que la ventaja sea positiva.\nRevisar la cuota antes de incluir."
+    for key, value in list(row.items()):
+        if isinstance(value, str):
+            row[key] = _spanish_text(value)
+    risk_keys = ("why_lose", "risk_reason", "hidden_risk", "risk_notes")
+    parlay_keys = ("chain_notes", "main_read", "add_on_legs", "parlay_notes")
+    risk_text = _alias_text(row, risk_keys, "Ventaja negativa con la cuota actual.\nNo jugar salvo que la cuota mejore.\nRevisar cuotas y noticias clave.")
+    parlay_text = _alias_text(row, parlay_keys, "No encadenar señales con VE negativo.\nEvitar parlays salvo que la ventaja sea positiva.\nRevisar la cuota antes de incluir.")
+    for key in risk_keys:
+        row[key] = risk_text
+    for key in parlay_keys:
+        row[key] = parlay_text
     if not any(_useful(row.get(k)) for k in ("final_explanation", "action_reason", "recommendation_reason", "decision_reasons")):
         row["final_explanation"] = "No jugar con la cuota listada. Revisar solo si mejora la línea o nueva información cambia la ventaja."
     if not _useful(row.get("data_source")) and not _useful(row.get("odds_source")):
         row["data_source"] = "fila cargada/en caché"
-    for key, value in list(row.items()):
-        if isinstance(value, str):
-            row[key] = _spanish_text(value)
 
 
 def enrich_row_with_live_api_data(row_like: Any) -> dict[str, Any]:
