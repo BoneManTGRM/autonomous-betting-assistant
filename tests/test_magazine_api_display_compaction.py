@@ -25,7 +25,7 @@ def _row() -> dict[str, object]:
 def test_team_items_are_deduped_and_compact() -> None:
     items = api.team_items(_row(), "away")
     assert items.count("SDIO checked; no provider event ID in row.") == 1
-    assert "API-FB team lookup matched Iraq / France; fixture not verified." in items
+    assert "API-FB lookup only; fixture not verified." in items
     assert "News checked; no injury/lineup headline." in items
     assert all("SportsDataIO configured" not in item for item in items)
     assert all("API-Football:" not in item for item in items)
@@ -40,9 +40,9 @@ def test_injury_items_are_compact() -> None:
 def test_matchup_items_show_weather_location_and_lookup_label() -> None:
     items = api.matchup_items(_row())
     assert items == [
-        "Weather: Partly cloudy, 22.8°C, wind 5.8 kph.",
-        "Location: Philadelphia, Pennsylvania, United States of America.",
-        "API-FB team lookup matched Iraq / France; fixture not verified.",
+        "Weather: 22.8°C, partly cloudy, wind 5.8 kph.",
+        "Location: Philadelphia, PA, USA.",
+        "API-FB lookup only; fixture not verified.",
     ]
 
 
