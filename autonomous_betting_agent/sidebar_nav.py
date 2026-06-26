@@ -33,24 +33,31 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 { margin
 '''
 GLOBAL_UPLOAD_ES_CSS = '''
 <style>
-div[data-testid="stFileUploader"] button div p,
-div[data-testid="stFileUploader"] button p,
-div[data-testid="stFileUploader"] button span {
+div[data-testid="stFileUploader"] button,
+div[data-testid="stFileUploader"] button * {
   font-size: 0 !important;
   line-height: 0 !important;
 }
-div[data-testid="stFileUploader"] button div p::after,
-div[data-testid="stFileUploader"] button p::after,
-div[data-testid="stFileUploader"] button span::after {
+div[data-testid="stFileUploader"] button::after {
   content: "Subir";
   font-size: 1rem !important;
   line-height: 1.2 !important;
 }
+div[data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"],
 div[data-testid="stFileUploader"] small {
   font-size: 0 !important;
 }
 div[data-testid="stFileUploader"] small::after {
-  content: "CSV u otro archivo compatible";
+  content: "Archivo compatible";
+  font-size: .9rem !important;
+}
+div[data-testid="stFileUploader"] section > div > span,
+div[data-testid="stFileUploader"] section > div > div > span {
+  font-size: 0 !important;
+}
+div[data-testid="stFileUploader"] section > div > span::after,
+div[data-testid="stFileUploader"] section > div > div > span::after {
+  content: "200 MB por archivo";
   font-size: .9rem !important;
 }
 </style>
