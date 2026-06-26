@@ -240,7 +240,7 @@ def source_summary(sources: Sequence[SourceScanResult]) -> dict[str, Any]:
         "sources_scanned": len(sources),
         "available_sources": [source.name for source in sources if source.available],
         "unavailable_sources": [source.name for source in sources if not source.available and not source.error],
-        "failed_sources": [source.name for source in sources if source.error],
+        "failed_sources": [source.name for source in sources if source.error and not source.available],
         "sources_with_warnings": [source.name for source in sources if source.available and source.error],
         "loaded_files": sum(source.loaded_files for source in sources),
         "failed_files": sum(source.failed_files for source in sources),
