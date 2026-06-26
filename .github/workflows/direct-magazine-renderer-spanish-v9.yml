@@ -1,0 +1,55 @@
+name: Direct Magazine Renderer Spanish V9
+
+on:
+  push:
+    paths:
+      - '.github/workflows/direct-magazine-renderer-spanish-v9.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch base renderer translation path
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('autonomous_betting_agent/magazine_book_export.py')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('NO_MARKET_EXPORT_VERSION = "no_market_metric_v8"', 'NO_MARKET_EXPORT_VERSION = "no_market_metric_v9"')
+          text = text.replace('premium_v4_reference_compact_no_market_v8_base_api_data', 'premium_v4_reference_compact_no_market_v9_base_api_data')
+          text = text.replace('    version = "v8 no-market"', '    version = "v9 no-market"')
+
+          marker = '    if low in COUNTRY_ES:\n        return COUNTRY_ES[low]\n'
+          patch = '''    if low in COUNTRY_ES:\n        return COUNTRY_ES[low]\n    phrase_replacements = (\n        ("Negative edge at current " + "price", "Ventaja negativa con la cuota actual"),\n        ("Do not play unless price " + "improves", "No jugar salvo que la cuota mejore"),\n        ("Recheck odds and key " + "news", "Revisar cuotas y noticias clave"),\n        ("Do not chain negative-EV " + "picks", "No encadenar señales con VE negativo"),\n        ("Avoid parlays unless edge turns " + "positive", "Evitar parlays salvo que la ventaja sea positiva"),\n        ("Recheck price before " + "including", "Revisar la cuota antes de incluir"),\n        ("Price check required before " + "entry", "Revisar cuota antes de entrar"),\n        ("Use only if the line remains playable and key news does not " + "change", "Revisar si mejora la línea"),\n    )\n    for old, new in phrase_replacements:\n        text = re.sub(re.escape(old) + r"\\.?", new + ".", text, flags=re.I)\n'''
+          if 'phrase_replacements = (' not in text:
+              text = text.replace(marker, patch, 1)
+
+          old_cond = '    if lang == "es" and ("nueva información" in explanation or len(explanation) > 72):\n        explanation = "Revisar si mejora la línea."'
+          new_cond = '    if lang == "es" and ("LISTA DE SEGUIMIENTO" in action.upper() or "NO JUGAR" in action.upper() or "nueva información" in explanation or len(explanation) > 56):\n        explanation = "Revisar si mejora la línea."'
+          text = text.replace(old_cond, new_cond)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Patch Report Studio cache version
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('pages/report_studio.py')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('NO_MARKET_EXPORT_VERSION = "no_market_metric_v8"', 'NO_MARKET_EXPORT_VERSION = "no_market_metric_v9"')
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add autonomous_betting_agent/magazine_book_export.py pages/report_studio.py
+          git diff --cached --quiet && exit 0
+          git commit -m "Force Spanish magazine renderer fallbacks v9"
+          git push
