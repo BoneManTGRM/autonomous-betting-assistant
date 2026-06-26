@@ -24,6 +24,7 @@ from autonomous_betting_agent.odds_lock_tools import performance_by_group, updat
 from autonomous_betting_agent.pick_hold_store import load_first_available, save_held_rows
 from autonomous_betting_agent.row_normalizer import safe_text
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
+from autonomous_betting_agent.ui_i18n import localize_dataframe, localize_options, localize_value, render_upload_css
 
 SESSION_KEYS = ['public_proof_dashboard_refresh_rows', 'odds_lock_pro_locked_rows']
 IDENTITY_COLUMNS = ['active_list_id', 'ledger_batch_id', 'source_file']
@@ -36,24 +37,28 @@ TEXT = {
         'upload_ledger': 'Upload locked ledger or historical tracker CSV', 'upload_results': 'Upload finished results CSV for auto-grading', 'save_db': 'Save current dashboard ledger to this test ledger', 'apply_results': 'Apply result updates',
         'source': 'Source', 'active_source': 'Active proof source', 'valid': 'Valid proof rows', 'ignored_nonproof': 'Ignored raw/non-proof rows', 'proof_quality': 'Proof quality',
         'events': 'Unique events', 'pick_rows': 'Pick rows', 'completed_events': 'Completed events', 'resolved': 'Resolved picks', 'record': 'Record', 'hit_rate': 'Hit rate', 'voids': 'Voids', 'pending': 'Pending',
-        'multi_market': 'Multi-market events', 'extra_pick_rows': 'Extra same-event rows', 'roi': 'ROI', 'units': 'Units', 'clv': 'Avg CLV', 'beat_close': 'Beat close',
+        'wins': 'Wins', 'losses': 'Losses', 'multi_market': 'Multi-market events', 'extra_pick_rows': 'Extra same-event rows', 'roi': 'ROI', 'units': 'Units', 'clv': 'Avg CLV', 'beat_close': 'Beat close',
         'filters': 'Dashboard filters', 'filtered': 'Filtered rows', 'sport_filter': 'Sport filter', 'market_filter': 'Market filter', 'status_filter': 'Result status filter',
         'table': 'Public ledger table', 'dashboard': 'Breakdowns', 'audit': 'Proof audit', 'cards': 'Report cards', 'brand': 'Brand name', 'card_title': 'Card title',
         'markdown_card': 'Markdown card', 'html_card': 'HTML card', 'daily_report': 'Daily report', 'download_public': 'Download public proof CSV', 'download_private': 'Download private audit CSV', 'download_audit': 'Download proof audit CSV',
         'download_markdown': 'Download Markdown card', 'download_html': 'Download HTML card', 'download_report': 'Download daily report TXT', 'download_tracker': 'Download normalized tracker CSV',
         'no_rows': 'No current proof rows loaded. Run Pro Predictor Volume after this redeploy, upload the current locked CSV, or intentionally enable full saved database.',
         'tracker_warning': 'This file can be reviewed for record tracking, but it is not official proof because it lacks proof_id and locked_at_utc.', 'updated': 'Result update summary',
+        'stale_warning': 'Ignored stale synced dashboard rows with no source_file/active_list_id. Run Pro Predictor Volume again or enable full saved database intentionally.',
+        'source_identity': 'Active source identity', 'by_sport': 'By sport', 'by_market': 'By market', 'saved': 'Saved persistent ledger: ',
     },
     'es': {
         'title': 'Dashboard Público de Prueba', 'caption': 'Dashboard para clientes con picks bloqueados.', 'info': 'El modo oficial usa filas bloqueadas antes del inicio con proof_id y locked_at_utc.',
         'active_test_window': 'Ledger activo', 'test_window': 'ID de ventana', 'use_db': 'Usar base completa', 'use_session': 'Usar filas sincronizadas actuales', 'use_demo': 'Mostrar demo',
         'upload_ledger': 'Subir CSV', 'upload_results': 'Subir resultados', 'save_db': 'Guardar ledger actual', 'apply_results': 'Aplicar resultados', 'source': 'Fuente', 'active_source': 'Fuente activa',
-        'valid': 'Filas válidas', 'ignored_nonproof': 'Ignoradas/no-prueba', 'proof_quality': 'Calidad', 'events': 'Eventos únicos', 'pick_rows': 'Filas de picks', 'completed_events': 'Eventos terminados',
-        'resolved': 'Picks resueltos', 'record': 'Récord', 'hit_rate': 'Acierto', 'voids': 'Voids', 'pending': 'Pendientes', 'multi_market': 'Eventos multi-mercado', 'extra_pick_rows': 'Filas extra mismo evento',
-        'roi': 'ROI', 'units': 'Unidades', 'clv': 'CLV prom.', 'beat_close': 'Beat close', 'filters': 'Filtros', 'filtered': 'Filas filtradas', 'sport_filter': 'Deporte', 'market_filter': 'Mercado', 'status_filter': 'Estado',
+        'valid': 'Filas válidas', 'ignored_nonproof': 'Ignoradas/no-prueba', 'proof_quality': 'Calidad prueba', 'events': 'Eventos únicos', 'pick_rows': 'Filas de picks', 'completed_events': 'Eventos terminados',
+        'resolved': 'Picks resueltos', 'record': 'Récord', 'hit_rate': 'Acierto', 'voids': 'Voids', 'pending': 'Pendientes', 'wins': 'Victorias', 'losses': 'Derrotas', 'multi_market': 'Eventos multi-mercado', 'extra_pick_rows': 'Filas extra mismo evento',
+        'roi': 'ROI', 'units': 'Unidades', 'clv': 'CLV prom.', 'beat_close': 'Superó cierre', 'filters': 'Filtros', 'filtered': 'Filas filtradas', 'sport_filter': 'Deporte', 'market_filter': 'Mercado', 'status_filter': 'Estado',
         'table': 'Tabla pública', 'dashboard': 'Desgloses', 'audit': 'Auditoría', 'cards': 'Tarjetas', 'brand': 'Marca', 'card_title': 'Título', 'markdown_card': 'Markdown', 'html_card': 'HTML',
         'daily_report': 'Reporte', 'download_public': 'Descargar público', 'download_private': 'Descargar privado', 'download_audit': 'Descargar auditoría', 'download_markdown': 'Descargar Markdown', 'download_html': 'Descargar HTML',
         'download_report': 'Descargar reporte', 'download_tracker': 'Descargar tracker', 'no_rows': 'No hay filas actuales.', 'tracker_warning': 'Este archivo no es prueba oficial porque no tiene proof_id y locked_at_utc.', 'updated': 'Actualización',
+        'stale_warning': 'Se ignoraron filas sincronizadas antiguas sin source_file/active_list_id. Ejecuta Pro Predictor Volume otra vez o activa la base completa intencionalmente.',
+        'source_identity': 'Identidad de fuente activa', 'by_sport': 'Por deporte', 'by_market': 'Por mercado', 'saved': 'Ledger persistente guardado: ',
     },
 }
 
@@ -73,7 +78,7 @@ def _has_current_identity(frame: pd.DataFrame) -> bool:
     return any(col in locked.columns and locked[col].map(safe_text).ne('').any() for col in IDENTITY_COLUMNS)
 
 
-def _load_saved_session_rows(workspace_id: str) -> tuple[str, pd.DataFrame]:
+def _load_saved_session_rows(workspace_id: str, lang: str) -> tuple[str, pd.DataFrame]:
     skipped = []
     for key in SESSION_KEYS:
         rows = st.session_state.get(key) or []
@@ -91,11 +96,11 @@ def _load_saved_session_rows(workspace_id: str) -> tuple[str, pd.DataFrame]:
                 return f'local:{key}', frame
             skipped.append(f'local:{key}')
     if skipped:
-        st.warning('Ignored stale synced dashboard rows with no source_file/active_list_id. Run Pro Predictor Volume again or enable full saved database intentionally.')
+        st.warning(_t(lang, 'stale_warning'))
     return '', pd.DataFrame()
 
 
-def _read_sources(workspace_id: str, *, use_db: bool, use_session: bool, use_demo: bool, uploads: list | None) -> tuple[str, pd.DataFrame, pd.DataFrame, int]:
+def _read_sources(workspace_id: str, *, use_db: bool, use_session: bool, use_demo: bool, uploads: list | None, lang: str) -> tuple[str, pd.DataFrame, pd.DataFrame, int]:
     raw_frames, ledger_frames, names = [], [], []
     raw_count = 0
     if uploads:
@@ -112,7 +117,7 @@ def _read_sources(workspace_id: str, *, use_db: bool, use_session: bool, use_dem
             except Exception as exc:
                 st.warning(f'{upload.name}: {exc}')
     if use_session:
-        label, session_frame = _load_saved_session_rows(workspace_id)
+        label, session_frame = _load_saved_session_rows(workspace_id, lang)
         if not session_frame.empty:
             raw_frames.append(session_frame)
             locked = filter_locked_proof_rows(session_frame)
@@ -151,7 +156,9 @@ def _filter_dashboard(frame: pd.DataFrame, lang: str) -> pd.DataFrame:
             if col not in filtered.columns:
                 continue
             options = sorted([str(v) for v in filtered[col].dropna().unique() if str(v).strip()])
-            selected = st.multiselect(_t(lang, label), options, default=options)
+            display_options, display_to_raw = localize_options(options, lang)
+            selected_display = st.multiselect(_t(lang, label), display_options, default=display_options)
+            selected = [display_to_raw.get(item, item) for item in selected_display]
             if selected:
                 filtered = filtered[filtered[col].astype(str).isin(selected)]
         st.caption(f"{_t(lang, 'filtered')}: {len(filtered)}")
@@ -171,9 +178,9 @@ def _show_source_summary(frame: pd.DataFrame, source: str, workspace_id: str, la
     }
     st.subheader(_t(lang, 'active_source'))
     cols = st.columns(7)
-    cols[0].metric(_t(lang, 'events'), info['unique_events']); cols[1].metric(_t(lang, 'pick_rows'), info['pick_rows']); cols[2].metric('Wins', info['wins']); cols[3].metric('Losses', info['losses']); cols[4].metric(_t(lang, 'voids'), info['voids']); cols[5].metric(_t(lang, 'pending'), info['pending']); cols[6].metric(_t(lang, 'multi_market'), info['events_with_multiple_pick_rows'])
-    with st.expander('Active source identity', expanded=True):
-        st.json(info)
+    cols[0].metric(_t(lang, 'events'), info['unique_events']); cols[1].metric(_t(lang, 'pick_rows'), info['pick_rows']); cols[2].metric(_t(lang, 'wins'), info['wins']); cols[3].metric(_t(lang, 'losses'), info['losses']); cols[4].metric(_t(lang, 'voids'), info['voids']); cols[5].metric(_t(lang, 'pending'), info['pending']); cols[6].metric(_t(lang, 'multi_market'), info['events_with_multiple_pick_rows'])
+    with st.expander(_t(lang, 'source_identity'), expanded=True):
+        st.dataframe(localize_dataframe(pd.DataFrame([info]), lang), use_container_width=True, hide_index=True)
 
 
 def _show_tracker_mode(raw_input: pd.DataFrame, lang: str) -> None:
@@ -186,7 +193,7 @@ def _show_tracker_mode(raw_input: pd.DataFrame, lang: str) -> None:
     cols[0].metric(_t(lang, 'events'), metrics['unique_events']); cols[1].metric(_t(lang, 'pick_rows'), metrics['pick_rows']); cols[2].metric(_t(lang, 'completed_events'), metrics['completed_events']); cols[3].metric(_t(lang, 'record'), f"{metrics['wins']}-{metrics['losses']}"); cols[4].metric(_t(lang, 'hit_rate'), _pct(metrics['pick_hit_rate_excluding_voids'])); cols[5].metric(_t(lang, 'voids'), metrics['voids']); cols[6].metric(_t(lang, 'pending'), metrics['pending_pick_rows']); cols[7].metric(_t(lang, 'proof_quality'), '0/100')
     st.caption(f"{_t(lang, 'multi_market')}: {metrics['events_with_multiple_pick_rows']} | {_t(lang, 'extra_pick_rows')}: {metrics['extra_same_event_pick_rows']}")
     show_cols = [col for col in ['event', 'unique_event_id', 'same_event_pick_count', 'event_pick_index', 'sport', 'market_type', 'line_point', 'prediction', 'result_status', 'winner', 'final_score', 'event_start_utc', 'source_file'] if col in exposed.columns]
-    st.dataframe(exposed[show_cols] if show_cols else exposed, use_container_width=True, hide_index=True)
+    st.dataframe(localize_dataframe(exposed[show_cols] if show_cols else exposed, lang), use_container_width=True, hide_index=True)
     st.download_button(_t(lang, 'download_tracker'), exposed.to_csv(index=False), file_name='historical_tracker_non_proof.csv', mime='text/csv')
     st.stop()
 
@@ -207,23 +214,24 @@ def _public_table_with_exposure(frame: pd.DataFrame) -> pd.DataFrame:
 def run() -> None:
     st.set_page_config(page_title='Public Proof Dashboard', layout='wide')
     lang = render_app_sidebar('public_proof_dashboard', language_key='public_proof_dashboard_language', selector='radio')
+    render_upload_css(st, lang)
     st.title(_t(lang, 'title'))
     st.caption(_t(lang, 'caption'))
     st.info(_t(lang, 'info'))
-    st.caption('Current synced rows must include source_file, active_list_id, or ledger_batch_id. Stale old rows without identity are ignored.')
+    st.caption('Current synced rows must include source_file, active_list_id, or ledger_batch_id. Stale old rows without identity are ignored.' if lang == 'en' else 'Las filas sincronizadas deben incluir source_file, active_list_id o ledger_batch_id. Las filas antiguas sin identidad se ignoran.')
 
     with st.expander(_t(lang, 'active_test_window'), expanded=True):
         workspace_input = st.text_input(_t(lang, 'test_window'), value=st.session_state.get('aba_test_window_id', 'test_01'))
-        use_db = st.checkbox(_t(lang, 'use_db'), value=False, help='OFF by default so historical rows do not silently replace the active list.')
-        use_session = st.checkbox(_t(lang, 'use_session'), value=True, help='ON by default for current synced rows only. Stale rows without source identity are ignored.')
+        use_db = st.checkbox(_t(lang, 'use_db'), value=False, help='OFF by default so historical rows do not silently replace the active list.' if lang == 'en' else 'Apagado por defecto para que filas históricas no reemplacen la lista activa.')
+        use_session = st.checkbox(_t(lang, 'use_session'), value=True, help='ON by default for current synced rows only. Stale rows without source identity are ignored.' if lang == 'en' else 'Encendido por defecto solo para filas sincronizadas actuales. Las filas antiguas sin identidad se ignoran.')
         use_demo = st.checkbox(_t(lang, 'use_demo'), value=False, key='public_proof_use_demo')
         uploads = st.file_uploader(_t(lang, 'upload_ledger'), type=['csv'], accept_multiple_files=True)
 
     workspace_id = normalize_workspace_id(workspace_input)
     st.session_state['aba_test_window_id'] = workspace_id
-    source, ledger, raw_input, raw_count = _read_sources(workspace_id, use_db=use_db, use_session=use_session, use_demo=use_demo, uploads=uploads)
+    source, ledger, raw_input, raw_count = _read_sources(workspace_id, use_db=use_db, use_session=use_session, use_demo=use_demo, uploads=uploads, lang=lang)
     st.caption(f"{_t(lang, 'active_test_window')}: {workspace_id}")
-    st.caption(f"{_t(lang, 'source')}: {source or 'none'}")
+    st.caption(f"{_t(lang, 'source')}: {localize_value(source or 'none', lang)}")
 
     results_upload = st.file_uploader(_t(lang, 'upload_results'), type=['csv'], accept_multiple_files=False, key='proof_results_upload')
     if results_upload is not None and not ledger.empty:
@@ -245,7 +253,7 @@ def run() -> None:
         records = ledger.to_dict('records')
         save_held_rows('odds_lock_pro_locked_rows', records, workspace_id)
         save_held_rows('public_proof_dashboard_refresh_rows', records, workspace_id)
-        st.success(('Saved persistent ledger: ' if lang == 'en' else 'Ledger persistente guardado: ') + workspace_id)
+        st.success(_t(lang, 'saved') + workspace_id)
 
     ledger = filter_locked_proof_rows(ledger)
     if ledger.empty:
@@ -269,25 +277,25 @@ def run() -> None:
     tabs = st.tabs([_t(lang, 'table'), _t(lang, 'dashboard'), _t(lang, 'audit'), _t(lang, 'cards')])
     with tabs[0]:
         public = _public_table_with_exposure(filtered_ledger)
-        st.dataframe(public, use_container_width=True, hide_index=True)
+        st.dataframe(localize_dataframe(public, lang), use_container_width=True, hide_index=True)
         st.download_button(_t(lang, 'download_public'), public.to_csv(index=False), file_name=f'public_proof_dashboard_{workspace_id}.csv', mime='text/csv')
         st.download_button(_t(lang, 'download_private'), filtered_ledger.to_csv(index=False), file_name=f'private_proof_audit_{workspace_id}.csv', mime='text/csv')
     with tabs[1]:
-        st.json(metrics)
+        st.dataframe(localize_dataframe(pd.DataFrame([metrics]), lang), use_container_width=True, hide_index=True)
         by_sport = performance_by_group(filtered_ledger, 'sport')
         if not by_sport.empty:
-            st.subheader('By sport'); st.dataframe(by_sport, use_container_width=True, hide_index=True)
+            st.subheader(_t(lang, 'by_sport')); st.dataframe(localize_dataframe(by_sport, lang), use_container_width=True, hide_index=True)
         by_market = performance_by_group(filtered_ledger, 'market_type')
         if not by_market.empty:
-            st.subheader('By market'); st.dataframe(by_market, use_container_width=True, hide_index=True)
+            st.subheader(_t(lang, 'by_market')); st.dataframe(localize_dataframe(by_market, lang), use_container_width=True, hide_index=True)
     with tabs[2]:
-        st.json(audit_summary)
+        st.dataframe(localize_dataframe(pd.DataFrame([audit_summary]), lang), use_container_width=True, hide_index=True)
         audit = proof_audit_frame(filtered_ledger)
-        st.dataframe(audit, use_container_width=True, hide_index=True)
+        st.dataframe(localize_dataframe(audit, lang), use_container_width=True, hide_index=True)
         st.download_button(_t(lang, 'download_audit'), audit.to_csv(index=False), file_name=f'proof_audit_{workspace_id}.csv', mime='text/csv')
     with tabs[3]:
         brand = st.text_input(_t(lang, 'brand'), value='ABA Signal Pro · Powered by Reparodynamics')
-        title = st.text_input(_t(lang, 'card_title'), value='Proof Dashboard')
+        title = st.text_input(_t(lang, 'card_title'), value='Proof Dashboard' if lang == 'en' else 'Dashboard de Prueba')
         markdown = report_card_markdown(filtered_ledger, title=title, brand=brand)
         html = report_card_html(filtered_ledger, title=title, brand=brand)
         report = daily_locked_report(filtered_ledger, language='Español' if lang == 'es' else 'English')
