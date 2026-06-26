@@ -3,13 +3,14 @@ from __future__ import annotations
 import builtins
 import json
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass
 from typing import Any
 from urllib.parse import quote_plus, urlencode
 from urllib.request import Request, urlopen
 
-ENRICHMENT_VERSION = "live_api_enrichment_v1"
+ENRICHMENT_VERSION = "live_api_enrichment_v2_checked_details"
 _TIMEOUT_SECONDS = 3.0
 _CACHE: dict[tuple[str, str], Any] = {}
 
@@ -40,7 +41,7 @@ def _useful(value: Any) -> bool:
     if _bad(value):
         return False
     text = str(value).strip().lower()
-    return not any(token in text for token in ("not returned", "not available", "no data", "data unavailable", "api key missing"))
+    return not any(token in text for token in ("api key missing",))
 
 
 def _get(row: Mapping[str, Any], *keys: str, default: str = "") -> str:
@@ -121,18 +122,36 @@ def _request_json(url: str, *, headers: Mapping[str, str] | None = None, cache_k
     return data
 
 
+def _candidate_location(row: Mapping[str, Any]) -> str:
+    explicit = _get(row, "weather_location", "venue_weather_location", "venue", "event_location", "location", "city")
+    if explicit:
+        return explicit
+    joined = " | ".join(str(row.get(key, "")) for key in ("venue_note", "matchup_note", "matchup_notes", "sports_context_summary", "weather_summary", "event", "event_name"))
+    patterns = (
+        r"([A-Z][A-Za-z .'-]+,\s*[A-Z][A-Za-z .'-]+,\s*(?:USA|United States|Mexico|Canada))",
+        r"([A-Z][A-Za-z .'-]+,\s*(?:USA|United States|Mexico|Canada))",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, joined)
+        if match:
+            return match.group(1).strip(" .")
+    return ""
+
+
 def _enrich_weather(row: dict[str, Any]) -> None:
     key = _secret(*API_SECRET_DEFS["WeatherAPI"])
     if not key:
         return
-    location = _get(row, "weather_location", "venue_weather_location", "venue", "event_location", "location", "city")
+    location = _candidate_location(row)
     if not location:
+        _set_if_empty(row, "weather_summary", "WeatherAPI configured; no venue/location field was available for this row.")
         return
     url = "https://api.weatherapi.com/v1/current.json?" + urlencode({"key": key, "q": location, "aqi": "no"})
     data = _request_json(url, cache_key=("weather", location.lower()))
     current = data.get("current") if isinstance(data, Mapping) else None
     place = data.get("location") if isinstance(data, Mapping) else None
     if not isinstance(current, Mapping):
+        _set_if_empty(row, "weather_summary", f"WeatherAPI checked {location}; live weather payload was not returned.")
         return
     condition = current.get("condition") if isinstance(current.get("condition"), Mapping) else {}
     place_name = ", ".join(str(place.get(k)) for k in ("name", "region", "country") if isinstance(place, Mapping) and place.get(k))
@@ -163,6 +182,9 @@ def _enrich_news(row: dict[str, Any]) -> None:
     data = _request_json("https://newsapi.org/v2/everything?" + urlencode(params), cache_key=("news", query.lower()))
     articles = data.get("articles") if isinstance(data, Mapping) else None
     if not isinstance(articles, list) or not articles:
+        summary = f"NewsAPI checked '{query}'; no recent matching articles were returned."
+        _set_if_empty(row, "newsapi_summary", summary)
+        _set_if_empty(row, "news_injury_summary", summary)
         return
     titles = [str(item.get("title", "")).strip() for item in articles if isinstance(item, Mapping) and item.get("title")]
     titles = [title for title in titles if title][:3]
@@ -172,6 +194,8 @@ def _enrich_news(row: dict[str, Any]) -> None:
     _set_if_empty(row, "newsapi_summary", summary)
     if any(any(token in title.lower() for token in ("injury", "injured", "lineup", "out", "questionable")) for title in titles):
         _set_if_empty(row, "news_injury_summary", summary)
+    else:
+        _set_if_empty(row, "news_injury_summary", "NewsAPI checked recent news; no injury/lineup headline was returned.")
 
 
 def _api_football_team_search(team: str, key: str) -> str:
@@ -211,17 +235,29 @@ def _enrich_api_football(row: dict[str, Any]) -> None:
         summary = "API-Football: " + " vs ".join(part for part in (away_result, home_result) if part)
         _set_if_empty(row, "api_football_team_summary", summary)
         _set_if_empty(row, "api_football_summary", summary)
+    else:
+        summary = f"API-Football checked team lookup for {away or 'away team'} and {home or 'home team'}; no matching team payload was returned."
+        _set_if_empty(row, "api_football_team_summary", summary)
+        _set_if_empty(row, "api_football_summary", summary)
 
 
 def _enrich_sportsdataio(row: dict[str, Any]) -> None:
-    # SportsDataIO has sport-specific endpoints. Until the row carries a league
-    # endpoint or provider id, record only returned row fields and let the report
-    # say the configured API was checked when no event-specific payload exists.
     if not _secret(*API_SECRET_DEFS["SportsDataIO"]):
         return
     existing = _get(row, "sportsdataio_team_summary", "sportsdataio_context", "sportsdataio_injury_summary", "sportsdataio_game_summary")
     if existing:
         return
+    kind = _sport_kind(row)
+    if kind == "baseball":
+        summary = "SportsDataIO configured; MLB event-specific provider id was not available in this row."
+    elif kind == "soccer":
+        summary = "SportsDataIO configured; soccer team/event endpoint data was not available for this row."
+    elif kind == "combat":
+        summary = "SportsDataIO configured; combat event endpoint data was not available for this row."
+    else:
+        summary = "SportsDataIO configured; event-specific provider id was not available in this row."
+    _set_if_empty(row, "sportsdataio_context", summary)
+    _set_if_empty(row, "sportsdataio_team_summary", summary)
 
 
 def enrich_row_with_live_api_data(row_like: Any) -> dict[str, Any]:
@@ -259,10 +295,6 @@ def install(module: Any) -> Any:
         return original_png(module.render_full_pick_magazine_page(enrich_row_with_live_api_data(row_like), background_image, report_name, page_number, total_pages, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
 
     def team_snapshot(img: Any, draw: Any, x: int, y: int, width: int, team: str, color: Any, lang: str, row_arg: Any | None = None, side_arg: str = "", *extra: Any, **kwargs: Any) -> None:
-        # Base renderer now passes row and side to _team_snapshot, while older
-        # runtime API patches accepted only the original eight parameters. Keep
-        # both call styles working so the final render path cannot fail before
-        # live enrichment data is displayed.
         if callable(original_team_snapshot):
             try:
                 original_team_snapshot(img, draw, x, y, width, team, color, lang, row_arg, side_arg, *extra, **kwargs)
