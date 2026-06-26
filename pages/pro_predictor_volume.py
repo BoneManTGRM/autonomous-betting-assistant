@@ -202,55 +202,122 @@ def run_predictor_full_update(workspace_id: str, *, api_key_override: str, days_
     return report
 
 
+AUTO_TEXT = {
+    'en': {
+        'title': 'Automation / Maintenance: results → learning',
+        'caption': 'Use this after picks have been locked. It can update finished wins/losses, save the ledger, and feed new results into learning memory.',
+        'workspace': 'Workspace ID',
+        'days': 'Days back for result sync',
+        'threshold': 'Match threshold',
+        'run_learning': 'Run learning after result sync',
+        'api_key': 'Optional Odds API key override',
+        'matcher': 'Active full-auto matcher: V3 actual-change-aware workspace sync. Threshold display: {threshold:.2f}.',
+        'find': 'Find & update wins/losses',
+        'learning_only': 'Run learning update only',
+        'full_auto': 'Full auto update',
+        'result_report': 'Result sync report',
+        'result_updated': 'Wins/losses updated and dashboard synced.',
+        'result_status': 'Result sync status: {status} / {reason}',
+        'download_result': 'Download result sync report',
+        'result_error': 'Auto Result Sync failed: {error}',
+        'learning_report': 'Learning update report',
+        'learning_updated': 'Learning memory updated.',
+        'learning_skipped': 'Learning update skipped: {reason}',
+        'download_learning': 'Download learning report',
+        'learning_error': 'Auto Learning Cycle failed: {error}',
+        'full_report': 'Full auto update report',
+        'full_updated': 'Results, dashboard sync, and learning update completed where new results were found.',
+        'full_status': 'Full auto update status: {status} / {reason}',
+        'download_full': 'Download full auto update report',
+        'full_error': 'Full auto update failed: {error}',
+    },
+    'es': {
+        'title': 'Automatización / mantenimiento: resultados → aprendizaje',
+        'caption': 'Úsalo después de bloquear picks. Puede actualizar ganadas/perdidas finalizadas, guardar el ledger y enviar nuevos resultados a la memoria de aprendizaje.',
+        'workspace': 'ID de workspace',
+        'days': 'Días atrás para sincronizar resultados',
+        'threshold': 'Umbral de coincidencia',
+        'run_learning': 'Ejecutar aprendizaje después de sincronizar resultados',
+        'api_key': 'Clave opcional de Odds API',
+        'matcher': 'Matcher full-auto activo: sincronización workspace V3 con cambios reales. Umbral mostrado: {threshold:.2f}.',
+        'find': 'Buscar y actualizar ganadas/perdidas',
+        'learning_only': 'Ejecutar solo actualización de aprendizaje',
+        'full_auto': 'Actualización automática completa',
+        'result_report': 'Reporte de sincronización de resultados',
+        'result_updated': 'Ganadas/perdidas actualizadas y dashboard sincronizado.',
+        'result_status': 'Estado de sincronización: {status} / {reason}',
+        'download_result': 'Descargar reporte de sincronización',
+        'result_error': 'Falló la sincronización automática de resultados: {error}',
+        'learning_report': 'Reporte de actualización de aprendizaje',
+        'learning_updated': 'Memoria de aprendizaje actualizada.',
+        'learning_skipped': 'Actualización de aprendizaje omitida: {reason}',
+        'download_learning': 'Descargar reporte de aprendizaje',
+        'learning_error': 'Falló el ciclo automático de aprendizaje: {error}',
+        'full_report': 'Reporte de actualización automática completa',
+        'full_updated': 'Resultados, dashboard y aprendizaje completados donde hubo nuevos resultados.',
+        'full_status': 'Estado de actualización automática completa: {status} / {reason}',
+        'download_full': 'Descargar reporte automático completo',
+        'full_error': 'Falló la actualización automática completa: {error}',
+    },
+}
+
+
+def auto_t(key: str, **kwargs) -> str:
+    lang = str(globals().get('LANG', 'en') or 'en').lower()
+    lang = 'es' if lang.startswith('es') else 'en'
+    text = AUTO_TEXT.get(lang, AUTO_TEXT['en']).get(key, AUTO_TEXT['en'].get(key, key))
+    return text.format(**kwargs) if kwargs else text
+
+
 def render_predictor_automation_panel() -> None:
-    with st.expander('Automation / Maintenance: results → learning', expanded=False):
-        st.caption('Use this after picks have been locked. It can update finished wins/losses, save the ledger, and feed new results into learning memory.')
-        workspace_input = st.text_input('Workspace ID', value=st.session_state.get('aba_test_window_id', 'test_01'), key='predictor_auto_workspace')
+    with st.expander(auto_t('title'), expanded=False):
+        st.caption(auto_t('caption'))
+        workspace_input = st.text_input(auto_t('workspace'), value=st.session_state.get('aba_test_window_id', 'test_01'), key='predictor_auto_workspace')
         workspace_id = normalize_workspace_id(workspace_input)
         st.session_state['aba_test_window_id'] = workspace_id
         cols = st.columns(4)
-        days_from = cols[0].number_input('Days back for result sync', min_value=1, max_value=7, value=7, step=1, key='predictor_auto_days')
-        threshold = cols[1].number_input('Match threshold', min_value=0.70, max_value=0.98, value=0.82, step=0.01, key='predictor_auto_threshold')
-        run_learning = cols[2].toggle('Run learning after result sync', value=True, key='predictor_auto_run_learning')
-        api_key = cols[3].text_input('Optional Odds API key override', value='', type='password', key='predictor_auto_api_key')
-        st.caption(f'Active full-auto matcher: V3 actual-change-aware workspace sync. Threshold display: {float(threshold):.2f}.')
+        days_from = cols[0].number_input(auto_t('days'), min_value=1, max_value=7, value=7, step=1, key='predictor_auto_days')
+        threshold = cols[1].number_input(auto_t('threshold'), min_value=0.70, max_value=0.98, value=0.82, step=0.01, key='predictor_auto_threshold')
+        run_learning = cols[2].toggle(auto_t('run_learning'), value=True, key='predictor_auto_run_learning')
+        api_key = cols[3].text_input(auto_t('api_key'), value='', type='password', key='predictor_auto_api_key')
+        st.caption(auto_t('matcher', threshold=float(threshold)))
         actions = st.columns(3)
-        if actions[0].button('Find & update wins/losses', use_container_width=True, key='predictor_auto_result_sync'):
+        if actions[0].button(auto_t('find'), use_container_width=True, key='predictor_auto_result_sync'):
             try:
                 report = run_predictor_full_update(workspace_id, api_key_override=api_key, days_from=int(days_from), run_learning_after=bool(run_learning))
-                st.subheader('Result sync report')
+                st.subheader(auto_t('result_report'))
                 if report.get('status') == 'updated':
-                    st.success('Wins/losses updated and dashboard synced.')
+                    st.success(auto_t('result_updated'))
                 else:
-                    st.warning(f"Result sync status: {report.get('status')} / {report.get('reason', 'no reason')}")
+                    st.warning(auto_t('result_status', status=report.get('status'), reason=report.get('reason', 'no reason')))
                 st.json(report)
-                st.download_button('Download result sync report', json.dumps(report, indent=2, sort_keys=True), file_name='auto_result_sync_report.json', mime='application/json')
+                st.download_button(auto_t('download_result'), json.dumps(report, indent=2, sort_keys=True), file_name='auto_result_sync_report.json', mime='application/json')
             except Exception as exc:
-                st.error(f'Auto Result Sync failed: {exc}')
-        if actions[1].button('Run learning update only', use_container_width=True, key='predictor_auto_learning'):
+                st.error(auto_t('result_error', error=exc))
+        if actions[1].button(auto_t('learning_only'), use_container_width=True, key='predictor_auto_learning'):
             try:
                 report = run_auto_learning_cycle(workspace_id, min_new_rows=1, min_total_rows=5, save_to_github=True)
-                st.subheader('Learning update report')
+                st.subheader(auto_t('learning_report'))
                 if report.get('status') == 'trained':
-                    st.success('Learning memory updated.')
+                    st.success(auto_t('learning_updated'))
                 else:
-                    st.warning(f"Learning update skipped: {report.get('reason')}")
+                    st.warning(auto_t('learning_skipped', reason=report.get('reason')))
                 st.json(report)
-                st.download_button('Download learning report', json.dumps(report, indent=2, sort_keys=True), file_name='auto_learning_cycle_report.json', mime='application/json')
+                st.download_button(auto_t('download_learning'), json.dumps(report, indent=2, sort_keys=True), file_name='auto_learning_cycle_report.json', mime='application/json')
             except Exception as exc:
-                st.error(f'Auto Learning Cycle failed: {exc}')
-        if actions[2].button('Full auto update', type='primary', use_container_width=True, key='predictor_full_auto_update'):
+                st.error(auto_t('learning_error', error=exc))
+        if actions[2].button(auto_t('full_auto'), type='primary', use_container_width=True, key='predictor_full_auto_update'):
             try:
                 report = run_predictor_full_update(workspace_id, api_key_override=api_key, days_from=int(days_from), run_learning_after=True)
-                st.subheader('Full auto update report')
+                st.subheader(auto_t('full_report'))
                 if report.get('status') == 'updated':
-                    st.success('Results, dashboard sync, and learning update completed where new results were found.')
+                    st.success(auto_t('full_updated'))
                 else:
-                    st.warning(f"Full auto update status: {report.get('status')} / {report.get('reason', 'no reason')}")
+                    st.warning(auto_t('full_status', status=report.get('status'), reason=report.get('reason', 'no reason')))
                 st.json(report)
-                st.download_button('Download full auto update report', json.dumps(report, indent=2, sort_keys=True), file_name='full_auto_update_report.json', mime='application/json')
+                st.download_button(auto_t('download_full'), json.dumps(report, indent=2, sort_keys=True), file_name='full_auto_update_report.json', mime='application/json')
             except Exception as exc:
-                st.error(f'Full auto update failed: {exc}')
+                st.error(auto_t('full_error', error=exc))
 
 
 def _replace_required(source: str, old: str, new: str, label: str) -> str:
