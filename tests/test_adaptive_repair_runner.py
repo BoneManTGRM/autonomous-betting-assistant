@@ -76,6 +76,21 @@ def test_failed_source_is_isolated_and_recorded():
     assert "abc123456789" not in failed.summary()["error"]
 
 
+def test_bad_csv_in_system_source_is_reported_not_silently_ignored(tmp_path):
+    ledger_dir = tmp_path / "ledgers"
+    ledger_dir.mkdir(parents=True)
+    (ledger_dir / "bad.csv").write_bytes(b"\xff\xfe\x00\x00")
+
+    report = run_adaptive_repair_scan(include_system_sources=True, data_root=tmp_path, timestamp="2026-06-26T13:31:30Z")
+
+    assert "local_csv_ledgers" in report.source_summary["failed_sources"]
+    ledger_source = next(source for source in report.sources if source["name"] == "local_csv_ledgers")
+    assert ledger_source["available"] is False
+    assert ledger_source["error"]
+    assert report.production_repairs_active is False
+    assert report.live_pick_changes is False
+
+
 def test_runner_markdown_json_exports_and_recent_listing(tmp_path):
     report = run_adaptive_repair_scan(
         uploaded_rows=_tracker_rows()[:3],
