@@ -238,6 +238,8 @@ class EnhancedSimulationDiagnostics:
     data_quality: dict[str, Any]
     column_coverage: dict[str, dict[str, Any]]
     duplicate_rows: int
+    mixed_outcome_events: int = 0
+    multi_market_events: int = 0
     duplicate_row_examples: list[dict[str, Any]] = field(default_factory=list)
     same_event_groups: list[dict[str, Any]] = field(default_factory=list)
     missing_required_field_examples: list[dict[str, Any]] = field(default_factory=list)
@@ -254,6 +256,9 @@ def build_enhanced_diagnostics(rows: list[Mapping[str, Any]], dataset_name: str 
     base = build_simulation_report(rows, dataset_name=dataset_name)
     coverage = column_coverage(rows)
     duplicate_rows, duplicate_examples = duplicate_row_details(rows)
+    same_event_groups = same_event_group_details(rows)
+    mixed_outcome_events = sum(1 for group in same_event_groups if group["mixed_outcome"])
+    multi_market_events = sum(1 for group in same_event_groups if group["multi_market"])
     data_quality = compute_data_quality(
         rows=rows,
         row_level=base.row_level,
@@ -266,8 +271,10 @@ def build_enhanced_diagnostics(rows: list[Mapping[str, Any]], dataset_name: str 
         data_quality=data_quality,
         column_coverage=coverage,
         duplicate_rows=duplicate_rows,
+        mixed_outcome_events=mixed_outcome_events,
+        multi_market_events=multi_market_events,
         duplicate_row_examples=duplicate_examples,
-        same_event_groups=same_event_group_details(rows),
+        same_event_groups=same_event_groups,
         missing_required_field_examples=missing_required_field_examples(rows),
         production_repairs_active=False,
     )
@@ -280,7 +287,6 @@ def simulate_csv_diagnostics(path: str | Path) -> EnhancedSimulationDiagnostics:
 
 def diagnostics_to_markdown(diagnostics: EnhancedSimulationDiagnostics) -> str:
     base = diagnostics.base_report
-    event = base["unique_event_level"]
     quality = diagnostics.data_quality
     lines = [
         report_to_markdown(build_simulation_report_from_dict(base)).rstrip(),
@@ -292,8 +298,8 @@ def diagnostics_to_markdown(diagnostics: EnhancedSimulationDiagnostics) -> str:
         f"- Shadow Mode allowed later: {quality['shadow_mode_allowed']}",
         f"- Production repairs allowed now: {quality['repairs_allowed']}",
         f"- Exact duplicate extra rows: {diagnostics.duplicate_rows}",
-        f"- Mixed-outcome unique events: {event.get('mixed_outcome_events', 0)}",
-        f"- Multi-market unique events: {event.get('multi_market_events', 0)}",
+        f"- Mixed-outcome unique events: {diagnostics.mixed_outcome_events}",
+        f"- Multi-market unique events: {diagnostics.multi_market_events}",
         "",
         "## Column coverage",
         "",
