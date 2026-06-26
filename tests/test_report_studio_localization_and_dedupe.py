@@ -50,23 +50,80 @@ def test_shared_spanish_options_localize_report_actions():
     assert reverse["Investigación / seguimiento para aprendizaje"] == "Research / Track for Learning"
 
 
-def test_report_studio_dedupe_key_ignores_price_but_preserves_line_identity():
+def test_report_studio_research_dedupe_collapses_same_event_even_with_market_variants():
     base = {
         "public_event": "Irak vs Francia",
         "public_pick": "Irak",
         "market": "spread",
         "line_point": 1.5,
         "decimal_price": 1.91,
-        "public_action": "No jugar",
+        "public_action": "Seguimiento de momio / investigación",
+        "report_lane": "no_play",
+    }
+    same_event_new_market = {**base, "market": "total", "line_point": 2.5, "decimal_price": 1.95}
+
+    assert _card_dedupe_key(base) == _card_dedupe_key(same_event_new_market)
+
+
+def test_report_studio_official_dedupe_preserves_real_market_and_line_identity():
+    base = {
+        "public_event": "Irak vs Francia",
+        "public_pick": "Irak",
+        "market": "spread",
+        "line_point": 1.5,
+        "decimal_price": 1.91,
+        "public_action": "Jugada oficial +EV",
+        "report_lane": "best_play",
+        "official_publish_ready": True,
     }
     same_pick_new_price = {**base, "decimal_price": 1.95}
     different_line = {**base, "line_point": 2.5, "decimal_price": 1.91}
+    different_market = {**base, "market": "team_total", "line_point": 2.5}
 
     assert _card_dedupe_key(base) == _card_dedupe_key(same_pick_new_price)
     assert _card_dedupe_key(base) != _card_dedupe_key(different_line)
+    assert _card_dedupe_key(base) != _card_dedupe_key(different_market)
 
 
-def test_report_studio_cards_dedupe_exact_duplicate_rows_but_keep_different_markets():
+def test_report_studio_cards_collapse_duplicate_research_pages_for_same_event():
+    rows = [
+        {
+            "sport": "Soccer",
+            "event": "Iraq vs France",
+            "prediction": "Iraq",
+            "market": "moneyline",
+            "decimal_price": 1.3,
+            "model_probability": 0.50,
+        },
+        {
+            "sport": "Soccer",
+            "event": "Iraq vs France",
+            "prediction": "France",
+            "market": "totals",
+            "line_point": 2.5,
+            "decimal_price": 1.4,
+            "model_probability": 0.50,
+        },
+        {
+            "sport": "Soccer",
+            "event": "Germany vs Ecuador",
+            "prediction": "Germany",
+            "market": "moneyline",
+            "decimal_price": 1.3,
+            "model_probability": 0.50,
+        },
+    ]
+
+    _, _, _, cards = build_report_studio_cards(
+        rows,
+        filters=ReportStudioFilters(language="es", include_sports_context=False),
+    )
+
+    assert len(cards) == 2
+    assert cards["public_event"].tolist() == ["Irak vs Francia", "Alemania vs Ecuador"]
+
+
+def test_report_studio_cards_preserve_separate_official_markets():
     rows = [
         {
             "sport": "Soccer",
@@ -74,27 +131,20 @@ def test_report_studio_cards_dedupe_exact_duplicate_rows_but_keep_different_mark
             "prediction": "Iraq",
             "market": "moneyline",
             "odds_source": "verified_book",
-            "decimal_price": 2.1,
-            "model_probability": 0.52,
-        },
-        {
-            "sport": "Soccer",
-            "event": "Iraq vs France",
-            "prediction": "Iraq",
-            "market": "moneyline",
-            "odds_source": "verified_book",
             "decimal_price": 2.2,
-            "model_probability": 0.52,
+            "model_probability": 0.56,
+            "proof_id": "proof-1",
         },
         {
             "sport": "Soccer",
             "event": "Iraq vs France",
-            "prediction": "Iraq",
+            "prediction": "Iraq Over 2.5",
             "market": "team_total",
             "line_point": 2.5,
             "odds_source": "verified_book",
-            "decimal_price": 2.1,
-            "model_probability": 0.52,
+            "decimal_price": 2.2,
+            "model_probability": 0.56,
+            "proof_id": "proof-2",
         },
     ]
 
