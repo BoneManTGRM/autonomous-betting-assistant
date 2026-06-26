@@ -14,21 +14,20 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from autonomous_betting_agent.adaptive_repair_engine import (
-    CLOSING_ODDS_COLUMNS,
-    CONFIDENCE_COLUMNS,
     EVENT_COLUMNS,
     MARKET_COLUMNS,
-    ODDS_COLUMNS,
     RESULT_COLUMNS,
     SPORT_COLUMNS,
     build_simulation_report,
-    normalized_event_name,
     read_csv_rows,
     report_to_markdown,
     status_from_row,
     unique_event_key,
 )
 
+ODDS_COLUMNS = ("odds", "american_odds", "decimal_odds", "price", "line_price", "book_odds")
+CLOSING_ODDS_COLUMNS = ("closing_odds", "close_odds", "closing_price", "closing_line", "clv_close")
+CONFIDENCE_COLUMNS = ("confidence", "confidence_score", "model_confidence", "probability", "win_probability")
 EDGE_COLUMNS = ("edge", "edge_score", "expected_value", "ev", "value_score")
 START_COLUMNS = ("event_start_time", "known_start_utc", "start_time", "commence_time", "game_time", "date")
 
@@ -184,7 +183,10 @@ def compute_data_quality(
             score -= penalty
             penalties.append(f"{field_name} missing on {missing_rate:.1%} of rows (-{penalty:.1f})")
 
-    non_completed = int(row_level.get("non_completed", 0))
+    non_completed = sum(
+        int(row_level.get(key, 0))
+        for key in ("pushes", "voids", "cancels", "pending", "unknown")
+    )
     if non_completed:
         penalty = min(20.0, (non_completed / total) * 20.0)
         score -= penalty
@@ -278,7 +280,6 @@ def simulate_csv_diagnostics(path: str | Path) -> EnhancedSimulationDiagnostics:
 
 def diagnostics_to_markdown(diagnostics: EnhancedSimulationDiagnostics) -> str:
     base = diagnostics.base_report
-    row = base["row_level"]
     event = base["unique_event_level"]
     quality = diagnostics.data_quality
     lines = [
