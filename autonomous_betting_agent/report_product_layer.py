@@ -76,6 +76,10 @@ COUNTRY_ES = {
     "nigeria": "Nigeria",
     "ghana": "Ghana",
     "cameroon": "Camerún",
+    "austria": "Austria",
+    "scotland": "Escocia",
+    "uzbekistan": "Uzbekistán",
+    "wales": "Gales",
 }
 
 SPORT_ES = {
@@ -108,6 +112,7 @@ VALUE_ES = {
     "Watchlist / thin value": "Lista de seguimiento / valor delgado",
     "Official +EV Play": "Jugada oficial +EV",
     "Official +EV": "Oficial +EV",
+    "Full magazine analysis": "Análisis completo de revista",
     "No approved plays in this report.": "No hay jugadas aprobadas en este reporte.",
     "No approved plays.": "No hay jugadas aprobadas.",
     "No cards.": "Sin tarjetas.",
@@ -121,12 +126,18 @@ VALUE_ES = {
     "Positive": "Positivo",
     "Negative at listed odds": "Negativo con la cuota actual",
     "Unknown": "Desconocido",
+    "unknown": "desconocido",
     "UNKNOWN": "DESCONOCIDO",
     "PENDING": "PENDIENTE",
+    "pending": "pendiente",
     "WIN": "GANADO",
+    "win": "ganada",
     "LOSS": "PERDIDO",
+    "loss": "perdida",
     "PUSH": "EMPATE/PUSH",
+    "push": "push",
     "CANCELLED": "CANCELADO",
+    "cancel": "cancelada",
     "Needs grading": "Necesita calificación",
     "Included in calibration": "Incluido en calibración",
     "Excluded: data blocked": "Excluido: datos bloqueados",
@@ -147,6 +158,13 @@ VALUE_ES = {
     "Blocked rows": "Filas bloqueadas",
     "Paid proof": "Prueba pagada",
     "Calibration rows": "Filas de calibración",
+    "totals": "totales",
+    "total": "total",
+    "spreads": "hándicaps",
+    "spread": "hándicap",
+    "moneyline": "ganador",
+    "team_total": "total del equipo",
+    "game_total": "total del partido",
 }
 
 
