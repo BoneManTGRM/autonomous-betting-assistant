@@ -10,7 +10,7 @@ from typing import Any
 from urllib.parse import quote_plus, urlencode
 from urllib.request import Request, urlopen
 
-ENRICHMENT_VERSION = "live_api_enrichment_v2_checked_details"
+ENRICHMENT_VERSION = "live_api_enrichment_v3_compact_display"
 _TIMEOUT_SECONDS = 3.0
 _CACHE: dict[tuple[str, str], Any] = {}
 
@@ -128,8 +128,8 @@ def _candidate_location(row: Mapping[str, Any]) -> str:
         return explicit
     joined = " | ".join(str(row.get(key, "")) for key in ("venue_note", "matchup_note", "matchup_notes", "sports_context_summary", "weather_summary", "event", "event_name"))
     patterns = (
-        r"([A-Z][A-Za-z .'-]+,\s*[A-Z][A-Za-z .'-]+,\s*(?:USA|United States|Mexico|Canada))",
-        r"([A-Z][A-Za-z .'-]+,\s*(?:USA|United States|Mexico|Canada))",
+        r"([A-Z][A-Za-z .'-]+,\s*[A-Z][A-Za-z .'-]+,\s*(?:USA|United States|United States of America|Mexico|Canada))",
+        r"([A-Z][A-Za-z .'-]+,\s*(?:USA|United States|United States of America|Mexico|Canada))",
     )
     for pattern in patterns:
         match = re.search(pattern, joined)
@@ -144,20 +144,19 @@ def _enrich_weather(row: dict[str, Any]) -> None:
         return
     location = _candidate_location(row)
     if not location:
-        _set_if_empty(row, "weather_summary", "WeatherAPI configured; no venue/location field was available for this row.")
+        _set_if_empty(row, "weather_summary", "Weather checked; no venue/location in row.")
         return
     url = "https://api.weatherapi.com/v1/current.json?" + urlencode({"key": key, "q": location, "aqi": "no"})
     data = _request_json(url, cache_key=("weather", location.lower()))
     current = data.get("current") if isinstance(data, Mapping) else None
     place = data.get("location") if isinstance(data, Mapping) else None
     if not isinstance(current, Mapping):
-        _set_if_empty(row, "weather_summary", f"WeatherAPI checked {location}; live weather payload was not returned.")
+        _set_if_empty(row, "weather_summary", f"Weather checked: {location}; no live payload.")
         return
     condition = current.get("condition") if isinstance(current.get("condition"), Mapping) else {}
+    weather = f"Weather: {condition.get('text', 'conditions available')}, {current.get('temp_c')}°C, wind {current.get('wind_kph')} kph."
     place_name = ", ".join(str(place.get(k)) for k in ("name", "region", "country") if isinstance(place, Mapping) and place.get(k))
-    summary = f"WeatherAPI: {condition.get('text', 'conditions available')}; {current.get('temp_c')}°C; wind {current.get('wind_kph')} kph."
-    if place_name:
-        summary += f" Location: {place_name}."
+    summary = weather + (f" Location: {place_name}." if place_name else "")
     _set_if_empty(row, "weather_summary", summary)
     _set_if_empty(row, "venue_weather", summary)
 
@@ -166,8 +165,7 @@ def _news_query(row: Mapping[str, Any]) -> str:
     away, home = _split_teams(row)
     event = _get(row, "event", "game", "event_name", "matchup")
     base = f"{away} {home}".strip() or event
-    kind = _sport_kind(row)
-    terms = " injuries lineup news odds" if kind != "combat" else " injuries camp news"
+    terms = " injury camp news" if _sport_kind(row) == "combat" else " injury lineup news odds"
     return (base + terms).strip()
 
 
@@ -182,20 +180,19 @@ def _enrich_news(row: dict[str, Any]) -> None:
     data = _request_json("https://newsapi.org/v2/everything?" + urlencode(params), cache_key=("news", query.lower()))
     articles = data.get("articles") if isinstance(data, Mapping) else None
     if not isinstance(articles, list) or not articles:
-        summary = f"NewsAPI checked '{query}'; no recent matching articles were returned."
-        _set_if_empty(row, "newsapi_summary", summary)
-        _set_if_empty(row, "news_injury_summary", summary)
+        _set_if_empty(row, "newsapi_summary", "News checked; no recent matching articles.")
+        _set_if_empty(row, "news_injury_summary", "News checked; no injury/lineup headline.")
         return
     titles = [str(item.get("title", "")).strip() for item in articles if isinstance(item, Mapping) and item.get("title")]
     titles = [title for title in titles if title][:3]
     if not titles:
         return
-    summary = "NewsAPI: " + " | ".join(titles)
-    _set_if_empty(row, "newsapi_summary", summary)
+    first = titles[0][:88].rstrip() + ("…" if len(titles[0]) > 88 else "")
+    _set_if_empty(row, "newsapi_summary", "News: " + first)
     if any(any(token in title.lower() for token in ("injury", "injured", "lineup", "out", "questionable")) for title in titles):
-        _set_if_empty(row, "news_injury_summary", summary)
+        _set_if_empty(row, "news_injury_summary", "News: " + first)
     else:
-        _set_if_empty(row, "news_injury_summary", "NewsAPI checked recent news; no injury/lineup headline was returned.")
+        _set_if_empty(row, "news_injury_summary", "News checked; no injury/lineup headline.")
 
 
 def _api_football_team_search(team: str, key: str) -> str:
@@ -208,18 +205,9 @@ def _api_football_team_search(team: str, key: str) -> str:
         return ""
     item = response[0]
     team_data = item.get("team") if isinstance(item, Mapping) else None
-    venue = item.get("venue") if isinstance(item, Mapping) else None
     if not isinstance(team_data, Mapping):
         return ""
-    name = team_data.get("name") or team
-    country = team_data.get("country") or ""
-    stadium = venue.get("name") if isinstance(venue, Mapping) else ""
-    bits = [str(name)]
-    if country:
-        bits.append(str(country))
-    if stadium:
-        bits.append(f"venue {stadium}")
-    return ", ".join(bits)
+    return str(team_data.get("name") or team)
 
 
 def _enrich_api_football(row: dict[str, Any]) -> None:
@@ -232,13 +220,12 @@ def _enrich_api_football(row: dict[str, Any]) -> None:
     away_result = _api_football_team_search(away, key)
     home_result = _api_football_team_search(home, key)
     if away_result or home_result:
-        summary = "API-Football: " + " vs ".join(part for part in (away_result, home_result) if part)
-        _set_if_empty(row, "api_football_team_summary", summary)
-        _set_if_empty(row, "api_football_summary", summary)
+        matched = " / ".join(part for part in (away_result or away, home_result or home) if part)
+        summary = f"API-FB team lookup matched {matched}; fixture not verified."
     else:
-        summary = f"API-Football checked team lookup for {away or 'away team'} and {home or 'home team'}; no matching team payload was returned."
-        _set_if_empty(row, "api_football_team_summary", summary)
-        _set_if_empty(row, "api_football_summary", summary)
+        summary = f"API-FB team lookup checked {away or 'away'} / {home or 'home'}; no match returned."
+    _set_if_empty(row, "api_football_team_summary", summary)
+    _set_if_empty(row, "api_football_summary", summary)
 
 
 def _enrich_sportsdataio(row: dict[str, Any]) -> None:
@@ -247,15 +234,7 @@ def _enrich_sportsdataio(row: dict[str, Any]) -> None:
     existing = _get(row, "sportsdataio_team_summary", "sportsdataio_context", "sportsdataio_injury_summary", "sportsdataio_game_summary")
     if existing:
         return
-    kind = _sport_kind(row)
-    if kind == "baseball":
-        summary = "SportsDataIO configured; MLB event-specific provider id was not available in this row."
-    elif kind == "soccer":
-        summary = "SportsDataIO configured; soccer team/event endpoint data was not available for this row."
-    elif kind == "combat":
-        summary = "SportsDataIO configured; combat event endpoint data was not available for this row."
-    else:
-        summary = "SportsDataIO configured; event-specific provider id was not available in this row."
+    summary = "SDIO checked; no provider event ID in row."
     _set_if_empty(row, "sportsdataio_context", summary)
     _set_if_empty(row, "sportsdataio_team_summary", summary)
 
@@ -307,7 +286,6 @@ def install(module: Any) -> Any:
             module._badge(img, draw, label, x, y, 50, 50, color)
             draw.text((x + 66, y + 9), label.upper(), font=module._fit(label.upper(), width - 70, 25, 7, True), fill=color)
             row = enrich_row_with_live_api_data(row_arg or {})
-            items = []
             try:
                 items = module._team_items(row, side_arg)
             except Exception:
