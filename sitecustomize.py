@@ -43,9 +43,11 @@ def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
     try:
         from autonomous_betting_agent.magazine_api_sources import apply_magazine_api_patch
         from autonomous_betting_agent.magazine_auto_sizer import apply_magazine_auto_sizer
+        from autonomous_betting_agent.magazine_headline_safety import install as install_headline_safety
 
         module = apply_magazine_api_patch(module)
-        return apply_magazine_auto_sizer(module)
+        module = apply_magazine_auto_sizer(module)
+        return install_headline_safety(module)
     except Exception:
         return module
 
