@@ -98,7 +98,6 @@ def _card_dedupe_key(row: Mapping[str, Any]) -> str:
         safe_text(row.get("public_pick") or row.get("prediction") or row.get("pick") or row.get("selection")),
         safe_text(row.get("market_type") or row.get("market")),
         safe_text(row.get("line_point") or row.get("line") or row.get("handicap") or row.get("total")),
-        safe_text(row.get("decimal_price") or row.get("best_price") or row.get("average_price") or row.get("odds_decimal") or row.get("odds_at_pick")),
         safe_text(row.get("consumer_action") or row.get("recommended_action") or row.get("public_action") or row.get("report_lane")),
     )
     key = "|".join(part.lower() for part in fields if part)
