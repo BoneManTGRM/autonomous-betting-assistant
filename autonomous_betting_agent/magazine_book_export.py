@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 PAGE_WIDTH = 1080
 PAGE_HEIGHT = 1620
-MAGAZINE_STYLE_VERSION = "premium_v4_reference_compact_no_market_v6"
+MAGAZINE_STYLE_VERSION = "premium_v4_reference_compact_no_market_v7_headline_autosize"
 NO_MARKET_EXPORT_VERSION = "no_market_metric_v6"
 SAFETY_FOOTER = "No guarantees. Bet responsibly. This analysis is for informational purposes only."
 ASSET_DIRS = (Path("assets/team_logos"), Path("assets/report_logos"), Path("assets/licensed_logos"))
@@ -32,86 +32,48 @@ TEXT = (14, 17, 21)
 NO_VERIFIED = "Data unavailable"
 NOT_PROVIDED = "Not provided"
 
+HEADLINE_AREA = (20, 90, 610, 455)
+AWAY_HEADLINE_BOX = (36, 100, 600, 200)
+VS_BADGE_BOX = (36, 214, 104, 286)
+HOME_HEADLINE_BOX = (112, 204, 600, 314)
+SEASON_BAR_BOX = (36, 330, 506, 378)
+CONTEXT_LINE_BOX = (42, 394, 600, 450)
+HERO_IMAGE_BOX = (620, 105, 1050, 455)
+METRIC_STRIP_BOX = (20, 456, 1060, 562)
+
 _FONT_CACHE: dict[tuple[int, bool], ImageFont.ImageFont] = {}
 FONT_ROOTS = tuple(Path(p) for p in (
-    "/usr/share/fonts",
-    "/usr/local/share/fonts",
-    "/opt/render/project/.apt/usr/share/fonts",
-    "/app/.apt/usr/share/fonts",
-    "~/.local/share/fonts",
+    "/usr/share/fonts", "/usr/local/share/fonts", "/opt/render/project/.apt/usr/share/fonts",
+    "/app/.apt/usr/share/fonts", "~/.local/share/fonts",
 ))
 BOLD_NAMES = ("DejaVuSansCondensed-Bold.ttf", "DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf", "Arial Bold.ttf")
 REG_NAMES = ("DejaVuSansCondensed.ttf", "DejaVuSans.ttf", "LiberationSans-Regular.ttf", "Arial.ttf")
 
 ES = {
-    "DAILY SPORTS ANALYSIS": "ANÁLISIS DEPORTIVO DIARIO",
-    "PAGE": "PÁGINA",
-    "OF": "DE",
-    "TREND": "TENDENCIA",
-    "ODDS": "CUOTA",
-    "CONFIDENCE": "CONFIANZA",
-    "EDGE": "VENTAJA",
-    "EV": "VE",
-    "UNITS": "UNIDADES",
-    "RISK": "RIESGO",
-    "WHY WE PICKED IT": "POR QUÉ LO ELEGIMOS",
-    "PRO BETTOR EVIDENCE": "EVIDENCIA PRO",
-    "TEAM SNAPSHOTS": "RESUMEN EQUIPOS",
-    "PLAYER / INJURY NOTES": "JUGADORES / LESIONES",
-    "RISK DESK": "RIESGO",
-    "MATCHUP NOTES": "NOTAS DEL PARTIDO",
-    "CHAIN BETTING NOTES": "NOTAS PARLAY",
-    "FINAL": "FINAL",
-    "RECOMMENDATION": "RECOMENDACIÓN",
-    "SOURCE": "FUENTE",
-    "BOOK": "CASA",
-    "LINE": "LÍNEA",
-    "PUBLIC": "PÚBLICO",
-    "PRO": "PRO",
-    "LOW": "BAJO",
-    "MEDIUM": "MEDIO",
-    "HIGH": "ALTO",
-    "VOLUME OK": "VOLUMEN OK",
-    "VOLUME_OK": "VOLUMEN OK",
-    "PLAY SMALL": "JUGAR PEQUEÑO",
-    "PLAY STANDARD": "JUGAR NORMAL",
-    "NO PLAY": "NO JUGAR",
+    "DAILY SPORTS ANALYSIS": "ANÁLISIS DEPORTIVO DIARIO", "PAGE": "PÁGINA", "OF": "DE",
+    "TREND": "TENDENCIA", "ODDS": "CUOTA", "CONFIDENCE": "CONFIANZA", "EDGE": "VENTAJA",
+    "EV": "VE", "UNITS": "UNIDADES", "RISK": "RIESGO", "WHY WE PICKED IT": "POR QUÉ LO ELEGIMOS",
+    "PRO BETTOR EVIDENCE": "EVIDENCIA PRO", "TEAM SNAPSHOTS": "RESUMEN EQUIPOS",
+    "PLAYER / INJURY NOTES": "JUGADORES / LESIONES", "RISK DESK": "RIESGO",
+    "MATCHUP NOTES": "NOTAS DEL PARTIDO", "CHAIN BETTING NOTES": "NOTAS PARLAY",
+    "FINAL": "FINAL", "RECOMMENDATION": "RECOMENDACIÓN", "SOURCE": "FUENTE", "BOOK": "CASA",
+    "LINE": "LÍNEA", "PUBLIC": "PÚBLICO", "PRO": "PRO", "LOW": "BAJO", "MEDIUM": "MEDIO",
+    "HIGH": "ALTO", "VOLUME OK": "VOLUMEN OK", "VOLUME_OK": "VOLUMEN OK",
+    "PLAY SMALL": "JUGAR PEQUEÑO", "PLAY STANDARD": "JUGAR NORMAL", "NO PLAY": "NO JUGAR",
     SAFETY_FOOTER: "No garantizamos resultados. Apuesta responsablemente. Este análisis es solo informativo.",
 }
 
 COUNTRY_ES = {
-    "iraq": "Irak",
-    "iran": "Irán",
-    "france": "Francia",
-    "germany": "Alemania",
-    "ecuador": "Ecuador",
-    "australia": "Australia",
-    "paraguay": "Paraguay",
-    "netherlands": "Países Bajos",
-    "tunisia": "Túnez",
-    "egypt": "Egipto",
-    "ivory coast": "Costa de Marfil",
-    "curacao": "Curazao",
-    "curaçao": "Curazao",
-    "senegal": "Senegal",
-    "norway": "Noruega",
-    "algeria": "Argelia",
-    "jordan": "Jordania",
-    "argentina": "Argentina",
-    "spain": "España",
-    "england": "Inglaterra",
-    "united states": "Estados Unidos",
-    "usa": "Estados Unidos",
-    "us": "Estados Unidos",
-    "mexico": "México",
-    "italy": "Italia",
-    "brazil": "Brasil",
-    "portugal": "Portugal",
-    "canada": "Canadá",
-    "japan": "Japón",
-    "south korea": "Corea del Sur",
-    "new zealand": "Nueva Zelanda",
-    "czech republic": "República Checa",
+    "iraq": "Irak", "iran": "Irán", "france": "Francia", "germany": "Alemania",
+    "ecuador": "Ecuador", "australia": "Australia", "paraguay": "Paraguay",
+    "netherlands": "Países Bajos", "tunisia": "Túnez", "egypt": "Egipto",
+    "ivory coast": "Costa de Marfil", "curacao": "Curazao", "curaçao": "Curazao",
+    "senegal": "Senegal", "norway": "Noruega", "algeria": "Argelia", "jordan": "Jordania",
+    "argentina": "Argentina", "spain": "España", "england": "Inglaterra",
+    "united states": "Estados Unidos", "usa": "Estados Unidos", "us": "Estados Unidos",
+    "mexico": "México", "italy": "Italia", "brazil": "Brasil", "portugal": "Portugal",
+    "canada": "Canadá", "japan": "Japón", "south korea": "Corea del Sur",
+    "new zealand": "Nueva Zelanda", "czech republic": "República Checa",
 }
 
 
@@ -249,46 +211,178 @@ def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
 
 def _fit(text: str, width: int, start: int, minimum: int = 12, bold: bool = True) -> ImageFont.ImageFont:
     draw = ImageDraw.Draw(Image.new("RGB", (10, 10)))
-    for size in range(int(start), int(minimum) - 1, -1):
+    for size in range(int(start), max(1, int(minimum)) - 1, -1):
         font = _font(size, bold)
         if draw.textbbox((0, 0), str(text), font=font)[2] <= width:
             return font
-    return _font(minimum, bold)
+    return _font(max(1, int(minimum)), bold)
 
 
 def _line_height(font: ImageFont.ImageFont) -> int:
     return getattr(font, "size", 18) + 4
 
 
-def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, width: int, max_lines: int | None = None) -> list[str]:
-    lines: list[str] = []
+def _rect_w(rect: tuple[int, int, int, int]) -> int:
+    return rect[2] - rect[0]
+
+
+def _rect_h(rect: tuple[int, int, int, int]) -> int:
+    return rect[3] - rect[1]
+
+
+def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
+    box = draw.textbbox((0, 0), str(text), font=font)
+    return int(box[2] - box[0])
+
+
+def _intersects(a: tuple[int, int, int, int], b: tuple[int, int, int, int], padding: int = 0) -> bool:
+    return not (a[2] + padding <= b[0] or b[2] + padding <= a[0] or a[3] + padding <= b[1] or b[3] + padding <= a[1])
+
+
+def _contained(outer: tuple[int, int, int, int], inner: tuple[int, int, int, int]) -> bool:
+    return inner[0] >= outer[0] and inner[1] >= outer[1] and inner[2] <= outer[2] and inner[3] <= outer[3]
+
+
+def _split_long_word_to_width(draw: ImageDraw.ImageDraw, word: str, font: ImageFont.ImageFont, max_width: int, remaining: int) -> list[str]:
+    chunks: list[str] = []
     current = ""
-    for word in str(text or "").replace("\n", " ").split():
-        trial = word if not current else f"{current} {word}"
-        if draw.textbbox((0, 0), trial, font=font)[2] <= width:
+    for ch in str(word):
+        trial = current + ch
+        if _text_width(draw, trial, font) <= max_width or not current:
             current = trial
         else:
-            if current:
-                lines.append(current)
+            chunks.append(current)
+            if len(chunks) >= remaining:
+                return chunks
+            current = ch
+    if current and len(chunks) < remaining:
+        chunks.append(current)
+    return chunks
+
+
+def _wrap_text_to_box(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, max_width: int, max_lines: int) -> list[str]:
+    words = str(text or "").replace("\n", " ").split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        trial = word if not current else f"{current} {word}"
+        if _text_width(draw, trial, font) <= max_width:
+            current = trial
+            continue
+        if current:
+            lines.append(current)
+            if len(lines) >= max_lines:
+                return lines[:max_lines]
+            current = ""
+        if _text_width(draw, word, font) <= max_width:
             current = word
-            if max_lines is not None and len(lines) >= max_lines:
-                return lines
-    if current and (max_lines is None or len(lines) < max_lines):
+            continue
+        broken = _split_long_word_to_width(draw, word, font, max_width, max_lines - len(lines))
+        lines.extend(broken[:-1])
+        if len(lines) >= max_lines:
+            return lines[:max_lines]
+        current = broken[-1] if broken else ""
+    if current and len(lines) < max_lines:
         lines.append(current)
-    return lines
+    return lines or [""]
+
+
+def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, width: int, max_lines: int | None = None) -> list[str]:
+    return _wrap_text_to_box(draw, text, font, width, max_lines or 999)
+
+
+def _ellipsize_to_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, max_width: int) -> str:
+    text = str(text or "")
+    if _text_width(draw, text, font) <= max_width:
+        return text
+    suffix = "…"
+    while text and _text_width(draw, text + suffix, font) > max_width:
+        text = text[:-1]
+    return f"{text}{suffix}" if text else suffix
+
+
+def _fit_lines_to_box(draw: ImageDraw.ImageDraw, text: str, box: tuple[int, int, int, int], max_font: int, min_font: int, max_lines: int, bold: bool = True) -> tuple[ImageFont.ImageFont, list[str]]:
+    label = " ".join(str(text or "").upper().split())
+    for size in range(int(max_font), int(min_font) - 1, -1):
+        font = _font(size, bold)
+        line_sets = [[label]] if _text_width(draw, label, font) <= _rect_w(box) else []
+        line_sets.append(_wrap_text_to_box(draw, label, font, _rect_w(box), max_lines))
+        for lines in line_sets:
+            if not lines or len(lines) > max_lines:
+                continue
+            if len(lines) * _line_height(font) > _rect_h(box):
+                continue
+            if all(_text_width(draw, line, font) <= _rect_w(box) for line in lines):
+                return font, lines
+    font = _font(max(1, int(min_font)), bold)
+    lines = _wrap_text_to_box(draw, label, font, _rect_w(box), max_lines)
+    return font, [_ellipsize_to_width(draw, line, font, _rect_w(box)) for line in lines[:max_lines]]
+
+
+def _draw_headline_name(draw: ImageDraw.ImageDraw, text: str, box: tuple[int, int, int, int], color: tuple[int, int, int], max_font: int, min_font: int = 6, max_lines: int = 2) -> list[tuple[int, int, int, int]]:
+    font, lines = _fit_lines_to_box(draw, text, box, max_font, min_font, max_lines, True)
+    line_h = _line_height(font)
+    total_h = min(_rect_h(box), len(lines) * line_h)
+    y = box[1] + max(0, (_rect_h(box) - total_h) // 2)
+    boxes: list[tuple[int, int, int, int]] = []
+    for line in lines:
+        if y + line_h > box[3]:
+            break
+        safe_line = _ellipsize_to_width(draw, line, font, _rect_w(box))
+        width = _text_width(draw, safe_line, font)
+        draw.text((box[0], y), safe_line, font=font, fill=color)
+        boxes.append((box[0], y, box[0] + width, y + line_h))
+        y += line_h
+    return boxes
+
+
+def _draw_small_text_box(draw: ImageDraw.ImageDraw, text: str, box: tuple[int, int, int, int], color: tuple[int, int, int], max_font: int, min_font: int = 8, bold: bool = False, max_lines: int = 2) -> list[tuple[int, int, int, int]]:
+    font, lines = _fit_lines_to_box(draw, text, box, max_font, min_font, max_lines, bold)
+    y = box[1]
+    line_h = _line_height(font)
+    boxes: list[tuple[int, int, int, int]] = []
+    for line in lines:
+        if y + line_h > box[3]:
+            break
+        safe_line = _ellipsize_to_width(draw, line, font, _rect_w(box))
+        width = _text_width(draw, safe_line, font)
+        draw.text((box[0], y), safe_line, font=font, fill=color)
+        boxes.append((box[0], y, box[0] + width, y + line_h))
+        y += line_h
+    return boxes
+
+
+def _headline_context_lines(row: Any) -> list[str]:
+    ctx: list[str] = []
+    for key in ("preview_summary", "game_summary", "sports_context_summary", "short_reason", "decision_reasons"):
+        ctx += _split(_row(row).get(key))
+    return ctx or ["Context unavailable."]
+
+
+def _draw_matchup_headlines(draw: ImageDraw.ImageDraw, away_label: str, home_label: str, sport: str, row: Any, lang: str) -> dict[str, list[tuple[int, int, int, int]]]:
+    draw.rectangle(HEADLINE_AREA, fill=PAPER)
+    away_boxes = _draw_headline_name(draw, away_label, AWAY_HEADLINE_BOX, RED, 60, 6, 2)
+    draw.rounded_rectangle(VS_BADGE_BOX, radius=7, fill=CREAM, outline=BLACK, width=2)
+    _draw_headline_name(draw, "V", (VS_BADGE_BOX[0] + 14, VS_BADGE_BOX[1] + 10, VS_BADGE_BOX[2] - 14, VS_BADGE_BOX[3] - 10), BLACK, 34, 10, 1)
+    home_boxes = _draw_headline_name(draw, home_label, HOME_HEADLINE_BOX, BLUE, 52, 6, 2)
+    season = _tr(_get(row, "season_label", "event_stage", "competition_round", default=f"{sport} REGULAR SEASON"), lang).upper()
+    draw.rectangle(SEASON_BAR_BOX, fill=BLACK)
+    season_boxes = _draw_small_text_box(draw, season, (SEASON_BAR_BOX[0] + 18, SEASON_BAR_BOX[1] + 9, SEASON_BAR_BOX[2] - 14, SEASON_BAR_BOX[3] - 6), CREAM, 25, 8, True, 1)
+    context_boxes = _draw_small_text_box(draw, _tr(_headline_context_lines(row)[0], lang), CONTEXT_LINE_BOX, TEXT, 18, 8, False, 2)
+    return {"away": away_boxes, "home": home_boxes, "season": season_boxes, "context": context_boxes}
 
 
 def _txt_auto(draw: ImageDraw.ImageDraw, x: int, y: int, text: str, width: int, height: int, start: int, minimum: int, fill: Any, bold: bool = False, max_lines: int | None = None) -> int:
     if max_lines == 1:
         font = _fit(str(text), width, start, minimum, bold)
-        draw.text((x, y), str(text), font=font, fill=fill)
+        draw.text((x, y), _ellipsize_to_width(draw, str(text), font, width), font=font, fill=fill)
         return y + _line_height(font)
     for size in range(start, minimum - 1, -1):
         font = _font(size, bold)
         lines = _wrap(draw, str(text), font, width, max_lines)
         if lines and len(lines) * _line_height(font) <= height:
             for line in lines:
-                draw.text((x, y), line, font=font, fill=fill)
+                draw.text((x, y), _ellipsize_to_width(draw, line, font, width), font=font, fill=fill)
                 y += _line_height(font)
             return y
     font = _font(minimum, bold)
@@ -296,7 +390,7 @@ def _txt_auto(draw: ImageDraw.ImageDraw, x: int, y: int, text: str, width: int, 
     for line in _wrap(draw, str(text), font, width, max_lines):
         if y + _line_height(font) > bottom:
             break
-        draw.text((x, y), line, font=font, fill=fill)
+        draw.text((x, y), _ellipsize_to_width(draw, line, font, width), font=font, fill=fill)
         y += _line_height(font)
     return y
 
@@ -406,10 +500,10 @@ def _initials(text: str) -> str:
     return "".join(part[0] for part in parts[:3]) or "TM"
 
 
-def _badge(img: Image.Image, draw: ImageDraw.ImageDraw, label: str, x: int, y: int, width: int, height: int, color: tuple[int, int, int]) -> None:
+def _badge(img: Image.Image, draw: ImageDraw.ImageDraw, label: str, x: int, y: int, width: int, height: int, color: tuple[int, int, int], *_args: Any, **_kwargs: Any) -> None:
     draw.rounded_rectangle((x, y, x + width, y + height), radius=8, fill=color, outline=CREAM, width=2)
     text = _initials(label)[:3]
-    font = _fit(text, width - 8, max(20, height // 2), 12, True)
+    font = _fit(text, width - 8, max(20, height // 2), 8, True)
     box = draw.textbbox((0, 0), text, font=font)
     draw.text((x + (width - box[2] + box[0]) / 2, y + (height - box[3] + box[1]) / 2 - 2), text, font=font, fill="white")
 
@@ -418,22 +512,22 @@ def _section(draw: ImageDraw.ImageDraw, x: int, y: int, width: int, height: int,
     label = _tr(title, lang).upper()
     draw.rounded_rectangle((x, y, x + width, y + height), radius=14, fill=CREAM + (255,), outline=BLACK + (238,), width=3)
     draw.rounded_rectangle((x, y, x + width, y + 56), radius=10, fill=color)
-    draw.text((x + 18, y + 11), label, font=_fit(label, width - 36, 33, 21, True), fill=CREAM)
+    draw.text((x + 18, y + 11), label, font=_fit(label, width - 36, 33, 18, True), fill=CREAM)
 
 
 def _bullets_auto(draw: ImageDraw.ImageDraw, x: int, y: int, items: list[str], width: int, height: int, color: tuple[int, int, int], start: int = 22, minimum: int = 10, limit: int | None = None, lang: str = "en") -> None:
     data = [_tr(item, lang) for item in (items[:limit] if limit is not None else items)]
-    chosen = _font(minimum)
+    chosen = _font(max(5, minimum))
     blocks: list[list[str]] = []
-    for size in range(start, minimum - 1, -1):
+    for size in range(start, max(5, minimum) - 1, -1):
         font = _font(size)
-        trial = [_wrap(draw, item, font, width - 30) for item in data]
+        trial = [_wrap_text_to_box(draw, item, font, width - 30, 4) for item in data]
         needed = sum(max(1, len(block)) * _line_height(font) + 8 for block in trial)
         if needed <= height:
             chosen, blocks = font, trial
             break
     if not blocks:
-        blocks = [_wrap(draw, item, chosen, width - 30) for item in data]
+        blocks = [_wrap_text_to_box(draw, item, chosen, width - 30, 4) for item in data]
     bottom = y + height
     for block in blocks:
         if y + _line_height(chosen) > bottom:
@@ -442,7 +536,7 @@ def _bullets_auto(draw: ImageDraw.ImageDraw, x: int, y: int, items: list[str], w
         for line in block:
             if y + _line_height(chosen) > bottom:
                 break
-            draw.text((x + 25, y), line, font=chosen, fill=TEXT)
+            draw.text((x + 25, y), _ellipsize_to_width(draw, line, chosen, width - 30), font=chosen, fill=TEXT)
             y += _line_height(chosen)
         y += 8
 
@@ -474,7 +568,7 @@ def _pairs(row: Any, lang: str) -> list[tuple[str, str]]:
     rows = [
         ("SOURCE", _get(row, "odds_source", "data_source", default=NO_VERIFIED)),
         ("BOOK", _get(row, "bookmaker", "sportsbook", default=NO_VERIFIED)),
-        ("LINE", _get(row, "line_movement", "price_movement", "market_move", default=NO_VERIFIED)),
+        ("LINE", _get(row, "line_movement", "price_movement", "price_move", default=NO_VERIFIED)),
         ("PUBLIC", _pct(_num(row, "public_percent", "public_bet_percent", "public_pct"))),
         ("PRO", _pct(_num(row, "pro_percent", "sharp_percent", "smart_money_percent"))),
     ]
@@ -484,13 +578,13 @@ def _pairs(row: Any, lang: str) -> list[tuple[str, str]]:
 def _team_snapshot(img: Image.Image, draw: ImageDraw.ImageDraw, x: int, y: int, width: int, team: str, color: tuple[int, int, int], lang: str) -> None:
     label = _team_label(team, lang)
     _badge(img, draw, label, x, y, 50, 50, color)
-    draw.text((x + 66, y + 9), label.upper(), font=_fit(label.upper(), width - 70, 25, 14, True), fill=color)
-    _bullets_auto(draw, x, y + 76, [TEAM_DATA_FALLBACK, "Use team form, injuries, and market movement before publishing."], width - 10, 165, color, 18, 10, 4, lang)
+    draw.text((x + 66, y + 9), label.upper(), font=_fit(label.upper(), width - 70, 25, 7, True), fill=color)
+    _bullets_auto(draw, x, y + 76, [TEAM_DATA_FALLBACK, "Use team form, injuries, and price movement before publishing."], width - 10, 165, color, 18, 8, 4, lang)
 
 
 def _looks_like_combat_measurement(text: str) -> bool:
     low = str(text or "").lower()
-    measurement_terms = ("stance:", "reach:", "height:", "weight:", "orthodox", "southpaw", "switch")
+    measurement_terms = ("stance:", "reach:", "height:", "orthodox", "southpaw", "switch")
     team_terms = ("injur", "lineup", "out", "doubtful", "questionable", "probable", "day-to-day", "suspended")
     return any(term in low for term in measurement_terms) and not any(term in low for term in team_terms)
 
@@ -507,16 +601,53 @@ def _player_items(row: Any, prefix: str) -> list[str]:
 
 def _player_notes(draw: ImageDraw.ImageDraw, x: int, y: int, width: int, team: str, prefix: str, color: tuple[int, int, int], row: Any, lang: str) -> None:
     label = _team_label(team, lang)
-    draw.text((x, y), label.upper(), font=_fit(label.upper(), width, 21, 12, True), fill=color)
-    _bullets_auto(draw, x, y + 32, _player_items(row, prefix), width, 106, color, 16, 8, 3, lang)
+    draw.text((x, y), label.upper(), font=_fit(label.upper(), width, 21, 7, True), fill=color)
+    _bullets_auto(draw, x, y + 32, _player_items(row, prefix), width, 106, color, 16, 7, 3, lang)
 
 
 def _metric(draw: ImageDraw.ImageDraw, x: int, y: int, width: int, label: str, value: str, color: tuple[int, int, int], lang: str) -> None:
     label = _tr(label, lang)
     value = _tr(value, lang)
     draw.rectangle((x, y, x + width, y + 94), fill=BLACK, outline=(230, 224, 204), width=1)
-    draw.text((x + 7, y + 10), label, font=_fit(label, width - 14, 17, 8, True), fill=(232, 230, 220))
-    _txt_auto(draw, x + 7, y + 43, _clean(value, True), width - 14, 38, 36, 8, color, True, 1)
+    draw.text((x + 7, y + 10), label, font=_fit(label, width - 14, 17, 7, True), fill=(232, 230, 220))
+    _txt_auto(draw, x + 7, y + 43, _clean(value, True), width - 14, 38, 36, 7, color, True, 1)
+
+
+def _headline_boxes(row: Any, language: str = "en") -> dict[str, list[tuple[int, int, int, int]]]:
+    lang = _lang(row, language)
+    away, home = _teams(row)
+    img = Image.new("RGBA", (PAGE_WIDTH, PAGE_HEIGHT), PAPER + (255,))
+    draw = ImageDraw.Draw(img, "RGBA")
+    return _draw_matchup_headlines(draw, _team_label(away, lang), _team_label(home, lang), _get(row, "sport", "league", default="Sport N/A"), row, lang)
+
+
+def validate_headline_layout(row: Any, language: str = "en") -> list[str]:
+    boxes = _headline_boxes(row, language)
+    warnings: list[str] = []
+    for name, safe_box in (("away", AWAY_HEADLINE_BOX), ("home", HOME_HEADLINE_BOX)):
+        for box in boxes.get(name, []):
+            if not _contained(safe_box, box):
+                warnings.append(f"{name}:outside_safe_box")
+            if not _contained(HEADLINE_AREA, box):
+                warnings.append(f"{name}:outside_headline_area")
+            if _intersects(box, HERO_IMAGE_BOX):
+                warnings.append(f"{name}:hero_overlap")
+            if _intersects(box, SEASON_BAR_BOX):
+                warnings.append(f"{name}:season_overlap")
+            if _intersects(box, METRIC_STRIP_BOX):
+                warnings.append(f"{name}:metric_overlap")
+    for away_box in boxes.get("away", []):
+        for home_box in boxes.get("home", []):
+            if _intersects(away_box, home_box):
+                warnings.append("headline:away_home_overlap")
+    for home_box in boxes.get("home", []):
+        if _intersects(home_box, VS_BADGE_BOX):
+            warnings.append("home:vs_badge_overlap")
+    return sorted(set(warnings))
+
+
+def validate_magazine_layout_no_overflow(row: Any, language: str = "en") -> list[str]:
+    return validate_headline_layout(row, language=language)
 
 
 def render_full_pick_magazine_page(pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> Image.Image:
@@ -538,26 +669,14 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     page_text = _tr(f"PAGE {page_number} OF {total_pages}", lang)
     draw.text((862, 32), page_text, font=_fit(page_text, 174, 28, 16, True), fill=BLACK)
 
-    draw.text((36, 105), away_label.upper(), font=_fit(away_label.upper(), 590, 140, 72, True), fill=RED)
-    draw.rounded_rectangle((36, 218, 104, 288), radius=6, fill=CREAM, outline=BLACK, width=2)
-    draw.text((55, 232), "V", font=_font(44, True), fill=BLACK)
-    draw.text((112, 220), home_label.upper(), font=_fit(home_label.upper(), 560, 112, 62, True), fill=BLUE)
-    season = _tr(_get(pick, "season_label", "event_stage", "competition_round", default=f"{sport} REGULAR SEASON"), lang)
-    draw.rectangle((36, 330, 506, 378), fill=BLACK)
-    draw.text((54, 339), season.upper(), font=_fit(season.upper(), 432, 28, 15, True), fill=CREAM)
-    ctx: list[str] = []
-    for key in ("preview_summary", "game_summary", "sports_context_summary", "short_reason", "decision_reasons"):
-        ctx += _split(_row(pick).get(key))
-    y = 394
-    for line in (ctx or ["Context unavailable.", "Confirm price and lineup news before entry."])[:2]:
-        y = _txt_auto(draw, 42, y, _tr(line, lang), 565, 28, 20, 12, TEXT, False, 1)
+    _draw_matchup_headlines(draw, away_label, home_label, sport, pick, lang)
 
     sy = 456
     draw.rounded_rectangle((20, sy, 1060, sy + 106), radius=13, fill=BLACK, outline=CREAM, width=3)
     trend = _tr("TREND", lang)
     draw.text((50, sy + 16), trend, font=_fit(trend, 190, 25, 14, True), fill=RED)
     pick_text = _tr(_clean(_pick(pick), True), lang).upper()
-    _txt_auto(draw, 50, sy + 52, pick_text, 210, 38, 30, 8, CREAM, True, 1)
+    _txt_auto(draw, 50, sy + 52, pick_text, 210, 38, 30, 7, CREAM, True, 1)
     _badge(img, draw, home_label, 268, sy + 27, 58, 50, BLUE)
 
     odds = _fmt(_get(pick, "american_odds", "odds_american", "decimal_price", "odds_at_pick", "best_price", "odds"), "odds")
@@ -582,15 +701,15 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
 
     left_x, left_w, right_x, right_w = 20, 320, 352, 708
     _section(draw, left_x, 585, left_w, 300, "WHY WE PICKED IT", RED, lang)
-    _bullets_auto(draw, left_x + 24, 655, _why(pick, lang), left_w - 44, 210, RED, 22, 10, 4, lang)
+    _bullets_auto(draw, left_x + 24, 655, _why(pick, lang), left_w - 44, 210, RED, 22, 8, 4, lang)
     _section(draw, left_x, 905, left_w, 225, "PRO BETTOR EVIDENCE", BLUE, lang)
     y = 974
     for label, value in (_pairs(pick, lang) or [(_tr("SOURCE", lang), _tr(_get(pick, "odds_source", default="Agent row"), lang)), (_tr("BOOK", lang), NO_VERIFIED)])[:5]:
-        draw.text((left_x + 24, y), f"{label}:", font=_fit(f"{label}:", 82, 17, 9, True), fill=BLACK)
-        _txt_auto(draw, left_x + 112, y, value, left_w - 128, 22, 17, 9, BLACK, True, 1)
+        draw.text((left_x + 24, y), f"{label}:", font=_fit(f"{label}:", 82, 17, 7, True), fill=BLACK)
+        _txt_auto(draw, left_x + 112, y, value, left_w - 128, 22, 17, 7, BLACK, True, 1)
         y += 31
     draw.rectangle((left_x + 8, 1088, left_x + left_w - 8, 1120), fill=BLUE)
-    _txt_auto(draw, left_x + 22, 1093, _tr(_get(pick, "evidence_summary", default="Market and model evidence support this read."), lang), left_w - 44, 26, 16, 7, CREAM, True, None)
+    _txt_auto(draw, left_x + 22, 1093, _tr(_get(pick, "evidence_summary", default="Market and model evidence support this read."), lang), left_w - 44, 26, 16, 6, CREAM, True, None)
 
     _section(draw, right_x, 585, right_w, 365, "TEAM SNAPSHOTS", BLUE, lang)
     divider = right_x + right_w // 2
@@ -607,11 +726,11 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
 
     low_y, low_h = 1178, 175
     _section(draw, 20, low_y, 320, low_h, "RISK DESK", RED, lang)
-    _bullets_auto(draw, 44, low_y + 70, _items(pick, ("why_lose", "risk_reason", "hidden_risk", "risk_notes"), [f"Risk status: {risk}", "Recheck odds before entry.", "Avoid if key news changes"], 3), 272, low_h - 88, RED, 16, 8, 3, lang)
+    _bullets_auto(draw, 44, low_y + 70, _items(pick, ("why_lose", "risk_reason", "hidden_risk", "risk_notes"), [f"Risk status: {risk}", "Recheck odds before entry.", "Avoid if key news changes"], 3), 272, low_h - 88, RED, 16, 7, 3, lang)
     _section(draw, 354, low_y, 344, low_h, "MATCHUP NOTES", BLUE, lang)
-    _bullets_auto(draw, 378, low_y + 70, _items(pick, ("matchup_note", "matchup_notes", "head_to_head", "h2h", "venue_note", "weather_location", "sports_context_summary"), ["Context unavailable.", "Confirm venue and start time.", "Recheck price before publishing."], 3), 296, low_h - 88, BLUE, 16, 8, 3, lang)
+    _bullets_auto(draw, 378, low_y + 70, _items(pick, ("matchup_note", "matchup_notes", "head_to_head", "h2h", "venue_note", "weather_location", "sports_context_summary"), ["Context unavailable.", "Confirm venue and start time.", "Recheck price before publishing."], 3), 296, low_h - 88, BLUE, 16, 7, 3, lang)
     _section(draw, 712, low_y, 348, low_h, "CHAIN BETTING NOTES", BLUE, lang)
-    _bullets_auto(draw, 736, low_y + 70, _items(pick, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), ["Straight only: research", "Do not combine without official verification", "Wait for better context or price"], 3), 300, low_h - 88, BLUE, 16, 8, 3, lang)
+    _bullets_auto(draw, 736, low_y + 70, _items(pick, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), ["Straight only: research", "Do not combine without official verification", "Wait for better context or price"], 3), 300, low_h - 88, BLUE, 16, 7, 3, lang)
 
     action = _tr(_clean(_get(pick, "final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action", default="PLAY STANDARD"), True), lang)
     explanation = _tr(_get(pick, "final_explanation", "action_reason", "recommendation_reason", "decision_reasons", default="Use only if the line remains playable and key news does not change."), lang)
@@ -620,17 +739,16 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     draw.rectangle((20, fy, 250, fb), fill=RED)
     draw.text((40, fy + 30), _tr("FINAL", lang), font=_font(30, True), fill=CREAM)
     rec = _tr("RECOMMENDATION", lang)
-    draw.text((40, fy + 76), rec, font=_fit(rec, 190, 24, 14, True), fill=CREAM)
-    draw.text((284, fy + 18), action.upper(), font=_fit(action.upper(), 340, 66, 22, True), fill=GREEN)
-    _txt_auto(draw, 284, fy + 92, pick_text, 360, 34, 46, 10, CREAM, True, 1)
-    _txt_auto(draw, 670, fy + 38, explanation, 340, 82, 20, 10, CREAM, False, None)
+    draw.text((40, fy + 76), rec, font=_fit(rec, 190, 24, 12, True), fill=CREAM)
+    draw.text((284, fy + 18), action.upper(), font=_fit(action.upper(), 340, 66, 18, True), fill=GREEN)
+    _txt_auto(draw, 284, fy + 92, pick_text, 360, 34, 46, 8, CREAM, True, 1)
+    _txt_auto(draw, 670, fy + 38, explanation, 340, 82, 20, 8, CREAM, False, None)
 
     footer_y, footer_b = 1542, 1581
     draw.rectangle((20, footer_y, 1060, footer_b), fill=BLACK)
     footer = _tr(SAFETY_FOOTER, lang)
     font = _fit(footer, PAGE_WIDTH - 190, 16, 10, False)
-    box = draw.textbbox((0, 0), footer, font=font)
-    draw.text((42, footer_y + 10), footer, font=font, fill=CREAM)
+    draw.text((42, footer_y + 10), _ellipsize_to_width(draw, footer, font, PAGE_WIDTH - 190), font=font, fill=CREAM)
     version = "v6 no-market"
     vfont = _font(14, True)
     vbox = draw.textbbox((0, 0), version, font=vfont)
