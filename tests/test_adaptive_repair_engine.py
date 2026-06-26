@@ -1,4 +1,4 @@
-from autonomous_betting_agent.adaptive_repair_diagnostics import build_enhanced_diagnostics
+from autonomous_betting_agent.adaptive_repair_diagnostics import build_enhanced_diagnostics, diagnostics_to_markdown
 from autonomous_betting_agent.adaptive_repair_engine import build_simulation_report, normalize_result_status
 
 
@@ -44,6 +44,7 @@ def test_row_level_and_unique_event_tracking_split_duplicates():
 
     report = build_simulation_report(rows, dataset_name="duplicates")
     diagnostics = build_enhanced_diagnostics(rows, dataset_name="duplicates")
+    markdown = diagnostics_to_markdown(diagnostics)
 
     assert report.row_level["rows"] == 3
     assert report.row_level["wins"] == 1
@@ -55,6 +56,10 @@ def test_row_level_and_unique_event_tracking_split_duplicates():
     assert report.unique_event_level["voids"] == 1
     assert diagnostics.same_event_groups[0]["mixed_outcome"] is True
     assert diagnostics.same_event_groups[0]["multi_market"] is True
+    assert diagnostics.mixed_outcome_events == 1
+    assert diagnostics.multi_market_events == 1
+    assert "Mixed-outcome unique events: 1" in markdown
+    assert "Multi-market unique events: 1" in markdown
 
 
 def test_candidate_watchlists_do_not_activate_repairs():
