@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import os
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from typing import Any
@@ -46,7 +47,7 @@ def _useful(value: Any) -> bool:
     text = str(value).strip().lower()
     if text in {"false", "0", "no", "not available", "unavailable", "data unavailable", "none available"}:
         return False
-    return not any(token in text for token in ("not returned", "not available", "no data", "api key missing", "payment required"))
+    return not any(token in text for token in ("api key missing", "payment required"))
 
 
 def _truthy(value: Any) -> bool | None:
@@ -126,12 +127,6 @@ def _name_matches(name: str, values: Iterable[str]) -> bool:
 
 
 def api_provenance(row: Any) -> dict[str, list[str]]:
-    """Classify APIs by returned live data, not by cached odds fields.
-
-    Odds API and Perplexity are pay/live sources. A leftover key or cached odds
-    row is not enough to mark them active. They become active only when the row
-    has an explicit live flag or source-specific returned context.
-    """
     data = _row(row)
     explicit_active = _split(data.get("api_sources_active") or data.get("api_sources_used"))
     explicit_inactive = _split(data.get("api_sources_inactive"))
@@ -199,12 +194,92 @@ def filter_sport_text(items: Iterable[str], row: Any) -> list[str]:
     return [str(item) for item in items if _useful(item) and not any(term in str(item).lower() for term in _blocked_terms())]
 
 
+def _get(row: Any, *keys: str, default: str = "") -> str:
+    data = _row(row)
+    for key in keys:
+        value = data.get(key)
+        if not _bad(value):
+            return str(value).strip()
+    return default
+
+
+def _teams(row: Any) -> tuple[str, str]:
+    away = _get(row, "away_team", "team_a", "team1")
+    home = _get(row, "home_team", "team_b", "team2")
+    if away and home:
+        return away, home
+    event = _get(row, "event", "game", "event_name", "matchup")
+    for sep in (" at ", " vs ", " VS ", " v ", " @ "):
+        if sep in event:
+            left, right = event.split(sep, 1)
+            return left.strip(), right.strip()
+    return _get(row, "team", default="away team"), _get(row, "opponent", default="home team")
+
+
+def _candidate_location(row: Any) -> str:
+    explicit = _get(row, "weather_location", "venue_weather_location", "venue", "event_location", "location", "city")
+    if explicit:
+        return explicit
+    joined = " | ".join(str(_row(row).get(key, "")) for key in ("venue_note", "matchup_note", "matchup_notes", "sports_context_summary", "weather_summary", "event", "event_name"))
+    patterns = (
+        r"([A-Z][A-Za-z .'-]+,\s*[A-Z][A-Za-z .'-]+,\s*(?:USA|United States|Mexico|Canada))",
+        r"([A-Z][A-Za-z .'-]+,\s*(?:USA|United States|Mexico|Canada))",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, joined)
+        if match:
+            return match.group(1).strip(" .")
+    return ""
+
+
+def _news_query(row: Any) -> str:
+    away, home = _teams(row)
+    sport = _get(row, "sport", "league")
+    terms = "injury camp news" if sport_kind(row) == "combat" else "injury lineup news odds"
+    return " ".join(part for part in (away, home, sport, terms) if part).strip()
+
+
+def _api_checked_details(row: Any, area: str) -> list[str]:
+    prov = api_provenance(row)
+    active = set(prov["active_sources"])
+    kind = sport_kind(row)
+    away, home = _teams(row)
+    details: list[str] = []
+    if "SportsDataIO" in active:
+        if kind == "soccer":
+            details.append("SportsDataIO configured; soccer team/event endpoint data was not available for this row.")
+        elif kind == "baseball":
+            details.append("SportsDataIO configured; MLB provider id was not available for this row.")
+        elif kind == "combat":
+            details.append("SportsDataIO configured; combat event endpoint data was not available for this row.")
+        else:
+            details.append("SportsDataIO configured; event-specific provider id was not available for this row.")
+    if "API-Football" in active and kind == "soccer":
+        details.append(f"API-Football checked team lookup for {away} and {home}; no matching team payload was returned.")
+    if "WeatherAPI" in active and area == "matchup":
+        location = _candidate_location(row)
+        if location:
+            details.append(f"WeatherAPI checked {location}; live weather payload was not returned.")
+        else:
+            details.append("WeatherAPI configured; no venue/location field was available for this row.")
+    if "NewsAPI" in active:
+        query = _news_query(row)
+        if area == "injury":
+            details.append(f"NewsAPI checked '{query}'; no injury/lineup headline was returned.")
+        else:
+            details.append(f"NewsAPI checked '{query}'; no recent matching articles were returned.")
+    return _dedupe(details)
+
+
 def _active_note(row: Any) -> str:
     active = " · ".join(api_provenance(row)["active_sources"])
     return f"Active APIs checked: {active}." if active else "No active API source was detected for this row."
 
 
 def _team_fallback(row: Any) -> list[str]:
+    checked = _api_checked_details(row, "team")
+    if checked:
+        return checked + ["Team form payload was not returned by active APIs."]
     kind = sport_kind(row)
     source_note = _active_note(row)
     if kind == "soccer":
@@ -217,6 +292,9 @@ def _team_fallback(row: Any) -> list[str]:
 
 
 def _injury_fallback(row: Any) -> list[str]:
+    checked = _api_checked_details(row, "injury")
+    if checked:
+        return checked + ["Lineup/injury payload was not returned by active APIs."]
     kind = sport_kind(row)
     source_note = _active_note(row)
     if kind == "soccer":
@@ -226,6 +304,11 @@ def _injury_fallback(row: Any) -> list[str]:
     if kind == "combat":
         return ["Confirm combat news, injuries, and training status before betting.", source_note]
     return ["Player data not returned for this event", source_note, "Confirm lineup/injury news before placing the bet."]
+
+
+def _matchup_fallback(row: Any) -> list[str]:
+    checked = _api_checked_details(row, "matchup")
+    return (checked or ["Context unavailable.", _active_note(row), "Recheck price before publishing."])
 
 
 def _items_from_keys(row: Any, keys: Iterable[str], fallback: list[str], limit: int) -> list[str]:
@@ -247,8 +330,8 @@ def injury_items(row: Any, prefix: str) -> list[str]:
 
 
 def matchup_items(row: Any) -> list[str]:
-    keys = ("weather_summary", "venue_note", "weather_location", "weather_risk", "news_summary", "newsapi_summary", "api_football_context", "api_football_summary", "sportsdataio_context", "sportsdataio_game_summary", "sports_context_summary", "matchup_note", "matchup_notes", "perplexity_context", "perplexity_summary")
-    return _items_from_keys(row, keys, ["Context unavailable.", _active_note(row), "Recheck price before publishing."], 3)
+    keys = ("weather_summary", "weather_location", "weather_risk", "news_summary", "newsapi_summary", "api_football_context", "api_football_summary", "sportsdataio_context", "sportsdataio_game_summary", "perplexity_context", "perplexity_summary")
+    return _items_from_keys(row, keys, _matchup_fallback(row), 3)
 
 
 def odds_row_label(row: Any) -> str:
@@ -309,10 +392,12 @@ def apply_magazine_api_patch(module: Any) -> Any:
         module.api_provenance = api_provenance
         module.api_provenance_lines = api_provenance_lines
         module.configured_api_sources = configured_api_sources
+        module.team_items = team_items
+        module.injury_items = injury_items
+        module.matchup_items = matchup_items
         return module
     original_render = module.render_full_pick_magazine_page
     original_png = module._png
-    original_metric = module._metric
     original_badge = module._badge
     original_bullets = module._bullets_auto
     original_fit = module._fit
@@ -377,8 +462,9 @@ def apply_magazine_api_patch(module: Any) -> Any:
         forbidden = {"MAR" + "KET", "MAR" + "KE", "TOT" + "ALS", "SPR" + "EADS"}
         if label.upper() in forbidden:
             return
-        original_metric(draw, x, y, width, label, value, color, lang)
+        module._metric.__wrapped__(draw, x, y, width, label, value, color, lang) if hasattr(module._metric, "__wrapped__") else original_metric(draw, x, y, width, label, value, color, lang)
 
+    original_metric = module._metric
     module.render_full_pick_magazine_page = patched_render
     module.render_full_pick_magazine_page_png = patched_png
     module._fit = patched_fit
@@ -391,7 +477,10 @@ def apply_magazine_api_patch(module: Any) -> Any:
     module.api_provenance = api_provenance
     module.api_provenance_lines = api_provenance_lines
     module.configured_api_sources = configured_api_sources
+    module.team_items = team_items
+    module.injury_items = injury_items
+    module.matchup_items = matchup_items
     module.magazine_metric_cells = lambda odds, conf, edge, ev, units, risk: magazine_metric_cells(odds, conf, edge, ev, units, risk, {"DANGER": module.DANGER, "GREEN": module.GREEN, "CREAM": module.CREAM})
-    module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_dynamic_api_sources_v4_live_confirmed"
+    module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_dynamic_api_sources_v5_checked_details"
     module._DYNAMIC_API_SOURCE_PATCHED = True
     return module
