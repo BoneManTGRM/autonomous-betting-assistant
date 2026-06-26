@@ -43,6 +43,14 @@ div[data-testid="stFileUploader"] button::after {
   content: "Subir";
   font-size: 1rem !important;
   line-height: 1.2 !important;
+  white-space: nowrap !important;
+}
+body div[data-testid="stFileUploader"] button div p::after,
+body div[data-testid="stFileUploader"] button p::after,
+body div[data-testid="stFileUploader"] button span::after,
+body div[data-testid="stFileUploader"] button *::after {
+  content: none !important;
+  display: none !important;
 }
 div[data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"],
 div[data-testid="stFileUploader"] small {
