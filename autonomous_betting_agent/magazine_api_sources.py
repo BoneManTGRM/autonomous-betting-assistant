@@ -31,6 +31,18 @@ API_SHORT_LABELS = {
     "Perplexity": "PPLX",
     "NewsAPI": "News",
 }
+LOCATION_SHORT_LABELS = {
+    "Pennsylvania": "PA",
+    "United States of America": "USA",
+    "United States": "USA",
+    "California": "CA",
+    "New York": "NY",
+    "Texas": "TX",
+    "Florida": "FL",
+    "Illinois": "IL",
+    "Arizona": "AZ",
+    "Nevada": "NV",
+}
 API_SUMMARY_KEY_FRAGMENTS = ("api", "sportsdataio", "weather", "news", "perplexity")
 _CURRENT_ROW: Mapping[str, Any] | None = None
 
@@ -257,10 +269,35 @@ def _news_query(row: Any) -> str:
 
 
 def _api_fb_lookup_text(row: Any, matched: bool) -> str:
-    away, home = _teams(row)
     if matched:
-        return f"API-FB team lookup matched {away} / {home}; fixture not verified."
-    return f"API-FB team lookup checked {away} / {home}; no match returned."
+        return "API-FB lookup only; fixture not verified."
+    return "API-FB lookup checked; no match returned."
+
+
+def _shorten_location(location: str) -> str:
+    value = re.sub(r"\s+", " ", str(location or "").strip(" ."))
+    if not value:
+        return ""
+    short_map = {key.lower(): label for key, label in LOCATION_SHORT_LABELS.items()}
+    parts = [part.strip() for part in value.split(",")]
+    compact = [short_map.get(part.lower(), part) for part in parts if part]
+    return ", ".join(compact)
+
+
+def _sentence_case_weather(text: str) -> str:
+    stripped = str(text or "").strip()
+    return stripped[:1].lower() + stripped[1:] if stripped else stripped
+
+
+def _format_weather_bits(bits: list[str]) -> str:
+    temperature = next((bit for bit in bits if re.search(r"-?\d+(?:\.\d+)?\s*°\s*[CF]\b", bit, re.IGNORECASE)), "")
+    wind = next((bit for bit in bits if "wind" in bit.lower()), "")
+    used = {temperature, wind}
+    conditions = [bit for bit in bits if bit not in used]
+    ordered = [part for part in (temperature, _sentence_case_weather(conditions[0]) if conditions else "", wind) if part]
+    if not ordered:
+        ordered = bits[:3]
+    return "Weather: " + ", ".join(ordered[:3]) + "."
 
 
 def _compact_weather_message(text: str) -> list[str]:
@@ -272,14 +309,13 @@ def _compact_weather_message(text: str) -> list[str]:
             body, location = body.split(" Location: ", 1)
             location = location.rstrip(".")
         bits = [part.strip(" .") for part in body.split(";") if part.strip(" .")]
-        weather = "Weather: " + ", ".join(bits[:3]) + "."
-        out = [weather]
+        out = [_format_weather_bits(bits)]
         if location:
-            out.append("Location: " + location + ".")
+            out.append("Location: " + _shorten_location(location) + ".")
         return out
     if value.startswith("WeatherAPI checked"):
         location = value.replace("WeatherAPI checked", "", 1).split(";", 1)[0].strip()
-        return [f"Weather checked: {location}; no live payload."] if location else ["Weather checked; no live payload."]
+        return [f"Weather checked: {_shorten_location(location)}; no live payload."] if location else ["Weather checked; no live payload."]
     if value.startswith("WeatherAPI configured"):
         return ["Weather checked; no venue/location in row."]
     return [value]
@@ -301,7 +337,7 @@ def compact_api_message(text: Any, row: Any, area: str = "team") -> list[str]:
     if low.startswith("weather:") or low.startswith("weather checked"):
         return _compact_weather_message(value.replace("Weather:", "WeatherAPI:", 1) if value.startswith("Weather:") else value)
     if low.startswith("location:"):
-        return [value]
+        return ["Location: " + _shorten_location(value.split(":", 1)[1]) + "."]
     if low.startswith("newsapi:"):
         title = value.split(":", 1)[1].strip().split(" | ", 1)[0]
         title = title[:88].rstrip() + ("…" if len(title) > 88 else "")
@@ -332,7 +368,7 @@ def _api_checked_details(row: Any, area: str) -> list[str]:
     if "WeatherAPI" in active and area == "matchup":
         location = _candidate_location(row)
         if location:
-            details.append(f"Weather checked: {location}; no live payload.")
+            details.append(f"Weather checked: {_shorten_location(location)}; no live payload.")
         else:
             details.append("Weather checked; no venue/location in row.")
     if "NewsAPI" in active:
@@ -405,6 +441,54 @@ def odds_row_label(row: Any) -> str:
     return "uploaded/cached row"
 
 
+def make_compact_pairs(module: Any):
+    no_verified = getattr(module, "NO_VERIFIED", "NO VERIFIED")
+
+    def module_get(row: Any, *keys: str, default: str = "") -> str:
+        getter = getattr(module, "_get", None)
+        if callable(getter):
+            try:
+                return getter(row, *keys, default=default)
+            except TypeError:
+                pass
+        return _get(row, *keys, default=default)
+
+    def module_clean(value: Any) -> str:
+        cleaner = getattr(module, "_clean", None)
+        if callable(cleaner):
+            try:
+                return cleaner(value)
+            except TypeError:
+                return cleaner(value, True)
+        return str(value)
+
+    def module_tr(value: Any, lang: str) -> str:
+        translator = getattr(module, "_tr", None)
+        if callable(translator):
+            return translator(value, lang)
+        return str(value)
+
+    def compact_pairs(row: Any, lang: str) -> list[tuple[str, str]]:
+        prov = api_provenance(row)
+        pairs = [
+            ("ODDS ROW", odds_row_label(row)),
+            ("BOOK", module_get(row, "bookmaker", "sportsbook", default="consensus average")),
+        ]
+        if prov["active_sources"]:
+            pairs.append(("ACTIVE", short_api_list(prov["active_sources"])))
+        if prov["available_no_data_sources"]:
+            pairs.append(("NO LIVE", short_api_list(prov["available_no_data_sources"])))
+        if prov["inactive_sources"]:
+            pairs.append(("INACTIVE", short_api_list(prov["inactive_sources"])))
+        return [
+            (module_tr(label, lang), module_tr(module_clean(value), lang))
+            for label, value in pairs
+            if value and value != no_verified
+        ][:5]
+
+    return compact_pairs
+
+
 def magazine_metric_cells(odds: str, conf: str, edge: str, ev: str, units: str, risk: str, palette: Mapping[str, Any]) -> list[tuple[str, str, Any, int, int]]:
     danger, green, cream = palette["DANGER"], palette["GREEN"], palette["CREAM"]
     return [("ODDS", odds, cream, 345, 98), ("CONFIDENCE", conf, green, 443, 145), ("EDGE", edge, danger if str(edge).startswith("-") else green, 588, 112), ("EV", ev, danger if str(ev).startswith("-") else green, 700, 112), ("UNITS", units, cream, 812, 100), ("RISK", risk, green, 912, 148)]
@@ -459,6 +543,7 @@ def apply_magazine_api_patch(module: Any) -> Any:
         module._team_items = team_items
         module._injury_items = injury_items
         module._matchup_items = matchup_items
+        module._pairs = make_compact_pairs(module)
         return module
     original_render = module.render_full_pick_magazine_page
     original_png = module._png
@@ -467,8 +552,6 @@ def apply_magazine_api_patch(module: Any) -> Any:
     original_fit = module._fit
     original_metric = module._metric
     original_tr = module._tr
-    original_clean = module._clean
-    original_get = module._get
     original_team_label = module._team_label
     original_teams = module._teams
 
@@ -497,17 +580,6 @@ def apply_magazine_api_patch(module: Any) -> Any:
     def patched_png(pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
         return original_png(module.render_full_pick_magazine_page(pick, background_image, report_name, page_number, total_pages, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
 
-    def patched_pairs(row: Any, lang: str) -> list[tuple[str, str]]:
-        prov = api_provenance(row)
-        pairs = [("ODDS ROW", odds_row_label(row)), ("BOOK", original_get(row, "bookmaker", "sportsbook", default=module.NO_VERIFIED)), ("LINE", original_get(row, "line_movement", "price_movement", "market_move", default=module.NO_VERIFIED))]
-        if prov["active_sources"]:
-            pairs.append(("ACTIVE", short_api_list(prov["active_sources"])))
-        if prov["available_no_data_sources"]:
-            pairs.append(("NO LIVE", short_api_list(prov["available_no_data_sources"])))
-        if prov["inactive_sources"]:
-            pairs.append(("INACTIVE", short_api_list(prov["inactive_sources"])))
-        return [(original_tr(label, lang), original_tr(original_clean(value), lang)) for label, value in pairs if value != module.NO_VERIFIED][:5]
-
     def patched_team_snapshot(img: Any, draw: Any, x: int, y: int, width: int, team: str, color: Any, lang: str, row_arg: Any | None = None, side_arg: str = "", *extra: Any, **kwargs: Any) -> None:
         row = _row(row_arg) if row_arg else (_CURRENT_ROW or {})
         away, _home = original_teams(row)
@@ -535,7 +607,7 @@ def apply_magazine_api_patch(module: Any) -> Any:
     module.render_full_pick_magazine_page_png = patched_png
     module._fit = patched_fit
     module._badge = compatible_badge
-    module._pairs = patched_pairs
+    module._pairs = make_compact_pairs(module)
     module._team_snapshot = patched_team_snapshot
     module._player_items = injury_items
     module._items = patched_items
