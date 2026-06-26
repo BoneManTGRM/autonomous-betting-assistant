@@ -31,6 +31,30 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 { margin
 .aba-safe-download { display:inline-block; padding:.65rem 1rem; border-radius:.7rem; background:#ef5350; color:#fff!important; text-decoration:none!important; font-weight:700; margin:.35rem 0; }
 </style>
 '''
+GLOBAL_UPLOAD_ES_CSS = '''
+<style>
+div[data-testid="stFileUploader"] button div p,
+div[data-testid="stFileUploader"] button p,
+div[data-testid="stFileUploader"] button span {
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+div[data-testid="stFileUploader"] button div p::after,
+div[data-testid="stFileUploader"] button p::after,
+div[data-testid="stFileUploader"] button span::after {
+  content: "Subir";
+  font-size: 1rem !important;
+  line-height: 1.2 !important;
+}
+div[data-testid="stFileUploader"] small {
+  font-size: 0 !important;
+}
+div[data-testid="stFileUploader"] small::after {
+  content: "CSV u otro archivo compatible";
+  font-size: .9rem !important;
+}
+</style>
+'''
 
 
 def normalize_language(value: Any) -> str:
@@ -71,6 +95,8 @@ def render_app_sidebar(current_page: str, *, language_key: str = 'global_languag
     widget_key = f'aba_radio_{language_key}'
     if widget_key not in st.session_state:
         st.session_state[widget_key] = language
+    if normalize_language(language) == 'es':
+        st.markdown(GLOBAL_UPLOAD_ES_CSS, unsafe_allow_html=True)
     with st.sidebar:
         st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
         st.markdown('<div class="aba-sidebar-title">ABA Signal Pro</div>', unsafe_allow_html=True)
@@ -78,6 +104,8 @@ def render_app_sidebar(current_page: str, *, language_key: str = 'global_languag
         st.markdown(f'<div class="aba-sidebar-tagline">{html.escape(tagline)}</div>', unsafe_allow_html=True)
         language = st.radio('Language / Idioma', ['English', 'Español'], key=widget_key, horizontal=True, on_change=_sync_global_from_radio, args=(widget_key,))
         st.session_state[GLOBAL_LANGUAGE_KEY] = language
+        if normalize_language(language) == 'es':
+            st.markdown(GLOBAL_UPLOAD_ES_CSS, unsafe_allow_html=True)
         st.markdown('---')
         for item in TOOLS:
             label = _label(item, language)
