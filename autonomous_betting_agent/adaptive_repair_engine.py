@@ -90,11 +90,8 @@ def normalize_result_status(value: Any) -> str:
 
 
 def status_from_row(row: Mapping[str, Any]) -> str:
-    for column in RESULT_COLUMNS:
-        value = row.get(column)
-        if _text(value):
-            return normalize_result_status(value)
-    return "pending"
+    value = _first_value(row, RESULT_COLUMNS)
+    return normalize_result_status(value) if value else "pending"
 
 
 def normalized_event_name(row: Mapping[str, Any]) -> str:
@@ -121,6 +118,7 @@ class ResultSummary:
     rows: int = 0
     wins: int = 0
     losses: int = 0
+    mixed: int = 0
     pushes: int = 0
     voids: int = 0
     cancels: int = 0
@@ -141,6 +139,8 @@ class ResultSummary:
             self.wins += 1
         elif status == "loss":
             self.losses += 1
+        elif status == "mixed":
+            self.mixed += 1
         elif status == "push":
             self.pushes += 1
         elif status == "void":
@@ -217,23 +217,25 @@ def summarize_unique_events(rows: list[Mapping[str, Any]]) -> tuple[dict[str, An
     summary = ResultSummary()
     for event_rows in grouped.values():
         statuses = {status_from_row(row) for row in event_rows}
-        summary.rows += 1
-        if "loss" in statuses:
-            summary.losses += 1
+        if "win" in statuses and "loss" in statuses:
+            summary.add_status("mixed")
+        elif "loss" in statuses:
+            summary.add_status("loss")
         elif "win" in statuses:
-            summary.wins += 1
+            summary.add_status("win")
         elif "push" in statuses:
-            summary.pushes += 1
+            summary.add_status("push")
         elif "void" in statuses:
-            summary.voids += 1
+            summary.add_status("void")
         elif "cancel" in statuses:
-            summary.cancels += 1
+            summary.add_status("cancel")
         elif "unknown" in statuses:
-            summary.unknown += 1
+            summary.add_status("unknown")
         else:
-            summary.pending += 1
+            summary.add_status("pending")
     data = summary.as_report()
     data["unique_events"] = data.pop("rows")
+    data["mixed_events"] = data.get("mixed", 0)
     return data, grouped
 
 
@@ -242,13 +244,14 @@ def _soccer_draw_trap_candidate(rows: list[Mapping[str, Any]]) -> dict[str, Any]
     soccer_losses = 0
     draw_losses = 0
     for row in rows:
-        sport_blob = " ".join(_token(row.get(column)) for column in ("sport", "league", "competition"))
+        sport_blob = " ".join(_token(_first_value(row, (column,))) for column in ("sport", "league", "competition"))
         if not any(hint in sport_blob for hint in SPORT_STYLE_HINTS):
             continue
         soccer_rows.append(row)
         if status_from_row(row) == "loss":
             soccer_losses += 1
-            note = _token(row.get("result_note") or row.get("notes") or row.get("explanation") or "")
+            lowered = {str(key).strip().lower(): value for key, value in row.items()}
+            note = _token(lowered.get("result_note") or lowered.get("notes") or lowered.get("explanation") or "")
             if "draw" in note or any(score in note for score in ("0-0", "1-1", "2-2", "3-3")):
                 draw_losses += 1
     if not soccer_rows or soccer_losses == 0 or draw_losses == 0:
@@ -270,8 +273,8 @@ def _combat_volatility_candidate(rows: list[Mapping[str, Any]]) -> dict[str, Any
     estimated = []
     combat_method = []
     for row in rows:
-        prop = _token(row.get("prop_type") or row.get("market") or row.get("bet_type"))
-        sport = _token(row.get("sport") or row.get("league"))
+        prop = _token(_first_value(row, ("prop_type", "market", "bet_type")))
+        sport = _token(_first_value(row, ("sport", "league")))
         if prop == "estimated score":
             estimated.append(row)
         if "round" in prop or "method" in prop or any(hint in sport for hint in COMBAT_HINTS):
@@ -320,6 +323,8 @@ def build_simulation_report(rows: list[Mapping[str, Any]], dataset_name: str = "
         grading_issues.append(f"{row_summary['voids']} void row(s) are excluded from win/loss rate.")
     if duplicate_names:
         grading_issues.append(f"{len(duplicate_names)} duplicate event name(s) need row-level vs unique-event review.")
+    if unique_summary.get("mixed_events"):
+        grading_issues.append(f"{unique_summary['mixed_events']} unique event(s) have mixed win/loss row outcomes and are excluded from unique-event win rate.")
 
     return SimulationReport(
         dataset_name=dataset_name,
@@ -363,6 +368,7 @@ def report_to_markdown(report: SimulationReport) -> str:
         f"- Unique events: {event['unique_events']}",
         f"- Unique-event record: {event['wins']}-{event['losses']}",
         f"- Unique-event win rate: {event['win_rate_display']}",
+        f"- Mixed unique events: {event.get('mixed_events', event.get('mixed', 0))}",
         f"- Pushes: {row['pushes']}",
         f"- Voids: {row['voids']}",
         f"- Cancels: {row['cancels']}",
