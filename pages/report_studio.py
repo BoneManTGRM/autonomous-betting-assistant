@@ -10,7 +10,7 @@ from autonomous_betting_agent.app_feed_delivery import save_app_feed
 from autonomous_betting_agent.commercial_platform_tools import load_persistent_ledger, normalize_workspace_id
 import autonomous_betting_agent.magazine_book_export as magazine_book_export
 from autonomous_betting_agent.magazine_api_sources import api_provenance
-from autonomous_betting_agent.magazine_live_api_enrichment import ENRICHMENT_VERSION, enrich_rows_with_live_api_data
+from autonomous_betting_agent.magazine_live_api_enrichment import ENRICHMENT_VERSION, enrich_rows_with_live_api_data, install as install_magazine_live_api_enrichment
 from autonomous_betting_agent.pick_hold_store import load_first_available
 from autonomous_betting_agent.report_background_image_service import render_custom_background_summary_png
 from autonomous_betting_agent.report_feed_service import save_report_feed
@@ -23,11 +23,11 @@ from autonomous_betting_agent.row_normalizer import normalize_frame
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 from autonomous_betting_agent.white_label_profiles import WhiteLabelProfile, list_profiles, load_profile, save_profile
 
-magazine_book_export = importlib.reload(magazine_book_export)
+magazine_book_export = install_magazine_live_api_enrichment(importlib.reload(magazine_book_export))
 
 st.set_page_config(page_title="Report Studio", layout="wide")
 LANG = render_app_sidebar("report_studio", language_key="report_studio_language", selector="radio")
-NO_MARKET_EXPORT_VERSION = "no_market_metric_v6"
+NO_MARKET_EXPORT_VERSION = "no_market_metric_v7"
 ACTIVE_EXPORT_VERSION = f"{magazine_book_export.MAGAZINE_STYLE_VERSION}:{NO_MARKET_EXPORT_VERSION}:{ENRICHMENT_VERSION}"
 if st.session_state.get("report_studio_active_export_version") != ACTIVE_EXPORT_VERSION:
     st.cache_data.clear()
@@ -315,7 +315,7 @@ def cached_render_full_pick_magazine_page_png(row_items: tuple[tuple[str, str], 
     rowd = with_report_language(dict(row_items), language)
     rowd["_magazine_style_version"] = f"{style_version}:{no_market_version}:{enrichment_version}"
     rowd = enrich_rows_with_live_api_data([rowd])[0]
-    return magazine_book_export.render_full_pick_magazine_page_png(rowd, background_image=background_bytes, report_name=report_name, page_number=page_number, total_pages=total_pages)
+    return magazine_book_export.render_full_pick_magazine_page_png(rowd, background_image=background_bytes, report_name=report_name, page_number=page_number, total_pages=total_pages, language=language)
 
 
 def serializable_row(rowd: dict) -> tuple[tuple[str, str], ...]:
@@ -452,9 +452,9 @@ with tabs[6]:
     if st.button(t("build_book"), key=f"report_studio_prepare_full_book_{LANG}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}"):
         with st.spinner(t("building_book")):
             st.session_state[book_cache_key] = {
-                "png": magazine_book_export.render_full_magazine_book_png(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name),
-                "pdf": magazine_book_export.render_full_magazine_book_pdf(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name),
-                "zip": magazine_book_export.render_full_magazine_zip(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name),
+                "png": magazine_book_export.render_full_magazine_book_png(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name, language=LANG),
+                "pdf": magazine_book_export.render_full_magazine_book_pdf(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name, language=LANG),
+                "zip": magazine_book_export.render_full_magazine_zip(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name, language=LANG),
             }
     full_book_cache = st.session_state.get(book_cache_key)
     if full_book_cache:
