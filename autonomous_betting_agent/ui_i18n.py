@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pandas as pd
+
+from autonomous_betting_agent.report_product_layer import event_text, pick_text, sport_text, team_label, value_text
 
 
 COLUMN_LABELS_ES = {
@@ -50,6 +53,7 @@ COLUMN_LABELS_ES = {
     "odds_verified": "cuota_verificada",
     "official_publish_ready": "listo_publicación_oficial",
     "official_status_label": "estado_oficial",
+    "page": "página",
     "pending": "pendientes",
     "pick_rows": "filas_pick",
     "prediction": "selección",
@@ -74,6 +78,7 @@ COLUMN_LABELS_ES = {
     "source": "fuente",
     "source_file": "archivo_fuente",
     "sport": "deporte",
+    "status": "estado",
     "suggested_stake_units": "unidades_stake_sugeridas",
     "unique_event_id": "id_evento_único",
     "voids": "voids",
@@ -111,6 +116,50 @@ VALUE_LABELS_ES = {
     "fallback_probability": "probabilidad fallback",
     "price_implied_probability": "probabilidad implícita por cuota",
     "direct_probability": "probabilidad directa",
+    "totals": "totales",
+    "total": "total",
+    "spreads": "hándicaps",
+    "spread": "hándicap",
+    "moneyline": "ganador",
+    "team_total": "total del equipo",
+    "game_total": "total del partido",
+    "price_watch_research": "seguimiento de precio / investigación",
+    "research_track_for_learning": "investigación / seguimiento para aprendizaje",
+    "research_learning": "investigación / aprendizaje",
+    "official_ev": "oficial +EV",
+    "official_plus_ev": "oficial +EV",
+    "ready_for_lock_or_learning": "listo para bloqueo o aprendizaje",
+    "lock_first": "bloquear primero",
+    "fifa_world_cup": "Copa Mundial FIFA",
+    "super_league_china": "Superliga - China",
+}
+
+EVENT_COLUMNS = {"event", "event_name", "matchup", "public_event", "game"}
+TEAM_COLUMNS = {"team", "team_name", "home_team", "away_team", "winner", "opponent"}
+SPORT_COLUMNS = {"sport", "league", "competition", "public_sport"}
+PICK_COLUMNS = {"prediction", "pick", "selection", "public_pick"}
+VALUE_COLUMNS = {
+    "consumer_action",
+    "recommended_action",
+    "public_action",
+    "market",
+    "market_type",
+    "model_lean_label",
+    "price_value_label",
+    "official_status_label",
+    "result_status",
+    "learning_status",
+    "data_issue_reason",
+    "suggestion",
+    "sports_context_summary",
+    "market_read",
+    "why_it_matters",
+    "report_lane",
+    "report_lane_v2",
+    "ledger_type",
+    "status",
+    "next_action",
+    "page",
 }
 
 
@@ -122,16 +171,47 @@ def tr(language: str | None, english: str, spanish: str) -> str:
     return spanish if is_spanish(language) else english
 
 
+def _value_key(value: Any) -> str:
+    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9+]+", "_", str(value).strip().lower())).strip("_")
+
+
 def localize_value(value: Any, language: str | None) -> Any:
     if not is_spanish(language):
         return value
     if value is None:
         return value
-    text = str(value)
-    key = text.strip().lower().replace(" ", "_").replace("-", "_")
+    text = str(value).strip()
+    if not text:
+        return value
+    key = _value_key(text)
     if key in VALUE_LABELS_ES:
         return VALUE_LABELS_ES[key]
-    return value
+    translated = value_text(text, "es")
+    return translated if translated != text else value
+
+
+def localize_cell(value: Any, language: str | None, column: str | None = None) -> Any:
+    if not is_spanish(language):
+        return value
+    if value is None:
+        return value
+    text = str(value).strip()
+    if not text:
+        return value
+    col = str(column or "").strip().lower()
+    if col in EVENT_COLUMNS:
+        return event_text(text, "es")
+    if col in TEAM_COLUMNS:
+        return team_label(text, "es")
+    if col in SPORT_COLUMNS:
+        return sport_text(text, "es")
+    if col in PICK_COLUMNS:
+        return pick_text(text, "es")
+    if col in VALUE_COLUMNS:
+        return localize_value(text, language)
+    if re.search(r"\s+(?:at|vs|v|@)\s+", text, flags=re.I):
+        return event_text(text, "es")
+    return localize_value(text, language)
 
 
 def localize_dataframe(frame: pd.DataFrame, language: str | None) -> pd.DataFrame:
@@ -140,14 +220,14 @@ def localize_dataframe(frame: pd.DataFrame, language: str | None) -> pd.DataFram
     out = frame.copy()
     for column in out.columns:
         if out[column].dtype == object:
-            out[column] = out[column].map(lambda item: localize_value(item, language))
+            out[column] = out[column].map(lambda item, col=column: localize_cell(item, language, str(col)))
     return out.rename(columns={column: COLUMN_LABELS_ES.get(str(column), str(column)) for column in out.columns})
 
 
 def localize_options(options: list[str], language: str | None) -> tuple[list[str], dict[str, str]]:
     if not is_spanish(language):
         return options, {option: option for option in options}
-    display = [str(localize_value(option, language)) for option in options]
+    display = [str(localize_cell(option, language)) for option in options]
     return display, dict(zip(display, options))
 
 
