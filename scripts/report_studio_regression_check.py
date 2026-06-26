@@ -77,8 +77,8 @@ def check_static_page_contract() -> None:
         "MATCHUP NOTES",
         "CHAIN BETTING NOTES",
         "TENDENCIA",
-        "Player data not available in uploaded row",
-        "Data not available from uploaded row",
+        "Player data not returned for this event",
+        "Data not returned for this event",
     ]
     diagnostics = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
