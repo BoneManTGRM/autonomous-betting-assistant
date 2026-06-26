@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from autonomous_betting_agent.magazine_sale_ready_patch import (
+    sale_ready_chain_items,
     sale_ready_injury_items,
     sale_ready_matchup_items,
     sale_ready_recommendation,
+    sale_ready_risk_items,
     sale_ready_team_items,
 )
 
@@ -32,6 +34,19 @@ def _row(**overrides):
     return row
 
 
+def _provider_terms():
+    return (
+        "No SDIO event ID returned",
+        "API-FB lookup checked",
+        "No lineup/injury headline returned",
+        "SportsDataIO",
+        "NewsAPI",
+        "SDIO checked; no provider event ID in row",
+        "News checked; no injury/lineup headline",
+        "API-FB lookup checked; no match returned",
+    )
+
+
 def test_negative_edge_or_ev_cannot_play_small():
     action, explanation, playable = sale_ready_recommendation(_row())
 
@@ -55,7 +70,7 @@ def test_team_and_injury_fallbacks_are_professional_and_compact():
     injury_items = sale_ready_injury_items(_row(), "away")
     text = "\n".join(team_items + injury_items)
 
-    assert "No SDIO event ID returned." in team_items
+    assert "No SDIO event ID." in team_items
     assert "No lineup/injury headline returned." in text
     assert "SDIO checked; no provider event ID in row." not in text
     assert "News checked; no injury/lineup headline." not in text
@@ -73,3 +88,39 @@ def test_matchup_weather_location_and_api_fb_are_compact():
     assert text.count("Partly cloudy") <= 1
     assert "Pennsylvania, United States of America" not in text
     assert "team lookup matched" not in text
+
+
+def test_negative_edge_risk_and_chain_notes_are_not_provider_fallbacks():
+    risk_items = sale_ready_risk_items(_row())
+    chain_items = sale_ready_chain_items(_row())
+    text = "\n".join(risk_items + chain_items)
+
+    assert risk_items == [
+        "Negative edge at current price.",
+        "Do not play unless price improves.",
+        "Recheck odds and key news.",
+    ]
+    assert chain_items == [
+        "Do not chain negative-EV picks.",
+        "Avoid parlays unless edge turns positive.",
+        "Recheck price before including.",
+    ]
+    assert all(term not in text for term in _provider_terms())
+
+
+def test_missing_edge_risk_and_chain_notes_are_research_only():
+    row = _row(model_market_edge="", expected_value_per_unit="")
+    text = "\n".join(sale_ready_risk_items(row) + sale_ready_chain_items(row))
+
+    assert "Research only: edge incomplete." in text
+    assert "Do not combine unverified picks." in text
+    assert all(term not in text for term in _provider_terms())
+
+
+def test_positive_edge_risk_and_chain_notes_are_operational():
+    row = _row(model_market_edge="0.035", expected_value_per_unit="0.050", risk="volume_ok")
+    text = "\n".join(sale_ready_risk_items(row) + sale_ready_chain_items(row))
+
+    assert "Risk status: VOLUME OK." in text
+    assert "Straight only: research." in text
+    assert all(term not in text for term in _provider_terms())
