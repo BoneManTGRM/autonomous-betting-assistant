@@ -1,0 +1,71 @@
+name: Final Spanish Magazine Renderer V10
+
+on:
+  push:
+    paths:
+      - '.github/workflows/final-spanish-magazine-render-v10.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch source files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          book = Path('autonomous_betting_agent/magazine_book_export.py')
+          text = book.read_text(encoding='utf-8')
+          text = text.replace('premium_v4_reference_compact_no_market_v9_base_api_data', 'premium_v4_reference_compact_no_market_v10_base_api_data')
+          text = text.replace('NO_MARKET_EXPORT_VERSION = "no_market_metric_v9"', 'NO_MARKET_EXPORT_VERSION = "no_market_metric_v10"')
+          text = text.replace('    version = "v9 no-market"', '    version = "v10 no-market"')
+
+          # Make row item lists translate before they reach drawing, not only inside _bullets_auto.
+          text = text.replace(
+              'def _items(row: Any, keys: Iterable[str], fallback: list[str], limit: int) -> list[str]:\n    return _items_from_keys(row, keys, fallback, limit)',
+              'def _items(row: Any, keys: Iterable[str], fallback: list[str], limit: int, lang: str = "en") -> list[str]:\n    return [_tr(item, lang) for item in _items_from_keys(row, keys, fallback, limit)]',
+          )
+          text = text.replace(
+              '_items(pick, ("why_lose", "risk_reason", "hidden_risk", "risk_notes"), [f"Risk status: {risk}", "Recheck odds before entry.", "Avoid if key news changes"], 3)',
+              '_items(pick, ("why_lose", "risk_reason", "hidden_risk", "risk_notes"), [f"Risk status: {risk}", "Recheck odds before entry.", "Avoid if key news changes"], 3, lang)',
+          )
+          text = text.replace(
+              '_items(pick, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), ["Straight only: research", "Do not combine without official verification", "Wait for better context or price"], 3)',
+              '_items(pick, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), ["Straight only: research", "Do not combine without official verification", "Wait for better context or price"], 3, lang)',
+          )
+
+          # Make final note impossible to overlap the large recommendation label in Spanish.
+          text = text.replace(
+              '    _txt_auto(draw, 670, fy + 38, explanation, 340, 82, 20, 8, CREAM, False, None)',
+              '    if lang == "es":\n        explanation = "Revisar si mejora la línea."\n        _txt_auto(draw, 720, fy + 112, explanation, 300, 32, 15, 8, CREAM, False, 1)\n    else:\n        _txt_auto(draw, 670, fy + 38, explanation, 340, 82, 20, 8, CREAM, False, None)',
+          )
+
+          book.write_text(text, encoding='utf-8')
+
+          studio = Path('pages/report_studio.py')
+          s = studio.read_text(encoding='utf-8')
+          s = s.replace('NO_MARKET_EXPORT_VERSION = "no_market_metric_v9"', 'NO_MARKET_EXPORT_VERSION = "no_market_metric_v10"')
+          studio.write_text(s, encoding='utf-8')
+
+          test = Path('tests/test_spanish_magazine_renderer_translation.py')
+          existing = test.read_text(encoding='utf-8') if test.exists() else ''
+          addition = '''\n\ndef test_base_magazine_renderer_spanish_fallbacks_and_version():\n    import autonomous_betting_agent.magazine_book_export as renderer\n\n    assert renderer.NO_MARKET_EXPORT_VERSION == "no_market_metric_v10"\n    assert renderer._tr("Price check required before entry.", "es") == "Revisar cuota antes de entrar."\n    assert renderer._tr("Negative edge at current price.", "es") == "Ventaja negativa con la cuota actual."\n    assert renderer._tr("Do not play unless price improves.", "es") == "No jugar salvo que la cuota mejore."\n    assert renderer._tr("Recheck odds and key news.", "es") == "Revisar cuotas y noticias clave."\n    assert renderer._tr("Do not chain negative-EV picks.", "es") == "No encadenar señales con VE negativo."\n    assert renderer._tr("Avoid parlays unless edge turns positive.", "es") == "Evitar parlays salvo que la ventaja sea positiva."\n    assert renderer._tr("Recheck price before including.", "es") == "Revisar la cuota antes de incluir."\n\n\ndef test_base_magazine_renderer_translates_row_sourced_items():\n    import autonomous_betting_agent.magazine_book_export as renderer\n\n    row = {\n        "report_language": "es",\n        "event": "Iraq at France",\n        "prediction": "GAME TOTAL OVER 2.5",\n        "why_lose": "Negative edge at current price.\\nDo not play unless price improves.\\nRecheck odds and key news.",\n        "chain_notes": "Do not chain negative-EV picks.\\nAvoid parlays unless edge turns positive.\\nRecheck price before including.",\n    }\n    risk_items = renderer._items(row, ("why_lose", "risk_reason", "hidden_risk", "risk_notes"), [], 3, "es")\n    parlay_items = renderer._items(row, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), [], 3, "es")\n    combined = "\\n".join(risk_items + parlay_items)\n\n    assert "Ventaja negativa con la cuota actual" in combined\n    assert "No jugar salvo que la cuota mejore" in combined\n    assert "Revisar cuotas y noticias clave" in combined\n    assert "No encadenar señales con VE negativo" in combined\n    assert "Evitar parlays salvo que la ventaja sea positiva" in combined\n    assert "Revisar la cuota antes de incluir" in combined\n    assert "Negative edge" not in combined\n    assert "Do not chain" not in combined\n'''
+          if 'test_base_magazine_renderer_spanish_fallbacks_and_version' not in existing:
+              test.write_text(existing.rstrip() + addition + '\n', encoding='utf-8')
+          PY
+      - name: Run targeted tests
+        run: |
+          python -m pytest tests/test_spanish_magazine_renderer_translation.py -q
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add autonomous_betting_agent/magazine_book_export.py pages/report_studio.py tests/test_spanish_magazine_renderer_translation.py
+          git diff --cached --quiet && exit 0
+          git commit -m "Finalize Spanish magazine renderer v10"
+          git push
