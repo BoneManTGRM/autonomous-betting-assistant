@@ -31,6 +31,7 @@ API_SHORT_LABELS = {
     "Perplexity": "PPLX",
     "NewsAPI": "News",
 }
+API_SUMMARY_KEY_FRAGMENTS = ("api", "sportsdataio", "weather", "news", "perplexity")
 _CURRENT_ROW: Mapping[str, Any] | None = None
 
 
@@ -289,14 +290,18 @@ def compact_api_message(text: Any, row: Any, area: str = "team") -> list[str]:
     if not value:
         return []
     low = value.lower()
-    if low.startswith("sportsdataio configured"):
+    if low.startswith("sportsdataio configured") or low.startswith("sdio checked"):
         return ["SDIO checked; no provider event ID in row."]
-    if low.startswith("api-football:"):
+    if low.startswith("api-football:") or low.startswith("api-fb team lookup matched"):
         return [_api_fb_lookup_text(row, matched=True)]
-    if low.startswith("api-football checked"):
+    if low.startswith("api-football checked") or low.startswith("api-fb team lookup checked"):
         return [_api_fb_lookup_text(row, matched=False)]
     if low.startswith("weatherapi"):
         return _compact_weather_message(value)
+    if low.startswith("weather:") or low.startswith("weather checked"):
+        return _compact_weather_message(value.replace("Weather:", "WeatherAPI:", 1) if value.startswith("Weather:") else value)
+    if low.startswith("location:"):
+        return [value]
     if low.startswith("newsapi:"):
         title = value.split(":", 1)[1].strip().split(" | ", 1)[0]
         title = title[:88].rstrip() + ("…" if len(title) > 88 else "")
@@ -358,11 +363,20 @@ def _matchup_fallback(row: Any) -> list[str]:
     return checked or ["Context unavailable.", _active_note(row), "Recheck price before publishing."]
 
 
+def _values_for_key(data: Mapping[str, Any], key: str) -> list[str]:
+    value = data.get(key)
+    if _bad(value):
+        return []
+    if any(fragment in key.lower() for fragment in API_SUMMARY_KEY_FRAGMENTS):
+        return [str(value)]
+    return _split(value)
+
+
 def _items_from_keys(row: Any, keys: Iterable[str], fallback: list[str], limit: int, area: str = "team") -> list[str]:
     data = _row(row)
     out: list[str] = []
     for key in keys:
-        out += _split(data.get(key))
+        out += _values_for_key(data, key)
     return _compact_items(out, row, area, limit) or _compact_items(fallback, row, area, limit)
 
 
@@ -536,6 +550,6 @@ def apply_magazine_api_patch(module: Any) -> Any:
     module._injury_items = injury_items
     module._matchup_items = matchup_items
     module.magazine_metric_cells = lambda odds, conf, edge, ev, units, risk: magazine_metric_cells(odds, conf, edge, ev, units, risk, {"DANGER": module.DANGER, "GREEN": module.GREEN, "CREAM": module.CREAM})
-    module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_dynamic_api_sources_v6_compact_display"
+    module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_dynamic_api_sources_v7_compact_display"
     module._DYNAMIC_API_SOURCE_PATCHED = True
     return module
