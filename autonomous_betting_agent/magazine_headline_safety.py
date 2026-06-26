@@ -155,6 +155,7 @@ def install(module: Any) -> Any:
     module.render_full_pick_magazine_page = render
     module.render_full_pick_magazine_page_png = render_png
     module.validate_magazine_layout_no_overflow = validate
+    module.validate_headline_layout = validate
     module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_headline_safety_v1"
     module._ABA_HEADLINE_SAFETY_V1 = True
     return module
