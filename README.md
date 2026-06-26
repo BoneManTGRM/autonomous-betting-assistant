@@ -48,7 +48,9 @@ No cloud server is required for the local-first layer. The app keeps no-login mo
 | `autonomous_betting_agent/grading_rules.py` | Row-level vs event-level result summaries. |
 | `autonomous_betting_agent/adaptive_repair_engine.py` | Phase 0-2 graded-list ingestion, row/event separation, duplicate detection, and watchlist-only pattern discovery. |
 | `autonomous_betting_agent/adaptive_repair_diagnostics.py` | Data-quality scoring, column coverage, exact duplicate-row detection, same-event review, mixed-event handling, and missing-field examples. |
-| `autonomous_betting_agent/adaptive_repair_runner.py` | Phase 3A internal system-wide runner. Event-triggered, simulation-only, source-adapter based, with persistent scan memory. |
+| `autonomous_betting_agent/adaptive_repair_runner.py` | Compatibility exports for the Phase 3A runner. |
+| `autonomous_betting_agent/adaptive_repair_runner_core.py` | Phase 3A internal system-wide runner. Event-triggered, simulation-only, source-adapter based, with persistent scan memory. |
+| `autonomous_betting_agent/reparodynamics_doctrine.py` | Single source of truth for the Phase 3A Reparodynamics operating doctrine used by runner reports and dashboard display. |
 | `scripts/run_adaptive_repair_simulation.py` | CLI entrypoint for runner scans, CSV simulations, JSON/Markdown output, and optional saved runs. |
 | `pages/adaptive_repair_simulation.py` | Streamlit dashboard/control page for the internal runner. Not the main engine. |
 | `autonomous_betting_agent/bankroll.py` | Conservative flat-stake and Kelly-style risk helpers. |
@@ -59,6 +61,30 @@ No cloud server is required for the local-first layer. The app keeps no-login mo
 | `autonomous_betting_agent/local_alerts.py` | Structured local alert messages. |
 | `autonomous_betting_agent/license_status.py` | Manual local license/client status records. No Stripe dependency. |
 | `autonomous_betting_agent/learning_memory_controls.py` | Learning-safe row checks, version placeholder, and reset confirmation helper. |
+
+## Reparodynamics Doctrine
+
+Reparodynamics is ABA's operating doctrine of measured self-repair. ABA observes first, diagnoses carefully, preserves data integrity, conserves repair energy, and repairs only after controlled evidence shows a targeted change improves measurable performance without increasing hidden risk.
+
+Reparodynamics means:
+
+- self-awareness without panic
+- adaptation without overfitting
+- repair without reckless mutation
+- learning without live model contamination
+- evidence before activation
+- targeted repair instead of blind retraining
+- repair energy must be conserved
+- every future repair must show value before promotion
+
+For this PR:
+
+- Phase 3A is observation-only.
+- Pattern candidates are watchlist-only.
+- RYE readiness is not RYE activation.
+- Shadow Mode readiness is not Shadow Mode activation.
+- No live model mutation exists in this PR.
+- Reparodynamics is being used here as ABA's operating doctrine, not as a guarantee of outcomes.
 
 ## ABA Adaptive Repair Engine
 
@@ -219,7 +245,7 @@ Run the app:
 streamlit run streamlit_app.py
 ```
 
-Open **Adaptive Repair Simulation**. The page can run a system-wide scan, upload a graded CSV for manual simulation, display source availability, source failures, row-level metrics, unique-event metrics, mixed events, duplicate events, data-quality score, column coverage, watchlist-only patterns, RYE readiness, Shadow Mode readiness, saved runs, and downloadable Markdown/JSON reports.
+Open **Adaptive Repair Simulation**. The page can run a system-wide scan, upload a graded CSV for manual simulation, display the Reparodynamics doctrine banner, display source availability, source failures, row-level metrics, unique-event metrics, mixed events, duplicate events, data-quality score, column coverage, watchlist-only patterns, RYE readiness, Shadow Mode readiness, saved runs, and downloadable Markdown/JSON reports.
 
 The page is not the main engine. It is the dashboard/control panel for the internal runner.
 
@@ -268,6 +294,7 @@ Complete or locally implemented:
 20. README and local-first status documentation.
 21. ABA Adaptive Repair Engine Phase 0-2 simulation gate, graded-list ingestion, row-level vs unique-event protection, and enhanced data-quality diagnostics.
 22. ABA Adaptive Repair Runner Phase 3A with source adapters, persistent simulation memory, watchlist-only candidates, and readiness-only RYE/Shadow checks.
+23. Reparodynamics doctrine layer for runner JSON, Markdown reports, dashboard display, and README documentation.
 
 Local placeholders remain for heavier future work: true generated PDF files, automated payment processing, destructive memory reset, full cooldown/drawdown automation, advanced team-level correlation modeling, Shadow Mode activation, full RYE scoring, Hidden Value Score activation, confidence calibration activation, and TGRM production repairs.
 
@@ -359,9 +386,9 @@ Do not put real API keys, private access codes, secrets, screenshots with secret
 
 ```bash
 python -m compileall autonomous_betting_agent pages tests scripts
-python -m py_compile autonomous_betting_agent/magazine_api_sources.py autonomous_betting_agent/magazine_live_api_enrichment.py pages/report_studio.py autonomous_betting_agent/adaptive_repair_engine.py autonomous_betting_agent/adaptive_repair_diagnostics.py autonomous_betting_agent/adaptive_repair_runner.py pages/adaptive_repair_simulation.py
+python -m py_compile autonomous_betting_agent/magazine_api_sources.py autonomous_betting_agent/magazine_live_api_enrichment.py pages/report_studio.py autonomous_betting_agent/adaptive_repair_engine.py autonomous_betting_agent/adaptive_repair_diagnostics.py autonomous_betting_agent/adaptive_repair_runner.py autonomous_betting_agent/adaptive_repair_runner_core.py autonomous_betting_agent/reparodynamics_doctrine.py pages/adaptive_repair_simulation.py
 python -m scripts.report_studio_regression_check
 python scripts/magazine_autofit_stress_test.py
-python -m pytest -q tests/test_adaptive_repair_engine.py tests/test_adaptive_repair_runner.py
+python -m pytest -q tests/test_adaptive_repair_engine.py tests/test_adaptive_repair_runner.py tests/test_doctrine.py
 python -m pytest -q
 ```
