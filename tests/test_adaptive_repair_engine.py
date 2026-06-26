@@ -1,5 +1,5 @@
 from autonomous_betting_agent.adaptive_repair_diagnostics import build_enhanced_diagnostics, diagnostics_to_markdown
-from autonomous_betting_agent.adaptive_repair_engine import build_simulation_report, normalize_result_status
+from autonomous_betting_agent.adaptive_repair_engine import build_simulation_report, normalize_result_status, status_from_row
 
 
 def test_result_status_preserves_void_and_unknown():
@@ -9,6 +9,12 @@ def test_result_status_preserves_void_and_unknown():
     assert normalize_result_status("void") == "void"
     assert normalize_result_status("unknown") == "unknown"
     assert normalize_result_status("") == "pending"
+
+
+def test_status_from_row_handles_case_insensitive_result_columns():
+    assert status_from_row({"Result": "Won"}) == "win"
+    assert status_from_row({"FINAL_RESULT": "Lost"}) == "loss"
+    assert status_from_row({"result_status": "Void"}) == "void"
 
 
 def test_uploaded_tracker_baseline_shape_counts():
@@ -32,6 +38,7 @@ def test_uploaded_tracker_baseline_shape_counts():
     assert report.row_level["voids"] == 2
     assert report.duplicate_event_names == 0
     assert report.unique_event_level["unique_events"] == 81
+    assert report.unique_event_level["mixed_events"] == 0
     assert round(report.row_level["win_rate"], 4) == 0.7333
 
 
@@ -52,12 +59,15 @@ def test_row_level_and_unique_event_tracking_split_duplicates():
     assert report.row_level["voids"] == 1
     assert report.duplicate_event_names == 1
     assert report.unique_event_level["unique_events"] == 2
-    assert report.unique_event_level["losses"] == 1
+    assert report.unique_event_level["wins"] == 0
+    assert report.unique_event_level["losses"] == 0
+    assert report.unique_event_level["mixed_events"] == 1
     assert report.unique_event_level["voids"] == 1
     assert diagnostics.same_event_groups[0]["mixed_outcome"] is True
     assert diagnostics.same_event_groups[0]["multi_market"] is True
     assert diagnostics.mixed_outcome_events == 1
     assert diagnostics.multi_market_events == 1
+    assert "Mixed unique events: 1" in markdown
     assert "Mixed-outcome unique events: 1" in markdown
     assert "Multi-market unique events: 1" in markdown
 
