@@ -10,9 +10,10 @@ from typing import Any
 from urllib.parse import quote_plus, urlencode
 from urllib.request import Request, urlopen
 
-ENRICHMENT_VERSION = "live_api_enrichment_v6_full_spanish_renderer_safe"
+ENRICHMENT_VERSION = "live_api_enrichment_v7_spanish_renderer_reload_safe"
 _TIMEOUT_SECONDS = 3.0
 _CACHE: dict[tuple[str, str], Any] = {}
+_SPANISH_TR_MARKER = "_aba_spanish_report_tr_v7"
 
 API_SECRET_DEFS = {
     "SportsDataIO": ("SPORTSDATAIO_API_KEY", "SPORTS_DATA_IO_API_KEY", "SPORTSDATA_API_KEY"),
@@ -407,17 +408,20 @@ def enrich_rows_with_live_api_data(rows: list[Any] | tuple[Any, ...]) -> list[di
 
 
 def install(module: Any) -> Any:
-    if getattr(module, "_LIVE_API_ENRICHMENT_PATCHED", False):
+    existing_tr = getattr(module, "_tr", None)
+    if callable(existing_tr) and getattr(existing_tr, _SPANISH_TR_MARKER, False):
         return module
+
     original_render = module.render_full_pick_magazine_page
     original_png = module._png
-    original_tr = getattr(module, "_tr", None)
+    original_tr = existing_tr
     original_team_snapshot = getattr(module, "_team_snapshot", None)
 
     if callable(original_tr):
         def tr(value: Any, lang: str) -> str:
             translated = original_tr(value, lang)
             return _spanish_text(translated) if str(lang).lower().startswith("es") else translated
+        setattr(tr, _SPANISH_TR_MARKER, True)
         module._tr = tr
 
     def render(row_like: Any, *args: Any, **kwargs: Any):
@@ -450,8 +454,9 @@ def install(module: Any) -> Any:
     module._team_snapshot = team_snapshot
     module.enrich_row_with_live_api_data = enrich_row_with_live_api_data
     module.enrich_rows_with_live_api_data = enrich_rows_with_live_api_data
-    module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_{ENRICHMENT_VERSION}"
-    module._LIVE_API_ENRICHMENT_PATCHED = True
+    if ENRICHMENT_VERSION not in str(getattr(module, "MAGAZINE_STYLE_VERSION", "")):
+        module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_{ENRICHMENT_VERSION}"
+    module._LIVE_API_ENRICHMENT_VERSION = ENRICHMENT_VERSION
     return module
 
 
