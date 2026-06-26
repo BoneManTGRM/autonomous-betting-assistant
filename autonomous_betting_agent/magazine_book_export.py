@@ -16,8 +16,8 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 PAGE_WIDTH = 1080
 PAGE_HEIGHT = 1620
-MAGAZINE_STYLE_VERSION = "premium_v4_reference_compact_no_market_v9_base_api_data"
-NO_MARKET_EXPORT_VERSION = "no_market_metric_v9"
+MAGAZINE_STYLE_VERSION = "premium_v4_reference_compact_no_market_v10_base_api_data"
+NO_MARKET_EXPORT_VERSION = "no_market_metric_v10"
 SAFETY_FOOTER = "No guarantees. Bet responsibly. This analysis is for informational purposes only."
 TEAM_DATA_FALLBACK = "Data not returned for this event"
 PLAYER_DATA_FALLBACK = "Player data not returned for this event"
@@ -752,8 +752,8 @@ def _bullets_auto(draw: ImageDraw.ImageDraw, x: int, y: int, items: list[str], w
         y += 8
 
 
-def _items(row: Any, keys: Iterable[str], fallback: list[str], limit: int) -> list[str]:
-    return _items_from_keys(row, keys, fallback, limit)
+def _items(row: Any, keys: Iterable[str], fallback: list[str], limit: int, lang: str = "en") -> list[str]:
+    return [_tr(item, lang) for item in _items_from_keys(row, keys, fallback, limit)]
 
 
 def _why(row: Any, lang: str) -> list[str]:
@@ -913,11 +913,11 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
 
     low_y, low_h = 1178, 175
     _section(draw, 20, low_y, 320, low_h, "RISK DESK", RED, lang)
-    _bullets_auto(draw, 44, low_y + 70, _items(pick, ("why_lose", "risk_reason", "hidden_risk", "risk_notes"), [f"Risk status: {risk}", "Recheck odds before entry.", "Avoid if key news changes"], 3), 272, low_h - 88, RED, 16, 7, 3, lang)
+    _bullets_auto(draw, 44, low_y + 70, _items(pick, ("why_lose", "risk_reason", "hidden_risk", "risk_notes"), [f"Risk status: {risk}", "Recheck odds before entry.", "Avoid if key news changes"], 3, lang), 272, low_h - 88, RED, 16, 7, 3, lang)
     _section(draw, 354, low_y, 344, low_h, "MATCHUP NOTES", BLUE, lang)
     _bullets_auto(draw, 378, low_y + 70, _matchup_items(pick), 296, low_h - 88, BLUE, 14, 6, 3, lang)
     _section(draw, 712, low_y, 348, low_h, "CHAIN BETTING NOTES", BLUE, lang)
-    _bullets_auto(draw, 736, low_y + 70, _items(pick, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), ["Straight only: research", "Do not combine without official verification", "Wait for better context or price"], 3), 300, low_h - 88, BLUE, 16, 7, 3, lang)
+    _bullets_auto(draw, 736, low_y + 70, _items(pick, ("chain_notes", "main_read", "add_on_legs", "parlay_notes"), ["Straight only: research", "Do not combine without official verification", "Wait for better context or price"], 3, lang), 300, low_h - 88, BLUE, 16, 7, 3, lang)
 
     action = _tr(_clean(_get(pick, "final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action", default="PLAY STANDARD"), True), lang)
     explanation = _tr(_get(pick, "final_explanation", "action_reason", "recommendation_reason", "decision_reasons", default="Use only if the line remains playable and key news does not change."), lang)
@@ -931,14 +931,18 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     draw.text((40, fy + 76), rec, font=_fit(rec, 190, 24, 12, True), fill=CREAM)
     draw.text((284, fy + 18), action.upper(), font=_fit(action.upper(), 340, 66, 18, True), fill=GREEN)
     _txt_auto(draw, 284, fy + 92, pick_text, 360, 34, 46, 8, CREAM, True, 1)
-    _txt_auto(draw, 670, fy + 38, explanation, 340, 82, 20, 8, CREAM, False, None)
+    if lang == "es":
+        explanation = "Revisar si mejora la línea."
+        _txt_auto(draw, 720, fy + 112, explanation, 300, 32, 15, 8, CREAM, False, 1)
+    else:
+        _txt_auto(draw, 670, fy + 38, explanation, 340, 82, 20, 8, CREAM, False, None)
 
     footer_y, footer_b = 1542, 1581
     draw.rectangle((20, footer_y, 1060, footer_b), fill=BLACK)
     footer = _tr(SAFETY_FOOTER, lang)
     font = _fit(footer, PAGE_WIDTH - 190, 16, 10, False)
     draw.text((42, footer_y + 10), _ellipsize_to_width(draw, footer, font, PAGE_WIDTH - 190), font=font, fill=CREAM)
-    version = "v9 no-market"
+    version = "v10 no-market"
     vfont = _font(14, True)
     vbox = draw.textbbox((0, 0), version, font=vfont)
     draw.text((1048 - (vbox[2] - vbox[0]), footer_y + 10), version, font=vfont, fill=GREEN)
