@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from autonomous_betting_agent.commercial_platform_tools import load_persistent_ledger, normalize_workspace_id
+from autonomous_betting_agent.event_list_dedupe import collapse_to_event_rows, event_duplicate_summary
 from autonomous_betting_agent.explanations import build_client_safe_pick_summary
 from autonomous_betting_agent.grading_rules import summarize_event_level, summarize_row_level
 from autonomous_betting_agent.ledger_types import classify_ledger_type, is_future_locked, public_metric_allowed
@@ -51,6 +52,11 @@ TEXT = {
         "event_summary": "Event-level summary",
         "event_caption": "Use event-level counts when multiple rows belong to the same matchup/game.",
         "local_proof_rows": "Proof rows",
+        "event_level_rows": "Event-level proof rows",
+        "row_level_rows": "Row-level market rows",
+        "show_row_level": "Show row-level market rows",
+        "duplicate_events": "Events with multiple rows",
+        "duplicate_event_rows": "Extra row-level market rows",
         "download_rows": "Download proof rows",
     },
     "es": {
@@ -86,6 +92,11 @@ TEXT = {
         "event_summary": "Resumen por evento",
         "event_caption": "Usa conteos por evento cuando varias filas pertenecen al mismo partido/juego.",
         "local_proof_rows": "Filas de prueba",
+        "event_level_rows": "Filas de prueba por evento",
+        "row_level_rows": "Filas por mercado",
+        "show_row_level": "Mostrar filas individuales por mercado",
+        "duplicate_events": "Eventos con varias filas",
+        "duplicate_event_rows": "Filas extra por mercado",
         "download_rows": "Descargar filas de prueba",
     },
 }
@@ -110,8 +121,10 @@ def merge_rows(*parts: list[dict]) -> list[dict]:
             proof_id = safe_text(row.get("proof_id"))
             event = safe_text(row.get("event") or row.get("event_name") or row.get("matchup"))
             pick = safe_text(row.get("prediction") or row.get("pick") or row.get("selection"))
+            market = safe_text(row.get("market_type") or row.get("market"))
+            line = safe_text(row.get("line_point") or row.get("line") or row.get("handicap") or row.get("total"))
             start = safe_text(row.get("event_start_utc") or row.get("event_start_time") or row.get("commence_time"))
-            key = proof_id or "|".join([event.lower(), pick.lower(), start.lower()])
+            key = proof_id or "|".join([event.lower(), pick.lower(), market.lower(), line.lower(), start.lower()])
             if key and key in seen:
                 continue
             if key:
@@ -221,7 +234,16 @@ with tabs[3]:
 with tabs[4]:
     st.subheader(t("local_proof_rows"))
     if rows:
-        df = pd.DataFrame(rows)
+        duplicate_summary = event_duplicate_summary(rows)
+        c1, c2, c3 = st.columns(3)
+        c1.metric(t("events"), duplicate_summary["unique_events"])
+        c2.metric(t("duplicate_events"), duplicate_summary["duplicate_events"])
+        c3.metric(t("duplicate_event_rows"), duplicate_summary["duplicate_event_rows"])
+        show_row_level = st.checkbox(t("show_row_level"), value=False)
+        display_rows = rows if show_row_level else collapse_to_event_rows(rows)
+        label = t("row_level_rows") if show_row_level else t("event_level_rows")
+        st.markdown(f"**{label}**")
+        df = pd.DataFrame(display_rows)
         st.dataframe(localize_dataframe(df, LANG), use_container_width=True)
         st.download_button(t("download_rows"), df.to_csv(index=False).encode("utf-8"), file_name="local_proof_rows.csv", mime="text/csv")
     else:
