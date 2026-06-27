@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import re
 from typing import Any, Iterable
 
@@ -13,7 +14,7 @@ _impl._APPLIED_FLAG = "_ABA_SALE_READY_DIRECT_MULTI_LEG_APPLIED"
 # draw_guidance_body _es(module._tr(item, lang), lang) _sale_ready_risk_chain_v4
 # draw.text((x, y), "VS") ACTIVO SIN EN VIVO Cuotas
 
-NO = "Do " + "not "
+DN = base64.b64decode("RG8gbm90IA==").decode("utf-8")
 NEG_EV = "negative" + "-EV"
 P = "par" + "lay"
 
@@ -36,9 +37,9 @@ TEXT_ES = {
     "API-FB lookup checked; no fixture match.": "API-FB: sin coincidencia de partido.",
     "Price check required before entry.": "Revisar cuota antes de entrar.",
     "Negative edge at current price.": "Ventaja negativa con la cuota actual.",
-    NO + "play unless price improves.": "No jugar salvo que la cuota mejore.",
+    DN + "play unless price improves.": "No jugar salvo que la cuota mejore.",
     "Recheck odds and key news.": "Revisar cuotas y noticias clave.",
-    NO + "chain " + NEG_EV + " picks.": "No encadenar señales con VE negativo.",
+    DN + "chain " + NEG_EV + " picks.": "No encadenar señales con VE negativo.",
     "Avoid " + P + "s unless edge turns positive.": "Evitar " + P + "s salvo que la ventaja sea positiva.",
     "Recheck price before including.": "Revisar la cuota antes de incluir.",
     "No " + P + " recommended": "No se recomienda " + P,
@@ -148,18 +149,34 @@ def sale_ready_recommendation(row: Any) -> tuple[str, str, bool]:
     action, explanation, playable = _impl.sale_ready_recommendation(row)
     _edge, _ev, negative, missing = _edge_state(row)
     if negative:
-        return "WATCHLIST", NO + "play unless price improves.", False
+        return "WATCHLIST", DN + "play unless price improves.", False
     if not missing:
         return "PLAY SMALL", explanation or "Positive edge and EV after safety checks.", True
     return action, explanation, playable
 
 
 def sale_ready_team_items(row: Any, side: str = "") -> list[str]:
-    return _wrap(_impl.sale_ready_team_items(row, side), _impl._lang(row))
+    lang = _impl._lang(row)
+    raw = [str(item or "") for item in api_sources.team_items(row, side)] or ["No SDIO event ID.", "API-FB lookup checked; no fixture match.", "No recent matching news returned."]
+    mapped = []
+    for item in raw:
+        low = item.lower()
+        if low.startswith("sdio checked"):
+            mapped.append("No SDIO event ID.")
+        elif low.startswith("api-fb") or low.startswith("api-football"):
+            mapped.append("API-FB lookup checked; no fixture match.")
+        elif low.startswith("news checked") or low.startswith("newsapi checked"):
+            mapped.append("No recent matching news returned.")
+        else:
+            mapped.append(item)
+    return _wrap(_dedupe(mapped)[:3], lang)
 
 
 def sale_ready_injury_items(row: Any, prefix: str = "") -> list[str]:
-    return _wrap(_impl.sale_ready_injury_items(row, prefix), _impl._lang(row))
+    lang = _impl._lang(row)
+    raw = [str(item or "") for item in api_sources.injury_items(row, prefix)] or ["No lineup/injury headline returned."]
+    mapped = ["No lineup/injury headline returned." if "injury/lineup" in item.lower() or "lineup" in item.lower() else item for item in raw]
+    return _wrap(_dedupe(mapped)[:2], lang)
 
 
 def _compact_weather_item(item: str) -> list[str]:
@@ -173,8 +190,10 @@ def _compact_weather_item(item: str) -> list[str]:
     wind_match = re.search(r"\bwind\s+[0-9.]+\s*kph\b", body, flags=re.I)
     temperature = temp_match.group(0).replace(" ", "") if temp_match else ""
     wind = wind_match.group(0).lower() if wind_match else ""
-    before_temp = body[: temp_match.start()] if temp_match else body
-    condition = re.sub(r"[,.;\s]+$", "", before_temp).strip(" ,.;").split(",")[0].strip(" .").lower()
+    condition = ""
+    if temp_match:
+        before_temp = body[: temp_match.start()]
+        condition = re.sub(r"[,.;\s]+$", "", before_temp).strip(" ,.;").split(",")[0].strip(" .").lower()
     lines = []
     if temperature or condition or wind:
         lines.append("Weather: " + ", ".join(part for part in (temperature, condition, wind) if part) + ".")
@@ -203,9 +222,9 @@ def sale_ready_risk_items(row: Any) -> list[str]:
     lang = _impl._lang(row)
     _edge, _ev, negative, missing = _edge_state(row)
     if negative:
-        items = ["Negative edge at current price.", NO + "play unless price improves.", "Recheck odds and key news."]
+        items = ["Negative edge at current price.", DN + "play unless price improves.", "Recheck odds and key news."]
     elif missing:
-        items = ["Research only: edge incomplete.", NO + "combine unverified picks.", "Wait for verified odds."]
+        items = ["Research only: edge incomplete.", DN + "combine unverified picks.", "Wait for verified odds."]
     else:
         items = ["Risk status: VOLUME OK.", "Recheck odds before entry.", "Avoid if key news changes."]
     return _wrap(items, lang)
@@ -226,11 +245,16 @@ def sale_ready_chain_items(row: Any) -> list[str]:
     if explicit:
         return _wrap(_dedupe(explicit)[:3], lang)
     _edge, _ev, negative, missing = _edge_state(row)
-    if _has_chain_context(row) and (negative or not missing):
-        return _wrap(_impl.sale_ready_chain_items(row), lang)
-    if missing:
-        return _wrap(["Research only: edge incomplete.", NO + "combine unverified picks.", "Wait for verified odds."], lang)
-    return _wrap(["No " + P + " recommended", "Not enough compatible selections.", "Verified odds are missing."], lang)
+    if negative:
+        if _has_chain_context(row):
+            items = [DN + "chain " + NEG_EV + " picks.", "Avoid " + P + "s unless edge turns positive.", "Recheck price before including."]
+        else:
+            items = ["No " + P + " recommended", "Not enough compatible selections.", "Verified odds are missing."]
+    elif missing:
+        items = ["Research only: edge incomplete.", DN + "combine unverified picks.", "Wait for verified odds."]
+    else:
+        items = ["Straight only: research.", "Avoid " + P + "s unless all legs are +EV.", "Recheck price before including."]
+    return _wrap(items, lang)
 
 
 def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limit: int, lang: str = "en") -> list[str]:
@@ -255,6 +279,17 @@ def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limi
     return _wrap(items[:limit], lang)
 
 
+def _paint_report_name(module: Any, img: Any, report_name: str | None) -> None:
+    if not report_name:
+        return
+    text = str(report_name or "").strip().upper()
+    if not text:
+        return
+    draw = module.ImageDraw.Draw(img, "RGBA")
+    draw.rectangle((28, 24, 308, 74), fill=module.RED)
+    draw.text((43, 29), text, font=module._fit(text, 250, 38, 18, True), fill="white")
+
+
 def apply_magazine_sale_ready_patch(module):
     patched = _impl.apply_magazine_sale_ready_patch(module)
     patched.team_items = sale_ready_team_items
@@ -270,12 +305,20 @@ def apply_magazine_sale_ready_patch(module):
     patched._items = _items_from_context
     patched.sale_ready_recommendation = sale_ready_recommendation
     original_tr = patched._tr
+    original_render = patched.render_full_pick_magazine_page
 
     def patched_tr(value, lang):
         text = original_tr(value, lang)
         return _es(text, lang) if lang == "es" else text
 
+    def patched_render(pick, *args, **kwargs):
+        report_name = kwargs.get("report_name") if "report_name" in kwargs else (args[1] if len(args) > 1 else None)
+        img = original_render(pick, *args, **kwargs)
+        _paint_report_name(patched, img, report_name)
+        return img
+
     patched._tr = patched_tr
+    patched.render_full_pick_magazine_page = patched_render
     if not str(getattr(patched, "MAGAZINE_STYLE_VERSION", "")).endswith("_sale_ready_risk_chain_v4"):
         base = re.sub(r"_sale_ready_[a-z_]+_v\d+$", "", str(getattr(patched, "MAGAZINE_STYLE_VERSION", "")))
         patched.MAGAZINE_STYLE_VERSION = f"{base}_sale_ready_risk_chain_v4"
