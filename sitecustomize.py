@@ -50,6 +50,7 @@ def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
         from autonomous_betting_agent.magazine_footer_cleanup import install as install_footer_cleanup
         from autonomous_betting_agent.magazine_headline_safety import install as install_headline_safety
         from autonomous_betting_agent.magazine_live_api_enrichment import install as install_live_api_enrichment
+        from autonomous_betting_agent.magazine_parlay_footer_override import install as install_parlay_footer_override
         from autonomous_betting_agent.magazine_sale_ready_patch import apply_magazine_sale_ready_patch
         from autonomous_betting_agent.spanish_magazine_fixes import install as install_spanish_magazine_fixes
 
@@ -60,6 +61,7 @@ def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
         module = apply_magazine_sale_ready_patch(module)
         module = install_footer_cleanup(module)
         module = install_combo_section(module)
+        module = install_parlay_footer_override(module)
         install_spanish_magazine_fixes()
         return module
     except Exception:
