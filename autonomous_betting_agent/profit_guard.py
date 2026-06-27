@@ -86,7 +86,7 @@ def add_profit_guard(frame: pd.DataFrame) -> pd.DataFrame:
     out['profit_guard_status'] = status
     out['profit_green_ok'] = out['value_color'].eq('GREEN') & price_safety
     out['profit_watchlist_ok'] = out['value_color'].isin({'GREEN', 'YELLOW'}) & price_safety
-    out['profit_volume_safe'] = out['value_color'].isin({'GREEN', 'YELLOW', 'RED'}) & price_safety & _flag(out, 'odds_verified', False)
+    out['profit_volume_safe'] = out['value_color'].isin({'GREEN', 'YELLOW'}) & price_safety & _flag(out, 'odds_verified', False)
     out['profit_balanced_ok'] = out['profit_watchlist_ok'] & _flag(out, 'odds_verified', False)
     out['profit_official_ok'] = out['profit_green_ok'] & _flag(out, 'odds_verified', False)
     out['profit_elite_ok'] = out['profit_green_ok'] & _num(out, 'model_market_edge', -1.0).ge(0.015) & _num(out, 'expected_value_per_unit', -1.0).ge(0.015)
