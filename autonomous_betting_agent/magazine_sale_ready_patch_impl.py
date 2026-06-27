@@ -6,8 +6,9 @@ from typing import Any, Iterable, Mapping
 from autonomous_betting_agent import magazine_api_sources as api_sources
 from autonomous_betting_agent.multi_leg_report import format_items as multi_leg_items
 
-_RENDER_FLAG = "_ABA_SALE_READY_DIRECT_MULTI_LEG_V1"
-_VERSION_SUFFIX = "_sale_ready_direct_multileg_v1"
+_APPLIED_FLAG = "_ABA_SALE_READY_DIRECT_MULTI_LEG_APPLIED"
+_RENDER_FLAG = "_ABA_SALE_READY_DIRECT_MULTI_LEG_V2"
+_VERSION_SUFFIX = "_sale_ready_direct_multileg_v2"
 
 COUNTRY_ES = {
     "france": "Francia",
@@ -38,6 +39,8 @@ TEXT_ES = {
     "Recheck odds and key news.": "Revisar cuotas y noticias clave.",
     "WATCHLIST": "LISTA DE SEGUIMIENTO",
     "RESEARCH ONLY": "SOLO INVESTIGACIÓN",
+    "NO PLAY": "NO JUGAR",
+    "PLAY": "JUGAR",
 }
 
 
@@ -124,10 +127,10 @@ def _edge_state(row: Any) -> tuple[float | None, float | None, bool, bool]:
 def sale_ready_recommendation(row: Any) -> tuple[str, str, bool]:
     _edge, _ev, negative, missing = _edge_state(row)
     if negative:
-        return "WATCHLIST", "Review only if the line improves or new information changes the edge.", False
+        return "WATCHLIST", "", False
     if missing:
-        return "RESEARCH ONLY", "Confirm the line, context, and value before publishing.", False
-    return "PLAY", "Positive value at the listed price. Recheck price and key news before entry.", True
+        return "RESEARCH ONLY", "", False
+    return "PLAY", "", True
 
 
 def _dedupe(items: Iterable[str]) -> list[str]:
@@ -233,6 +236,24 @@ def _paint_footer(module: Any, img: Any, lang: str) -> None:
     draw.text((42, y0 + 10), module._ellipsize_to_width(draw, footer, font, module.PAGE_WIDTH - 90), font=font, fill=module.CREAM)
 
 
+def _paint_final(module: Any, img: Any, row: Any, lang: str) -> None:
+    draw = module.ImageDraw.Draw(img, "RGBA")
+    action, _explanation, playable = sale_ready_recommendation(row)
+    pick_text = module._tr(module._clean(module._pick(row), True), lang).upper()
+    fy, fb = 1374, 1532
+    accent = module.GREEN if playable else (239, 182, 58)
+    side = module.GREEN if playable else module.BLUE
+    outline = module.GREEN if playable else module.RED
+    draw.rounded_rectangle((20, fy, 1060, fb), radius=14, fill=module.BLACK, outline=outline, width=3)
+    draw.rectangle((20, fy, 250, fb), fill=side)
+    draw.text((40, fy + 30), module._tr("FINAL", lang), font=module._font(30, True), fill=module.CREAM)
+    rec = module._tr("RECOMMENDATION", lang)
+    draw.text((40, fy + 76), rec, font=module._fit(rec, 190, 24, 12, True), fill=module.CREAM)
+    action_label = _es(module._tr(action, lang).upper(), lang)
+    module._txt_auto(draw, 284, fy + 24, action_label, 720, 60, 46, 20, accent, True, 1)
+    module._txt_auto(draw, 284, fy + 98, pick_text, 720, 34, 38, 10, module.CREAM, True, 1)
+
+
 def _patch_visuals(module: Any) -> None:
     current = getattr(module, "render_full_pick_magazine_page", None)
     if getattr(current, _RENDER_FLAG, False):
@@ -250,6 +271,7 @@ def _patch_visuals(module: Any) -> None:
             draw.ellipse((736, y + 5, 748, y + 17), fill=module.BLUE)
             module._txt_auto(draw, 756, y, _es(module._tr(item, lang), lang), 280, 30, 15, 11, module.TEXT, False, 2)
             y += 30
+        _paint_final(module, img, pick, lang)
         _paint_footer(module, img, lang)
         return img
 
