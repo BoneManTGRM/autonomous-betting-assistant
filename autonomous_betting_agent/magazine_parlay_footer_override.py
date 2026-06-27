@@ -4,8 +4,8 @@ from typing import Any
 
 from autonomous_betting_agent.multi_leg_report import format_items
 
-_FLAG = "_ABA_PARLAY_FOOTER_OVERRIDE_V2"
-_VERSION_SUFFIX = "_parlay_footer_v2"
+_FLAG = "_ABA_PARLAY_FOOTER_OVERRIDE_V3"
+_VERSION_SUFFIX = "_parlay_footer_v3"
 
 
 def _row(value: Any) -> dict[str, Any]:
@@ -41,7 +41,7 @@ def parlay_review_items(row_value: Any, language: str = "en") -> list[str]:
     return explicit[:3] if explicit else format_items([row], language, 3)
 
 
-def _repaint_footer(module: Any, image: Any, row: dict[str, Any], language: str) -> None:
+def _repaint_footer(module: Any, image: Any, language: str) -> None:
     draw = module.ImageDraw.Draw(image, "RGBA")
     footer_y, footer_b = 1542, 1581
     draw.rectangle((20, footer_y, 1060, footer_b), fill=module.BLACK)
@@ -58,17 +58,9 @@ def _repaint_parlay_box(module: Any, image: Any, row: dict[str, Any], language: 
     module._bullets_auto(draw, x + 24, y + 70, parlay_review_items(row, language), width - 48, height - 88, module.BLUE, 14, 7, 3, language)
 
 
-def _patch_sale_ready_globals() -> None:
-    try:
-        from autonomous_betting_agent import magazine_sale_ready_patch as sale_ready
-    except Exception:
-        return
-
-    def sale_ready_parlay_items(row_value: Any) -> list[str]:
-        row = _row(row_value)
-        return parlay_review_items(row, _lang(row))
-
-    sale_ready.sale_ready_chain_items = sale_ready_parlay_items
+def _set_chain_item_functions(module: Any) -> None:
+    module.chain_items = lambda row: parlay_review_items(row, _lang(_row(row)))
+    module._chain_items = module.chain_items
 
 
 def _bump_style_version(module: Any) -> None:
@@ -77,10 +69,32 @@ def _bump_style_version(module: Any) -> None:
         module.MAGAZINE_STYLE_VERSION = f"{current}{_VERSION_SUFFIX}"
 
 
+def _patch_sale_ready_apply_function() -> None:
+    try:
+        from autonomous_betting_agent import magazine_sale_ready_patch as sale_ready
+    except Exception:
+        return
+    if getattr(sale_ready, "_ABA_SALE_READY_APPLY_RETURNS_PARLAY_FOOTER", False):
+        return
+    original = getattr(sale_ready, "apply_magazine_sale_ready_patch", None)
+    if not callable(original):
+        return
+
+    def wrapped_apply(target_module: Any) -> Any:
+        patched = original(target_module)
+        try:
+            patched = install(patched)
+        except Exception:
+            pass
+        return patched
+
+    sale_ready.apply_magazine_sale_ready_patch = wrapped_apply
+    sale_ready._ABA_SALE_READY_APPLY_RETURNS_PARLAY_FOOTER = True
+
+
 def install(module: Any) -> Any:
-    _patch_sale_ready_globals()
-    module.chain_items = lambda row: parlay_review_items(row, _lang(_row(row)))
-    module._chain_items = module.chain_items
+    _patch_sale_ready_apply_function()
+    _set_chain_item_functions(module)
     if getattr(module, _FLAG, False):
         _bump_style_version(module)
         return module
@@ -93,7 +107,7 @@ def install(module: Any) -> Any:
             language = _lang(row, explicit)
             try:
                 _repaint_parlay_box(module, image, row, language)
-                _repaint_footer(module, image, row, language)
+                _repaint_footer(module, image, language)
             except Exception:
                 pass
             return image
