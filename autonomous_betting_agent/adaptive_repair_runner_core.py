@@ -1,4 +1,9 @@
-"""Core implementation for the Phase 3A Adaptive Repair Runner."""
+"""Core implementation for the Phase 3B Adaptive Repair Runner.
+
+Phase 3B turns Shadow Mode on for counterfactual evaluation only. It still
+forbids live repairs, live pick changes, confidence changes, bet-tier changes,
+bankroll changes, sportsbook changes, and production model mutation.
+"""
 
 from __future__ import annotations
 
@@ -19,16 +24,16 @@ from autonomous_betting_agent.reparodynamics_doctrine import get_reparodynamics_
 from autonomous_betting_agent.security import file_sha256, redact_secret_text, sanitize_filename
 
 SIMULATION_RUNS_DIR = Path("data/adaptive_repair/simulation_runs")
-RUNNER_SCHEMA_VERSION = "adaptive_repair_runner_phase_3a_v2"
+RUNNER_SCHEMA_VERSION = "adaptive_repair_runner_phase_3b_shadow_v1"
 MIN_RYE_SAMPLE_SIZE = 30
 MIN_SHADOW_SAMPLE_SIZE = 30
 MIN_READY_QUALITY_SCORE = 70.0
 
 SAFETY_STATE = {
     "Repair Mode": "OFF",
-    "Shadow Mode": "OFF",
+    "Shadow Mode": "ON",
     "Live Pick Changes": "OFF",
-    "Learning Impact": "Simulation only",
+    "Learning Impact": "Shadow simulation only",
     "TGRM Activation": "OFF",
     "Hidden Value Activation": "OFF",
     "Confidence Calibration Activation": "OFF",
@@ -38,9 +43,10 @@ SAFETY_STATE = {
 
 FALSE_FLAGS = {
     "production_repairs_active": False,
-    "shadow_mode_active": False,
+    "shadow_mode_active": True,
     "live_pick_changes": False,
 }
+SHADOW_FLAGS = FALSE_FLAGS
 
 
 @dataclass
@@ -112,7 +118,7 @@ class AdaptiveRunnerReport:
     activation_gate: dict[str, Any]
     unavailable_data: list[str]
     production_repairs_active: bool = False
-    shadow_mode_active: bool = False
+    shadow_mode_active: bool = True
     live_pick_changes: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -284,6 +290,7 @@ def readiness_report(diagnostics: Mapping[str, Any], unavailable_data: Sequence[
     score = float(quality.get("score", 0.0) or 0.0)
     mixed = int(diagnostics.get("mixed_outcome_events", 0) or 0)
     duplicates = int(base.get("duplicate_event_names", 0) or 0) + int(diagnostics.get("duplicate_rows", 0) or 0)
+
     reasons = []
     if completed < MIN_RYE_SAMPLE_SIZE:
         reasons.append(f"sample size below {MIN_RYE_SAMPLE_SIZE} completed win/loss rows")
@@ -301,6 +308,7 @@ def readiness_report(diagnostics: Mapping[str, Any], unavailable_data: Sequence[
         reasons.append("mixed-event risk present")
     if unavailable_data:
         reasons.extend(str(item) for item in unavailable_data[:5])
+
     shadow_reasons = []
     if completed < MIN_SHADOW_SAMPLE_SIZE:
         shadow_reasons.append(f"sample size below {MIN_SHADOW_SAMPLE_SIZE} completed win/loss rows")
@@ -310,13 +318,15 @@ def readiness_report(diagnostics: Mapping[str, Any], unavailable_data: Sequence[
         shadow_reasons.append("duplicate event/row risk present")
     if mixed:
         shadow_reasons.append("mixed-event risk present")
+
     return {
         "RYE_ready": not reasons,
         "Shadow_Mode_ready": not shadow_reasons,
         "reason_not_ready": reasons if reasons else [],
         "shadow_mode_reason_not_ready": shadow_reasons if shadow_reasons else [],
         "RYE_activation": False,
-        "Shadow_Mode_activation": False,
+        "Shadow_Mode_activation": True,
+        "Shadow_Mode_live_changes": False,
     }
 
 
@@ -339,12 +349,14 @@ def activation_gate_report(diagnostics: Mapping[str, Any], readiness: Mapping[st
         "mixed_event_risk_acceptable": mixed_count == 0,
         "rye_ready": bool(readiness.get("RYE_ready")),
         "shadow_mode_ready": bool(readiness.get("Shadow_Mode_ready")),
+        "shadow_mode_active": True,
         "live_repair_allowed": False,
     }
     return {
-        "gate_status": "CLOSED",
+        "gate_status": "SHADOW_ONLY",
         "repair_activation": "OFF",
-        "reason": "Phase 3A is observation-only. Readiness checks do not activate live behavior.",
+        "shadow_mode_activation": "ON",
+        "reason": "Phase 3B runs Shadow Mode counterfactual evaluation only. Live repairs and live pick changes remain forbidden.",
         "checks": checks,
     }
 
@@ -359,8 +371,10 @@ def _pattern(name: str, pattern_type: str, source: str, sample_size: int, affect
         "affected_scope": affected_scope,
         "evidence_summary": redact_text(evidence),
         "status": "watchlist",
+        "shadow_mode_evaluation": True,
+        "live_activated": False,
         "repair_allowed": False,
-        "reason_no_activation": "Phase 3A is simulation-only/readiness-only. No live repair activation is allowed.",
+        "reason_no_activation": "Phase 3B Shadow Mode evaluates candidates only. No live repair activation is allowed.",
     }
 
 
@@ -396,7 +410,21 @@ def build_runner_report(rows: Sequence[Mapping[str, Any]], *, sources: Sequence[
     timestamp = timestamp or utc_timestamp()
     source_hash = hash_rows(safe_rows)
     run_id = create_run_id(timestamp=timestamp, source_hash=source_hash, total_rows=len(safe_rows), source_count=len(sources))
-    return AdaptiveRunnerReport(run_id=run_id, timestamp=timestamp, schema_version=RUNNER_SCHEMA_VERSION, safety_state=dict(SAFETY_STATE), reparodynamics_doctrine=get_reparodynamics_doctrine(), sources=[source.summary() for source in sources], source_summary=source_summary(sources), diagnostics=diagnostics, pattern_candidates=candidates, readiness=readiness, activation_gate=activation_gate, unavailable_data=list(unavailable), **FALSE_FLAGS)
+    return AdaptiveRunnerReport(
+        run_id=run_id,
+        timestamp=timestamp,
+        schema_version=RUNNER_SCHEMA_VERSION,
+        safety_state=dict(SAFETY_STATE),
+        reparodynamics_doctrine=get_reparodynamics_doctrine(),
+        sources=[source.summary() for source in sources],
+        source_summary=source_summary(sources),
+        diagnostics=diagnostics,
+        pattern_candidates=candidates,
+        readiness=readiness,
+        activation_gate=activation_gate,
+        unavailable_data=list(unavailable),
+        **SHADOW_FLAGS,
+    )
 
 
 def run_adaptive_repair_scan(*, uploaded_rows: Sequence[Mapping[str, Any]] | None = None, uploaded_filename: str = "uploaded_rows.csv", uploaded_bytes: bytes | None = None, include_system_sources: bool = True, data_root: Path = Path("data"), timestamp: str | None = None) -> AdaptiveRunnerReport:
@@ -433,26 +461,26 @@ def runner_report_to_markdown(report: AdaptiveRunnerReport) -> str:
     lines.extend(f"- {key}: {value}" for key, value in data["safety_state"].items())
     lines.extend(["", "## Reparodynamics Doctrine", "", str(doctrine.get("motive", "Reparodynamics is the operating doctrine of measured self-repair.")), ""])
     lines.extend([
-        f"- Doctrine version: {doctrine.get('doctrine_version', 'phase_3a_v1')}",
-        f"- Current phase: {doctrine.get('current_phase', 'Phase 3A')}",
-        f"- Operating mode: {doctrine.get('operating_mode', 'Observation-only')}",
+        f"- Doctrine version: {doctrine.get('doctrine_version', 'reparodynamics_phase_3b_shadow_v1')}",
+        f"- Current phase: {doctrine.get('current_phase', 'Phase 3B')}",
+        f"- Operating mode: {doctrine.get('operating_mode', 'Shadow Mode evaluation')}",
         f"- Repair philosophy: {doctrine.get('repair_philosophy', 'Evidence-gated targeted repair')}",
         f"- Live mutation: {doctrine.get('live_mutation', 'Forbidden')}",
         f"- Repair activation: {doctrine.get('repair_activation', 'OFF')}",
-        f"- Shadow Mode activation: {doctrine.get('shadow_mode_activation', 'OFF')}",
+        f"- Shadow Mode activation: {doctrine.get('shadow_mode_activation', 'ON')}",
         f"- TGRM activation: {doctrine.get('tgrm_activation', 'OFF')}",
         f"- RYE activation: {doctrine.get('rye_activation', 'OFF')}",
-        "- Runner role: system scanner and report generator, not a live repair daemon.",
+        "- Runner role: system scanner and Shadow Mode report generator, not a live repair daemon.",
         "- Page role: dashboard/control panel for review, manual upload, and audit visibility.",
-        "- Watchlist candidates are not production repairs.",
+        "- Watchlist candidates are Shadow Mode evaluations, not production repairs.",
         "- RYE readiness is not RYE activation.",
-        "- Shadow Mode readiness is not Shadow Mode activation.",
+        "- Shadow Mode is counterfactual evaluation only.",
         "- ABA observes first and repairs later.",
-        f"- Final rule: {doctrine.get('final_rule', 'ABA should learn automatically, but repair cautiously.')}",
+        f"- Final rule: {doctrine.get('final_rule', 'ABA may test repairs in Shadow Mode, but live repair remains forbidden.')}",
         "", "## Activation gate", "",
     ])
     gate = data["activation_gate"]
-    lines.extend([f"- Gate status: {gate['gate_status']}", f"- Repair activation: {gate['repair_activation']}", f"- Reason: {gate['reason']}"])
+    lines.extend([f"- Gate status: {gate['gate_status']}", f"- Repair activation: {gate['repair_activation']}", f"- Shadow Mode activation: {gate.get('shadow_mode_activation', 'ON')}", f"- Reason: {gate['reason']}"])
     for key, value in gate.get("checks", {}).items():
         lines.append(f"- {key}: {value}")
     lines.extend(["", "## Source summary", ""])
@@ -466,19 +494,20 @@ def runner_report_to_markdown(report: AdaptiveRunnerReport) -> str:
         f"- Loaded files: {summary.get('loaded_files', 0)}",
         f"- Failed files: {summary.get('failed_files', 0)}",
         f"- Total rows found: {summary['total_rows_found']}",
-        "", "## Phase 0-2 diagnostics", "", diagnostics_to_markdown(diagnostics).strip(), "", "## RYE / Shadow readiness", "",
+        "", "## Phase 0-2 diagnostics", "", diagnostics_to_markdown(diagnostics).strip(), "", "## RYE / Shadow Mode readiness", "",
         f"- RYE_ready: {data['readiness']['RYE_ready']}",
         f"- Shadow_Mode_ready: {data['readiness']['Shadow_Mode_ready']}",
         f"- RYE activation: {data['readiness']['RYE_activation']}",
         f"- Shadow Mode activation: {data['readiness']['Shadow_Mode_activation']}",
+        f"- Shadow Mode live changes: {data['readiness'].get('Shadow_Mode_live_changes', False)}",
         f"- Reasons not ready: {', '.join(data['readiness']['reason_not_ready']) or 'none'}",
-        "", "## Watchlist-only pattern candidates", "",
+        "", "## Shadow-evaluation pattern candidates", "",
     ])
     if data["pattern_candidates"]:
-        lines.extend(f"- {item['candidate_id']} | {item['pattern_name']}: {item['evidence_summary']}" for item in data["pattern_candidates"])
+        lines.extend(f"- {item['candidate_id']} | {item['pattern_name']}: {item['evidence_summary']} | shadow={item.get('shadow_mode_evaluation', False)} | live_activated={item.get('live_activated', False)}" for item in data["pattern_candidates"])
     else:
         lines.append("- none")
-    lines.extend(["", "## Safety conclusion", "", "No live repairs, live confidence changes, live filters, bet-tier changes, bankroll changes, or production model mutations were activated."])
+    lines.extend(["", "## Safety conclusion", "", "Shadow Mode evaluation is ON, but no live repairs, live confidence changes, live filters, bet-tier changes, bankroll changes, sportsbook changes, or production model mutations were activated."])
     return "\n".join(lines) + "\n"
 
 
