@@ -7,8 +7,7 @@ from autonomous_betting_agent import magazine_api_sources as api_sources
 
 _APPLIED_FLAG = "_ABA_SALE_READY_MAGAZINE_PATCHED"
 _RENDER_FLAG = "_ABA_SALE_READY_RENDER_WRAPPED"
-_VERSION_SUFFIX = "_sale_ready_risk_chain_v2"
-
+_VERSION_SUFFIX = "_sale_ready_risk_chain_v3"
 
 SPANISH_VISIBLE_TEXT = {
     "No recent matching Noticias returned.": "Sin noticias recientes relacionadas.",
@@ -241,7 +240,7 @@ def _patch_visuals(module: Any) -> None:
 
     def repaint_final(img: Any, row: Any, lang: str) -> None:
         draw = module.ImageDraw.Draw(img, "RGBA")
-        action, explanation, playable = sale_ready_recommendation(row)
+        action, _explanation, playable = sale_ready_recommendation(row)
         pick_text = module._tr(module._clean(module._pick(row), True), lang).upper()
         fy, fb = 1374, 1532
         accent = module.GREEN if playable else (239, 182, 58)
@@ -253,10 +252,8 @@ def _patch_visuals(module: Any) -> None:
         rec = module._tr("RECOMMENDATION", lang)
         draw.text((40, fy + 76), rec, font=module._fit(rec, 190, 24, 12, True), fill=module.CREAM)
         action_label = _es(module._tr(action, lang).upper(), lang)
-        module._txt_auto(draw, 284, fy + 18, action_label, 420, 56, 52, 20, accent, True, 1)
-        module._txt_auto(draw, 284, fy + 92, pick_text, 420, 34, 38, 10, module.CREAM, True, 1)
-        note = "Revisar si mejora la línea." if lang == "es" else module._tr(explanation, lang)
-        module._txt_auto(draw, 735, fy + 56, _es(note, lang), 300, 64, 20, 13, module.CREAM, False, 2)
+        module._txt_auto(draw, 284, fy + 24, action_label, 500, 60, 52, 20, accent, True, 1)
+        module._txt_auto(draw, 284, fy + 98, pick_text, 500, 34, 38, 10, module.CREAM, True, 1)
 
     def patched_render(pick: Any, *args: Any, **kwargs: Any):
         img = original_render(pick, *args, **kwargs)
