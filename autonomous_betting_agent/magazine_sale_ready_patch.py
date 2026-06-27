@@ -4,7 +4,17 @@ from autonomous_betting_agent import magazine_sale_ready_patch_impl as _impl
 
 _impl._APPLIED_FLAG = "_ABA_SALE_READY_DIRECT_MULTI_LEG_APPLIED"
 
-apply_magazine_sale_ready_patch = _impl.apply_magazine_sale_ready_patch
+
+def apply_magazine_sale_ready_patch(module):
+    patched = _impl.apply_magazine_sale_ready_patch(module)
+    try:
+        from autonomous_betting_agent.positive_ev_bilingual_patches import install
+        install()
+    except Exception:
+        pass
+    return patched
+
+
 sale_ready_chain_items = _impl.sale_ready_chain_items
 sale_ready_team_items = _impl.sale_ready_team_items
 sale_ready_injury_items = _impl.sale_ready_injury_items
