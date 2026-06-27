@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from autonomous_betting_agent.combo_recommendation_guard import combo_guard_items
+from autonomous_betting_agent.multi_leg_report import format_items
 
 _FLAG = "_ABA_MAGAZINE_COMBO_SECTION_PATCHED_V1"
 
@@ -37,7 +37,7 @@ def combo_section_items(row_value: Any) -> list[str]:
         explicit.extend(_split_items(row.get(key)))
     if explicit:
         return explicit[:3]
-    return combo_guard_items([row], _lang(row))[:3]
+    return format_items([row], _lang(row), 3)
 
 
 def install(module: Any) -> Any:
