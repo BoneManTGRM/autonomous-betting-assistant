@@ -10,14 +10,19 @@ def test_runner_schema_activation_gate_and_candidate_ids():
     second = run_adaptive_repair_scan(uploaded_rows=rows, include_system_sources=False, timestamp="2026-06-26T15:01:00Z")
 
     assert first.schema_version == RUNNER_SCHEMA_VERSION
-    assert first.activation_gate["gate_status"] == "CLOSED"
+    assert first.activation_gate["gate_status"] == "SHADOW_ONLY"
     assert first.activation_gate["repair_activation"] == "OFF"
+    assert first.activation_gate["shadow_mode_activation"] == "ON"
+    assert first.activation_gate["checks"]["shadow_mode_active"] is True
     assert first.activation_gate["checks"]["live_repair_allowed"] is False
     assert first.pattern_candidates
     assert all(candidate.get("candidate_id") for candidate in first.pattern_candidates)
+    assert all(candidate.get("shadow_mode_evaluation") is True for candidate in first.pattern_candidates)
+    assert all(candidate.get("live_activated") is False for candidate in first.pattern_candidates)
+    assert all(candidate.get("repair_allowed") is False for candidate in first.pattern_candidates)
     assert [candidate["candidate_id"] for candidate in first.pattern_candidates] == [candidate["candidate_id"] for candidate in second.pattern_candidates]
     assert first.production_repairs_active is False
-    assert first.shadow_mode_active is False
+    assert first.shadow_mode_active is True
     assert first.live_pick_changes is False
 
 
@@ -40,4 +45,5 @@ def test_partial_csv_source_failure_is_reported_without_losing_good_rows(tmp_pat
     assert report.source_summary["loaded_files"] == 1
     assert report.source_summary["failed_files"] == 1
     assert report.production_repairs_active is False
+    assert report.shadow_mode_active is True
     assert report.live_pick_changes is False
