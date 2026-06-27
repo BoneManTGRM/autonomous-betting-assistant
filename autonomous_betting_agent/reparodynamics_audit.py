@@ -26,6 +26,7 @@ REPARODYNAMICS_AUDIT_SCHEMA_VERSION = "reparodynamics_audit_phase_3a_v1"
 REPARODYNAMICS_AUDIT_LOG_PATH = Path("data/adaptive_repair/reparodynamics_audit_log.jsonl")
 REPARODYNAMICS_AUDIT_LATEST_PATH = Path("data/adaptive_repair/reparodynamics_audit_latest.json")
 PHASE_3A_BLOCK_REASON = "Phase 3A observation-only"
+NO_DATA_DRIFT_DISPLAY = "NO DATA"
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,14 @@ class ReparodynamicsAuditEvent:
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
 
+_ROLE_PHRASES = (
+    "phase 3a observation-only",
+    "reparodynamics page observation scan",
+    "learning page graded upload",
+    "no source available",
+)
+
+
 def _to_int(value: Any, default: int = 0) -> int:
     try:
         return int(value or default)
@@ -84,6 +93,11 @@ def _row_event_gap(base_report: Mapping[str, Any]) -> float:
     return abs(_to_float(row_rate) - _to_float(event_rate))
 
 
+def _source_has_data(source: str) -> bool:
+    normalized = str(source or "").strip().lower()
+    return bool(normalized) and normalized not in _ROLE_PHRASES
+
+
 def observation_only_drift_detected(
     diagnostics: Mapping[str, Any],
     *,
@@ -94,9 +108,13 @@ def observation_only_drift_detected(
     """Return whether the observation-only audit sees drift or drift risk.
 
     This is a safety signal only. It does not authorize or apply repairs.
+    A zero-row scan has no evidence, so it must never report real drift.
     """
 
     base = diagnostics.get("base_report", {}) or {}
+    total_rows = _to_int(base.get("total_rows"))
+    if total_rows <= 0:
+        return False
     quality = diagnostics.get("data_quality", {}) or {}
     penalties = quality.get("penalties", []) or []
     mixed_events = _to_int(diagnostics.get("mixed_outcome_events"))
@@ -106,6 +124,8 @@ def observation_only_drift_detected(
 
 def _duplicates_detected(base_report: Mapping[str, Any], diagnostics: Mapping[str, Any]) -> int:
     total_rows = _to_int(base_report.get("total_rows"))
+    if total_rows <= 0:
+        return 0
     event = base_report.get("unique_event_level", {}) or {}
     unique_events = _to_int(event.get("unique_events"))
     row_minus_event = max(total_rows - unique_events, 0)
@@ -129,9 +149,9 @@ def audit_event_from_runner_report(
     doctrine = get_reparodynamics_doctrine()
 
     rows_scanned = _to_int(base.get("total_rows"))
-    unique_events_scanned = _to_int(event.get("unique_events"))
+    unique_events_scanned = _to_int(event.get("unique_events")) if rows_scanned else 0
     duplicates = _duplicates_detected(base, diagnostics)
-    patterns = len(data.get("pattern_candidates", []) or [])
+    patterns = 0 if rows_scanned <= 0 else len(data.get("pattern_candidates", []) or [])
     drift = observation_only_drift_detected(
         diagnostics,
         pattern_count=patterns,
@@ -277,6 +297,7 @@ def latest_reparodynamics_audit_event(
 def audit_event_display_rows(event: ReparodynamicsAuditEvent) -> list[dict[str, str]]:
     """Return the exact rows displayed by the Reparodynamics page."""
 
+    drift_value = NO_DATA_DRIFT_DISPLAY if event.rows_scanned <= 0 else ("YES" if event.drift_detected else "NO")
     return [
         {"field": "Last Reparodynamics Run", "value": event.timestamp},
         {"field": "Source", "value": event.source},
@@ -284,7 +305,7 @@ def audit_event_display_rows(event: ReparodynamicsAuditEvent) -> list[dict[str, 
         {"field": "Unique events scanned", "value": str(event.unique_events_scanned)},
         {"field": "Duplicates detected", "value": str(event.duplicates_detected)},
         {"field": "New patterns detected", "value": str(event.new_patterns_detected)},
-        {"field": "Drift detected", "value": "YES" if event.drift_detected else "NO"},
+        {"field": "Drift detected", "value": drift_value},
         {"field": "Repair candidates generated", "value": str(event.repair_candidates_generated)},
         {"field": "Shadow Mode", "value": event.shadow_mode},
         {"field": "Live Mutation", "value": event.live_mutation},
