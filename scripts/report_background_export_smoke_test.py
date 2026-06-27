@@ -14,6 +14,9 @@ from autonomous_betting_agent.report_background_image_service import (
 from autonomous_betting_agent.report_product_layer import MagazineBrand
 
 
+EXPECTED_SUMMARY_SIZE = (1080, 1620)
+
+
 def _background_bytes() -> bytes:
     image = Image.new("RGB", (900, 1200), (190, 92, 58))
     draw = ImageDraw.Draw(image)
@@ -69,9 +72,10 @@ def run_smoke_test() -> None:
         assert len(payload) > 1000, f"{name} too small: {len(payload)}"
 
     summary = _image(summary_custom)
-    assert summary.size == (1080, 1350), f"unexpected summary size: {summary.size}"
+    assert summary.size == EXPECTED_SUMMARY_SIZE, f"unexpected summary size: {summary.size}"
 
-    points = [(24, 24), (1056, 24), (24, 1326), (1056, 1326)]
+    width, height = summary.size
+    points = [(24, 24), (width - 24, 24), (24, height - 24), (width - 24, height - 24)]
     pixels = [_pixel_rgb(summary_custom, point) for point in points]
     custom_mean = _mean_rgb(summary_custom)
     print({
