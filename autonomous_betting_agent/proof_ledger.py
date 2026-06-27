@@ -87,9 +87,12 @@ def compute_row_hash(row: Mapping[str, Any]) -> str:
 
 
 def prediction_id_for_row(row: Mapping[str, Any]) -> str:
+    # The ledger row hash still includes the timestamp for tamper evidence, but
+    # duplicate detection must stay stable when the same prediction is uploaded
+    # again without an original source timestamp. Therefore the prediction_id is
+    # based on the actual pick identity, not the append time.
     basis = '|'.join([
         _safe_text(row.get('local_user_id')),
-        _safe_text(row.get('prediction_timestamp')),
         _safe_text(row.get('event')),
         _safe_text(row.get('market_type')),
         _safe_text(row.get('prediction')),
