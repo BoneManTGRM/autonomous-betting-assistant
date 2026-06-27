@@ -200,7 +200,7 @@ def sale_ready_chain_items(row: Any) -> list[str]:
     ]
 
 
-def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limit: int) -> list[str]:
+def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limit: int, lang: str = "en") -> list[str]:
     key_tuple = tuple(keys)
     if any(key in key_tuple for key in ("risk", "risk_level", "risk_label", "profit_guard_status", "risk_note", "risk_notes")):
         return sale_ready_risk_items(row)[:limit]
