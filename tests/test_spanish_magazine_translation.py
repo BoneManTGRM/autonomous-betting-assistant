@@ -96,3 +96,25 @@ def test_spanish_weather_matchup_notes_are_readable_and_translated():
     assert "Light rain" not in text
     assert "wind" not in text
     assert "United States of America" not in text
+
+
+def test_tipster_brand_changes_full_magazine_masthead_output():
+    apply_magazine_sale_ready_patch(magazine)
+    row = {
+        "report_language": "es",
+        "event_name": "Haiti vs Morocco",
+        "away_team": "Haiti",
+        "home_team": "Morocco",
+        "report_title": "Análisis Deportivo Diario",
+        "pick": "Game total: Over 2.5",
+        "model_probability": "0.71",
+        "market_probability": "0.73",
+        "model_market_edge": "-0.021",
+        "expected_value_per_unit": "-0.029",
+    }
+
+    aba = magazine.render_full_pick_magazine_page_png(row, report_name="ABA Signal Pro", language="es")
+    los_reyes = magazine.render_full_pick_magazine_page_png(row, report_name="LOS REYES", language="es")
+
+    assert "sale_ready_risk_chain_v4" in magazine.MAGAZINE_STYLE_VERSION
+    assert aba != los_reyes
