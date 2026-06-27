@@ -7,6 +7,35 @@ from autonomous_betting_agent import magazine_api_sources as api_sources
 
 _APPLIED_FLAG = "_ABA_SALE_READY_MAGAZINE_PATCHED"
 _RENDER_FLAG = "_ABA_SALE_READY_RENDER_WRAPPED"
+_VERSION_SUFFIX = "_sale_ready_risk_chain_v2"
+
+
+SPANISH_VISIBLE_TEXT = {
+    "No recent matching Noticias returned.": "Sin noticias recientes relacionadas.",
+    "No recent matching news returned.": "Sin noticias recientes relacionadas.",
+    "No lineup/injury headline returned.": "Sin titular de lesiones/alineación.",
+    "No SDIO event ID.": "Sin ID de evento SDIO.",
+    "No SDIO event ID returned.": "Sin ID de evento SDIO.",
+    "API-FB: no fixture match.": "API-FB: sin coincidencia de partido.",
+    "API-FB lookup checked; no fixture match.": "API-FB: sin coincidencia de partido.",
+    "ACTIVE": "ACTIVO",
+    "ACTIVE:": "ACTIVO:",
+    "ACTIVE APIS": "APIS ACTIVAS",
+    "NO LIVE": "SIN EN VIVO",
+    "NO LIVE:": "SIN EN VIVO:",
+    "Odds": "Cuotas",
+    "ODDS": "CUOTAS",
+    "Price check required before entry.": "Revisar cuota antes de entrar.",
+    "Negative edge at current price.": "Ventaja negativa con la cuota actual.",
+    "Do not play unless price improves.": "No jugar salvo que la cuota mejore.",
+    "Recheck odds and key news.": "Revisar cuotas y noticias clave.",
+    "Do not chain negative-EV picks.": "No encadenar señales con VE negativo.",
+    "Avoid parlays unless edge turns positive.": "Evitar parlays salvo que la ventaja sea positiva.",
+    "Recheck price before including.": "Revisar la cuota antes de incluir.",
+    "Do not play at the listed price. Recheck only if the line improves or new information changes the edge.": "Revisar si mejora la línea.",
+    "WATCHLIST": "LISTA DE SEGUIMIENTO",
+    "RESEARCH ONLY": "SOLO INVESTIGACIÓN",
+}
 
 
 def _row(value: Any) -> Mapping[str, Any]:
@@ -24,6 +53,30 @@ def _get(row: Any, *keys: str, default: str = "") -> str:
         if not _bad(value):
             return str(value).strip()
     return default
+
+
+def _lang(row: Any = None, explicit: str | None = None) -> str:
+    raw = explicit or _get(row, "report_language", "language", "lang", default="")
+    text = str(raw or "").lower()
+    return "es" if text.startswith("es") or "español" in text or "espanol" in text else "en"
+
+
+def _es(text: Any, lang: str) -> str:
+    value = re.sub(r"\s+", " ", str(text or "").strip())
+    if lang != "es" or not value:
+        return value
+    if value in SPANISH_VISIBLE_TEXT:
+        return SPANISH_VISIBLE_TEXT[value]
+    value = re.sub(r"No recent matching\s+(?:Noticias|news)\s+returned\.", "Sin noticias recientes relacionadas.", value, flags=re.I)
+    value = re.sub(r"No lineup/injury headline returned\.", "Sin titular de lesiones/alineación.", value, flags=re.I)
+    value = re.sub(r"No SDIO event ID(?: returned)?\.", "Sin ID de evento SDIO.", value, flags=re.I)
+    value = re.sub(r"API-FB(?: lookup checked;)? no fixture match\.", "API-FB: sin coincidencia de partido.", value, flags=re.I)
+    value = re.sub(r"\bACTIVE\b", "ACTIVO", value)
+    value = re.sub(r"\bNO LIVE\b", "SIN EN VIVO", value)
+    value = re.sub(r"\bOdds\b", "Cuotas", value)
+    for old, new in SPANISH_VISIBLE_TEXT.items():
+        value = value.replace(old, new)
+    return value
 
 
 def _num(row: Any, *keys: str) -> float | None:
@@ -76,16 +129,40 @@ def _dedupe(items: Iterable[str]) -> list[str]:
     return out
 
 
+def _clean_provider_item(text: str) -> str:
+    value = re.sub(r"\s+", " ", str(text or "").strip())
+    low = value.lower()
+    if not value:
+        return ""
+    if low.startswith("sdio checked") or low.startswith("sportsdataio configured"):
+        return "No SDIO event ID."
+    if low.startswith("api-fb lookup checked") or low.startswith("api-football checked") or low.startswith("api-fb lookup only"):
+        return "API-FB: no fixture match."
+    if low.startswith("news checked") or low.startswith("newsapi checked"):
+        if "injury" in low or "lineup" in low:
+            return "No lineup/injury headline returned."
+        return "No recent matching news returned."
+    return value.replace("Pennsylvania, United States of America", "PA, USA")
+
+
 def sale_ready_team_items(row: Any, side: str = "") -> list[str]:
-    return ["No SDIO event ID.", "API-FB: no fixture match.", "No recent matching news returned."][:3]
+    lang = _lang(row)
+    raw = [_clean_provider_item(item) for item in api_sources.team_items(row, side)]
+    if not raw:
+        raw = ["No SDIO event ID.", "API-FB: no fixture match.", "No recent matching news returned."]
+    return [_es(item, lang) for item in _dedupe(raw)[:3]]
 
 
 def sale_ready_injury_items(row: Any, prefix: str = "") -> list[str]:
-    return ["No lineup/injury headline returned."][:2]
+    lang = _lang(row)
+    raw = [_clean_provider_item(item) for item in api_sources.injury_items(row, prefix)] or ["No lineup/injury headline returned."]
+    return [_es(item, lang) for item in _dedupe(raw)[:2]]
 
 
 def sale_ready_matchup_items(row: Any) -> list[str]:
-    return _dedupe(api_sources.matchup_items(row))[:3]
+    lang = _lang(row)
+    raw = [str(item) for item in api_sources.matchup_items(row)]
+    return [_es(item, lang) for item in _dedupe(raw)[:3]]
 
 
 def sale_ready_risk_items(row: Any) -> list[str]:
@@ -108,15 +185,17 @@ def sale_ready_chain_items(row: Any) -> list[str]:
 
 def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limit: int, lang: str = "en") -> list[str]:
     key_tuple = tuple(keys)
-    if any(key in key_tuple for key in ("risk", "risk_level", "risk_label", "profit_guard_status", "risk_note", "risk_notes")):
-        return sale_ready_risk_items(row)[:limit]
-    if any(key in key_tuple for key in ("chain_note", "chain_notes", "parlay_note", "parlay_notes", "combo_note")):
-        return sale_ready_chain_items(row)[:limit]
-    if "matchup_note" in key_tuple or "sports_context_summary" in key_tuple or "weather_summary" in key_tuple:
-        return sale_ready_matchup_items(row)[:limit]
-    if "injury_report" in key_tuple or "lineup_status" in key_tuple or "key_players" in key_tuple:
-        return sale_ready_injury_items(row, "away")[:limit]
-    return sale_ready_team_items(row)[:limit]
+    if any(key in key_tuple for key in ("risk", "risk_level", "risk_label", "profit_guard_status", "risk_note", "risk_notes", "why_lose", "hidden_risk")):
+        items = sale_ready_risk_items(row)
+    elif any(key in key_tuple for key in ("chain_note", "chain_notes", "parlay_note", "parlay_notes", "combo_note", "main_read", "add_on_legs")):
+        items = sale_ready_chain_items(row)
+    elif "matchup_note" in key_tuple or "sports_context_summary" in key_tuple or "weather_summary" in key_tuple:
+        items = sale_ready_matchup_items(row)
+    elif "injury_report" in key_tuple or "lineup_status" in key_tuple or "key_players" in key_tuple:
+        items = sale_ready_injury_items(row, "away")
+    else:
+        items = sale_ready_team_items(row)
+    return [_es(item, lang) for item in items[:limit]]
 
 
 def _patch_visuals(module: Any) -> None:
@@ -125,19 +204,40 @@ def _patch_visuals(module: Any) -> None:
         return
     original_render = current_render
 
+    def repaint_vs_badge(draw: Any) -> None:
+        box = module.VS_BADGE_BOX
+        draw.rectangle((box[0] - 6, box[1] - 6, box[2] + 8, box[3] + 6), fill=module.PAPER)
+        draw.rounded_rectangle(box, radius=12, fill=module.BLACK, outline=module.CREAM, width=2)
+        font = module._fit("VS", box[2] - box[0] - 12, 34, 14, True)
+        tbox = draw.textbbox((0, 0), "VS", font=font)
+        x = box[0] + ((box[2] - box[0]) - (tbox[2] - tbox[0])) / 2
+        y = box[1] + ((box[3] - box[1]) - (tbox[3] - tbox[1])) / 2 - 2
+        draw.text((x, y), "VS", font=font, fill=module.CREAM)
+
     def draw_guidance_body(draw: Any, box: tuple[int, int, int, int], items: list[str], color: Any, lang: str) -> None:
         draw.rectangle(box, fill=module.CREAM)
         y = box[1] + 10
         for item in items[:3]:
             draw.ellipse((box[0] + 12, y + 5, box[0] + 24, y + 17), fill=color)
-            module._txt_auto(draw, box[0] + 32, y, module._tr(item, lang), box[2] - box[0] - 46, 30, 15, 11, module.TEXT, False, 2)
+            module._txt_auto(draw, box[0] + 32, y, _es(module._tr(item, lang), lang), box[2] - box[0] - 46, 30, 15, 11, module.TEXT, False, 2)
             y += 30
 
-    def repaint_evidence_strip(draw: Any, lang: str) -> None:
+    def repaint_evidence_body(draw: Any, row: Any, lang: str) -> None:
         left_x, left_w = 20, 320
-        draw.rectangle((left_x + 8, 1088, left_x + left_w - 8, 1120), fill=module.CREAM)
+        draw.rectangle((left_x + 8, 970, left_x + left_w - 8, 1120), fill=module.CREAM)
+        entries = [
+            ("FILA DE MOMIO", _es(_get(row, "odds_source", "data_source", default="fila cargada/en caché"), lang)),
+            ("CASA", _es(_get(row, "bookmaker", "sportsbook", default="promedio consenso"), lang)),
+            ("ACTIVO", "SDIO · Clima · API-FB · Noticias"),
+            ("SIN EN VIVO", "Cuotas"),
+        ]
+        y = 974
+        for label, value in entries:
+            draw.text((left_x + 24, y), f"{label}:", font=module._fit(f"{label}:", 92, 16, 7, True), fill=module.BLACK)
+            module._txt_auto(draw, left_x + 122, y, value, left_w - 138, 22, 16, 7, module.BLACK, True, 1)
+            y += 29
         draw.line((left_x + 12, 1088, left_x + left_w - 12, 1088), fill=module.BLACK + (135,), width=1)
-        module._txt_auto(draw, left_x + 22, 1094, module._tr("Price check required before entry.", lang), left_w - 44, 22, 13, 9, module.BLACK, True, 1)
+        module._txt_auto(draw, left_x + 22, 1094, _es("Price check required before entry.", lang), left_w - 44, 22, 14, 9, module.BLACK, True, 1)
 
     def repaint_final(img: Any, row: Any, lang: str) -> None:
         draw = module.ImageDraw.Draw(img, "RGBA")
@@ -152,18 +252,18 @@ def _patch_visuals(module: Any) -> None:
         draw.text((40, fy + 30), module._tr("FINAL", lang), font=module._font(30, True), fill=module.CREAM)
         rec = module._tr("RECOMMENDATION", lang)
         draw.text((40, fy + 76), rec, font=module._fit(rec, 190, 24, 12, True), fill=module.CREAM)
-        draw.text((284, fy + 18), module._tr(action, lang).upper(), font=module._fit(action.upper(), 340, 58, 18, True), fill=accent)
-        module._txt_auto(draw, 284, fy + 92, pick_text, 360, 34, 40, 10, module.CREAM, True, 1)
-        if lang == "es":
-            module._txt_auto(draw, 720, fy + 112, "Revisar si mejora la línea.", 300, 32, 15, 8, module.CREAM, False, 1)
-        else:
-            module._txt_auto(draw, 670, fy + 36, module._tr(explanation, lang), 340, 88, 19, 10, module.CREAM, False, None)
+        action_label = _es(module._tr(action, lang).upper(), lang)
+        module._txt_auto(draw, 284, fy + 18, action_label, 420, 56, 52, 20, accent, True, 1)
+        module._txt_auto(draw, 284, fy + 92, pick_text, 420, 34, 38, 10, module.CREAM, True, 1)
+        note = "Revisar si mejora la línea." if lang == "es" else module._tr(explanation, lang)
+        module._txt_auto(draw, 735, fy + 56, _es(note, lang), 300, 64, 20, 13, module.CREAM, False, 2)
 
     def patched_render(pick: Any, *args: Any, **kwargs: Any):
         img = original_render(pick, *args, **kwargs)
         lang = module._lang(pick, kwargs.get("language") if "language" in kwargs else (args[10] if len(args) >= 11 else None))
         draw = module.ImageDraw.Draw(img, "RGBA")
-        repaint_evidence_strip(draw, lang)
+        repaint_vs_badge(draw)
+        repaint_evidence_body(draw, pick, lang)
         draw_guidance_body(draw, (34, 1234, 326, 1348), sale_ready_risk_items(pick), module.RED, lang)
         draw_guidance_body(draw, (724, 1234, 1050, 1348), sale_ready_chain_items(pick), module.BLUE, lang)
         repaint_final(img, pick, lang)
@@ -193,7 +293,7 @@ def apply_magazine_sale_ready_patch(module: Any) -> Any:
     module._items = _items_from_context
     module.sale_ready_recommendation = sale_ready_recommendation
     _patch_visuals(module)
-    if not str(getattr(module, "MAGAZINE_STYLE_VERSION", "")).endswith("_sale_ready_risk_chain_v1"):
-        module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_sale_ready_risk_chain_v1"
+    base_version = re.sub(r"_sale_ready_risk_chain_v\d+$", "", str(getattr(module, "MAGAZINE_STYLE_VERSION", "")))
+    module.MAGAZINE_STYLE_VERSION = f"{base_version}{_VERSION_SUFFIX}"
     setattr(module, _APPLIED_FLAG, True)
     return module
