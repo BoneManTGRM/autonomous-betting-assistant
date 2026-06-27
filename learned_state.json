@@ -1,13 +1,13 @@
 {
-  "accuracy_after": 0.7545454545454545,
-  "accuracy_before": 0.7545454545454545,
-  "brier_after": 0.19028604545454536,
-  "brier_before": 0.19028604545454536,
+  "accuracy_after": 0.7478991596638656,
+  "accuracy_before": 0.7478991596638656,
+  "brier_after": 0.19278542016806707,
+  "brier_before": 0.19278542016806707,
   "calibration_strength": 0.0,
-  "events_trained": 110,
+  "events_trained": 119,
   "intercept": 0.0,
-  "log_loss_after": 0.5692117958099555,
-  "log_loss_before": 0.5692117958099555,
+  "log_loss_after": 0.574498030384078,
+  "log_loss_before": 0.574498030384078,
   "notes": [
     "Learns probability calibration from graded historical predictions.",
     "Uses sample-size shrinkage to reduce overfitting on small datasets.",
@@ -15,11 +15,11 @@
     "This does not prove betting profitability; use untouched forward tests before making performance claims."
   ],
   "slope": 1.0,
-  "source": "auto_learning_cycle_all_lists:test_01",
-  "trained_at_utc": "2026-06-25T14:22:01+00:00",
+  "source": "High_confidence_2_checked_new_games_2026-06-20_no_tennis_updates_2026-06-26.csv",
+  "trained_at_utc": "2026-06-27T23:19:18+00:00",
   "training_strategy": "cross_validated_logistic_calibration_l2=0.03_identity_fallback",
-  "validation_brier_after": 0.19493895724338708,
-  "validation_brier_before": 0.19028604545454542,
-  "validation_log_loss_after": 0.5834279519742082,
-  "validation_log_loss_before": 0.5692117958099551
+  "validation_brier_after": 0.1985283970450809,
+  "validation_brier_before": 0.19278542016806718,
+  "validation_log_loss_after": 0.5910399167084345,
+  "validation_log_loss_before": 0.5744980303840778
 }
