@@ -46,6 +46,7 @@ def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
     try:
         from autonomous_betting_agent.magazine_api_sources import apply_magazine_api_patch
         from autonomous_betting_agent.magazine_auto_sizer import apply_magazine_auto_sizer
+        from autonomous_betting_agent.magazine_combo_section_patch import install as install_combo_section
         from autonomous_betting_agent.magazine_footer_cleanup import install as install_footer_cleanup
         from autonomous_betting_agent.magazine_headline_safety import install as install_headline_safety
         from autonomous_betting_agent.magazine_live_api_enrichment import install as install_live_api_enrichment
@@ -58,6 +59,7 @@ def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
         module = install_headline_safety(module)
         module = apply_magazine_sale_ready_patch(module)
         module = install_footer_cleanup(module)
+        module = install_combo_section(module)
         install_spanish_magazine_fixes()
         return module
     except Exception:
