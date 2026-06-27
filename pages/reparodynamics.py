@@ -28,20 +28,20 @@ TEXT = {
         "motive": "Doctrine motive",
         "principles": "Repair principles",
         "safety": "Safety principles",
-        "forbidden": "Forbidden in Phase 3A",
+        "forbidden": "Forbidden in Phase 3B",
         "status": "Activation status",
         "audit": "Reparodynamics Audit Log",
-        "controls": "Observation-only scan controls",
+        "controls": "Shadow Mode scan controls",
         "include_system": "Include available local system sources",
         "upload": "Optional graded CSV for this Reparodynamics scan",
-        "upload_loaded": "Loaded uploaded rows for observation scan.",
-        "run_now": "Run Phase 3A observation scan now",
-        "run_success": "Reparodynamics observation scan completed and audit event written.",
+        "upload_loaded": "Loaded uploaded rows for Shadow Mode scan.",
+        "run_now": "Run Phase 3B Shadow Mode scan now",
+        "run_success": "Reparodynamics Shadow Mode scan completed and audit event written.",
         "scan_summary": "Latest scan summary",
         "no_run": "No run recorded yet.",
-        "phase3a_explanation": "Phase 3A does not improve picks directly. It observes graded results, detects drift, finds duplicate-event issues, and prepares repair candidates for later Shadow Mode testing. No live model changes are allowed in this phase.",
+        "phase3b_explanation": "Phase 3B evaluates repairs in Shadow Mode only. It scans graded results, detects real drift, finds duplicate-event issues, and creates counterfactual repair candidates without changing live picks, confidence, bankroll, sportsbook recommendations, filters, or model behavior.",
         "final": "Final rule",
-        "warning": "This page can now run a real observation-only scan and write an audit event. It still does not activate live repairs, Shadow Mode, TGRM, RYE scoring, confidence changes, bet-tier changes, bankroll changes, sportsbook changes, filters, or model mutation.",
+        "warning": "This page can run a real Shadow Mode scan and write an audit event. Shadow Mode is ON for counterfactual evaluation only. Live repairs, TGRM activation, RYE activation, confidence changes, bet-tier changes, bankroll changes, sportsbook changes, filters, and model mutation remain blocked.",
     },
     "es": {
         "title": "Reparodynamics",
@@ -55,34 +55,40 @@ TEXT = {
         "motive": "Motivo de la doctrina",
         "principles": "Principios de reparación",
         "safety": "Principios de seguridad",
-        "forbidden": "Prohibido en Fase 3A",
+        "forbidden": "Prohibido en Fase 3B",
         "status": "Estado de activación",
         "audit": "Registro de Auditoría Reparodynamics",
-        "controls": "Controles de escaneo solo observación",
+        "controls": "Controles de escaneo Shadow Mode",
         "include_system": "Incluir fuentes locales disponibles del sistema",
         "upload": "CSV calificado opcional para este escaneo Reparodynamics",
-        "upload_loaded": "Filas subidas cargadas para escaneo de observación.",
-        "run_now": "Ejecutar escaneo de observación Fase 3A ahora",
-        "run_success": "Escaneo de observación Reparodynamics completado y evento de auditoría escrito.",
+        "upload_loaded": "Filas subidas cargadas para escaneo Shadow Mode.",
+        "run_now": "Ejecutar escaneo Shadow Mode Fase 3B ahora",
+        "run_success": "Escaneo Shadow Mode Reparodynamics completado y evento de auditoría escrito.",
         "scan_summary": "Resumen del último escaneo",
         "no_run": "Todavía no hay ejecución registrada.",
-        "phase3a_explanation": "La Fase 3A no mejora picks directamente. Observa resultados calificados, detecta deriva, encuentra problemas de eventos duplicados y prepara candidatos de reparación para pruebas posteriores en Shadow Mode. No se permiten cambios al modelo en vivo en esta fase.",
+        "phase3b_explanation": "La Fase 3B evalúa reparaciones solo en Shadow Mode. Escanea resultados calificados, detecta deriva real, encuentra problemas de eventos duplicados y crea candidatos contrafactuales sin cambiar picks en vivo, confianza, bankroll, recomendaciones de sportsbook, filtros ni comportamiento del modelo.",
         "final": "Regla final",
-        "warning": "Esta página ahora puede ejecutar un escaneo real solo de observación y escribir un evento de auditoría. Todavía no activa reparaciones en vivo, Shadow Mode, TGRM, puntuación RYE, cambios de confianza, niveles de apuesta, bankroll, sportsbook, filtros ni mutación del modelo.",
+        "warning": "Esta página puede ejecutar un escaneo real en Shadow Mode y escribir un evento de auditoría. Shadow Mode está ON solo para evaluación contrafactual. Reparaciones en vivo, activación TGRM, activación RYE, cambios de confianza, niveles de apuesta, bankroll, sportsbook, filtros y mutación del modelo siguen bloqueados.",
     },
 }
 
 ES_VALUE_MAP = {
     "Phase 3A": "Fase 3A",
+    "Phase 3B": "Fase 3B",
     "Observation-only": "Solo observación",
+    "Shadow Mode evaluation": "Evaluación Shadow Mode",
     "Evidence-gated targeted repair": "Reparación dirigida con control de evidencia",
     "Forbidden": "Prohibido",
     "FORBIDDEN": "PROHIBIDO",
     "OFF": "APAGADO",
+    "ON": "ENCENDIDO",
     "YES": "SÍ",
     "NO": "NO",
+    "NO DATA": "SIN DATOS",
     "Phase 3A observation-only": "Fase 3A solo observación",
+    "Phase 3B Shadow Mode; live mutation forbidden": "Fase 3B Shadow Mode; mutación en vivo prohibida",
     "ABA should learn automatically, but repair cautiously.": "ABA debe aprender automáticamente, pero reparar con cautela.",
+    "ABA may test repairs in Shadow Mode, but live repair remains forbidden.": "ABA puede probar reparaciones en Shadow Mode, pero la reparación en vivo sigue prohibida.",
 }
 
 ES_LIST_MAP = {
@@ -90,21 +96,20 @@ ES_LIST_MAP = {
     "Diagnose drift before proposing any repair.": "Diagnosticar deriva antes de proponer cualquier reparación.",
     "Prefer targeted repair over blind retraining.": "Preferir reparación dirigida en vez de reentrenamiento ciego.",
     "Conserve repair energy by changing only what evidence supports.": "Conservar energía de reparación cambiando solo lo que la evidencia respalda.",
-    "Keep pattern candidates watchlist-only until controlled evidence supports promotion.": "Mantener candidatos de patrón solo en watchlist hasta que evidencia controlada respalde su promoción.",
-    "Treat RYE readiness as readiness only, not activation.": "Tratar la preparación RYE solo como preparación, no como activación.",
-    "Treat Shadow Mode readiness as readiness only, not activation.": "Tratar la preparación de Shadow Mode solo como preparación, no como activación.",
-    "Phase 3A is observation-only.": "La Fase 3A es solo observación.",
-    "Learning means observation, diagnostics, watchlist candidates, readiness checks, and saved reports only.": "Aprendizaje significa solo observación, diagnósticos, candidatos en watchlist, revisiones de preparación y reportes guardados.",
-    "No repair activates during Phase 3A.": "Ninguna reparación se activa durante Phase 3A.",
+    "Evaluate pattern candidates in Shadow Mode before promotion.": "Evaluar candidatos de patrón en Shadow Mode antes de promoción.",
+    "Treat RYE readiness as readiness only, not live activation.": "Tratar la preparación RYE solo como preparación, no como activación en vivo.",
+    "Treat Shadow Mode as counterfactual evaluation only.": "Tratar Shadow Mode solo como evaluación contrafactual.",
+    "Phase 3B enables Shadow Mode evaluation only.": "La Fase 3B habilita solo evaluación Shadow Mode.",
+    "Learning means observation, diagnostics, shadow evaluation, readiness checks, and saved reports only.": "Aprendizaje significa solo observación, diagnósticos, evaluación shadow, revisiones de preparación y reportes guardados.",
+    "No live repair activates during Phase 3B.": "Ninguna reparación en vivo se activa durante la Fase 3B.",
     "No repair survives without proof.": "Ninguna reparación sobrevive sin prueba.",
     "The system does not chase losses.": "El sistema no persigue pérdidas.",
     "The system does not panic after variance.": "El sistema no entra en pánico después de la varianza.",
     "The system does not blindly retrain.": "El sistema no se reentrena a ciegas.",
     "The system does not inflate confidence.": "El sistema no infla la confianza.",
     "live repairs": "reparaciones en vivo",
-    "Shadow Mode activation": "activación de Shadow Mode",
     "TGRM repair activation": "activación de reparación TGRM",
-    "full RYE repair scoring": "puntuación completa de reparación RYE",
+    "full RYE repair activation": "activación completa de reparación RYE",
     "Hidden Value Score activation": "activación de Hidden Value Score",
     "confidence calibration activation": "activación de calibración de confianza",
     "live pick filtering": "filtrado de picks en vivo",
@@ -193,7 +198,7 @@ if st.button(t("run_now"), type="primary"):
         uploaded_bytes=uploaded_bytes,
         include_system_sources=include_system,
     )
-    audit_event = write_reparodynamics_audit_event_from_runner_report(report, source="Reparodynamics page observation scan")
+    audit_event = write_reparodynamics_audit_event_from_runner_report(report, source="Reparodynamics page Shadow Mode scan")
     st.success(t("run_success"))
     with st.expander(t("scan_summary"), expanded=True):
         st.json({
@@ -210,7 +215,7 @@ else:
     audit_event = latest_reparodynamics_audit_event()
 
 st.subheader(t("audit"))
-st.info(t("phase3a_explanation"))
+st.info(t("phase3b_explanation"))
 if audit_event is None:
     st.info(t("no_run"))
 else:
@@ -222,7 +227,7 @@ else:
 
 st.subheader(t("motive"))
 if LANG == "es":
-    st.write("Reparodynamics es la doctrina operativa de autorreparación medida. ABA observa primero, diagnostica con cuidado, preserva la integridad de los datos, conserva energía de reparación y repara solo después de que evidencia controlada demuestre que un cambio dirigido mejora el rendimiento medible sin aumentar riesgo oculto.")
+    st.write("Reparodynamics es la doctrina operativa de autorreparación medida. ABA observa primero, diagnostica con cuidado, preserva la integridad de los datos, conserva energía de reparación y evalúa candidatos en Shadow Mode antes de cualquier aprobación manual. La reparación en vivo sigue prohibida.")
 else:
     st.write(doctrine.get("motive", ""))
 
