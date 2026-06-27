@@ -20,10 +20,12 @@ def test_report_studio_imports_api_enrichment_helpers() -> None:
 def test_cards_as_rows_are_enriched_before_book_rendering() -> None:
     text = _source()
     enrich_pos = text.index("cards_as_rows = enrich_rows_with_live_api_data")
-    book_png_pos = text.index("render_full_magazine_book_png(cards_as_rows")
-    book_pdf_pos = text.index("render_full_magazine_book_pdf(cards_as_rows")
-    book_zip_pos = text.index("render_full_magazine_zip(cards_as_rows")
-    assert enrich_pos < book_png_pos < book_pdf_pos < book_zip_pos
+    tab_pdf_pos = text.index("magazine_pdf_bytes = magazine_book_export.render_full_magazine_book_pdf")
+    book_cache_pos = text.index("st.session_state[book_cache_key] = {")
+    book_png_pos = text.index("render_full_magazine_book_png(cards_as_rows", book_cache_pos)
+    book_pdf_pos = text.index("render_full_magazine_book_pdf(cards_as_rows", book_cache_pos)
+    book_zip_pos = text.index("render_full_magazine_zip(cards_as_rows", book_cache_pos)
+    assert enrich_pos < tab_pdf_pos < book_cache_pos < book_png_pos < book_pdf_pos < book_zip_pos
 
 
 def test_selected_page_uses_enriched_rows_and_cache_version() -> None:

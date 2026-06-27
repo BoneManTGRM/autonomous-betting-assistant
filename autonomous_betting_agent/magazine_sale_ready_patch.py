@@ -6,8 +6,62 @@ from typing import Any, Iterable, Mapping
 from autonomous_betting_agent import magazine_api_sources as api_sources
 
 _APPLIED_FLAG = "_ABA_SALE_READY_MAGAZINE_PATCHED"
-_RENDER_FLAG = "_ABA_SALE_READY_RENDER_WRAPPED"
-_VERSION_SUFFIX = "_sale_ready_risk_chain_v3"
+_RENDER_FLAG = "_ABA_SALE_READY_RENDER_WRAPPED_V4"
+_TRANSLATION_FLAG = "_ABA_SPANISH_COUNTRY_TRANSLATION_PATCHED"
+_VERSION_SUFFIX = "_sale_ready_risk_chain_v4"
+
+PROTECTED_BRANDS = (
+    "The Odds API",
+    "Odds API",
+    "SportsDataIO",
+    "WeatherAPI",
+    "API-Football",
+    "NewsAPI",
+    "Perplexity",
+    "Playdoit",
+    "Caliente",
+    "Codere",
+)
+
+COUNTRY_ES = {
+    "albania": "Albania", "algeria": "Argelia", "angola": "Angola", "argentina": "Argentina",
+    "australia": "Australia", "austria": "Austria", "belgium": "Bélgica", "bolivia": "Bolivia",
+    "brazil": "Brasil", "bulgaria": "Bulgaria", "cameroon": "Camerún", "canada": "Canadá",
+    "chile": "Chile", "china": "China", "colombia": "Colombia", "costa rica": "Costa Rica",
+    "croatia": "Croacia", "curacao": "Curazao", "curaçao": "Curazao",
+    "czech republic": "República Checa", "czechia": "Chequia", "denmark": "Dinamarca",
+    "dominican republic": "República Dominicana", "ecuador": "Ecuador", "egypt": "Egipto",
+    "england": "Inglaterra", "finland": "Finlandia", "france": "Francia", "germany": "Alemania",
+    "ghana": "Ghana", "greece": "Grecia", "haiti": "Haití", "holland": "Países Bajos",
+    "honduras": "Honduras", "hungary": "Hungría", "iceland": "Islandia", "iran": "Irán",
+    "iraq": "Irak", "ireland": "Irlanda", "israel": "Israel", "italy": "Italia",
+    "ivory coast": "Costa de Marfil", "cote d'ivoire": "Costa de Marfil", "côte d'ivoire": "Costa de Marfil",
+    "jamaica": "Jamaica", "japan": "Japón", "jordan": "Jordania", "korea republic": "Corea del Sur",
+    "mexico": "México", "morocco": "Marruecos", "netherlands": "Países Bajos", "new zealand": "Nueva Zelanda",
+    "nigeria": "Nigeria", "northern ireland": "Irlanda del Norte", "norway": "Noruega", "panama": "Panamá",
+    "paraguay": "Paraguay", "peru": "Perú", "poland": "Polonia", "portugal": "Portugal",
+    "qatar": "Qatar", "romania": "Rumanía", "russia": "Rusia", "saudi arabia": "Arabia Saudita",
+    "scotland": "Escocia", "senegal": "Senegal", "serbia": "Serbia", "slovakia": "Eslovaquia",
+    "slovenia": "Eslovenia", "south africa": "Sudáfrica", "south korea": "Corea del Sur",
+    "spain": "España", "sweden": "Suecia", "switzerland": "Suiza", "tunisia": "Túnez",
+    "turkey": "Turquía", "uae": "Emiratos Árabes Unidos", "ukraine": "Ucrania",
+    "united arab emirates": "Emiratos Árabes Unidos", "united states": "Estados Unidos",
+    "united states of america": "Estados Unidos", "uruguay": "Uruguay", "usa": "Estados Unidos",
+    "uzbekistan": "Uzbekistán", "wales": "Gales",
+}
+
+WEATHER_ES = (
+    ("Moderate or heavy rain with thunder", "lluvia y tormenta"),
+    ("moderate or heavy rain with thunder", "lluvia y tormenta"),
+    ("Patchy rain nearby", "lluvia cercana"), ("patchy rain nearby", "lluvia cercana"),
+    ("Partly cloudy", "parcialmente nublado"), ("partly cloudy", "parcialmente nublado"),
+    ("Light rain", "lluvia ligera"), ("light rain", "lluvia ligera"),
+    ("Overcast", "nublado"), ("overcast", "nublado"), ("Sunny", "soleado"),
+    ("sunny", "soleado"), ("Clear", "despejado"), ("clear", "despejado"),
+    ("Mist", "neblina"), ("mist", "neblina"), ("Weather:", "Clima:"),
+    ("Location:", "Ubicación:"), ("weather checked", "clima revisado"),
+    ("wind", "viento"), ("Pennsylvania", "Pensilvania"),
+)
 
 SPANISH_VISIBLE_TEXT = {
     "No recent matching Noticias returned.": "Sin noticias recientes relacionadas.",
@@ -17,13 +71,8 @@ SPANISH_VISIBLE_TEXT = {
     "No SDIO event ID returned.": "Sin ID de evento SDIO.",
     "API-FB: no fixture match.": "API-FB: sin coincidencia de partido.",
     "API-FB lookup checked; no fixture match.": "API-FB: sin coincidencia de partido.",
-    "ACTIVE": "ACTIVO",
-    "ACTIVE:": "ACTIVO:",
-    "ACTIVE APIS": "APIS ACTIVAS",
-    "NO LIVE": "SIN EN VIVO",
-    "NO LIVE:": "SIN EN VIVO:",
-    "Odds": "Cuotas",
-    "ODDS": "CUOTAS",
+    "ACTIVE": "ACTIVO", "ACTIVE:": "ACTIVO:", "ACTIVE APIS": "APIS ACTIVAS",
+    "NO LIVE": "SIN EN VIVO", "NO LIVE:": "SIN EN VIVO:", "Odds": "Cuotas", "ODDS": "CUOTAS",
     "Price check required before entry.": "Revisar cuota antes de entrar.",
     "Negative edge at current price.": "Ventaja negativa con la cuota actual.",
     "Do not play unless price improves.": "No jugar salvo que la cuota mejore.",
@@ -32,13 +81,24 @@ SPANISH_VISIBLE_TEXT = {
     "Avoid parlays unless edge turns positive.": "Evitar parlays salvo que la ventaja sea positiva.",
     "Recheck price before including.": "Revisar la cuota antes de incluir.",
     "Do not play at the listed price. Recheck only if the line improves or new information changes the edge.": "Revisar si mejora la línea.",
-    "WATCHLIST": "LISTA DE SEGUIMIENTO",
-    "RESEARCH ONLY": "SOLO INVESTIGACIÓN",
+    "WATCHLIST": "LISTA DE SEGUIMIENTO", "RESEARCH ONLY": "SOLO INVESTIGACIÓN",
 }
 
 
 def _row(value: Any) -> Mapping[str, Any]:
     return api_sources._row(value)
+
+
+def _split(value: Any) -> list[str]:
+    splitter = getattr(api_sources, "_split", None)
+    if callable(splitter):
+        try:
+            return splitter(value)
+        except Exception:
+            pass
+    if _bad(value):
+        return []
+    return [p.strip(" -•") for p in str(value).replace("•", "\n").replace(";", "\n").replace("|", "\n").splitlines() if p.strip(" -•")]
 
 
 def _bad(value: Any) -> bool:
@@ -60,22 +120,82 @@ def _lang(row: Any = None, explicit: str | None = None) -> str:
     return "es" if text.startswith("es") or "español" in text or "espanol" in text else "en"
 
 
+def _normalize_country_key(value: Any) -> str:
+    text = str(value or "").replace("’", "'").replace("`", "'").strip()
+    return re.sub(r"\s+", " ", text).casefold()
+
+
+def translate_country_name(value: Any, lang: str = "es") -> str:
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    if lang != "es" or not text:
+        return text
+    return COUNTRY_ES.get(_normalize_country_key(text), text)
+
+
+def translate_team_label(value: Any, lang: str = "es") -> str:
+    return translate_country_name(value, lang)
+
+
+def _protect_brands(value: str) -> tuple[str, dict[str, str]]:
+    protected: dict[str, str] = {}
+    text = value.replace("The Cuotas API", "The Odds API").replace("Cuotas API", "Odds API")
+    for brand in sorted(PROTECTED_BRANDS, key=len, reverse=True):
+        pattern = re.compile(re.escape(brand), flags=re.I)
+
+        def repl(match: re.Match[str]) -> str:
+            token = f"__ABA_BRAND_{len(protected)}__"
+            protected[token] = match.group(0)
+            return token
+
+        text = pattern.sub(repl, text)
+    return text, protected
+
+
+def _restore_brands(value: str, protected: dict[str, str]) -> str:
+    text = value
+    for token, brand in protected.items():
+        text = text.replace(token, brand)
+    return text
+
+
+def translate_country_terms_in_text(value: Any, lang: str = "es") -> str:
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    if lang != "es" or not text:
+        return text
+    text, protected = _protect_brands(text)
+    aliases = sorted(COUNTRY_ES, key=len, reverse=True)
+    pattern = re.compile(r"(?<![\w])(" + "|".join(re.escape(alias) for alias in aliases) + r")(?![\w])", flags=re.I)
+
+    def repl(match: re.Match[str]) -> str:
+        return COUNTRY_ES.get(_normalize_country_key(match.group(0)), match.group(0))
+
+    text = pattern.sub(repl, text)
+    return _restore_brands(text, protected)
+
+
+def translate_event_name(value: Any, lang: str = "es") -> str:
+    return translate_country_terms_in_text(value, lang)
+
+
 def _es(text: Any, lang: str) -> str:
     value = re.sub(r"\s+", " ", str(text or "").strip())
     if lang != "es" or not value:
         return value
     if value in SPANISH_VISIBLE_TEXT:
         return SPANISH_VISIBLE_TEXT[value]
+    value, protected = _protect_brands(value)
     value = re.sub(r"No recent matching\s+(?:Noticias|news)\s+returned\.", "Sin noticias recientes relacionadas.", value, flags=re.I)
     value = re.sub(r"No lineup/injury headline returned\.", "Sin titular de lesiones/alineación.", value, flags=re.I)
     value = re.sub(r"No SDIO event ID(?: returned)?\.", "Sin ID de evento SDIO.", value, flags=re.I)
     value = re.sub(r"API-FB(?: lookup checked;)? no fixture match\.", "API-FB: sin coincidencia de partido.", value, flags=re.I)
     value = re.sub(r"\bACTIVE\b", "ACTIVO", value)
     value = re.sub(r"\bNO LIVE\b", "SIN EN VIVO", value)
-    value = re.sub(r"\bOdds\b", "Cuotas", value)
     for old, new in SPANISH_VISIBLE_TEXT.items():
         value = value.replace(old, new)
-    return value
+    for old, new in WEATHER_ES:
+        value = value.replace(old, new)
+    value = _restore_brands(value, protected)
+    return translate_country_terms_in_text(value, lang)
 
 
 def _num(row: Any, *keys: str) -> float | None:
@@ -128,6 +248,15 @@ def _dedupe(items: Iterable[str]) -> list[str]:
     return out
 
 
+def _short_location(location: str) -> str:
+    return (
+        re.sub(r"\s+", " ", str(location or "").strip(" ."))
+        .replace("Pennsylvania, United States of America", "PA, USA")
+        .replace("United States of America", "USA")
+        .replace("United States", "USA")
+    )
+
+
 def _clean_provider_item(text: str) -> str:
     value = re.sub(r"\s+", " ", str(text or "").strip())
     low = value.lower()
@@ -142,6 +271,44 @@ def _clean_provider_item(text: str) -> str:
             return "No lineup/injury headline returned."
         return "No recent matching news returned."
     return value.replace("Pennsylvania, United States of America", "PA, USA")
+
+
+def _clean_matchup_item(text: str) -> list[str]:
+    value = re.sub(r"\s+", " ", str(text or "").strip())
+    low = value.lower()
+    if not value:
+        return []
+    if low.startswith("api-fb lookup checked") or low.startswith("api-football checked") or low.startswith("api-fb lookup only"):
+        return ["API-FB lookup checked; no fixture match."]
+    if low.startswith("location:"):
+        return ["Location: " + _short_location(value.split(":", 1)[1]) + "."]
+    if low.startswith("weather:") or low.startswith("weatherapi:"):
+        body = value.split(":", 1)[1].strip()
+        location = ""
+        loc_match = re.search(r"\bLocation:\s*(.+)$", body, flags=re.I)
+        if loc_match:
+            location = loc_match.group(1).strip(" .")
+            body = body[: loc_match.start()].strip(" .")
+        temp_match = re.search(r"(-?\d+(?:\.\d+)?)\s*°\s*([CF])\b", body, flags=re.I)
+        wind_match = re.search(r"wind\s+\d+(?:\.\d+)?\s*kph", body, flags=re.I)
+        condition = ""
+        for part in re.split(r"[.,;]", body):
+            clean = part.strip()
+            if clean and not re.search(r"°\s*[CF]\b", clean, re.I) and "wind" not in clean.lower():
+                condition = clean[:1].lower() + clean[1:]
+                break
+        pieces = []
+        if temp_match:
+            pieces.append(f"{temp_match.group(1)}°{temp_match.group(2).upper()}")
+        if condition:
+            pieces.append(condition)
+        if wind_match:
+            pieces.append(wind_match.group(0).lower())
+        out = ["Weather: " + ", ".join(pieces[:3]) + "."] if pieces else [value]
+        if location:
+            out.append("Location: " + _short_location(location) + ".")
+        return out
+    return [_clean_provider_item(value)]
 
 
 def sale_ready_team_items(row: Any, side: str = "") -> list[str]:
@@ -160,8 +327,10 @@ def sale_ready_injury_items(row: Any, prefix: str = "") -> list[str]:
 
 def sale_ready_matchup_items(row: Any) -> list[str]:
     lang = _lang(row)
-    raw = [str(item) for item in api_sources.matchup_items(row)]
-    return [_es(item, lang) for item in _dedupe(raw)[:3]]
+    cleaned: list[str] = []
+    for item in api_sources.matchup_items(row):
+        cleaned.extend(_clean_matchup_item(item))
+    return [_es(item, lang) for item in _dedupe(cleaned)[:3]]
 
 
 def sale_ready_risk_items(row: Any) -> list[str]:
@@ -184,6 +353,12 @@ def sale_ready_chain_items(row: Any) -> list[str]:
 
 def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limit: int, lang: str = "en") -> list[str]:
     key_tuple = tuple(keys)
+    explicit: list[str] = []
+    data = _row(row)
+    for key in key_tuple:
+        explicit.extend(_split(data.get(key)))
+    if explicit:
+        return [_es(item, lang) for item in explicit[:limit]]
     if any(key in key_tuple for key in ("risk", "risk_level", "risk_label", "profit_guard_status", "risk_note", "risk_notes", "why_lose", "hidden_risk")):
         items = sale_ready_risk_items(row)
     elif any(key in key_tuple for key in ("chain_note", "chain_notes", "parlay_note", "parlay_notes", "combo_note", "main_read", "add_on_legs")):
@@ -197,11 +372,79 @@ def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limi
     return [_es(item, lang) for item in items[:limit]]
 
 
+def _patch_translation_layer(module: Any) -> None:
+    if getattr(module, _TRANSLATION_FLAG, False):
+        try:
+            if getattr(module, "_team_label")("Haiti", "es") == "Haití":
+                return
+        except Exception:
+            pass
+    try:
+        module.COUNTRY_ES.update(COUNTRY_ES)
+    except Exception:
+        module.COUNTRY_ES = dict(COUNTRY_ES)
+    original_team_label = getattr(module, "_team_label", None)
+    original_tr = getattr(module, "_tr", None)
+
+    def patched_team_label(team: str, lang: str) -> str:
+        if lang == "es":
+            return translate_team_label(team, lang)
+        return original_team_label(team, lang) if callable(original_team_label) else str(team or "").strip()
+
+    def patched_tr(value: Any, lang: str) -> str:
+        text = original_tr(value, lang) if callable(original_tr) else str(value or "")
+        if lang != "es":
+            return text
+        return _es(translate_country_terms_in_text(text, lang), lang)
+
+    module._team_label = patched_team_label
+    module._tr = patched_tr
+    module.translate_country_name = translate_country_name
+    module.translate_team_label = translate_team_label
+    module.translate_event_name = translate_event_name
+    module.translate_country_terms_in_text = translate_country_terms_in_text
+    setattr(module, _TRANSLATION_FLAG, True)
+
+
+def _clean_report_brand(value: Any) -> str:
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    text = re.split(r"\s+[—-]\s+", text, maxsplit=1)[0].strip()
+    if text.lower() in {"full pick magazine", "magazine report", "report"}:
+        return ""
+    return text
+
+
+def _arg(args: tuple[Any, ...], kwargs: Mapping[str, Any], index: int, name: str, default: Any) -> Any:
+    return kwargs.get(name) if name in kwargs else (args[index] if len(args) > index else default)
+
+
 def _patch_visuals(module: Any) -> None:
     current_render = getattr(module, "render_full_pick_magazine_page", None)
     if getattr(current_render, _RENDER_FLAG, False):
         return
     original_render = current_render
+
+    def repaint_masthead(draw: Any, row: Any, lang: str, report_name: Any, page_number: Any, total_pages: Any) -> None:
+        brand = _get(row, "report_brand_name", "brand_name", "tipster_name", default="") or _clean_report_brand(report_name) or "ABA Signal Pro"
+        title = _get(row, "report_title", default="") or module._tr("DAILY SPORTS ANALYSIS", lang)
+        title = module._tr(title, lang)
+        try:
+            page_no = int(page_number)
+        except Exception:
+            page_no = 1
+        try:
+            total = int(total_pages)
+        except Exception:
+            total = 1
+        draw.rectangle((18, 18, module.PAGE_WIDTH - 18, 82), fill=module.BLACK)
+        draw.rectangle((28, 24, 308, 74), fill=module.RED)
+        brand_upper = str(brand).upper()
+        title_upper = str(title).upper()
+        draw.text((43, 29), brand_upper, font=module._fit(brand_upper, 250, 38, 15, True), fill="white")
+        draw.text((330, 28), title_upper, font=module._fit(title_upper, 470, 38, 16, True), fill="white")
+        draw.rounded_rectangle((840, 24, 1050, 74), radius=5, fill=module.CREAM, outline=module.BLACK)
+        page_text = module._tr(f"PAGE {page_no} OF {total}", lang)
+        draw.text((862, 32), page_text, font=module._fit(page_text, 174, 28, 16, True), fill=module.BLACK)
 
     def repaint_vs_badge(draw: Any) -> None:
         box = module.VS_BADGE_BOX
@@ -238,6 +481,28 @@ def _patch_visuals(module: Any) -> None:
         draw.line((left_x + 12, 1088, left_x + left_w - 12, 1088), fill=module.BLACK + (135,), width=1)
         module._txt_auto(draw, left_x + 22, 1094, _es("Price check required before entry.", lang), left_w - 44, 22, 14, 9, module.BLACK, True, 1)
 
+    def repaint_matchup_body(draw: Any, row: Any, lang: str) -> None:
+        if lang != "es":
+            return
+        x, y, width, height = 354, 1178, 344, 175
+        module._section(draw, x, y, width, height, "MATCHUP NOTES", module.BLUE, lang)
+        draw.rectangle((x + 10, y + 56, x + width - 10, y + height - 8), fill=module.CREAM)
+        font = module._font(11, False)
+        line_h = module._line_height(font)
+        cursor = y + 70
+        bottom = y + height - 12
+        for item in sale_ready_matchup_items(row)[:3]:
+            item = re.sub(r"\bUbicación:\s*", "Ubic.: ", item)
+            lines = module._wrap_text_to_box(draw, item, font, width - 60, 2)[:2]
+            needed = max(1, len(lines)) * line_h + 6
+            if cursor + needed > bottom:
+                break
+            draw.ellipse((x + 24, cursor + 7, x + 36, cursor + 19), fill=module.BLUE)
+            for line in lines:
+                draw.text((x + 48, cursor), module._ellipsize_to_width(draw, line, font, width - 62), font=font, fill=module.TEXT)
+                cursor += line_h
+            cursor += 6
+
     def repaint_final(img: Any, row: Any, lang: str) -> None:
         draw = module.ImageDraw.Draw(img, "RGBA")
         action, _explanation, playable = sale_ready_recommendation(row)
@@ -257,10 +522,13 @@ def _patch_visuals(module: Any) -> None:
 
     def patched_render(pick: Any, *args: Any, **kwargs: Any):
         img = original_render(pick, *args, **kwargs)
-        lang = module._lang(pick, kwargs.get("language") if "language" in kwargs else (args[10] if len(args) >= 11 else None))
+        explicit_lang = kwargs.get("language") if "language" in kwargs else _arg(args, kwargs, 10, "language", None)
+        lang = module._lang(pick, explicit_lang)
         draw = module.ImageDraw.Draw(img, "RGBA")
+        repaint_masthead(draw, pick, lang, _arg(args, kwargs, 1, "report_name", None), _arg(args, kwargs, 2, "page_number", 1), _arg(args, kwargs, 3, "total_pages", 1))
         repaint_vs_badge(draw)
         repaint_evidence_body(draw, pick, lang)
+        repaint_matchup_body(draw, pick, lang)
         draw_guidance_body(draw, (34, 1234, 326, 1348), sale_ready_risk_items(pick), module.RED, lang)
         draw_guidance_body(draw, (724, 1234, 1050, 1348), sale_ready_chain_items(pick), module.BLUE, lang)
         repaint_final(img, pick, lang)
@@ -277,6 +545,7 @@ def _patch_visuals(module: Any) -> None:
 
 def apply_magazine_sale_ready_patch(module: Any) -> Any:
     api_sources.apply_magazine_api_patch(module)
+    _patch_translation_layer(module)
     module.team_items = sale_ready_team_items
     module.injury_items = sale_ready_injury_items
     module.matchup_items = sale_ready_matchup_items

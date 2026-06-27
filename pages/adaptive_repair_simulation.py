@@ -12,6 +12,7 @@ from autonomous_betting_agent.adaptive_repair_runner import (
     save_runner_report,
 )
 from autonomous_betting_agent.local_access import require_streamlit_access
+from autonomous_betting_agent.reparodynamics_audit import audit_event_display_rows, write_reparodynamics_audit_event_from_runner_report
 from autonomous_betting_agent.reparodynamics_doctrine import get_reparodynamics_doctrine
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 from autonomous_betting_agent.ui_i18n import tr, upload_helper
@@ -146,6 +147,10 @@ if st.button("Run system-wide Adaptive Repair scan"):
 
     st.subheader("RYE / Shadow Mode readiness")
     st.json(report.readiness)
+
+    audit_event = write_reparodynamics_audit_event_from_runner_report(report, source="Adaptive Repair Simulation scan")
+    st.subheader("Reparodynamics Audit Log")
+    st.dataframe(pd.DataFrame(audit_event_display_rows(audit_event)), use_container_width=True, hide_index=True)
 
     saved = save_runner_report(report)
     st.success(f"Simulation run saved: {saved['run_dir']}")

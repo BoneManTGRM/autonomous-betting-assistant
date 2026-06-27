@@ -5,6 +5,7 @@ import streamlit as st
 
 from autonomous_betting_agent.learning_memory_controls import reset_confirmation_matches, split_learning_safe_rows, version_placeholder_path
 from autonomous_betting_agent.local_access import require_streamlit_access
+from autonomous_betting_agent.reparodynamics_audit import write_reparodynamics_audit_event_from_rows
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 from autonomous_betting_agent.storage import LocalStorage
 from autonomous_betting_agent.ui_i18n import tr, upload_helper
@@ -45,7 +46,18 @@ if upload is not None:
     try:
         preview = pd.read_csv(upload)
         st.dataframe(preview.head(100), use_container_width=True)
-        st.caption(tr(LANG, "Preview only. This page does not automatically update memory.", "Solo vista previa. Esta página no actualiza la memoria automáticamente."))
+        audit_event = write_reparodynamics_audit_event_from_rows(
+            preview.to_dict(orient="records"),
+            source="Learning Page graded upload",
+        )
+        st.success(
+            tr(
+                LANG,
+                f"Reparodynamics audit event written: {audit_event.timestamp}",
+                f"Evento de auditoría Reparodynamics escrito: {audit_event.timestamp}",
+            )
+        )
+        st.caption(tr(LANG, "Preview only. This page does not automatically update memory or activate repairs.", "Solo vista previa. Esta página no actualiza la memoria ni activa reparaciones automáticamente."))
     except Exception as exc:
         st.warning(f"{tr(LANG, 'Could not preview CSV', 'No se pudo previsualizar el CSV')}: {exc}")
 

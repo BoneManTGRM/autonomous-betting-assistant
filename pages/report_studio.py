@@ -11,19 +11,18 @@ from autonomous_betting_agent.commercial_platform_tools import load_persistent_l
 import autonomous_betting_agent.magazine_book_export as magazine_book_export
 from autonomous_betting_agent.magazine_api_sources import api_provenance
 from autonomous_betting_agent.magazine_live_api_enrichment import ENRICHMENT_VERSION, enrich_rows_with_live_api_data, install as install_magazine_live_api_enrichment
+from autonomous_betting_agent.magazine_sale_ready_patch import apply_magazine_sale_ready_patch
 from autonomous_betting_agent.pick_hold_store import load_first_available
-from autonomous_betting_agent.report_background_image_service import render_custom_background_summary_png
 from autonomous_betting_agent.report_feed_service import save_report_feed
-from autonomous_betting_agent.report_image_export_service import render_magazine_summary_png
-from autonomous_betting_agent.report_magazine_pdf_service import render_vintage_magazine_pdf
 from autonomous_betting_agent.report_product_layer import MagazineBrand, event_text, pick_text, safe_text, sport_text, value_text
 from autonomous_betting_agent.report_studio_service import ReportStudioFilters, build_report_studio_state, report_studio_summary
+from autonomous_betting_agent.report_studio_spanish_ui import render_sport_league_filter, sport_league_display_text
 from autonomous_betting_agent.report_studio_ui import render_premium_card_deck, render_status_dashboard
 from autonomous_betting_agent.row_normalizer import normalize_frame
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 from autonomous_betting_agent.white_label_profiles import WhiteLabelProfile, list_profiles, load_profile, save_profile
 
-magazine_book_export = install_magazine_live_api_enrichment(importlib.reload(magazine_book_export))
+magazine_book_export = apply_magazine_sale_ready_patch(install_magazine_live_api_enrichment(importlib.reload(magazine_book_export)))
 
 st.set_page_config(page_title="Report Studio", layout="wide")
 LANG = render_app_sidebar("report_studio", language_key="report_studio_language", selector="radio")
@@ -54,7 +53,7 @@ TEXT = {
         "brand_name": "Brand / tipster name",
         "tagline": "Tagline",
         "report_title": "Report title",
-        "full_book_name": "Full magazine book name",
+        "full_book_name": "Full magazine book file name",
         "logo_url": "Logo URL",
         "disclaimer": "Disclaimer",
         "mode": "Report mode",
@@ -114,7 +113,7 @@ TEXT = {
         "brand_name": "Marca / tipster",
         "tagline": "Lema",
         "report_title": "Título del reporte",
-        "full_book_name": "Nombre del libro revista completo",
+        "full_book_name": "Nombre de archivo del libro revista",
         "logo_url": "URL del logo",
         "disclaimer": "Aviso legal",
         "mode": "Modo de reporte",
@@ -288,6 +287,13 @@ def with_report_language(rowd: dict, language: str) -> dict:
     return data
 
 
+def with_report_branding(rowd: dict, brand_name: str, report_title: str, language: str) -> dict:
+    data = with_report_language(rowd, language)
+    data["report_brand_name"] = brand_name
+    data["report_title"] = report_title
+    return data
+
+
 def api_enrichment_diagnostics(rows: list[dict]) -> dict:
     first = dict(rows[0]) if rows else {}
     provenance = api_provenance(first) if first else {"active_sources": [], "available_no_data_sources": [], "inactive_sources": []}
@@ -359,7 +365,8 @@ with st.expander(t("profile"), expanded=True):
     brand_name = b1.text_input(t("brand_name"), value=loaded.brand_name)
     tagline = b2.text_input(t("tagline"), value=value_text(loaded.tagline, LANG))
     report_title = b1.text_input(t("report_title"), value=value_text(loaded.report_title, LANG))
-    full_magazine_book_name = st.text_input(t("full_book_name"), "ABA Signal Pro — Full Pick Magazine")
+    default_book_name = safe_text(brand_name) or "ABA Signal Pro"
+    full_magazine_book_name = st.text_input(t("full_book_name"), default_book_name, key="report_studio_full_magazine_book_filename")
     logo_url = b2.text_input(t("logo_url"), value=loaded.logo_url)
     background_profile_upload = st.file_uploader(t("background_upload"), type=["png", "jpg", "jpeg"], key="report_studio_profile_background_upload")
     if background_profile_upload is not None:
@@ -377,7 +384,7 @@ with st.expander(t("profile"), expanded=True):
     visibility_values = ["private", "public"]
     loaded_visibility = safe_text((loaded.delivery_settings or {}).get("visibility")) or "private"
     visibility = b2.selectbox(t("visibility"), visibility_values, index=visibility_values.index(loaded_visibility) if loaded_visibility in visibility_values else 0)
-    preferred_sports = st.multiselect(t("sports"), all_sport_options, default=[sport for sport in list(loaded.preferred_sports or []) if sport in all_sport_options], key="report_profile_sports")
+    preferred_sports = render_sport_league_filter(st, label=t("sports"), options=all_sport_options, default=[sport for sport in list(loaded.preferred_sports or []) if sport in all_sport_options], language=LANG, key="report_profile_sports")
     disclaimer_default = "Informational content only. Results are not guaranteed." if LANG == "en" else "Contenido informativo. No garantiza resultados."
     disclaimer = st.text_area(t("disclaimer"), value=loaded.disclaimer or disclaimer_default, height=80)
     technical = "Analyst" in report_mode or "técnico" in report_mode.lower()
@@ -397,26 +404,27 @@ legacy_feed = save_app_feed(cards, brand, mode=mode_key, public=visibility == "p
 unified_feed = save_report_feed(cards, brand, mode=mode_key, public=visibility == "public")
 feed = {"unified_v2": unified_feed, "legacy_v1": legacy_feed}
 summary = report_studio_summary(state)
-cards_as_rows = enrich_rows_with_live_api_data([with_report_language(row.to_dict(), LANG) for _, row in cards.iterrows()])
+magazine_report_name = safe_text(brand_name) or "ABA Signal Pro"
+magazine_title = safe_text(report_title) or ("Análisis Deportivo Diario" if LANG == "es" else "Daily Sports Analysis")
+cards_as_rows = enrich_rows_with_live_api_data([with_report_branding(row.to_dict(), magazine_report_name, magazine_title, LANG) for _, row in cards.iterrows()])
 api_diagnostics = api_enrichment_diagnostics(cards_as_rows)
 
 st.markdown(render_status_dashboard(cards, language=LANG), unsafe_allow_html=True)
 st.caption(state.context_note)
 safe_workspace = safe_workspace_name(workspace_id)
-magazine_pdf_bytes = render_vintage_magazine_pdf(cards, brand)
 report_background_bytes = profile_background_bytes
+magazine_pdf_bytes = magazine_book_export.render_full_magazine_book_pdf(cards_as_rows, background_image=report_background_bytes, report_name=magazine_report_name, language=LANG)
+magazine_tab_png = magazine_book_export.render_full_pick_magazine_page_png(cards_as_rows[0], background_image=report_background_bytes, report_name=magazine_report_name, page_number=1, total_pages=len(cards_as_rows), language=LANG) if cards_as_rows else b""
 tabs = st.tabs([t("cards"), t("magazine"), t("copy"), t("audit"), t("proof"), t("exports"), t("images"), t("profile_json"), t("feed_json"), t("diagnostics")])
 
 with tabs[0]:
     st.markdown(render_premium_card_deck(cards, language=LANG), unsafe_allow_html=True)
 with tabs[1]:
     m1, m2 = st.columns(2)
-    m1.download_button(t("magazine_pdf"), data=magazine_pdf_bytes, file_name=f"magazine_report_{safe_workspace}.pdf", mime="application/pdf", key="report_studio_magazine_pdf")
-    magazine_tab_png = render_custom_background_summary_png(cards, brand, background_bytes=report_background_bytes) if report_background_bytes else render_magazine_summary_png(cards, brand)
-    m2.download_button(t("magazine_png"), data=magazine_tab_png, file_name=f"magazine_report_{safe_workspace}.png", mime="image/png", key="report_studio_magazine_tab_png")
-    if report_background_bytes:
+    m1.download_button(t("magazine_pdf"), data=magazine_pdf_bytes, file_name=magazine_book_export.sanitize_image_filename(f"{full_magazine_book_name}_{LANG}_{NO_MARKET_EXPORT_VERSION}", extension="pdf"), mime="application/pdf", key="report_studio_magazine_pdf")
+    m2.download_button(t("magazine_png"), data=magazine_tab_png, file_name=magazine_book_export.sanitize_image_filename(f"{full_magazine_book_name}_{LANG}_{NO_MARKET_EXPORT_VERSION}_preview", extension="png"), mime="image/png", key="report_studio_magazine_tab_png")
+    if magazine_tab_png:
         st.image(magazine_tab_png, caption=t("generated_preview"), use_container_width=True)
-    st.markdown(bundle.html, unsafe_allow_html=True)
 with tabs[2]:
     st.text_area(t("copy_label"), value=bundle.whatsapp, height=420, key="report_studio_whatsapp_copy_text")
     st.download_button(t("copy_download"), data=bundle.whatsapp, file_name=f"whatsapp_copy_{safe_workspace}.txt", mime="text/plain", key="report_studio_copy_tab_download")
@@ -432,7 +440,7 @@ with tabs[4]:
     st.dataframe(localized_dataframe(cards[cols] if cols else cards, LANG), use_container_width=True, hide_index=True)
 with tabs[5]:
     st.download_button(t("pdf"), data=bundle.pdf_bytes, file_name=f"report_{safe_workspace}.pdf", mime="application/pdf", key="report_studio_export_pdf")
-    st.download_button(t("magazine_pdf"), data=magazine_pdf_bytes, file_name=f"magazine_report_{safe_workspace}.pdf", mime="application/pdf", key="report_studio_export_magazine_pdf")
+    st.download_button(t("magazine_pdf"), data=magazine_pdf_bytes, file_name=magazine_book_export.sanitize_image_filename(f"{full_magazine_book_name}_{LANG}_{NO_MARKET_EXPORT_VERSION}", extension="pdf"), mime="application/pdf", key="report_studio_export_magazine_pdf")
     st.download_button(t("html"), data=bundle.html, file_name=f"report_{safe_workspace}.html", mime="text/html", key="report_studio_export_html")
     st.download_button(t("md"), data=bundle.markdown, file_name=f"report_{safe_workspace}.md", mime="text/markdown", key="report_studio_export_md")
     st.download_button(t("copy_download"), data=bundle.whatsapp, file_name=f"whatsapp_copy_{safe_workspace}.txt", mime="text/plain", key="report_studio_export_whatsapp")
@@ -448,20 +456,21 @@ with tabs[6]:
     if background_bytes:
         st.success(t("background_ready"))
         st.image(background_bytes, caption=t("background_preview"), width=260)
-    book_cache_key = f"report_studio_full_book_export_cache_{LANG}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}"
-    if st.button(t("build_book"), key=f"report_studio_prepare_full_book_{LANG}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}"):
+    brand_cache = safe_workspace_name(magazine_report_name)
+    book_cache_key = f"report_studio_full_book_export_cache_{LANG}_{brand_cache}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}"
+    if st.button(t("build_book"), key=f"report_studio_prepare_full_book_{LANG}_{brand_cache}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}"):
         with st.spinner(t("building_book")):
             st.session_state[book_cache_key] = {
-                "png": magazine_book_export.render_full_magazine_book_png(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name, language=LANG),
-                "pdf": magazine_book_export.render_full_magazine_book_pdf(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name, language=LANG),
-                "zip": magazine_book_export.render_full_magazine_zip(cards_as_rows, background_image=background_bytes, report_name=full_magazine_book_name, language=LANG),
+                "png": magazine_book_export.render_full_magazine_book_png(cards_as_rows, background_image=background_bytes, report_name=magazine_report_name, language=LANG),
+                "pdf": magazine_book_export.render_full_magazine_book_pdf(cards_as_rows, background_image=background_bytes, report_name=magazine_report_name, language=LANG),
+                "zip": magazine_book_export.render_full_magazine_zip(cards_as_rows, background_image=background_bytes, report_name=magazine_report_name, language=LANG),
             }
     full_book_cache = st.session_state.get(book_cache_key)
     if full_book_cache:
         book1, book2, book3 = st.columns(3)
-        book1.download_button(t("download_book_png"), data=full_book_cache["png"], file_name=magazine_book_export.sanitize_image_filename(f"{full_magazine_book_name}_{LANG}_{NO_MARKET_EXPORT_VERSION}", extension="png"), mime="image/png", key=f"report_studio_full_book_png_{LANG}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}")
-        book2.download_button(t("download_book_pdf"), data=full_book_cache["pdf"], file_name=magazine_book_export.sanitize_image_filename(f"{full_magazine_book_name}_{LANG}_{NO_MARKET_EXPORT_VERSION}", extension="pdf"), mime="application/pdf", key=f"report_studio_full_book_pdf_{LANG}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}")
-        book3.download_button(t("download_zip"), data=full_book_cache["zip"], file_name=magazine_book_export.sanitize_image_filename(f"{full_magazine_book_name}_{LANG}_{NO_MARKET_EXPORT_VERSION}", extension="zip"), mime="application/zip", key=f"report_studio_full_book_zip_{LANG}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}")
+        book1.download_button(t("download_book_png"), data=full_book_cache["png"], file_name=magazine_book_export.sanitize_image_filename(f"{full_magazine_book_name}_{LANG}_{NO_MARKET_EXPORT_VERSION}", extension="png"), mime="image/png", key=f"report_studio_full_book_png_{LANG}_{brand_cache}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}")
+        book2.download_button(t("download_book_pdf"), data=full_book_cache["pdf"], file_name=magazine_book_export.sanitize_image_filename(f"{full_magazine_book_name}_{LANG}_{NO_MARKET_EXPORT_VERSION}", extension="pdf"), mime="application/pdf", key=f"report_studio_full_book_pdf_{LANG}_{brand_cache}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}")
+        book3.download_button(t("download_zip"), data=full_book_cache["zip"], file_name=magazine_book_export.sanitize_image_filename(f"{full_magazine_book_name}_{LANG}_{NO_MARKET_EXPORT_VERSION}", extension="zip"), mime="application/zip", key=f"report_studio_full_book_zip_{LANG}_{brand_cache}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}")
     st.markdown("---")
     if cards_as_rows:
         pick_options: list[str] = []
@@ -469,10 +478,10 @@ with tabs[6]:
             event = display_event_text(safe_text(rowd.get("public_event") or rowd.get("event")) or f"Game {idx + 1}", LANG)
             action = display_action_text(safe_text(rowd.get("consumer_action") or rowd.get("recommended_action")) or "Full magazine analysis", LANG)
             pick_options.append(f"{idx + 1}. {event} - {action}")
-        selected_idx = st.selectbox(t("select_page"), range(len(pick_options)), format_func=lambda i: pick_options[i], key=f"report_studio_selected_full_page_{LANG}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}")
+        selected_idx = st.selectbox(t("select_page"), range(len(pick_options)), format_func=lambda i: pick_options[i], key=f"report_studio_selected_full_page_{LANG}_{brand_cache}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}")
         selected_row = cards_as_rows[int(selected_idx)]
-        selected_png = cached_render_full_pick_magazine_page_png(serializable_row(selected_row), background_bytes, full_magazine_book_name, int(selected_idx) + 1, len(cards_as_rows), LANG, magazine_book_export.MAGAZINE_STYLE_VERSION, NO_MARKET_EXPORT_VERSION, ENRICHMENT_VERSION)
-        st.download_button(t("download_page"), data=selected_png, file_name=no_market_filename(magazine_book_export.pick_full_page_filename(selected_row, int(selected_idx))), mime="image/png", key=f"report_studio_image_full_page_selected_{LANG}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}")
+        selected_png = cached_render_full_pick_magazine_page_png(serializable_row(selected_row), background_bytes, magazine_report_name, int(selected_idx) + 1, len(cards_as_rows), LANG, magazine_book_export.MAGAZINE_STYLE_VERSION, NO_MARKET_EXPORT_VERSION, ENRICHMENT_VERSION)
+        st.download_button(t("download_page"), data=selected_png, file_name=no_market_filename(magazine_book_export.pick_full_page_filename(selected_row, int(selected_idx))), mime="image/png", key=f"report_studio_image_full_page_selected_{LANG}_{brand_cache}_{magazine_book_export.MAGAZINE_STYLE_VERSION}_{NO_MARKET_EXPORT_VERSION}_{ENRICHMENT_VERSION}")
 with tabs[7]:
     st.json(asdict(WhiteLabelProfile(profile_id=profile_id, workspace_id=workspace_id, brand_name=brand_name, logo_url=logo_url, tagline=tagline, language=LANG, report_title=report_title, disclaimer=disclaimer, preferred_report_mode=report_mode, preferred_sports=preferred_sports, risk_preference=risk_preference, show_technical_fields=technical, default_audience="analyst" if technical else "consumer")))
 with tabs[8]:

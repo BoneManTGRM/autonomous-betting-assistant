@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 
 APP_NAME = 'ABA Signal Pro'
@@ -236,9 +237,75 @@ def _install_magazine_dynamic_sources_and_autosizer() -> None:
         return
 
 
+def _install_weather_compaction_patch() -> None:
+    try:
+        from . import magazine_api_sources as mas
+    except Exception:
+        return
+    if getattr(mas, '_aba_weather_compaction_patch_v1', False):
+        return
+
+    def compact_weather_message(text: str) -> list[str]:
+        value = re.sub(r'\s+', ' ', str(text or '')).strip()
+        lower = value.lower()
+        if lower.startswith('weather:'):
+            value = 'WeatherAPI:' + value.split(':', 1)[1]
+            lower = value.lower()
+        if lower.startswith('weatherapi:'):
+            body = value.split(':', 1)[1].strip()
+            location = ''
+            location_match = re.search(r'\bLocation:\s*(.+)$', body, flags=re.IGNORECASE)
+            if location_match:
+                location = location_match.group(1).strip(' .')
+                body = body[: location_match.start()].strip(' .')
+
+            bits = [part.strip(' .') for part in body.split(';') if part.strip(' .')]
+            if len(bits) <= 1:
+                expanded = re.sub(r'\.\s*', ', ', body)
+                bits = [part.strip(' .') for part in expanded.split(',') if part.strip(' .')]
+
+            deduped: list[str] = []
+            seen: set[str] = set()
+            for bit in bits:
+                clean = re.sub(r'\s+', ' ', bit).strip(' .')
+                key = clean.lower()
+                if clean and key not in seen:
+                    deduped.append(clean)
+                    seen.add(key)
+
+            temperature = next((bit for bit in deduped if re.search(r'-?\d+(?:\.\d+)?\s*°\s*[CF]\b', bit, re.IGNORECASE)), '')
+            wind = next((bit for bit in deduped if re.search(r'\bwind\s*-?\d+(?:\.\d+)?\s*kph\b', bit, re.IGNORECASE)), '')
+            condition = next((bit for bit in deduped if bit not in {temperature, wind} and 'location:' not in bit.lower()), '')
+
+            ordered = []
+            if temperature:
+                ordered.append(temperature.replace(' ', ''))
+            if condition:
+                ordered.append(condition[:1].lower() + condition[1:])
+            if wind:
+                ordered.append(wind.lower())
+            if not ordered:
+                ordered = deduped[:3]
+
+            out = ['Weather: ' + ', '.join(ordered[:3]) + '.']
+            if location:
+                out.append('Location: ' + mas._shorten_location(location) + '.')
+            return out
+        if lower.startswith('weatherapi checked'):
+            location = value.replace('WeatherAPI checked', '', 1).split(';', 1)[0].strip()
+            return [f'Weather checked: {mas._shorten_location(location)}; no live payload.'] if location else ['Weather checked; no live payload.']
+        if lower.startswith('weatherapi configured'):
+            return ['Weather checked; no venue/location in row.']
+        return [value]
+
+    mas._compact_weather_message = compact_weather_message
+    mas._aba_weather_compaction_patch_v1 = True
+
+
 _install_price_normalizer()
 _install_adaptive_learning_area_key_normalizer()
 _install_magazine_renderer_patches()
 _install_mexico_spanish_terms()
 _install_chain_notes()
 _install_magazine_dynamic_sources_and_autosizer()
+_install_weather_compaction_patch()

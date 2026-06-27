@@ -49,12 +49,15 @@ def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
         from autonomous_betting_agent.magazine_headline_safety import install as install_headline_safety
         from autonomous_betting_agent.magazine_live_api_enrichment import install as install_live_api_enrichment
         from autonomous_betting_agent.magazine_sale_ready_patch import apply_magazine_sale_ready_patch
+        from autonomous_betting_agent.spanish_magazine_fixes import install as install_spanish_magazine_fixes
 
         module = apply_magazine_api_patch(module)
         module = install_live_api_enrichment(module)
         module = apply_magazine_auto_sizer(module)
         module = install_headline_safety(module)
-        return apply_magazine_sale_ready_patch(module)
+        module = apply_magazine_sale_ready_patch(module)
+        install_spanish_magazine_fixes()
+        return module
     except Exception:
         return module
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+from autonomous_betting_agent.reparodynamics_audit import audit_event_display_rows, latest_reparodynamics_audit_event
 from autonomous_betting_agent.reparodynamics_doctrine import get_reparodynamics_doctrine
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
@@ -24,6 +25,9 @@ TEXT = {
         "safety": "Safety principles",
         "forbidden": "Forbidden in Phase 3A",
         "status": "Activation status",
+        "audit": "Reparodynamics Audit Log",
+        "no_run": "No run recorded yet.",
+        "phase3a_explanation": "Phase 3A does not improve picks directly. It observes graded results, detects drift, finds duplicate-event issues, and prepares repair candidates for later Shadow Mode testing. No live model changes are allowed in this phase.",
         "final": "Final rule",
         "warning": "This page is documentation/status only. It does not activate live repairs, Shadow Mode, TGRM, RYE scoring, confidence changes, bet-tier changes, bankroll changes, sportsbook changes, or model mutation.",
     },
@@ -41,6 +45,9 @@ TEXT = {
         "safety": "Principios de seguridad",
         "forbidden": "Prohibido en Fase 3A",
         "status": "Estado de activación",
+        "audit": "Registro de Auditoría Reparodynamics",
+        "no_run": "Todavía no hay ejecución registrada.",
+        "phase3a_explanation": "La Fase 3A no mejora picks directamente. Observa resultados calificados, detecta deriva, encuentra problemas de eventos duplicados y prepara candidatos de reparación para pruebas posteriores en Shadow Mode. No se permiten cambios al modelo en vivo en esta fase.",
         "final": "Regla final",
         "warning": "Esta página es solo documentación/estado. No activa reparaciones en vivo, Shadow Mode, TGRM, puntuación RYE, cambios de confianza, cambios de nivel de apuesta, cambios de bankroll, cambios de sportsbook ni mutación del modelo.",
     },
@@ -51,7 +58,11 @@ ES_VALUE_MAP = {
     "Observation-only": "Solo observación",
     "Evidence-gated targeted repair": "Reparación dirigida con control de evidencia",
     "Forbidden": "Prohibido",
+    "FORBIDDEN": "PROHIBIDO",
     "OFF": "APAGADO",
+    "YES": "SÍ",
+    "NO": "NO",
+    "Phase 3A observation-only": "Fase 3A solo observación",
     "ABA should learn automatically, but repair cautiously.": "ABA debe aprender automáticamente, pero reparar con cautela.",
 }
 
@@ -87,6 +98,20 @@ ES_LIST_MAP = {
     "automatic sportsbook recommendation changes": "cambios automáticos de recomendación de sportsbook",
 }
 
+ES_AUDIT_FIELD_MAP = {
+    "Last Reparodynamics Run": "Última ejecución Reparodynamics",
+    "Source": "Fuente",
+    "Rows scanned": "Filas escaneadas",
+    "Unique events scanned": "Eventos únicos escaneados",
+    "Duplicates detected": "Duplicados detectados",
+    "New patterns detected": "Patrones nuevos detectados",
+    "Drift detected": "Deriva detectada",
+    "Repair candidates generated": "Candidatos de reparación generados",
+    "Shadow Mode": "Shadow Mode",
+    "Live Mutation": "Mutación en vivo",
+    "Reason": "Razón",
+}
+
 
 def t(key: str) -> str:
     return TEXT.get(LANG, TEXT["en"]).get(key, TEXT["en"].get(key, key))
@@ -102,18 +127,40 @@ def list_text(values: list[str]) -> list[str]:
     return [ES_LIST_MAP.get(value, value) for value in values]
 
 
+def audit_rows_for_language(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    if LANG != "es":
+        return rows
+    translated = []
+    for row in rows:
+        translated.append({"field": ES_AUDIT_FIELD_MAP.get(row["field"], row["field"]), "value": value_text(row["value"])})
+    return translated
+
+
 doctrine = get_reparodynamics_doctrine()
 
 st.title(t("title"))
 st.caption(t("caption"))
 st.warning(t("warning"))
 
-status_cols = st.columns(5)
+status_cols = st.columns(6)
 status_cols[0].metric(t("phase"), value_text(str(doctrine.get("current_phase", ""))))
 status_cols[1].metric(t("mode"), value_text(str(doctrine.get("operating_mode", ""))))
 status_cols[2].metric(t("repair"), value_text(str(doctrine.get("repair_activation", ""))))
 status_cols[3].metric(t("shadow"), value_text(str(doctrine.get("shadow_mode_activation", ""))))
 status_cols[4].metric(t("tgrm"), value_text(str(doctrine.get("tgrm_activation", ""))))
+status_cols[5].metric(t("rye"), value_text(str(doctrine.get("rye_activation", ""))))
+
+st.subheader(t("audit"))
+st.info(t("phase3a_explanation"))
+audit_event = latest_reparodynamics_audit_event()
+if audit_event is None:
+    st.info(t("no_run"))
+else:
+    st.dataframe(
+        pd.DataFrame(audit_rows_for_language(audit_event_display_rows(audit_event))),
+        use_container_width=True,
+        hide_index=True,
+    )
 
 st.subheader(t("motive"))
 if LANG == "es":
