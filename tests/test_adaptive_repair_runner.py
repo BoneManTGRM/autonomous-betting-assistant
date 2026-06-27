@@ -48,11 +48,19 @@ def test_runner_scans_uploaded_rows_and_preserves_tracker_baseline(tmp_path):
     assert event["unique_events"] == 81
     assert event["mixed_events"] == 0
     assert report.production_repairs_active is False
-    assert report.shadow_mode_active is False
+    assert report.shadow_mode_active is True
     assert report.live_pick_changes is False
     assert report.safety_state["Repair Mode"] == "OFF"
+    assert report.safety_state["Shadow Mode"] == "ON"
+    assert report.safety_state["Live Pick Changes"] == "OFF"
+    assert report.safety_state["Learning Impact"] == "Shadow simulation only"
     assert report.readiness["RYE_activation"] is False
-    assert report.readiness["Shadow_Mode_activation"] is False
+    assert report.readiness["Shadow_Mode_activation"] is True
+    assert report.readiness["Shadow_Mode_live_changes"] is False
+    assert report.activation_gate["gate_status"] == "SHADOW_ONLY"
+    assert report.activation_gate["repair_activation"] == "OFF"
+    assert report.activation_gate["shadow_mode_activation"] == "ON"
+    assert report.activation_gate["checks"]["live_repair_allowed"] is False
 
 
 def test_runner_handles_missing_system_sources_safely(tmp_path):
@@ -61,6 +69,7 @@ def test_runner_handles_missing_system_sources_safely(tmp_path):
     assert report.source_summary["sources_scanned"] >= 1
     assert report.source_summary["failed_sources"] == []
     assert report.production_repairs_active is False
+    assert report.shadow_mode_active is True
     assert report.live_pick_changes is False
 
 
@@ -88,6 +97,7 @@ def test_bad_csv_in_system_source_is_reported_not_silently_ignored(tmp_path):
     assert ledger_source["available"] is False
     assert ledger_source["error"]
     assert report.production_repairs_active is False
+    assert report.shadow_mode_active is True
     assert report.live_pick_changes is False
 
 
@@ -104,6 +114,10 @@ def test_runner_markdown_json_exports_and_recent_listing(tmp_path):
 
     assert "ABA Adaptive Repair Runner Scan" in markdown
     assert "Repair Mode: OFF" in markdown
+    assert "Shadow Mode: ON" in markdown
+    assert "Gate status: SHADOW_ONLY" in markdown
+    assert "shadow_mode_active" in json_text
+    assert "true" in json_text.lower()
     assert "production_repairs_active" in json_text
     assert "false" in json_text.lower()
 
@@ -135,7 +149,7 @@ def test_runner_csv_bytes_hash_mapping_and_secret_redaction():
     assert "api_key=" not in report.to_json()
 
 
-def test_runner_reports_missing_market_data_and_watchlists_remain_inactive():
+def test_runner_reports_missing_market_data_and_watchlists_remain_shadow_only():
     rows = [
         {"sport": "Soccer", "event": "Team A vs Team B", "known_start_utc": "2026-06-20", "result": "Won", "market": "moneyline"},
         {"sport": "Soccer", "event": "Team A vs Team B", "known_start_utc": "2026-06-20", "result": "Lost", "market": "total"},
@@ -149,7 +163,10 @@ def test_runner_reports_missing_market_data_and_watchlists_remain_inactive():
     assert any("mixed-outcome unique event" in item for item in report.diagnostics["data_quality"]["penalties"])
     assert report.pattern_candidates
     assert all(candidate["status"] == "watchlist" for candidate in report.pattern_candidates)
+    assert all(candidate["shadow_mode_evaluation"] is True for candidate in report.pattern_candidates)
+    assert all(candidate["live_activated"] is False for candidate in report.pattern_candidates)
     assert all(candidate["repair_allowed"] is False for candidate in report.pattern_candidates)
+    assert all("Phase 3B Shadow Mode" in candidate["reason_no_activation"] for candidate in report.pattern_candidates)
 
 
 def test_runner_deterministic_run_id_helper():
