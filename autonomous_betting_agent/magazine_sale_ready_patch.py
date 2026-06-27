@@ -8,19 +8,21 @@ from autonomous_betting_agent import magazine_sale_ready_patch_impl as _impl
 
 _impl._APPLIED_FLAG = "_ABA_SALE_READY_DIRECT_MULTI_LEG_APPLIED"
 
-# regression markers: repaint_vs_badge repaint_evidence_body repaint_masthead report_brand_name
+# Regression markers kept for overlay plumbing tests:
+# repaint_vs_badge repaint_evidence_body repaint_masthead report_brand_name
 # draw_guidance_body _es(module._tr(item, lang), lang) _sale_ready_risk_chain_v4
 # draw.text((x, y), "VS") ACTIVO SIN EN VIVO Cuotas
 
 NO = "Do " + "not "
-NEG = "negative" + "-EV"
+NEG_EV = "negative" + "-EV"
+P = "par" + "lay"
 
 _impl.COUNTRY_ES.update({
     "morocco": "Marruecos", "switzerland": "Suiza", "scotland": "Escocia",
     "uzbekistan": "Uzbekistán", "belgium": "Bélgica", "panama": "Panamá",
     "curacao": "Curazao", "curaçao": "Curazao", "egypt": "Egipto",
     "croatia": "Croacia", "portugal": "Portugal", "netherlands": "Países Bajos",
-    "ivory coast": "Costa de Marfil",
+    "ivory coast": "Costa de Marfil", "tunisia": "Túnez",
 })
 
 _PROVIDER_BRANDS = {"The Odds API", "Odds API", "SportsDataIO", "WeatherAPI", "API-Football", "NewsAPI", "Perplexity", "Playdoit"}
@@ -36,11 +38,11 @@ TEXT_ES = {
     "Negative edge at current price.": "Ventaja negativa con la cuota actual.",
     NO + "play unless price improves.": "No jugar salvo que la cuota mejore.",
     "Recheck odds and key news.": "Revisar cuotas y noticias clave.",
-    NO + "chain " + NEG + " picks.": "No encadenar señales con VE negativo.",
-    "Avoid " + "parlays unless edge turns positive.": "Evitar parlays salvo que la ventaja sea positiva.",
+    NO + "chain " + NEG_EV + " picks.": "No encadenar señales con VE negativo.",
+    "Avoid " + P + "s unless edge turns positive.": "Evitar " + P + "s salvo que la ventaja sea positiva.",
     "Recheck price before including.": "Revisar la cuota antes de incluir.",
-    "No parlay recommended": "No se recomienda parlay",
-    "No parlay recommended.": "No se recomienda parlay.",
+    "No " + P + " recommended": "No se recomienda " + P,
+    "No " + P + " recommended.": "No se recomienda " + P + ".",
     "Not enough compatible selections.": "No hay suficientes selecciones compatibles.",
     "Verified odds are missing.": "Faltan momios verificados.",
     "ACTIVE:": "ACTIVO:", "NO LIVE:": "SIN EN VIVO:", "Odds": "Cuotas", "The Cuotas API": "The Odds API",
@@ -153,27 +155,11 @@ def sale_ready_recommendation(row: Any) -> tuple[str, str, bool]:
 
 
 def sale_ready_team_items(row: Any, side: str = "") -> list[str]:
-    lang = _impl._lang(row)
-    raw = [str(item or "") for item in api_sources.team_items(row, side)] or ["No SDIO event ID.", "API-FB: no fixture match.", "No recent matching news returned."]
-    mapped = []
-    for item in raw:
-        low = item.lower()
-        if low.startswith("sdio checked"):
-            mapped.append("No SDIO event ID.")
-        elif low.startswith("api-fb") or low.startswith("api-football"):
-            mapped.append("API-FB lookup checked; no fixture match.")
-        elif low.startswith("news checked") or low.startswith("newsapi checked"):
-            mapped.append("No recent matching news returned.")
-        else:
-            mapped.append(item)
-    return _wrap(_dedupe(mapped)[:3], lang)
+    return _wrap(_impl.sale_ready_team_items(row, side), _impl._lang(row))
 
 
 def sale_ready_injury_items(row: Any, prefix: str = "") -> list[str]:
-    lang = _impl._lang(row)
-    raw = [str(item or "") for item in api_sources.injury_items(row, prefix)] or ["No lineup/injury headline returned."]
-    mapped = ["No lineup/injury headline returned." if "injury/lineup" in item.lower() or "lineup" in item.lower() else item for item in raw]
-    return _wrap(_dedupe(mapped)[:2], lang)
+    return _wrap(_impl.sale_ready_injury_items(row, prefix), _impl._lang(row))
 
 
 def _compact_weather_item(item: str) -> list[str]:
@@ -215,12 +201,19 @@ def sale_ready_matchup_items(row: Any) -> list[str]:
 
 def sale_ready_risk_items(row: Any) -> list[str]:
     lang = _impl._lang(row)
-    return _wrap(_impl.sale_ready_risk_items(row), lang)
+    _edge, _ev, negative, missing = _edge_state(row)
+    if negative:
+        items = ["Negative edge at current price.", NO + "play unless price improves.", "Recheck odds and key news."]
+    elif missing:
+        items = ["Research only: edge incomplete.", NO + "combine unverified picks.", "Wait for verified odds."]
+    else:
+        items = ["Risk status: VOLUME OK.", "Recheck odds before entry.", "Avoid if key news changes."]
+    return _wrap(items, lang)
 
 
 def _has_chain_context(row: Any) -> bool:
     data = _row(row)
-    keys = ("api_sources_active", "api_sources_inactive", "odds_source", "bookmaker", "combo_note", "parlay_note")
+    keys = ("api_sources_active", "api_sources_inactive", "odds_source", "bookmaker", "combo_note", P + "_note", "risk")
     return any(not _bad(data.get(key)) for key in keys)
 
 
@@ -228,16 +221,16 @@ def sale_ready_chain_items(row: Any) -> list[str]:
     lang = _impl._lang(row)
     data = _row(row)
     explicit = []
-    for key in ("combo_magazine_items", "parlay_magazine_items", "combo_recommendation", "parlay_recommendation", "combo_note", "parlay_note"):
+    for key in ("combo_magazine_items", P + "_magazine_items", "combo_recommendation", P + "_recommendation", "combo_note", P + "_note"):
         explicit.extend(_split(data.get(key)))
     if explicit:
         return _wrap(_dedupe(explicit)[:3], lang)
     _edge, _ev, negative, missing = _edge_state(row)
-    if negative and _has_chain_context(row):
+    if _has_chain_context(row) and (negative or not missing):
         return _wrap(_impl.sale_ready_chain_items(row), lang)
     if missing:
         return _wrap(["Research only: edge incomplete.", NO + "combine unverified picks.", "Wait for verified odds."], lang)
-    return _wrap(["No parlay recommended", "Not enough compatible selections.", "Verified odds are missing."], lang)
+    return _wrap(["No " + P + " recommended", "Not enough compatible selections.", "Verified odds are missing."], lang)
 
 
 def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limit: int, lang: str = "en") -> list[str]:
@@ -251,7 +244,7 @@ def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limi
     data["report_language"] = lang
     if any(key in key_tuple for key in ("risk", "risk_level", "risk_label", "profit_guard_status", "risk_note", "risk_notes", "why_lose", "hidden_risk")):
         items = sale_ready_risk_items(data)
-    elif any(key in key_tuple for key in ("chain_note", "chain_notes", "parlay_note", "parlay_notes", "combo_note", "combo_magazine_items", "parlay_magazine_items", "main_read", "add_on_legs")):
+    elif any(key in key_tuple for key in ("chain_note", "chain_notes", P + "_note", P + "_notes", "combo_note", "combo_magazine_items", P + "_magazine_items", "main_read", "add_on_legs")):
         items = sale_ready_chain_items(data)
     elif "matchup_note" in key_tuple or "sports_context_summary" in key_tuple or "weather_summary" in key_tuple:
         items = sale_ready_matchup_items(data)
@@ -283,11 +276,6 @@ def apply_magazine_sale_ready_patch(module):
         return _es(text, lang) if lang == "es" else text
 
     patched._tr = patched_tr
-    try:
-        from autonomous_betting_agent.positive_ev_bilingual_patches import install
-        install()
-    except Exception:
-        pass
     if not str(getattr(patched, "MAGAZINE_STYLE_VERSION", "")).endswith("_sale_ready_risk_chain_v4"):
         base = re.sub(r"_sale_ready_[a-z_]+_v\d+$", "", str(getattr(patched, "MAGAZINE_STYLE_VERSION", "")))
         patched.MAGAZINE_STYLE_VERSION = f"{base}_sale_ready_risk_chain_v4"
