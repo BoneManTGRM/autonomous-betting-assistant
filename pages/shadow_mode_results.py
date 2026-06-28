@@ -6,7 +6,9 @@ import pandas as pd
 import streamlit as st
 
 from autonomous_betting_agent.adaptive_repair_runner import combined_rows, hash_rows, rows_from_csv_bytes, run_adaptive_repair_scan, system_source_adapters, uploaded_source
+from autonomous_betting_agent.pick_hold_store import normalize_workspace_id
 from autonomous_betting_agent.reparodynamics_audit import write_reparodynamics_audit_event_from_runner_report
+from autonomous_betting_agent.reparodynamics_repair_memory import load_repair_memory, repair_memory_to_frames, save_repair_memory, update_repair_memory
 from autonomous_betting_agent.reparodynamics_shadow_backtest import build_phase3c_report
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 from autonomous_betting_agent.ui_i18n import localize_dataframe
@@ -18,11 +20,17 @@ TEXT = {
     "en": {
         "title": "Shadow Mode Results",
         "caption": "Phase 3C Shadow Backtest comparison. Live behavior stays unchanged.",
-        "warning": "Shadow Mode results are simulation-only. No live model, odds, proof ledger, stake, EV, bankroll, or prediction behavior was changed.",
+        "warning": "Shadow Mode results are simulation-only. Live behavior was not changed.",
+        "memory_warning": "Saving to Repair Memory stores simulation summaries only. It does not change live picks or stored proof data.",
         "include_system": "Include available local system sources",
+        "workspace": "Workspace ID",
         "upload": "Optional graded CSV for Shadow Backtest",
         "uploaded": "Uploaded rows loaded",
         "run": "Run Shadow Backtest comparison",
+        "save_memory": "Save to Repair Memory",
+        "saved_memory": "Saved to Repair Memory. No live repairs were activated.",
+        "memory_preview": "Repair Memory Preview",
+        "open_reparodynamics": "Open Reparodynamics page",
         "baseline": "Baseline Metrics",
         "comparison": "Shadow Backtest Comparison",
         "blockers": "Data Blockers",
@@ -41,11 +49,17 @@ TEXT = {
     "es": {
         "title": "Resultados Shadow Mode",
         "caption": "Comparacion Shadow Backtest Fase 3C. El comportamiento en vivo no cambia.",
-        "warning": "Los resultados de Shadow Mode son solo simulación. No se cambió el modelo en vivo, cuotas, ledger de prueba, stake, EV, bankroll ni predicciones.",
+        "warning": "Los resultados de Shadow Mode son solo simulacion. El comportamiento en vivo no cambio.",
+        "memory_warning": "Guardar en Repair Memory almacena solo resumenes de simulacion. No cambia picks en vivo ni datos de prueba guardados.",
         "include_system": "Incluir fuentes locales disponibles del sistema",
+        "workspace": "ID del espacio de trabajo",
         "upload": "CSV calificado opcional para Shadow Backtest",
         "uploaded": "Filas subidas cargadas",
         "run": "Ejecutar comparacion Shadow Backtest",
+        "save_memory": "Guardar en Repair Memory",
+        "saved_memory": "Guardado en Repair Memory. No se activaron reparaciones en vivo.",
+        "memory_preview": "Vista previa de Repair Memory",
+        "open_reparodynamics": "Abrir pagina Reparodynamics",
         "baseline": "Metricas baseline",
         "comparison": "Comparacion Shadow Backtest",
         "blockers": "Bloqueadores de datos",
@@ -74,6 +88,13 @@ def display_frame(frame: pd.DataFrame | None) -> pd.DataFrame | None:
 
 def show_table(rows: Any) -> None:
     frame = pd.DataFrame(list(rows or []))
+    if frame.empty:
+        st.info(t("empty"))
+    else:
+        st.dataframe(display_frame(frame), use_container_width=True, hide_index=True)
+
+
+def show_frame(frame: pd.DataFrame) -> None:
     if frame.empty:
         st.info(t("empty"))
     else:
@@ -126,7 +147,12 @@ def scan_rows(uploaded_rows: list[dict[str, Any]] | None, uploaded_name: str, in
 st.title(t("title"))
 st.caption(t("caption"))
 st.warning(t("warning"))
+st.info(t("memory_warning"))
+st.page_link("pages/reparodynamics.py", label=t("open_reparodynamics"))
 
+workspace_input = st.text_input(t("workspace"), value=st.session_state.get("aba_test_window_id", "test_01"))
+workspace_id = normalize_workspace_id(workspace_input)
+st.session_state["aba_test_window_id"] = workspace_id
 include_system = st.checkbox(t("include_system"), value=True)
 uploaded_rows = None
 uploaded_bytes = None
@@ -148,6 +174,12 @@ if st.button(t("run"), type="primary"):
     st.success(t("audit_written"))
 
 report = st.session_state.get("phase3c_latest_report")
+if report and st.button(t("save_memory")):
+    memory = update_repair_memory(load_repair_memory(workspace_id), report, source="Shadow Mode Results page")
+    memory = save_repair_memory(memory, workspace_id)
+    st.session_state["phase3d_repair_memory"] = memory
+    st.success(t("saved_memory"))
+
 if not report:
     st.info(t("no_data"))
 else:
@@ -159,7 +191,7 @@ else:
     c4.metric(t("watchlists"), counts.get("watchlists_count", 0))
     c5.metric(t("manual_review"), counts.get("manual_review_eligible_count", 0))
     c6.metric(t("live_repairs"), counts.get("live_repairs_applied_count", 0))
-    tabs = st.tabs([t("baseline"), t("comparison"), t("blockers"), t("watchlists"), t("rejected"), t("manual"), t("safety")])
+    tabs = st.tabs([t("baseline"), t("comparison"), t("blockers"), t("watchlists"), t("rejected"), t("manual"), t("safety"), t("memory_preview")])
     with tabs[0]:
         st.dataframe(display_frame(one_row(report.get("baseline_metrics", {}) or {})), use_container_width=True, hide_index=True)
     with tabs[1]:
@@ -174,3 +206,7 @@ else:
         show_table(report.get("manual_review_queue", []))
     with tabs[6]:
         st.dataframe(display_frame(one_row(report.get("safety_gates", {}) or {})), use_container_width=True, hide_index=True)
+    with tabs[7]:
+        memory = st.session_state.get("phase3d_repair_memory") or load_repair_memory(workspace_id)
+        frames = repair_memory_to_frames(memory)
+        show_frame(frames["summary"])
