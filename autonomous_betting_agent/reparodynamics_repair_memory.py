@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
+import os
 import statistics
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -9,13 +11,16 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import pandas as pd
+import requests
 
 from autonomous_betting_agent.pick_hold_store import normalize_workspace_id
 
-SCHEMA_VERSION = "reparodynamics_phase_3d_memory_v1"
+SCHEMA_VERSION = "reparodynamics_phase_3d_memory_v2"
 PHASE_3D = "Phase 3D Repair Memory"
 FORBIDDEN = "FORBIDDEN"
 REPAIR_MEMORY_DIR = Path("data/adaptive_repair/repair_memory")
+GITHUB_API = "https://api.github.com"
+GITHUB_STATE_DIR = ".aba_state"
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "minimum_runs_for_promising": 2,
@@ -88,6 +93,104 @@ def _median(values: Sequence[float]) -> float | None:
     return _round(statistics.median(clean)) if clean else None
 
 
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe(val) for key, val in sorted(value.items(), key=lambda item: str(item[0]))}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, float):
+        return round(value, 10)
+    if value is None or isinstance(value, (str, int, bool)):
+        return value
+    return str(value)
+
+
+def _secret_value(*names: str) -> str:
+    try:
+        import streamlit as st
+        for name in names:
+            value = str(st.secrets.get(name, "")).strip()
+            if value:
+                return value
+    except Exception:
+        pass
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _github_token() -> str:
+    return _secret_value("GITHUB_PROOF_TOKEN", "PROOF_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
+
+
+def _github_repo() -> str:
+    return _secret_value("GITHUB_PROOF_REPO", "PROOF_GITHUB_REPO", "GITHUB_REPOSITORY") or "BoneManTGRM/autonomous-betting-assistant"
+
+
+def _github_branch() -> str:
+    return _secret_value("GITHUB_PROOF_BRANCH", "PROOF_GITHUB_BRANCH") or "main"
+
+
+def github_repair_memory_enabled() -> bool:
+    return bool(_github_token() and _github_repo())
+
+
+def _github_headers(token: str) -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+
+def _github_memory_path(workspace_id: Any = "test_01") -> str:
+    workspace = normalize_workspace_id(workspace_id)
+    return f"{GITHUB_STATE_DIR}/reparodynamics_repair_memory_{workspace}.json"
+
+
+def _github_get_memory(workspace_id: Any = "test_01") -> tuple[dict[str, Any], str]:
+    token = _github_token()
+    repo = _github_repo()
+    branch = _github_branch()
+    if not token or not repo:
+        return {}, ""
+    url = f"{GITHUB_API}/repos/{repo}/contents/{_github_memory_path(workspace_id)}"
+    try:
+        response = requests.get(url, headers=_github_headers(token), params={"ref": branch}, timeout=20)
+        if response.status_code == 404:
+            return {}, ""
+        response.raise_for_status()
+        payload = response.json()
+        encoded = str(payload.get("content", "")).replace("\n", "")
+        decoded = base64.b64decode(encoded).decode("utf-8")
+        data = json.loads(decoded)
+        return data if isinstance(data, dict) else {}, str(payload.get("sha", ""))
+    except Exception:
+        return {}, ""
+
+
+def _github_put_memory(memory: Mapping[str, Any], workspace_id: Any = "test_01") -> bool:
+    token = _github_token()
+    repo = _github_repo()
+    branch = _github_branch()
+    if not token or not repo:
+        return False
+    _existing, sha = _github_get_memory(workspace_id)
+    url = f"{GITHUB_API}/repos/{repo}/contents/{_github_memory_path(workspace_id)}"
+    content = base64.b64encode((json.dumps(memory, ensure_ascii=False, indent=2, sort_keys=True, default=str) + "\n").encode("utf-8")).decode("ascii")
+    body: dict[str, Any] = {"message": f"Persist Reparodynamics repair memory for {normalize_workspace_id(workspace_id)}", "content": content, "branch": branch}
+    if sha:
+        body["sha"] = sha
+    try:
+        response = requests.put(url, headers=_github_headers(token), json=body, timeout=30)
+        response.raise_for_status()
+        return True
+    except Exception:
+        return False
+
+
 def _memory_path(workspace_id: Any = "test_01") -> Path:
     workspace = normalize_workspace_id(workspace_id)
     return REPAIR_MEMORY_DIR / f"reparodynamics_repair_memory_{workspace}.json"
@@ -108,6 +211,8 @@ def _new_memory(workspace_id: Any = "test_01") -> dict[str, Any]:
         "stored_data_mutation": FORBIDDEN,
         "repair_activation": "OFF",
         "automatic_live_promotion": "FORBIDDEN",
+        "github_persistence_enabled": github_repair_memory_enabled(),
+        "saved_run_ids": [],
         "items": {},
         "events": [],
     }
@@ -115,6 +220,7 @@ def _new_memory(workspace_id: Any = "test_01") -> dict[str, Any]:
 
 def _safety(memory: dict[str, Any]) -> None:
     memory["phase"] = PHASE_3D
+    memory["schema_version"] = SCHEMA_VERSION
     memory["repairs_applied_live"] = 0
     memory["live_repairs_applied_count"] = 0
     memory["live_mutation"] = FORBIDDEN
@@ -122,6 +228,10 @@ def _safety(memory: dict[str, Any]) -> None:
     memory["stored_data_mutation"] = FORBIDDEN
     memory["repair_activation"] = "OFF"
     memory["automatic_live_promotion"] = "FORBIDDEN"
+    memory["github_persistence_enabled"] = github_repair_memory_enabled()
+    memory.setdefault("saved_run_ids", [])
+    memory.setdefault("items", {})
+    memory.setdefault("events", [])
 
 
 def stable_repair_key(finding: Mapping[str, Any]) -> str:
@@ -148,14 +258,57 @@ def normalize_phase3c_report(report: Mapping[str, Any]) -> dict[str, Any]:
     for name in ("data_blockers", "watchlists", "repair_candidates", "shadow_tested_repairs", "rejected_repairs", "manual_review_queue"):
         value = safe.get(name, [])
         safe[name] = [dict(item) for item in value if isinstance(item, Mapping)] if isinstance(value, list) else []
+    safe["memory_run_id"] = _text(safe.get("memory_run_id") or safe.get("shadow_backtest_run_id") or stable_memory_run_id(safe))
     return safe
 
 
-def _memory_row(finding: Mapping[str, Any], section: str, source: str, observed_at: str) -> dict[str, Any]:
+def _run_fingerprint_rows(report: Mapping[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for section in ("data_blockers", "watchlists", "repair_candidates", "shadow_tested_repairs", "rejected_repairs", "manual_review_queue"):
+        for finding in report.get(section, []) or []:
+            if not isinstance(finding, Mapping):
+                continue
+            comparison = finding.get("comparison_metrics", {}) or {}
+            rows.append(
+                {
+                    "section": section,
+                    "repair_key": stable_repair_key(finding),
+                    "finding_type": finding.get("finding_type"),
+                    "candidate_type": finding.get("candidate_type"),
+                    "sample_size": finding.get("sample_size"),
+                    "completed_rows_used": finding.get("completed_rows_used"),
+                    "decision": finding.get("decision") or comparison.get("decision"),
+                    "data_blockers": finding.get("data_blockers") or [],
+                    "unavailable_options": finding.get("unavailable_options") or [],
+                    "ROI_delta": comparison.get("ROI_delta"),
+                    "profit_units_delta": comparison.get("profit_units_delta"),
+                    "losses_delta": comparison.get("losses_delta"),
+                }
+            )
+    return sorted(rows, key=lambda row: json.dumps(_json_safe(row), sort_keys=True))
+
+
+def stable_memory_run_id(phase3c_report: Mapping[str, Any]) -> str:
+    report = deepcopy(dict(phase3c_report or {}))
+    for volatile in ("generated_at_utc", "timestamp", "created_at_utc", "updated_at_utc", "shadow_backtest_run_id", "memory_run_id"):
+        report.pop(volatile, None)
+    payload = {
+        "phase": report.get("phase", "Phase 3C Shadow Backtest"),
+        "rows_scanned": report.get("rows_scanned"),
+        "completed_rows_used": report.get("completed_rows_used"),
+        "summary_counts": report.get("summary_counts", {}),
+        "baseline_metrics": report.get("baseline_metrics", {}),
+        "findings": _run_fingerprint_rows(report),
+    }
+    return sha256(json.dumps(_json_safe(payload), sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()[:24]
+
+
+def _memory_row(finding: Mapping[str, Any], section: str, source: str, observed_at: str, memory_run_id: str) -> dict[str, Any]:
     comparison = dict(finding.get("comparison_metrics", {}) or {})
     baseline = dict(finding.get("baseline_metrics", {}) or {})
-    row = {
+    return {
         "repair_key": stable_repair_key(finding),
+        "memory_run_id": memory_run_id,
         "source": source,
         "section": section,
         "observed_at_utc": observed_at,
@@ -185,12 +338,12 @@ def _memory_row(finding: Mapping[str, Any], section: str, source: str, observed_
         "stored_data_mutation": FORBIDDEN,
         "repairs_applied_live": 0,
     }
-    return row
 
 
 def extract_repair_memory_rows(phase3c_report: Mapping[str, Any], source: str | None = None) -> list[dict[str, Any]]:
     report = normalize_phase3c_report(phase3c_report)
     observed_at = _text(report.get("generated_at_utc")) or utc_now()
+    memory_run_id = _text(report.get("memory_run_id")) or stable_memory_run_id(report)
     label = source or "Phase 3C Shadow Backtest"
     rows: list[dict[str, Any]] = []
     sections = {
@@ -203,8 +356,29 @@ def extract_repair_memory_rows(phase3c_report: Mapping[str, Any], source: str | 
     }
     for section, findings in sections.items():
         for finding in findings:
-            rows.append(_memory_row(finding, section, label, observed_at))
+            rows.append(_memory_row(finding, section, label, observed_at, memory_run_id))
     return rows
+
+
+def _history_identity(row: Mapping[str, Any]) -> str:
+    run_id = _text(row.get("memory_run_id"))
+    if run_id:
+        return run_id
+    comparable = {key: value for key, value in dict(row).items() if key not in {"observed_at_utc", "source"}}
+    return sha256(json.dumps(_json_safe(comparable), sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()[:24]
+
+
+def _dedupe_history(history: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for item in history or []:
+        row = dict(item)
+        identity = _history_identity(row)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        deduped.append(row)
+    return deduped
 
 
 def _history_values(history: Sequence[Mapping[str, Any]], field: str) -> list[float]:
@@ -269,7 +443,8 @@ def summarize_repair_memory(memory_rows: Sequence[Mapping[str, Any]], config: Ma
         key = _text(row.get("repair_key")) or stable_repair_key(row)
         grouped.setdefault(key, []).append(dict(row, repair_key=key))
     summaries: dict[str, dict[str, Any]] = {}
-    for key, history in grouped.items():
+    for key, raw_history in grouped.items():
+        history = _dedupe_history(raw_history)
         first = history[0]
         latest = history[-1]
         roi_values = _history_values(history, "ROI_delta")
@@ -324,17 +499,42 @@ def summarize_repair_memory(memory_rows: Sequence[Mapping[str, Any]], config: Ma
 
 
 def update_repair_memory(existing_memory: Mapping[str, Any] | None, phase3c_report: Mapping[str, Any], source: str | None = None, config: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    report = normalize_phase3c_report(phase3c_report)
+    run_id = _text(report.get("memory_run_id")) or stable_memory_run_id(report)
     memory = deepcopy(dict(existing_memory or _new_memory()))
-    if not memory.get("items"):
-        memory.setdefault("items", {})
-    memory.setdefault("events", [])
     memory.setdefault("created_at_utc", utc_now())
     _safety(memory)
-    rows = extract_repair_memory_rows(phase3c_report, source=source)
+    saved_run_ids = set(_text(item) for item in memory.get("saved_run_ids", []) if _text(item))
+    if run_id in saved_run_ids:
+        now = utc_now()
+        events = memory.setdefault("events", [])
+        duplicate_event_id = sha256(f"phase3c_duplicate_save_skipped|{run_id}".encode("utf-8")).hexdigest()[:16]
+        if not any(event.get("event_id") == duplicate_event_id for event in events):
+            events.append(
+                {
+                    "event_id": duplicate_event_id,
+                    "event_type": "phase3c_duplicate_save_skipped",
+                    "workspace_id": memory.get("workspace_id", "test_01"),
+                    "memory_run_id": run_id,
+                    "rows_added": 0,
+                    "duplicate_skipped": True,
+                    "live_mutation": FORBIDDEN,
+                    "model_training": FORBIDDEN,
+                    "stored_data_mutation": FORBIDDEN,
+                    "repairs_applied_live": 0,
+                    "created_at_utc": now,
+                }
+            )
+        memory["last_save_status"] = "already_saved"
+        memory["last_saved_run_id"] = run_id
+        memory["updated_at_utc"] = now
+        return memory
+
+    rows = extract_repair_memory_rows(report, source=source)
     for row in rows:
         key = row["repair_key"]
         current = dict(memory["items"].get(key, {}))
-        old_history = list(current.get("history", []) or [])
+        old_history = _dedupe_history(list(current.get("history", []) or []))
         old_manual = {
             "manual_status": current.get("manual_status", ""),
             "manual_note": current.get("manual_note", ""),
@@ -347,12 +547,18 @@ def update_repair_memory(existing_memory: Mapping[str, Any] | None, phase3c_repo
         summary["eligible_for_phase4_lockbox"] = summary["memory_status"] == "phase4_lockbox_candidate"
         memory["items"][key] = summary
     memory["updated_at_utc"] = utc_now()
+    saved_run_ids.add(run_id)
+    memory["saved_run_ids"] = sorted(saved_run_ids)
+    memory["last_save_status"] = "saved"
+    memory["last_saved_run_id"] = run_id
     memory["events"].append(
         {
-            "event_id": sha256(f"phase3c_saved_to_memory|{memory['updated_at_utc']}|{len(rows)}".encode("utf-8")).hexdigest()[:16],
+            "event_id": sha256(f"phase3c_saved_to_memory|{run_id}".encode("utf-8")).hexdigest()[:16],
             "event_type": "phase3c_saved_to_memory",
             "workspace_id": memory.get("workspace_id", "test_01"),
+            "memory_run_id": run_id,
             "rows_added": len(rows),
+            "duplicate_skipped": False,
             "live_mutation": FORBIDDEN,
             "model_training": FORBIDDEN,
             "stored_data_mutation": FORBIDDEN,
@@ -409,27 +615,37 @@ def manual_review_decision(memory: Mapping[str, Any], repair_key: str, decision:
     return updated
 
 
-def load_repair_memory(workspace_id: Any = "test_01") -> dict[str, Any]:
+def _load_local_memory(workspace_id: Any = "test_01") -> dict[str, Any]:
     path = _memory_path(workspace_id)
     if not path.exists():
-        return _new_memory(workspace_id)
+        return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return _new_memory(workspace_id)
-        data.setdefault("workspace_id", normalize_workspace_id(workspace_id))
-        data.setdefault("items", {})
-        data.setdefault("events", [])
-        _safety(data)
-        return data
+        return data if isinstance(data, dict) else {}
     except Exception:
-        return _new_memory(workspace_id)
+        return {}
+
+
+def load_repair_memory(workspace_id: Any = "test_01") -> dict[str, Any]:
+    workspace = normalize_workspace_id(workspace_id)
+    local = _load_local_memory(workspace)
+    github, _sha = _github_get_memory(workspace)
+    candidates = [data for data in (local, github) if isinstance(data, dict) and data.get("items")]
+    if candidates:
+        data = max(candidates, key=lambda item: _text(item.get("updated_at_utc")))
+    else:
+        data = local or github or _new_memory(workspace)
+    data.setdefault("workspace_id", workspace)
+    data.setdefault("items", {})
+    data.setdefault("events", [])
+    data.setdefault("saved_run_ids", [])
+    _safety(data)
+    return data
 
 
 def save_repair_memory(memory: Mapping[str, Any], workspace_id: Any = "test_01") -> dict[str, Any]:
     payload = deepcopy(dict(memory or _new_memory(workspace_id)))
     payload["workspace_id"] = normalize_workspace_id(workspace_id or payload.get("workspace_id", "test_01"))
-    payload.setdefault("schema_version", SCHEMA_VERSION)
     payload.setdefault("created_at_utc", utc_now())
     payload["updated_at_utc"] = utc_now()
     _safety(payload)
@@ -438,6 +654,7 @@ def save_repair_memory(memory: Mapping[str, Any], workspace_id: Any = "test_01")
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
     tmp.replace(path)
+    _github_put_memory(payload, payload["workspace_id"])
     return payload
 
 
@@ -462,7 +679,7 @@ def repair_memory_to_frames(memory: Mapping[str, Any]) -> dict[str, pd.DataFrame
     history_rows = []
     for item in items:
         clean = dict(item)
-        history = list(clean.pop("history", []) or [])
+        history = _dedupe_history(list(clean.pop("history", []) or []))
         summary_rows.append(clean)
         for entry in history:
             history_rows.append(dict(entry, repair_key=item.get("repair_key", "")))
