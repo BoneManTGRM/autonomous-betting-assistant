@@ -7,6 +7,7 @@ from typing import Any, Mapping
 import pandas as pd
 import streamlit as st
 
+import autonomous_betting_agent.ui_i18n_phase3e  # noqa: F401
 from autonomous_betting_agent.commercial_platform_tools import (
     filter_locked_proof_rows,
     load_persistent_ledger,
@@ -15,6 +16,7 @@ from autonomous_betting_agent.commercial_platform_tools import (
     proof_audit_summary,
     save_persistent_ledger,
 )
+from autonomous_betting_agent.dynamic_odds_display import build_dynamic_odds_shadow_rows, dynamic_odds_shadow_safety_summary
 from autonomous_betting_agent.four_tool_orchestrator import page_health_frame
 from autonomous_betting_agent.odds_lock_tools import (
     client_view,
@@ -114,6 +116,9 @@ TEXT = {
         'official_ev_source': 'official +EV',
         'by_sport': 'By sport',
         'by_market': 'By market',
+        'dynamic_odds_shadow': 'Dynamic Odds Shadow Math',
+        'dynamic_odds_warning': 'Dynamic Odds is Shadow Mode only. These values do not change live picks, lock readiness, EV, stake, bankroll, grading, proof ledgers, or model probability.',
+        'dynamic_odds_empty': 'No rows available for Dynamic Odds Shadow display.',
     },
     'es': {
         'title': 'Odds Lock Pro',
@@ -189,6 +194,9 @@ TEXT = {
         'official_ev_source': 'oficial +EV',
         'by_sport': 'Por deporte',
         'by_market': 'Por mercado',
+        'dynamic_odds_shadow': 'Matematica Shadow de Dynamic Odds',
+        'dynamic_odds_warning': 'Dynamic Odds es solo Shadow Mode. Estos valores no cambian picks en vivo, preparacion de bloqueo, EV, stake, bankroll, calificacion, ledgers de prueba ni probabilidad del modelo.',
+        'dynamic_odds_empty': 'No hay filas disponibles para mostrar Dynamic Odds Shadow.',
     },
 }
 
@@ -460,6 +468,18 @@ def show_candidates(frame: pd.DataFrame) -> None:
     st.dataframe(display_frame(frame[cols] if cols else frame), use_container_width=True, hide_index=True)
 
 
+def show_dynamic_odds_shadow_panel(frame: pd.DataFrame) -> None:
+    st.subheader(t('dynamic_odds_shadow'))
+    st.warning(t('dynamic_odds_warning'))
+    if frame.empty:
+        st.info(t('dynamic_odds_empty'))
+        return
+    shadow_rows = build_dynamic_odds_shadow_rows(frame.to_dict('records'))
+    shadow_frame = pd.DataFrame(shadow_rows)
+    st.dataframe(display_frame(shadow_frame), use_container_width=True, hide_index=True)
+    st.json(dynamic_odds_shadow_safety_summary())
+
+
 def exposure_summary(frame: pd.DataFrame, *, daily_limit_units: float, sport_limit_units: float) -> pd.DataFrame:
     if frame.empty:
         return pd.DataFrame(columns=['scope', 'stake_units', 'limit_units', 'status'])
@@ -570,6 +590,10 @@ cols[7].metric(t('proof_quality'), f"{audit['proof_quality_score']}/100")
 
 st.subheader(t('handoff'))
 st.dataframe(display_frame(page_health_frame(health_frame_source, page='what_are_the_odds')), use_container_width=True, hide_index=True)
+
+dynamic_shadow_source = review_rows if not review_rows.empty else (active_locked if not active_locked.empty else normalized)
+with st.expander(t('dynamic_odds_shadow'), expanded=True):
+    show_dynamic_odds_shadow_panel(dynamic_shadow_source)
 
 tabs = st.tabs([t('research_candidates_tab'), t('official_candidates_tab'), t('locked'), t('dashboard'), t('reports'), t('exposure'), t('client')])
 
