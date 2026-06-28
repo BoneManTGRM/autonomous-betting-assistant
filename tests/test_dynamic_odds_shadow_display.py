@@ -12,10 +12,15 @@ from autonomous_betting_agent.dynamic_odds_display import (
     dynamic_odds_shadow_learning_summary,
     dynamic_odds_shadow_safety_summary,
 )
+from autonomous_betting_agent.dynamic_odds_shadow_memory import (
+    delete_dynamic_odds_shadow_model,
+    load_dynamic_odds_shadow_model,
+    train_and_save_dynamic_odds_shadow_model,
+)
 from autonomous_betting_agent.ui_i18n import localize_dataframe, localize_value
 
 
-def sample_row() -> dict[str, object]:
+def sample_row(workspace_id: str = "shadow_display_no_model") -> dict[str, object]:
     return {
         "event": "Team A at Team B",
         "prediction": "Team A",
@@ -25,6 +30,7 @@ def sample_row() -> dict[str, object]:
         "model_probability": 0.55,
         "model_market_edge": 0.15,
         "expected_value_per_unit": 0.375,
+        "test_window_id": workspace_id,
         "lock_ready": True,
         "publish_ready": True,
         "official_status_label": "official_plus_ev",
@@ -32,14 +38,15 @@ def sample_row() -> dict[str, object]:
     }
 
 
-def completed_row(result: str, sport: str = "soccer") -> dict[str, object]:
-    row = sample_row()
+def completed_row(result: str, sport: str = "soccer", workspace_id: str = "shadow_learning_feed") -> dict[str, object]:
+    row = sample_row(workspace_id)
     row["sport"] = sport
     row["result_status"] = result
     return row
 
 
 def test_shadow_row_returns_dynamic_math_fields() -> None:
+    delete_dynamic_odds_shadow_model("shadow_display_no_model")
     row = build_dynamic_odds_shadow_row(sample_row())
     assert row["dynamic_probability"] is not None
     assert row["dynamic_edge"] is not None
@@ -72,22 +79,30 @@ def test_shadow_row_does_not_mutate_input_row_or_live_fields() -> None:
 
 
 def test_missing_odds_returns_no_odds_status() -> None:
-    row = build_dynamic_odds_shadow_row({"event": "Team A at Team B", "model_probability": 0.55})
+    row = build_dynamic_odds_shadow_row({"event": "Team A at Team B", "model_probability": 0.55, "test_window_id": "shadow_missing_odds"})
     assert row["dynamic_signal_status"] == "no_odds"
     assert row["dynamic_probability"] is None
 
 
 def test_missing_lr_data_defaults_to_shadow_lr_one() -> None:
-    row = build_dynamic_odds_shadow_row(sample_row())
+    delete_dynamic_odds_shadow_model("shadow_no_lr")
+    row = build_dynamic_odds_shadow_row(sample_row("shadow_no_lr"))
     assert row["total_LR_multiplier"] == 1.0
     assert row["dynamic_signal_status"] == "no_lr_data"
     assert row["lr_model_loaded"] is False
 
 
-def test_completed_rows_build_read_only_lr_learning_feed() -> None:
-    rows = [completed_row("win") for _ in range(30)] + [completed_row("loss", sport="basketball") for _ in range(30)] + [sample_row()]
+def test_completed_rows_build_and_save_read_only_lr_learning_feed() -> None:
+    workspace = "shadow_learning_feed"
+    delete_dynamic_odds_shadow_model(workspace)
+    rows = [completed_row("win", workspace_id=workspace) for _ in range(30)] + [completed_row("loss", sport="basketball", workspace_id=workspace) for _ in range(30)] + [sample_row(workspace)]
     shadow = build_dynamic_odds_shadow_rows(rows)
+    saved = load_dynamic_odds_shadow_model(workspace)
+    assert saved["workspace_id"] == workspace
+    assert saved["dynamic_odds_live_activation"] == "OFF"
+    assert saved["dynamic_odds_applied_live_count"] == 0
     assert shadow[-1]["lr_model_loaded"] is True
+    assert shadow[-1]["lr_model_source"] == "saved_shadow_model"
     assert shadow[-1]["lr_training_rows_used"] >= 60
     assert shadow[-1]["lr_feature_count"] > 0
     assert shadow[-1]["strongest_LR_feature"]
@@ -99,8 +114,20 @@ def test_completed_rows_build_read_only_lr_learning_feed() -> None:
     assert summary["dynamic_odds_applied_live_count"] == 0
 
 
+def test_saved_model_loads_for_pending_rows_without_completed_rows() -> None:
+    workspace = "shadow_saved_model_pending"
+    delete_dynamic_odds_shadow_model(workspace)
+    train_rows = [completed_row("win", workspace_id=workspace) for _ in range(30)] + [completed_row("loss", sport="basketball", workspace_id=workspace) for _ in range(30)]
+    train_and_save_dynamic_odds_shadow_model(train_rows, workspace_id=workspace, source="unit_test")
+    pending = [sample_row(workspace)]
+    shadow = build_dynamic_odds_shadow_rows(pending)
+    assert shadow[0]["lr_model_loaded"] is True
+    assert shadow[0]["lr_model_source"] == "saved_shadow_model"
+    assert shadow[0]["dynamic_odds_applied_live_count"] == 0
+
+
 def test_shadow_rows_and_safety_summary_are_display_only() -> None:
-    rows = build_dynamic_odds_shadow_rows([sample_row()])
+    rows = build_dynamic_odds_shadow_rows([sample_row("shadow_display_only")])
     assert len(rows) == 1
     safety = dynamic_odds_shadow_safety_summary()
     assert safety["dynamic_odds_predictor"] == "SHADOW ONLY"
@@ -125,7 +152,7 @@ def test_ui_sources_include_read_only_dynamic_odds_panel() -> None:
 
 
 def test_spanish_dynamic_odds_display_labels() -> None:
-    frame = pd.DataFrame([build_dynamic_odds_shadow_row(sample_row())])
+    frame = pd.DataFrame([build_dynamic_odds_shadow_row(sample_row("shadow_spanish"))])
     localized = localize_dataframe(frame, "es")
     assert "Probabilidad dinamica" in localized.columns
     assert "EV dinamico" in localized.columns
