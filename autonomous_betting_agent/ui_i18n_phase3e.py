@@ -4,31 +4,45 @@ from autonomous_betting_agent.ui_i18n import COLUMN_LABELS_ES, VALUE_COLUMNS, VA
 
 COLUMN_LABELS_ES.update({
     "dynamic_shadow_run_id": "ID de corrida Dynamic Shadow",
+    "current_model_probability": "Probabilidad actual del modelo",
+    "raw_implied_probability": "Probabilidad implicita cruda",
+    "no_vig_implied_probability": "Probabilidad implicita sin vig",
+    "book_odds_ratio": "Odds ratio de la casa",
+    "total_LR_multiplier": "Multiplicador LR total",
+    "recency_decay_factor": "Factor de decaimiento por recencia",
     "dynamic_probability": "Probabilidad dinamica",
     "dynamic_edge": "Ventaja dinamica",
     "dynamic_no_vig_edge": "Ventaja dinamica sin vig",
     "dynamic_EV": "EV dinamico",
+    "dynamic_fair_odds": "Cuota justa dinamica",
     "dynamic_signal_status": "Estado de senal dinamica",
+    "dynamic_odds_mode": "Modo Dynamic Odds",
+    "dynamic_odds_predictor": "Dynamic Odds Predictor",
+    "dynamic_odds_live_activation": "Activacion Dynamic Odds en vivo",
+    "dynamic_odds_applied_live": "Dynamic Odds aplicado en vivo",
+    "dynamic_odds_applied_live_count": "Conteo Dynamic Odds aplicado en vivo",
     "lr_training_rows": "Filas entrenamiento LR",
     "lr_evaluation_rows": "Filas evaluacion LR",
     "evaluation_mode": "Modo de evaluacion",
     "leakage_guard_enabled": "Guardia anti-filtracion activa",
+    "leakage_guard_reason": "Razon guardia anti-filtracion",
     "train_test_overlap_count": "Traslape train/test",
     "blocked_leakage_fields": "Campos de filtracion bloqueados",
     "walk_forward_windows_evaluated": "Ventanas walk-forward evaluadas",
     "dynamic_green_count": "Conteo dynamic green",
     "dynamic_yellow_count": "Conteo dynamic yellow",
     "dynamic_red_count": "Conteo dynamic red",
-    "dynamic_odds_applied_live_count": "Conteo Dynamic Odds aplicado en vivo",
 })
 
 VALUE_LABELS_ES.update({
+    "SHADOW ONLY": "SOLO SHADOW",
+    "shadow_only": "solo shadow",
     "dynamic_green": "dynamic green",
     "dynamic_yellow": "dynamic yellow",
     "dynamic_red": "dynamic red",
     "no_odds": "sin cuotas",
     "no_lr_data": "sin datos LR",
-    "shadow_only": "solo shadow",
+    "unsafe_probability": "probabilidad insegura",
     "future_manual_review": "revision manual futura",
     "keep_testing": "seguir probando",
     "data_blocked": "bloqueado por datos",
@@ -38,4 +52,14 @@ VALUE_LABELS_ES.update({
     "phase3e_dynamic_odds_shadow_run": "ejecucion shadow Dynamic Odds Fase 3E",
 })
 
-VALUE_COLUMNS.update({"dynamic_signal_status", "evaluation_mode", "decision", "decision_reason", "event_type"})
+VALUE_COLUMNS.update({
+    "dynamic_signal_status",
+    "dynamic_odds_mode",
+    "dynamic_odds_predictor",
+    "dynamic_odds_live_activation",
+    "evaluation_mode",
+    "leakage_guard_reason",
+    "decision",
+    "decision_reason",
+    "event_type",
+})
