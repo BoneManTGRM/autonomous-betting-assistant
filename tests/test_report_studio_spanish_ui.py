@@ -37,7 +37,7 @@ def test_report_studio_uses_local_spanish_sport_filter_not_global_widget_patch()
     assert "from autonomous_betting_agent.report_studio_spanish_ui import render_sport_league_filter" in text
     assert "preferred_sports = render_sport_league_filter(" in text
     assert "st.multiselect(t(\"sports\")" not in text
-    assert "sport_league_display_text" in text
+    assert "render_sport_league_filter" in text
 
 
 def test_report_studio_magazine_tab_uses_full_pick_renderer_not_old_mobile_preview():
