@@ -24,6 +24,7 @@ from autonomous_betting_agent.advisory_odds_value_display import (
     playable_table,
     prediction_only_table,
     sportsbook_hold_summary,
+    sportsbook_source_summary,
     stale_line_summary,
     validate_advisory_rows,
     watchlist_table,
@@ -40,7 +41,7 @@ LANG = render_app_sidebar("advisory_odds_value", language_key="advisory_odds_val
 TEXT = {
     "en": {
         "title": "Advisory Odds Value",
-        "caption": "Phase 3E.5.4 proof-safe advisory odds readiness, diagnostics, and report cleanup.",
+        "caption": "Phase 3E.5.5 proof-safe advisory odds readiness, sportsbook source normalization, diagnostics, and report cleanup.",
         "input": "Input",
         "test_window": "Test Window ID",
         "use_session": "Use latest saved/session rows",
@@ -51,6 +52,7 @@ TEXT = {
         "safety": "Advisory safety banner",
         "readiness": "Fresh Slate Readiness",
         "readiness_details": "Fresh slate readiness details",
+        "source_summary": "Sportsbook Source Summary",
         "diagnostics": "Why no playable +EV rows?",
         "summary": "Advisory summary",
         "playable": "Playable +EV advisory picks",
@@ -68,7 +70,7 @@ TEXT = {
     },
     "es": {
         "title": "Valor de Odds Asesoría",
-        "caption": "Fase 3E.5.4 preparacion, diagnostico y reporte asesoría sin tocar prueba.",
+        "caption": "Fase 3E.5.5 preparacion, fuentes sportsbook, diagnostico y reporte asesoría sin tocar prueba.",
         "input": "Entrada",
         "test_window": "ID de ventana de prueba",
         "use_session": "Usar ultimas filas guardadas/sesion",
@@ -79,6 +81,7 @@ TEXT = {
         "safety": "Banner de seguridad asesoría",
         "readiness": "Preparacion de slate fresco",
         "readiness_details": "Detalles de preparacion de slate fresco",
+        "source_summary": "Resumen de fuente sportsbook",
         "diagnostics": "Por que no hay filas +EV jugables?",
         "summary": "Resumen asesoría",
         "playable": "Picks asesoría jugables +EV",
@@ -210,6 +213,8 @@ status_col.metric("Readiness status", readiness["readiness_status"])
 st.info(readiness.get("recommended_next_action", "Review advisory tables."))
 with st.expander(t("readiness_details"), expanded=True):
     st.json(readiness)
+
+show_table(t("source_summary"), sportsbook_source_summary(advisory))
 
 st.subheader(t("diagnostics"))
 if diagnostics.get("show_no_playable_warning"):
