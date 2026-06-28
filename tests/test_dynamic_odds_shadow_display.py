@@ -9,6 +9,7 @@ import autonomous_betting_agent.ui_i18n_phase3e  # noqa: F401
 from autonomous_betting_agent.dynamic_odds_display import (
     build_dynamic_odds_shadow_row,
     build_dynamic_odds_shadow_rows,
+    dynamic_odds_shadow_learning_summary,
     dynamic_odds_shadow_safety_summary,
 )
 from autonomous_betting_agent.ui_i18n import localize_dataframe, localize_value
@@ -31,6 +32,13 @@ def sample_row() -> dict[str, object]:
     }
 
 
+def completed_row(result: str, sport: str = "soccer") -> dict[str, object]:
+    row = sample_row()
+    row["sport"] = sport
+    row["result_status"] = result
+    return row
+
+
 def test_shadow_row_returns_dynamic_math_fields() -> None:
     row = build_dynamic_odds_shadow_row(sample_row())
     assert row["dynamic_probability"] is not None
@@ -38,6 +46,9 @@ def test_shadow_row_returns_dynamic_math_fields() -> None:
     assert row["dynamic_no_vig_edge"] is not None
     assert row["dynamic_EV"] is not None
     assert row["book_odds_ratio"] is not None
+    assert row["probability_delta"] is not None
+    assert row["dynamic_EV_delta"] is not None
+    assert row["baseline_vs_dynamic_status"]
     assert row["dynamic_odds_mode"] == "SHADOW ONLY"
     assert row["dynamic_odds_applied_live_count"] == 0
 
@@ -70,6 +81,22 @@ def test_missing_lr_data_defaults_to_shadow_lr_one() -> None:
     row = build_dynamic_odds_shadow_row(sample_row())
     assert row["total_LR_multiplier"] == 1.0
     assert row["dynamic_signal_status"] == "no_lr_data"
+    assert row["lr_model_loaded"] is False
+
+
+def test_completed_rows_build_read_only_lr_learning_feed() -> None:
+    rows = [completed_row("win") for _ in range(30)] + [completed_row("loss", sport="basketball") for _ in range(30)] + [sample_row()]
+    shadow = build_dynamic_odds_shadow_rows(rows)
+    assert shadow[-1]["lr_model_loaded"] is True
+    assert shadow[-1]["lr_training_rows_used"] >= 60
+    assert shadow[-1]["lr_feature_count"] > 0
+    assert shadow[-1]["strongest_LR_feature"]
+    assert shadow[-1]["dynamic_odds_applied_live_count"] == 0
+    summary = dynamic_odds_shadow_learning_summary(rows)
+    assert summary["lr_model_loaded"] is True
+    assert summary["training_rows_used"] >= 60
+    assert summary["dynamic_odds_live_activation"] == "OFF"
+    assert summary["dynamic_odds_applied_live_count"] == 0
 
 
 def test_shadow_rows_and_safety_summary_are_display_only() -> None:
