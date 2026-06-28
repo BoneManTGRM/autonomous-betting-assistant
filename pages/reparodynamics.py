@@ -105,6 +105,13 @@ def t(key: str) -> str:
     return TEXT.get(LANG, TEXT["en"]).get(key, key)
 
 
+def metric_value(value: Any) -> str:
+    localized = str(localize_value(value, LANG))
+    if str(value).strip().upper() in {"ON", "OFF", "FORBIDDEN"}:
+        return localized.upper()
+    return localized
+
+
 def display_frame(frame: pd.DataFrame | None) -> pd.DataFrame | None:
     if frame is None:
         return None
@@ -169,12 +176,12 @@ st.info(t("storage_warning"))
 st.page_link("pages/shadow_mode_results.py", label=t("comparison"))
 
 cols = st.columns(6)
-cols[0].metric(t("phase"), str(doctrine.get("current_phase", "")))
-cols[1].metric(t("shadow"), str(doctrine.get("shadow_mode_activation", "ON")))
-cols[2].metric(t("repair"), str(doctrine.get("repair_activation", "OFF")))
+cols[0].metric(t("phase"), metric_value(doctrine.get("current_phase", "")))
+cols[1].metric(t("shadow"), metric_value(doctrine.get("shadow_mode_activation", "ON")))
+cols[2].metric(t("repair"), metric_value(doctrine.get("repair_activation", "OFF")))
 cols[3].metric(t("live_repairs"), int(doctrine.get("repairs_applied_live", 0) or 0))
-cols[4].metric(t("model_training"), str(doctrine.get("model_training", "FORBIDDEN")))
-cols[5].metric(t("stored_data"), str(doctrine.get("stored_data_mutation", "FORBIDDEN")))
+cols[4].metric(t("model_training"), metric_value(doctrine.get("model_training", "FORBIDDEN")))
+cols[5].metric(t("stored_data"), metric_value(doctrine.get("stored_data_mutation", "FORBIDDEN")))
 
 st.subheader(t("controls"))
 st.caption(t("save_warning"))
