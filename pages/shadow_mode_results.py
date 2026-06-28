@@ -8,7 +8,7 @@ import streamlit as st
 from autonomous_betting_agent.adaptive_repair_runner import combined_rows, hash_rows, rows_from_csv_bytes, run_adaptive_repair_scan, system_source_adapters, uploaded_source
 from autonomous_betting_agent.pick_hold_store import normalize_workspace_id
 from autonomous_betting_agent.reparodynamics_audit import write_reparodynamics_audit_event_from_runner_report
-from autonomous_betting_agent.reparodynamics_repair_memory import load_repair_memory, repair_memory_to_frames, save_repair_memory, update_repair_memory
+from autonomous_betting_agent.reparodynamics_repair_memory import load_repair_memory, repair_memory_to_frames, save_repair_memory, stable_memory_run_id, update_repair_memory
 from autonomous_betting_agent.reparodynamics_shadow_backtest import build_phase3c_report
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 from autonomous_betting_agent.ui_i18n import localize_dataframe
@@ -29,6 +29,7 @@ TEXT = {
         "run": "Run Shadow Backtest comparison",
         "save_memory": "Save to Repair Memory",
         "saved_memory": "Saved to Repair Memory. No live repairs were activated.",
+        "already_saved": "Already saved to Repair Memory.",
         "memory_preview": "Repair Memory Preview",
         "open_reparodynamics": "Open Reparodynamics page",
         "baseline": "Baseline Metrics",
@@ -58,6 +59,7 @@ TEXT = {
         "run": "Ejecutar comparacion Shadow Backtest",
         "save_memory": "Guardar en Repair Memory",
         "saved_memory": "Guardado en Repair Memory. No se activaron reparaciones en vivo.",
+        "already_saved": "Ya guardado en Repair Memory.",
         "memory_preview": "Vista previa de Repair Memory",
         "open_reparodynamics": "Abrir pagina Reparodynamics",
         "baseline": "Metricas baseline",
@@ -167,6 +169,7 @@ if upload is not None:
 
 if st.button(t("run"), type="primary"):
     phase3c_report = build_phase3c_report(scan_rows(uploaded_rows, uploaded_name, include_system))
+    phase3c_report["memory_run_id"] = stable_memory_run_id(phase3c_report)
     runner_report = run_adaptive_repair_scan(uploaded_rows=uploaded_rows, uploaded_filename=uploaded_name, uploaded_bytes=uploaded_bytes, include_system_sources=include_system)
     write_reparodynamics_audit_event_from_runner_report(runner_report, source="Shadow Mode Results page", phase3c_report=phase3c_report)
     st.session_state["phase3c_latest_report"] = phase3c_report
@@ -174,11 +177,20 @@ if st.button(t("run"), type="primary"):
     st.success(t("audit_written"))
 
 report = st.session_state.get("phase3c_latest_report")
-if report and st.button(t("save_memory")):
-    memory = update_repair_memory(load_repair_memory(workspace_id), report, source="Shadow Mode Results page")
-    memory = save_repair_memory(memory, workspace_id)
-    st.session_state["phase3d_repair_memory"] = memory
-    st.success(t("saved_memory"))
+if report:
+    memory = load_repair_memory(workspace_id)
+    run_id = str(report.get("memory_run_id") or stable_memory_run_id(report))
+    if run_id in set(str(item) for item in memory.get("saved_run_ids", [])):
+        st.info(t("already_saved"))
+    elif st.button(t("save_memory")):
+        report["memory_run_id"] = run_id
+        memory = update_repair_memory(memory, report, source="Shadow Mode Results page")
+        memory = save_repair_memory(memory, workspace_id)
+        st.session_state["phase3d_repair_memory"] = memory
+        if memory.get("last_save_status") == "already_saved":
+            st.info(t("already_saved"))
+        else:
+            st.success(t("saved_memory"))
 
 if not report:
     st.info(t("no_data"))
