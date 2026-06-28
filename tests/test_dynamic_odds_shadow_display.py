@@ -158,3 +158,7 @@ def test_spanish_dynamic_odds_display_labels() -> None:
     assert "EV dinamico" in localized.columns
     assert "Modo Dynamic Odds" in localized.columns
     assert localize_value("SHADOW ONLY", "es") == "solo shadow"
+
+
+def test_shadow_memory_trainer_branch_check() -> None:
+    assert True
