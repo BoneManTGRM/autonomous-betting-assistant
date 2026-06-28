@@ -115,6 +115,12 @@ def _render_page_link(st: Any, item: tuple[str, str, str], language: str, curren
         st.page_link(path, label=label)
 
 
+def _sidebar_language_option(option: str, language: str) -> str:
+    if normalize_language(language) == 'es' and option == 'English':
+        return 'Inglés'
+    return option
+
+
 def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'radio') -> str:
     import streamlit as st
     language = _language_label(_current_language(st))
@@ -128,7 +134,7 @@ def render_app_sidebar(current_page: str, *, language_key: str = 'global_languag
         st.markdown('<div class="aba-sidebar-title">ABA Signal Pro</div>', unsafe_allow_html=True)
         tagline = APP_TAGLINE if language == 'English' else APP_TAGLINE_ES
         st.markdown(f'<div class="aba-sidebar-tagline">{html.escape(tagline)}</div>', unsafe_allow_html=True)
-        language = st.radio('Language / Idioma', ['English', 'Español'], key=widget_key, horizontal=True, on_change=_sync_global_from_radio, args=(widget_key,))
+        language = st.radio('Idioma' if normalize_language(language) == 'es' else 'Language', ['English', 'Español'], key=widget_key, horizontal=True, format_func=lambda option: _sidebar_language_option(option, language), on_change=_sync_global_from_radio, args=(widget_key,))
         st.session_state[GLOBAL_LANGUAGE_KEY] = language
         if normalize_language(language) == 'es':
             st.markdown(GLOBAL_UPLOAD_ES_CSS, unsafe_allow_html=True)
