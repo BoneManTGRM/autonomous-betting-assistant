@@ -18,7 +18,7 @@ TEXT = {
     "en": {
         "title": "Shadow Mode Results",
         "caption": "Phase 3C Shadow Backtest comparison. Live behavior stays unchanged.",
-        "warning": "Shadow Mode results are simulation-only. No live system behavior was changed.",
+        "warning": "Shadow Mode results are simulation-only. No live model, odds, proof ledger, stake, EV, bankroll, or prediction behavior was changed.",
         "include_system": "Include available local system sources",
         "upload": "Optional graded CSV for Shadow Backtest",
         "uploaded": "Uploaded rows loaded",
@@ -33,11 +33,15 @@ TEXT = {
         "no_data": "Run a Shadow Backtest scan to show results.",
         "empty": "No rows in this section.",
         "audit_written": "Audit event written. Live mutation remains forbidden.",
+        "rows": "Rows",
+        "completed": "Completed",
+        "manual_review": "Manual Review",
+        "live_repairs": "Live Repairs",
     },
     "es": {
         "title": "Resultados Shadow Mode",
         "caption": "Comparacion Shadow Backtest Fase 3C. El comportamiento en vivo no cambia.",
-        "warning": "Los resultados de Shadow Mode son solo simulacion. No se cambio el comportamiento en vivo del sistema.",
+        "warning": "Los resultados de Shadow Mode son solo simulación. No se cambió el modelo en vivo, cuotas, ledger de prueba, stake, EV, bankroll ni predicciones.",
         "include_system": "Incluir fuentes locales disponibles del sistema",
         "upload": "CSV calificado opcional para Shadow Backtest",
         "uploaded": "Filas subidas cargadas",
@@ -52,6 +56,10 @@ TEXT = {
         "no_data": "Ejecuta un escaneo Shadow Backtest para mostrar resultados.",
         "empty": "No hay filas en esta seccion.",
         "audit_written": "Evento de auditoria escrito. La mutacion en vivo sigue prohibida.",
+        "rows": "Filas",
+        "completed": "Completadas",
+        "manual_review": "Revision manual",
+        "live_repairs": "Reparaciones en vivo",
     },
 }
 
@@ -80,7 +88,29 @@ def flat(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out = []
     for item in rows or []:
         comparison = item.get("comparison_metrics", {}) or {}
-        out.append({"title": item.get("title", ""), "finding_type": item.get("finding_type", ""), "candidate_type": item.get("candidate_type", ""), "sample_size": item.get("sample_size", 0), "baseline_ROI": comparison.get("baseline_ROI"), "shadow_ROI": comparison.get("shadow_ROI"), "ROI_delta": comparison.get("ROI_delta"), "decision": item.get("decision", ""), "decision_reason": item.get("decision_reason", "")})
+        out.append(
+            {
+                "title": item.get("title", ""),
+                "finding_type": item.get("finding_type", ""),
+                "candidate_type": item.get("candidate_type", ""),
+                "sample_size": item.get("sample_size", 0),
+                "baseline_ROI": comparison.get("baseline_ROI"),
+                "shadow_ROI": comparison.get("shadow_ROI"),
+                "ROI_delta": comparison.get("ROI_delta"),
+                "baseline_profit_units": comparison.get("baseline_profit_units"),
+                "shadow_profit_units": comparison.get("shadow_profit_units"),
+                "profit_units_delta": comparison.get("profit_units_delta"),
+                "baseline_losses": comparison.get("baseline_losses"),
+                "shadow_losses": comparison.get("shadow_losses"),
+                "losses_delta": comparison.get("losses_delta"),
+                "decision": item.get("decision", ""),
+                "decision_reason": item.get("decision_reason", ""),
+                "eligible_for_manual_review": item.get("eligible_for_manual_review", False),
+                "live_mutation": item.get("live_mutation", "FORBIDDEN"),
+                "model_training": item.get("model_training", "FORBIDDEN"),
+                "stored_data_mutation": item.get("stored_data_mutation", "FORBIDDEN"),
+            }
+        )
     return out
 
 
@@ -123,12 +153,12 @@ if not report:
 else:
     counts = dict(report.get("summary_counts", {}) or {})
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric("Rows", report.get("rows_scanned", 0))
-    c2.metric("Completed", report.get("completed_rows_used", 0))
-    c3.metric("Blockers", counts.get("data_blockers_count", 0))
-    c4.metric("Watchlists", counts.get("watchlists_count", 0))
-    c5.metric("Manual Review", counts.get("manual_review_eligible_count", 0))
-    c6.metric("Live Repairs", counts.get("live_repairs_applied_count", 0))
+    c1.metric(t("rows"), report.get("rows_scanned", 0))
+    c2.metric(t("completed"), report.get("completed_rows_used", 0))
+    c3.metric(t("blockers"), counts.get("data_blockers_count", 0))
+    c4.metric(t("watchlists"), counts.get("watchlists_count", 0))
+    c5.metric(t("manual_review"), counts.get("manual_review_eligible_count", 0))
+    c6.metric(t("live_repairs"), counts.get("live_repairs_applied_count", 0))
     tabs = st.tabs([t("baseline"), t("comparison"), t("blockers"), t("watchlists"), t("rejected"), t("manual"), t("safety")])
     with tabs[0]:
         st.dataframe(display_frame(one_row(report.get("baseline_metrics", {}) or {})), use_container_width=True, hide_index=True)
