@@ -158,3 +158,7 @@ def test_export_model_json_preserves_safety() -> None:
     assert '"dynamic_odds_live_activation": "OFF"' in exported
     assert '"dynamic_odds_applied_live_count": 0' in exported
     assert '"shadow_model_training": "OFFLINE_ONLY"' in exported
+
+
+def test_branch_check_marker() -> None:
+    assert protected_baseline_metrics(1, 1)["global_baseline"] == 0.70
