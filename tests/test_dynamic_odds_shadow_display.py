@@ -92,26 +92,27 @@ def test_missing_lr_data_defaults_to_shadow_lr_one() -> None:
     assert row["lr_model_loaded"] is False
 
 
-def test_completed_rows_build_and_save_read_only_lr_learning_feed() -> None:
+def test_completed_rows_build_read_only_in_memory_lr_learning_feed() -> None:
     workspace = "shadow_learning_feed"
     delete_dynamic_odds_shadow_model(workspace)
     rows = [completed_row("win", workspace_id=workspace) for _ in range(30)] + [completed_row("loss", sport="basketball", workspace_id=workspace) for _ in range(30)] + [sample_row(workspace)]
     shadow = build_dynamic_odds_shadow_rows(rows)
     saved = load_dynamic_odds_shadow_model(workspace)
-    assert saved["workspace_id"] == workspace
-    assert saved["dynamic_odds_live_activation"] == "OFF"
-    assert saved["dynamic_odds_applied_live_count"] == 0
+    assert saved == {}
     assert shadow[-1]["lr_model_loaded"] is True
-    assert shadow[-1]["lr_model_source"] == "saved_shadow_model"
+    assert shadow[-1]["lr_model_source"] == "current_completed_rows_shadow_learning_unsaved"
     assert shadow[-1]["lr_training_rows_used"] >= 60
     assert shadow[-1]["lr_feature_count"] > 0
     assert shadow[-1]["strongest_LR_feature"]
     assert shadow[-1]["dynamic_odds_applied_live_count"] == 0
+    assert load_dynamic_odds_shadow_model(workspace) == {}
     summary = dynamic_odds_shadow_learning_summary(rows)
     assert summary["lr_model_loaded"] is True
+    assert summary["learning_source"] == "current_completed_rows_shadow_learning_unsaved"
     assert summary["training_rows_used"] >= 60
     assert summary["dynamic_odds_live_activation"] == "OFF"
     assert summary["dynamic_odds_applied_live_count"] == 0
+    assert load_dynamic_odds_shadow_model(workspace) == {}
 
 
 def test_saved_model_loads_for_pending_rows_without_completed_rows() -> None:
