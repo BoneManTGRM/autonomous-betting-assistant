@@ -5,6 +5,16 @@ from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
+from autonomous_betting_agent.advisory_sportsbook_sources import (
+    CONSENSUS_ONLY,
+    REAL_SPORTSBOOK,
+    UNKNOWN_SOURCE,
+    add_sportsbook_source_fields,
+    detect_sportsbook_source,
+    normalize_sportsbook_source,
+    sportsbook_source_counts,
+    sportsbook_source_summary,
+)
 from autonomous_betting_agent.odds_value_engine import (
     BLOCKED_INVALID_PROBABILITY,
     BLOCKED_MISSING_ODDS,
@@ -25,46 +35,14 @@ SAFETY_CONFIRMATION = (
 )
 PLAYABLE_STATUSES = {PLAYABLE_PLUS_EV, WATCHLIST_VALUE, PREDICTION_ONLY_NOT_PLUS_EV}
 STALE_WARNING_STATUSES = {"STALE", "UNKNOWN", "EVENT_STARTED", "HISTORICAL_ROW"}
-EVENT_START_FIELDS = [
-    "event_start_time",
-    "event_start_utc",
-    "commence_time",
-    "start_utc",
-    "start_time",
-    "game_time",
-    "match_time",
-]
-ODDS_FRESHNESS_FIELDS = [
-    "odds_timestamp",
-    "odds_last_update",
-    "last_update",
-    "pulled_at_utc",
-    "created_at_utc",
-]
-SPORTSBOOK_FIELDS = [
-    "bookmaker",
-    "sportsbook",
-    "book",
-    "book_name",
-    "odds_source",
-    "provider",
-    "source",
-    "sportsbook_name",
-    "casino",
-    "bookie",
-]
+EVENT_START_FIELDS = ["event_start_time", "event_start_utc", "commence_time", "start_utc", "start_time", "game_time", "match_time"]
+ODDS_FRESHNESS_FIELDS = ["odds_timestamp", "odds_last_update", "last_update", "pulled_at_utc", "created_at_utc"]
+SPORTSBOOK_FIELDS = ["bookmaker", "sportsbook", "book", "book_name", "odds_source", "provider", "source", "sportsbook_name", "casino", "bookie"]
 DECIMAL_ODDS_FIELDS = ["decimal_price", "decimal_odds", "odds", "price", "current_decimal_odds"]
-MODEL_PROBABILITY_FIELDS = [
-    "model_probability",
-    "model_probability_clean",
-    "final_probability",
-    "probability",
-    "confidence_probability",
-]
+MODEL_PROBABILITY_FIELDS = ["model_probability", "model_probability_clean", "final_probability", "probability", "confidence_probability"]
 MARKET_TYPE_FIELDS = ["market_type", "market", "bet_type"]
 PREDICTION_FIELDS = ["prediction", "selection", "pick", "team", "outcome"]
 SHADOW_MODEL_FIELDS = ["lr_model_loaded", "model_loaded", "shadow_model_loaded", "model_source", "shadow_model_status"]
-CONSENSUS_SOURCES = {"", "consensus", "consensus_average", "average", "market_average", "aggregated", "unknown", "none", "nan", "null"}
 READINESS_STATUSES = {
     "READY_FOR_ADVISORY_VALUE",
     "PARTIALLY_READY",
@@ -75,34 +53,21 @@ READINESS_STATUSES = {
     "NEEDS_SHADOW_TRAINING",
 }
 IMMUTABLE_FIELDS = [
-    "model_probability",
-    "model_probability_clean",
-    "final_probability",
-    "expected_value_per_unit",
-    "EV",
-    "ev",
-    "official_EV",
-    "official_ev",
-    "model_edge",
-    "model_market_edge",
-    "edge",
-    "official_edge",
-    "lock_ready",
-    "official_lock_ready",
-    "publish_ready",
-    "proof_hash",
-    "proof_id",
-    "locked_at_utc",
-    "result",
-    "grade",
-    "outcome",
-    "official_result",
-    "final_result",
-    "result_status",
-    "pick_result",
-    "settled_status",
+    "model_probability", "model_probability_clean", "final_probability", "expected_value_per_unit", "EV", "ev",
+    "official_EV", "official_ev", "model_edge", "model_market_edge", "edge", "official_edge",
+    "lock_ready", "official_lock_ready", "publish_ready", "proof_hash", "proof_id", "locked_at_utc",
+    "result", "grade", "outcome", "official_result", "final_result", "result_status", "pick_result", "settled_status",
 ]
 DISPLAY_KEY_COLUMNS = ["event", "prediction", "sport", "league", "market_type", "sportsbook", "bookmaker"]
+SOURCE_COLUMNS = [
+    "advisory_original_sportsbook_label",
+    "advisory_normalized_sportsbook",
+    "advisory_sportsbook_source_type",
+    "advisory_is_real_sportsbook",
+    "advisory_is_consensus_source",
+    "advisory_line_shopping_source_status",
+    "advisory_line_shopping_source_reason",
+]
 
 
 def _records(rows: Sequence[Mapping[str, Any]] | pd.DataFrame | None) -> list[dict[str, Any]]:
@@ -117,9 +82,8 @@ def advisory_rows(rows: Sequence[Mapping[str, Any]] | pd.DataFrame, *, config: M
     source = _records(rows)
     if not source:
         return []
-    if any("advisory_playable_status" in row for row in source):
-        return source
-    return build_advisory_odds_value_rows(source, config=config)
+    valued = source if any("advisory_playable_status" in row for row in source) else build_advisory_odds_value_rows(source, config=config)
+    return add_sportsbook_source_fields(valued)
 
 
 def advisory_frame(rows: Sequence[Mapping[str, Any]] | pd.DataFrame, *, config: Mapping[str, Any] | None = None) -> pd.DataFrame:
@@ -186,7 +150,7 @@ def playable_table(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> pd.DataF
         return pd.DataFrame()
     out = frame[frame["advisory_playable_status"].fillna("").astype(str) == PLAYABLE_PLUS_EV].copy()
     return _select_columns(out, [
-        "event", "prediction", "sport", "league", "market_type", "sportsbook", "bookmaker",
+        "event", "prediction", "sport", "league", "market_type", "sportsbook", "bookmaker", *SOURCE_COLUMNS,
         "advisory_playable_status", "advisory_current_decimal_odds", "advisory_best_available_decimal_odds",
         "advisory_best_available_sportsbook", "advisory_raw_EV", "advisory_best_price_EV",
         "advisory_no_vig_edge", "advisory_market_hold", "advisory_line_shopping_gain_pct",
@@ -200,7 +164,7 @@ def watchlist_table(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> pd.Data
         return pd.DataFrame()
     out = frame[frame["advisory_playable_status"].fillna("").astype(str) == WATCHLIST_VALUE].copy()
     return _select_columns(out, [
-        "event", "prediction", "sport", "league", "market_type", "sportsbook", "bookmaker",
+        "event", "prediction", "sport", "league", "market_type", "sportsbook", "bookmaker", *SOURCE_COLUMNS,
         "advisory_playable_status", "advisory_current_decimal_odds", "advisory_best_available_decimal_odds",
         "advisory_best_available_sportsbook", "advisory_raw_EV", "advisory_best_price_EV",
         "advisory_no_vig_edge", "advisory_market_completeness_status",
@@ -214,9 +178,9 @@ def prediction_only_table(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> p
         return pd.DataFrame()
     out = frame[frame["advisory_playable_status"].fillna("").astype(str) == PREDICTION_ONLY_NOT_PLUS_EV].copy()
     return _select_columns(out, [
-        "event", "prediction", "model_probability", "advisory_playable_status", "advisory_current_decimal_odds",
-        "advisory_raw_EV", "advisory_no_vig_edge", "advisory_prediction_only_reason",
-        "advisory_playable_reason",
+        "event", "prediction", "model_probability", *SOURCE_COLUMNS,
+        "advisory_playable_status", "advisory_current_decimal_odds", "advisory_raw_EV", "advisory_no_vig_edge",
+        "advisory_prediction_only_reason", "advisory_playable_reason",
     ])
 
 
@@ -236,7 +200,7 @@ def sportsbook_hold_summary(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) ->
     if frame.empty:
         return pd.DataFrame()
     work = frame.copy()
-    work["sportsbook_or_bookmaker"] = work.get("sportsbook", pd.Series(index=work.index, dtype=object)).fillna(work.get("bookmaker", pd.Series(index=work.index, dtype=object)))
+    work["sportsbook_or_bookmaker"] = work.get("advisory_original_sportsbook_label", pd.Series(index=work.index, dtype=object)).fillna(work.get("sportsbook", pd.Series(index=work.index, dtype=object))).fillna(work.get("bookmaker", pd.Series(index=work.index, dtype=object)))
     if "prediction" in work.columns:
         work["_side"] = work["prediction"].fillna("").astype(str)
     else:
@@ -257,7 +221,7 @@ def line_shopping_summary(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> p
     if frame.empty:
         return pd.DataFrame()
     out = _select_columns(frame, [
-        "event", "market_type", "prediction", "advisory_current_decimal_odds", "sportsbook", "bookmaker",
+        "event", "market_type", "prediction", "advisory_current_decimal_odds", "sportsbook", "bookmaker", *SOURCE_COLUMNS,
         "advisory_best_available_decimal_odds", "advisory_best_available_sportsbook",
         "advisory_line_shopping_gain", "advisory_line_shopping_gain_pct", "advisory_best_price_EV",
     ])
@@ -272,7 +236,7 @@ def stale_line_summary(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> pd.D
         return pd.DataFrame()
     out = frame[frame["advisory_stale_line_status"].fillna("").astype(str).isin(STALE_WARNING_STATUSES)].copy()
     timestamp_cols = [col for col in [*ODDS_FRESHNESS_FIELDS, *EVENT_START_FIELDS] if col in out.columns]
-    return _select_columns(out, ["event", "prediction", "market_type", "sportsbook", "bookmaker", "advisory_stale_line_status", "advisory_stale_line_reason", *timestamp_cols])
+    return _select_columns(out, ["event", "prediction", "market_type", "sportsbook", "bookmaker", *SOURCE_COLUMNS, "advisory_stale_line_status", "advisory_stale_line_reason", *timestamp_cols])
 
 
 def duplicate_conflict_summary(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> pd.DataFrame:
@@ -283,7 +247,7 @@ def duplicate_conflict_summary(rows: Sequence[Mapping[str, Any]] | pd.DataFrame)
     conflict = frame.get("advisory_conflict_status", pd.Series(index=frame.index, dtype=object)).fillna("NO_CONFLICT").astype(str)
     out = frame[(duplicate != "UNIQUE_EVENT") | (conflict != "NO_CONFLICT")].copy()
     return _select_columns(out, [
-        "event", "prediction", "market_type", "sportsbook", "bookmaker",
+        "event", "prediction", "market_type", "sportsbook", "bookmaker", *SOURCE_COLUMNS,
         "advisory_duplicate_event_status", "advisory_duplicate_event_reason",
         "advisory_conflict_status", "advisory_conflict_reason", "advisory_playable_status",
     ])
@@ -364,15 +328,6 @@ def _status_value(value: Any) -> str:
     return str(value).strip().lower().replace(" ", "_")
 
 
-def _first_text_value(row: Mapping[str, Any], fields: Sequence[str]) -> str:
-    for field in fields:
-        if field in row:
-            text = str(row.get(field, "")).strip()
-            if text and text.lower() not in {"nan", "none", "nat", "null"}:
-                return text
-    return ""
-
-
 def _top_blocked_reason(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> dict[str, Any]:
     blocked = blocked_reason_summary(rows)
     if blocked.empty:
@@ -392,7 +347,6 @@ def advisory_real_file_diagnostics(rows: Sequence[Mapping[str, Any]] | pd.DataFr
     now_ts = _parse_utc(now) if now is not None else pd.Timestamp.now(tz="UTC")
     if now_ts is None:
         now_ts = pd.Timestamp.now(tz="UTC")
-
     event_times: list[pd.Timestamp] = []
     odds_times: list[pd.Timestamp] = []
     for row in valued:
@@ -402,7 +356,6 @@ def advisory_real_file_diagnostics(rows: Sequence[Mapping[str, Any]] | pd.DataFr
             event_times.append(event_time)
         if odds_time is not None:
             odds_times.append(odds_time)
-
     earliest_event = min(event_times) if event_times else None
     latest_event = max(event_times) if event_times else None
     earliest_odds = min(odds_times) if odds_times else None
@@ -418,35 +371,18 @@ def advisory_real_file_diagnostics(rows: Sequence[Mapping[str, Any]] | pd.DataFr
         slate_type = "HISTORICAL_ONLY"
     else:
         slate_type = "ACTIVE_OR_MIXED_SLATE"
-
     top = _top_blocked_reason(valued)
-    no_playable_rows = bool(
-        counts["total_advisory_rows"] > 0
-        and counts["PLAYABLE_PLUS_EV"] == 0
-        and counts["WATCHLIST_VALUE"] == 0
-        and counts["PREDICTION_ONLY_NOT_PLUS_EV"] == 0
-    )
-    all_blocked_by_past_events = bool(
-        counts["total_advisory_rows"] > 0
-        and counts["blocked_rows"] == counts["total_advisory_rows"]
-        and str(top.get("advisory_playable_reason") or "") == "event_start_time_is_not_future"
-    )
+    no_playable_rows = bool(counts["total_advisory_rows"] > 0 and counts["PLAYABLE_PLUS_EV"] == 0 and counts["WATCHLIST_VALUE"] == 0 and counts["PREDICTION_ONLY_NOT_PLUS_EV"] == 0)
+    all_blocked_by_past_events = bool(counts["total_advisory_rows"] > 0 and counts["blocked_rows"] == counts["total_advisory_rows"] and str(top.get("advisory_playable_reason") or "") == "event_start_time_is_not_future")
     if all_blocked_by_past_events:
-        explanation = (
-            "All rows are blocked because event start times are not future. "
-            "This file is being treated as historical/proof data, not a fresh playable slate."
-        )
+        explanation = "All rows are blocked because event start times are not future. This file is being treated as historical/proof data, not a fresh playable slate."
         recommendation = "Upload a fresh future-event odds file to evaluate PLAYABLE_PLUS_EV rows."
     elif no_playable_rows:
-        explanation = (
-            "No playable advisory rows were found. Review blocked reasons, market completeness, "
-            "future event times, odds freshness, and sportsbook price sources."
-        )
+        explanation = "No playable advisory rows were found. Review blocked reasons, market completeness, future event times, odds freshness, and sportsbook price sources."
         recommendation = "Upload a fresh future slate with current odds, complete market sides, and sportsbook/bookmaker prices."
     else:
         explanation = "The advisory engine produced at least one playable, watchlist, or prediction-only row."
         recommendation = "Review advisory tables before any manual promotion in a later phase."
-
     return {
         "section_title": "Why no playable +EV rows?",
         "total_rows": int(counts["total_advisory_rows"]),
@@ -470,21 +406,12 @@ def advisory_real_file_diagnostics(rows: Sequence[Mapping[str, Any]] | pd.DataFr
         "earliest_odds_timestamp": _iso(earliest_odds),
         "latest_odds_timestamp": _iso(latest_odds),
         "odds_freshness_timestamp_available_rows": int(len(odds_times)),
-        "timestamp_rule_confirmation": (
-            "Event-start fields are used only for future/active/historical classification. "
-            "Odds timestamp fields are used only for odds freshness."
-        ),
+        "timestamp_rule_confirmation": "Event-start fields are used only for future/active/historical classification. Odds timestamp fields are used only for odds freshness.",
         "show_no_playable_warning": bool(no_playable_rows),
         "all_rows_blocked_by_non_future_events": all_blocked_by_past_events,
         "explanation": explanation,
         "recommended_next_action": recommendation,
-        "playable_requirements": [
-            "future event start times",
-            "fresh odds timestamps",
-            "complete market sides",
-            "current sportsbook/bookmaker prices",
-            "valid model probability",
-        ],
+        "playable_requirements": ["future event start times", "fresh odds timestamps", "complete market sides", "current sportsbook/bookmaker prices", "valid model probability"],
         "proof_safety_check_result": proof_safety_comparison(source, valued),
     }
 
@@ -530,32 +457,21 @@ def _field_presence_summary(rows: Sequence[Mapping[str, Any]], valued: Sequence[
     }
 
 
-def _sportsbook_counts(rows: Sequence[Mapping[str, Any]]) -> tuple[int, int]:
-    real = 0
-    consensus = 0
-    for row in rows:
-        label = _first_text_value(row, SPORTSBOOK_FIELDS)
-        normalized = _status_value(label)
-        if normalized in CONSENSUS_SOURCES:
-            consensus += 1
-        else:
-            real += 1
-    return real, consensus
-
-
 def fresh_slate_readiness_check(rows: Sequence[Mapping[str, Any]] | pd.DataFrame, *, now: Any | None = None, require_shadow_ready: bool = False) -> dict[str, Any]:
     source = _records(rows)
     valued = advisory_rows(source)
     counts = advisory_summary_counts(valued)
     diagnostics = advisory_real_file_diagnostics(valued, now=now)
     fields = _field_presence_summary(source, valued)
-    real_sportsbook_count, consensus_only_count = _sportsbook_counts(valued)
+    source_counts = sportsbook_source_counts(valued)
+    real_sportsbook_count = int(source_counts["real_sportsbook_count"])
+    consensus_only_count = int(source_counts["consensus_only_count"])
+    unknown_source_count = int(source_counts["unknown_source_count"])
     complete_market_count = int(counts["complete_markets"])
     incomplete_market_count = int(counts["incomplete_markets"])
     future_event_count = int(diagnostics["future_event_rows_with_event_time"])
     historical_or_started_event_count = int(diagnostics["historical_or_started_event_rows_with_event_time"])
     shadow_status = _shadow_ready_status(valued)
-
     passed_checks: list[str] = []
     failed_checks: list[str] = []
     warnings: list[str] = []
@@ -572,7 +488,6 @@ def fresh_slate_readiness_check(rows: Sequence[Mapping[str, Any]] | pd.DataFrame
         "shadow_model_ready_or_not_required": 5 if (shadow_status == "SHADOW_READY" or not require_shadow_ready) else 0,
     }
     readiness_score = max(0, min(100, int(sum(score_breakdown.values()))))
-
     checks = {
         "future_events_present": future_event_count > 0,
         "event_start_field_present": bool(fields["event_start_field_present"]),
@@ -589,31 +504,32 @@ def fresh_slate_readiness_check(rows: Sequence[Mapping[str, Any]] | pd.DataFrame
         (passed_checks if passed else failed_checks).append(name)
     critical_missing = [
         name for name in [
-            "event_start_field_present",
-            "odds_freshness_field_present",
-            "sportsbook_field_present",
-            "decimal_odds_field_present",
-            "model_probability_field_present",
-            "market_type_field_present",
+            "event_start_field_present", "odds_freshness_field_present", "sportsbook_field_present",
+            "decimal_odds_field_present", "model_probability_field_present", "market_type_field_present",
             "prediction_selection_field_present",
         ] if not fields.get(name)
     ]
+    if unknown_source_count and real_sportsbook_count == 0 and consensus_only_count == 0:
+        warnings.append("Sportsbook source is missing or unknown. Add bookmaker/sportsbook/source fields.")
     if shadow_status != "SHADOW_READY":
         warnings.append("Shadow model is not ready. This is a warning unless Shadow readiness is required.")
     if consensus_only_count and real_sportsbook_count == 0:
-        warnings.append("This file has only consensus/average prices, not real sportsbook/bookmaker prices.")
+        warnings.append("This file has only consensus/average prices. Consensus is useful for context, but it is not a real sportsbook.")
+    if real_sportsbook_count == 1:
+        warnings.append("Only one real sportsbook was detected. Line shopping needs at least two real books for comparison.")
+    if real_sportsbook_count >= 2:
+        warnings.append("Real sportsbook prices detected. Line shopping can compare available sportsbook prices when event, market, selection, and price fields align.")
     if incomplete_market_count and complete_market_count == 0:
         warnings.append("No complete markets were detected for no-vig advisory review.")
-
-    if critical_missing:
+    if critical_missing or (unknown_source_count > 0 and real_sportsbook_count == 0 and consensus_only_count == 0):
         readiness_status = "MISSING_CRITICAL_FIELDS"
-        recommended_next_action = "This file is missing required fields for advisory value review. Upload a CSV with event times, odds timestamps, sportsbook/bookmaker, decimal odds, model probability, market type, and prediction/selection."
+        recommended_next_action = "This file is missing required fields for advisory value review. Add event times, odds timestamps, real sportsbook/bookmaker, decimal odds, model probability, market type, and prediction/selection."
     elif future_event_count == 0 and historical_or_started_event_count > 0:
         readiness_status = "HISTORICAL_ONLY"
         recommended_next_action = "This file is historical/proof-only. Upload a fresh future-event odds file for playable advisory +EV evaluation."
-    elif real_sportsbook_count == 0:
+    elif real_sportsbook_count == 0 and consensus_only_count > 0:
         readiness_status = "NEEDS_REAL_SPORTSBOOK_PRICES"
-        recommended_next_action = "This file has only consensus/average prices. Upload real sportsbook/bookmaker prices for line-shopping and playable value review."
+        recommended_next_action = "This file has only consensus/average prices. Consensus is useful for context, but it is not a real sportsbook. Upload real sportsbook/bookmaker prices for playable line-shopping review."
     elif complete_market_count == 0:
         readiness_status = "NEEDS_COMPLETE_MARKETS"
         recommended_next_action = "This file needs complete market sides before no-vig advisory value can be evaluated."
@@ -626,7 +542,6 @@ def fresh_slate_readiness_check(rows: Sequence[Mapping[str, Any]] | pd.DataFrame
     else:
         readiness_status = "PARTIALLY_READY"
         recommended_next_action = "This file is partially ready. Review failed checks and warnings before relying on playable advisory +EV rows."
-
     return {
         "readiness_score": readiness_score,
         "readiness_score_breakdown": score_breakdown,
@@ -642,6 +557,7 @@ def fresh_slate_readiness_check(rows: Sequence[Mapping[str, Any]] | pd.DataFrame
         "incomplete_market_count": incomplete_market_count,
         "real_sportsbook_count": real_sportsbook_count,
         "consensus_only_count": consensus_only_count,
+        "unknown_source_count": unknown_source_count,
         "shadow_readiness_status": shadow_status,
         "event_start_fields_detected": fields["event_start_fields_detected"],
         "odds_freshness_fields_detected": fields["odds_freshness_fields_detected"],
@@ -684,6 +600,7 @@ def advisory_report_text(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> st
     blocked = blocked_reason_summary(valued)
     diagnostics = advisory_real_file_diagnostics(valued)
     readiness = fresh_slate_readiness_check(valued)
+    source_summary = sportsbook_source_summary(valued)
     lines = [
         "Advisory Odds Value Report",
         "",
@@ -691,6 +608,18 @@ def advisory_report_text(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> st
         f"- Score: {readiness['readiness_score']}/100",
         f"- Status: {readiness['readiness_status']}",
         f"- Recommendation: {readiness['recommended_next_action']}",
+        "",
+        "Sportsbook Source Summary",
+    ]
+    if source_summary.empty:
+        lines.append("- No sportsbook source rows detected.")
+    else:
+        for item in source_summary.to_dict("records"):
+            lines.append(
+                f"- {item.get('advisory_sportsbook_source_type')} / {item.get('advisory_normalized_sportsbook')}: "
+                f"{item.get('row_count')} rows; counted for line shopping={item.get('counted_for_line_shopping')} — {item.get('reason')}"
+            )
+    lines.extend([
         "",
         "Advisory +EV picks",
         f"- PLAYABLE_PLUS_EV: {counts['PLAYABLE_PLUS_EV']}",
@@ -708,7 +637,7 @@ def advisory_report_text(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> st
         f"- Recommendation: {diagnostics['recommended_next_action']}",
         "",
         "Blocked reasons",
-    ]
+    ])
     if blocked.empty:
         lines.append("- No blocked advisory rows.")
     else:
