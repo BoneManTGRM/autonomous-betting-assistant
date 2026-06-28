@@ -14,12 +14,13 @@ from autonomous_betting_agent.magazine_live_api_enrichment import ENRICHMENT_VER
 from autonomous_betting_agent.magazine_sale_ready_patch import apply_magazine_sale_ready_patch
 from autonomous_betting_agent.pick_hold_store import load_first_available
 from autonomous_betting_agent.report_feed_service import save_report_feed
-from autonomous_betting_agent.report_product_layer import MagazineBrand, event_text, pick_text, safe_text, sport_text, value_text
+from autonomous_betting_agent.report_product_layer import MagazineBrand, event_text, safe_text, value_text
 from autonomous_betting_agent.report_studio_service import ReportStudioFilters, build_report_studio_state, report_studio_summary
-from autonomous_betting_agent.report_studio_spanish_ui import render_sport_league_filter, sport_league_display_text
+from autonomous_betting_agent.report_studio_spanish_ui import render_sport_league_filter
 from autonomous_betting_agent.report_studio_ui import render_premium_card_deck, render_status_dashboard
 from autonomous_betting_agent.row_normalizer import normalize_frame
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
+from autonomous_betting_agent.ui_i18n import localize_dataframe as global_localize_dataframe, localize_options, localize_value
 from autonomous_betting_agent.white_label_profiles import WhiteLabelProfile, list_profiles, load_profile, save_profile
 
 magazine_book_export = apply_magazine_sale_ready_patch(install_magazine_live_api_enrichment(importlib.reload(magazine_book_export)))
@@ -97,7 +98,7 @@ TEXT = {
         "select_page": "Select one pick to render",
     },
     "es": {
-        "title": "Estudio de Reportes",
+        "title": "Report Studio",
         "caption": "Reportes premium, prueba, exportaciones, perfiles y feed de app.",
         "input": "Filas de entrada",
         "workspace": "ID de cliente / workspace",
@@ -112,25 +113,25 @@ TEXT = {
         "save_profile": "Guardar perfil",
         "brand_name": "Marca / tipster",
         "tagline": "Lema",
-        "report_title": "Título del reporte",
+        "report_title": "Titulo del reporte",
         "full_book_name": "Nombre de archivo del libro revista",
         "logo_url": "URL del logo",
         "disclaimer": "Aviso legal",
         "mode": "Modo de reporte",
         "risk": "Preferencia de riesgo",
         "sports": "Filtro deporte / liga",
-        "max_rows": "Máximo de filas",
+        "max_rows": "Maximo de filas",
         "visibility": "Visibilidad del feed",
         "cards": "Tarjetas premium",
         "magazine": "Reporte revista",
         "copy": "WhatsApp / Telegram",
-        "audit": "Auditoría de aprendizaje",
-        "proof": "Prueba técnica",
+        "audit": "Auditoria de aprendizaje",
+        "proof": "Prueba tecnica",
         "exports": "Exportaciones",
-        "images": "Imágenes",
+        "images": "Imagenes",
         "profile_json": "JSON del perfil",
         "feed_json": "Feed de app",
-        "diagnostics": "Diagnóstico",
+        "diagnostics": "Diagnostico",
         "pdf": "Descargar PDF",
         "magazine_pdf": "Descargar PDF revista",
         "magazine_png": "Descargar PNG reporte revista",
@@ -139,21 +140,21 @@ TEXT = {
         "json": "Descargar JSON",
         "csv": "Descargar CSV",
         "copy_download": "Descargar copy WhatsApp",
-        "images_note": "Exportaciones de revista para el reporte completo y una página seleccionada.",
-        "image_tab_info": "Crea el libro completo solo cuando sea necesario, o selecciona una jugada para renderizar una sola página.",
+        "images_note": "Exportaciones de revista para el reporte completo y una pagina seleccionada.",
+        "image_tab_info": "Crea el libro completo solo cuando sea necesario, o selecciona una jugada para renderizar una sola pagina.",
         "background_upload": "Imagen de fondo opcional para exportaciones de revista",
         "background_ready": "Fondo personalizado activo.",
         "background_preview": "Vista previa del fondo subido",
         "generated_preview": "Vista previa del reporte revista generado",
         "feed_saved": "Feed unificado y legado guardados.",
         "copy_label": "Copy corto",
-        "no_audit": "Aún no hay datos gradados para calibración.",
+        "no_audit": "Aun no hay datos gradados para calibracion.",
         "build_book": "Crear libro revista completo",
         "building_book": "Creando libro revista completo...",
         "download_book_png": "Descargar libro revista PNG",
         "download_book_pdf": "Descargar libro revista PDF",
         "download_zip": "Descargar ZIP revista",
-        "download_page": "Descargar página revista",
+        "download_page": "Descargar pagina revista",
         "select_page": "Seleccionar una jugada para renderizar",
     },
 }
@@ -167,22 +168,6 @@ HANDOFF_KEYS = (
     "ara_latest_predictions",
 )
 
-COLUMN_ES = {
-    "event": "evento",
-    "sport": "deporte",
-    "league": "liga",
-    "prediction": "selección",
-    "public_pick": "selección pública",
-    "decimal_price": "cuota decimal",
-    "model_probability": "probabilidad modelo",
-    "market_probability": "probabilidad mercado",
-    "model_market_edge": "ventaja modelo/mercado",
-    "expected_value_per_unit": "valor esperado por unidad",
-    "odds_source": "fuente de cuotas",
-    "bookmaker": "casa",
-    "sports_context_summary": "contexto deportivo",
-}
-
 AUDIT_ES = {
     "by_sport": "Por deporte",
     "by_league": "Por liga",
@@ -193,16 +178,25 @@ AUDIT_ES = {
     "negative_edge_winners": "Ganadoras con ventaja negativa",
 }
 
-LANE_ES = {
-    "best_play": "mejor jugada",
-    "watchlist": "lista de seguimiento",
-    "no_play": "investigación / aprendizaje",
-    "research": "investigación",
+REPORT_MODE_ES = {
+    "Consumer Magazine": "Revista de consumidor",
+    "Tipster Report": "Reporte tipster",
+    "Client-Safe Summary": "Resumen seguro para cliente",
+    "Analyst Proof Report": "Reporte de prueba para analista",
 }
+RISK_ES = {"Balanced": "Balanceado", "Conservative": "Conservador", "Aggressive": "Agresivo"}
 
 
 def t(key: str) -> str:
     return TEXT.get(LANG, TEXT["en"]).get(key, key)
+
+
+def localized_options(values: list[str], custom: dict[str, str] | None = None) -> tuple[list[str], dict[str, str]]:
+    if LANG != "es":
+        return values, {value: value for value in values}
+    custom = custom or {}
+    labels = [custom.get(value, str(localize_value(value, LANG))) for value in values]
+    return labels, dict(zip(labels, values))
 
 
 def display_event_text(value: str, language: str) -> str:
@@ -218,23 +212,7 @@ def audit_name_text(name: str, language: str) -> str:
 
 
 def localized_dataframe(frame: pd.DataFrame, language: str) -> pd.DataFrame:
-    if language != "es" or frame is None or frame.empty:
-        return frame
-    out = frame.copy()
-    for col in list(out.columns):
-        if col in {"event", "public_event"}:
-            out[col] = out[col].map(lambda v: event_text(v, "es"))
-        elif col in {"sport", "public_sport", "league"}:
-            out[col] = out[col].map(lambda v: sport_text(v, "es"))
-        elif col in {"prediction", "public_pick"}:
-            out[col] = out[col].map(lambda v: pick_text(v, "es"))
-        elif col in {"consumer_action", "recommended_action", "public_action", "model_lean_label", "price_value_label", "official_status_label", "result_status", "learning_status", "data_issue_reason", "suggestion", "sports_context_summary", "market_read", "why_it_matters"}:
-            out[col] = out[col].map(lambda v: value_text(v, "es"))
-        elif col in {"report_lane", "report_lane_v2"}:
-            out[col] = out[col].map(lambda v: LANE_ES.get(safe_text(v), value_text(v, "es")))
-        elif out[col].dtype == object:
-            out[col] = out[col].map(lambda v: value_text(v, "es"))
-    return out.rename(columns={col: COLUMN_ES.get(col, col) for col in out.columns})
+    return global_localize_dataframe(frame, language)
 
 
 def rows_from_saved_sources(workspace_id: str) -> tuple[str, pd.DataFrame]:
@@ -341,7 +319,7 @@ with st.expander(t("input"), expanded=True):
     upload_source, upload_rows = read_uploaded_rows()
     raw = pd.concat([frame for frame in (saved_rows, upload_rows) if frame is not None and not frame.empty], ignore_index=True, sort=False) if (not saved_rows.empty or not upload_rows.empty) else pd.DataFrame()
     source_note = ", ".join([name for name in (saved_source, upload_source) if name]) or "none"
-    st.caption(f"{t('source')}: {source_note}")
+    st.caption(f"{t('source')}: {localize_value(source_note, LANG)}")
 
 if raw.empty:
     st.warning(t("empty"))
@@ -354,7 +332,9 @@ with st.expander(t("profile"), expanded=True):
     profile_rows = list_profiles()
     profile_ids = sorted({safe_text(row.get("profile_id")) for row in profile_rows if safe_text(row.get("profile_id"))}) or ["default"]
     p1, p2, p3 = st.columns([2, 1, 1])
-    selected_profile = p1.selectbox(t("profile_id"), profile_ids, index=0)
+    profile_labels, profile_map = localized_options(profile_ids)
+    selected_profile_label = p1.selectbox(t("profile_id"), profile_labels, index=0)
+    selected_profile = profile_map.get(selected_profile_label, selected_profile_label)
     profile_id = p1.text_input(t("profile_key"), value=selected_profile)
     if p2.button(t("load_profile"), use_container_width=True):
         profile = load_profile(profile_id)
@@ -375,19 +355,28 @@ with st.expander(t("profile"), expanded=True):
     if profile_background_bytes:
         st.success(t("background_ready"))
         st.image(profile_background_bytes, caption=t("background_preview"), width=260)
-    mode_options = ["Consumer Magazine", "Tipster Report", "Client-Safe Summary", "Analyst Proof Report"] if LANG == "en" else ["Revista consumidor", "Reporte tipster", "Resumen cliente", "Reporte técnico"]
-    default_mode_index = mode_options.index(loaded.preferred_report_mode) if loaded.preferred_report_mode in mode_options else 0
-    report_mode = b1.selectbox(t("mode"), mode_options, index=default_mode_index)
-    risk_values = ["Balanced", "Conservative", "Aggressive"] if LANG == "en" else ["Balanceado", "Conservador", "Agresivo"]
-    risk_index = risk_values.index(loaded.risk_preference) if loaded.risk_preference in risk_values else 0
-    risk_preference = b2.selectbox(t("risk"), risk_values, index=risk_index)
+    report_mode_values = ["Consumer Magazine", "Tipster Report", "Client-Safe Summary", "Analyst Proof Report"]
+    mode_labels, mode_map = localized_options(report_mode_values, REPORT_MODE_ES)
+    loaded_mode = loaded.preferred_report_mode if loaded.preferred_report_mode in report_mode_values else report_mode_values[0]
+    default_mode_index = report_mode_values.index(loaded_mode)
+    report_mode_label = b1.selectbox(t("mode"), mode_labels, index=default_mode_index)
+    report_mode = mode_map.get(report_mode_label, report_mode_label)
+    risk_values = ["Balanced", "Conservative", "Aggressive"]
+    risk_labels, risk_map = localized_options(risk_values, RISK_ES)
+    loaded_risk = loaded.risk_preference if loaded.risk_preference in risk_values else risk_values[0]
+    risk_index = risk_values.index(loaded_risk)
+    risk_label = b2.selectbox(t("risk"), risk_labels, index=risk_index)
+    risk_preference = risk_map.get(risk_label, risk_label)
     visibility_values = ["private", "public"]
+    visibility_labels, visibility_map = localize_options(visibility_values, LANG)
     loaded_visibility = safe_text((loaded.delivery_settings or {}).get("visibility")) or "private"
-    visibility = b2.selectbox(t("visibility"), visibility_values, index=visibility_values.index(loaded_visibility) if loaded_visibility in visibility_values else 0)
+    visibility_index = visibility_values.index(loaded_visibility) if loaded_visibility in visibility_values else 0
+    visibility_label = b2.selectbox(t("visibility"), visibility_labels, index=visibility_index)
+    visibility = visibility_map.get(visibility_label, visibility_label)
     preferred_sports = render_sport_league_filter(st, label=t("sports"), options=all_sport_options, default=[sport for sport in list(loaded.preferred_sports or []) if sport in all_sport_options], language=LANG, key="report_profile_sports")
     disclaimer_default = "Informational content only. Results are not guaranteed." if LANG == "en" else "Contenido informativo. No garantiza resultados."
     disclaimer = st.text_area(t("disclaimer"), value=loaded.disclaimer or disclaimer_default, height=80)
-    technical = "Analyst" in report_mode or "técnico" in report_mode.lower()
+    technical = report_mode == "Analyst Proof Report"
     if p3.button(t("save_profile"), use_container_width=True):
         saved = save_profile(WhiteLabelProfile(profile_id=profile_id, workspace_id=workspace_id, brand_name=brand_name, logo_url=logo_url, tagline=tagline, language=LANG, report_title=report_title, disclaimer=disclaimer, preferred_report_mode=report_mode, preferred_sports=list(preferred_sports), risk_preference=risk_preference, show_technical_fields=technical, default_audience="analyst" if technical else "consumer", delivery_settings={"save_latest_feed": True, "visibility": visibility}))
         st.session_state["report_studio_profile"] = asdict(saved)
@@ -405,7 +394,7 @@ unified_feed = save_report_feed(cards, brand, mode=mode_key, public=visibility =
 feed = {"unified_v2": unified_feed, "legacy_v1": legacy_feed}
 summary = report_studio_summary(state)
 magazine_report_name = safe_text(brand_name) or "ABA Signal Pro"
-magazine_title = safe_text(report_title) or ("Análisis Deportivo Diario" if LANG == "es" else "Daily Sports Analysis")
+magazine_title = safe_text(report_title) or ("Analisis Deportivo Diario" if LANG == "es" else "Daily Sports Analysis")
 cards_as_rows = enrich_rows_with_live_api_data([with_report_branding(row.to_dict(), magazine_report_name, magazine_title, LANG) for _, row in cards.iterrows()])
 api_diagnostics = api_enrichment_diagnostics(cards_as_rows)
 
