@@ -6,8 +6,11 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+import autonomous_betting_agent.ui_i18n_phase3e  # noqa: F401
+from autonomous_betting_agent.dynamic_odds_display import build_dynamic_odds_shadow_rows, dynamic_odds_shadow_safety_summary
 from autonomous_betting_agent.odds_quality import audit_prices
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
+from autonomous_betting_agent.ui_i18n import localize_dataframe
 
 st.set_page_config(page_title='What Are the Odds', layout='wide')
 LANG = render_app_sidebar('what_are_the_odds', language_key='what_are_the_odds_pro_language', selector='radio')
@@ -42,6 +45,9 @@ TEXT = {
         'safety': 'Price safety gate',
         'passed': 'Passed',
         'review': 'Needs review',
+        'dynamic_odds_shadow': 'Dynamic Odds Shadow Math',
+        'dynamic_odds_warning': 'Dynamic Odds is Shadow Mode only. These values do not change live picks, lock readiness, EV, stake, bankroll, grading, proof ledgers, or model probability.',
+        'dynamic_odds_empty': 'No rows available for Dynamic Odds Shadow display.',
     },
     'es': {
         'title': 'What Are the Odds',
@@ -72,12 +78,30 @@ TEXT = {
         'safety': 'Revisión de precio',
         'passed': 'Aprobadas',
         'review': 'Revisar',
+        'dynamic_odds_shadow': 'Matematica Shadow de Dynamic Odds',
+        'dynamic_odds_warning': 'Dynamic Odds es solo Shadow Mode. Estos valores no cambian picks en vivo, preparacion de bloqueo, EV, stake, bankroll, calificacion, ledgers de prueba ni probabilidad del modelo.',
+        'dynamic_odds_empty': 'No hay filas disponibles para mostrar Dynamic Odds Shadow.',
     },
 }
 
 
 def t(key: str) -> str:
     return TEXT[LANG].get(key, TEXT['en'].get(key, key))
+
+
+def display_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    return localize_dataframe(frame, LANG)
+
+
+def show_dynamic_odds_shadow_panel(frame: pd.DataFrame) -> None:
+    st.subheader(t('dynamic_odds_shadow'))
+    st.warning(t('dynamic_odds_warning'))
+    if frame.empty:
+        st.info(t('dynamic_odds_empty'))
+        return
+    shadow_frame = pd.DataFrame(build_dynamic_odds_shadow_rows(frame.to_dict('records')))
+    st.dataframe(display_frame(shadow_frame), use_container_width=True, hide_index=True)
+    st.json(dynamic_odds_shadow_safety_summary())
 
 
 def safe_float(value: Any, default: float | None = None) -> float | None:
@@ -387,3 +411,5 @@ with tab_pass:
     st.dataframe(passed_output, use_container_width=True, hide_index=True)
 with tab_review:
     st.dataframe(review_output, use_container_width=True, hide_index=True)
+
+show_dynamic_odds_shadow_panel(passed_output if not passed_output.empty else output)
