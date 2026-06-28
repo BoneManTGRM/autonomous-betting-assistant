@@ -43,6 +43,8 @@ RESULT_COLUMNS = ("result", "grade", "outcome", "result_status", "official_resul
 MARKET_COLUMNS = ("market_type", "market", "bet_type")
 SPORT_COLUMNS = ("sport", "league", "competition", "sport_key")
 PICK_COLUMNS = ("prediction", "pick", "selection", "market", "market_type")
+DNB_ODDS_COLUMNS = ("draw_no_bet_odds", "dnb_odds", "draw_no_bet_decimal", "dnb_decimal")
+DOUBLE_CHANCE_ODDS_COLUMNS = ("double_chance_odds", "dc_odds", "double_chance_decimal", "dc_decimal")
 
 
 def _cfg(config: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -80,9 +82,6 @@ def _float(value: Any, default: float | None = None) -> float | None:
         return default
     text = _text(value).replace("%", "").replace(",", "")
     if text == "":
-        return default
-    if text.startswith("+") and text[1:].replace(".", "", 1).isdigit():
-        # Do not silently convert American odds. Treat as not decimal.
         return default
     try:
         return float(text)
@@ -167,8 +166,8 @@ def calculate_clv(row: Mapping[str, Any]) -> float | None:
         explicit = _float(row.get(column))
         if explicit is not None:
             if column in {"clv_percent", "closing_line_value"} and abs(explicit) > 1:
-                return explicit / 100.0
-            return explicit
+                return round(explicit / 100.0, 6)
+            return round(explicit, 6)
     entry = _safe_decimal(_first(row, ENTRY_ODDS_COLUMNS))
     close = _safe_decimal(_first(row, CLOSING_ODDS_COLUMNS))
     if entry is None or close is None or close <= 0:
@@ -179,6 +178,15 @@ def calculate_clv(row: Mapping[str, Any]) -> float | None:
         if _text(line) == "":
             return None
     return round(entry / close - 1.0, 6)
+
+
+def _beat_close(row: Mapping[str, Any]) -> bool | None:
+    value = _text(row.get("beat_close")).lower()
+    if value in {"true", "yes", "1", "y"}:
+        return True
+    if value in {"false", "no", "0", "n"}:
+        return False
+    return None
 
 
 def normalize_backtest_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -198,6 +206,7 @@ def normalize_backtest_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str,
         row["_stake_units"] = stake
         row["_profit_units"] = profit
         row["_clv"] = calculate_clv(row)
+        row["_beat_close"] = _beat_close(row)
         normalized.append(row)
     return normalized
 
@@ -214,6 +223,7 @@ def baseline_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     profit_units = sum(profits)
     prices = [row["_entry_decimal"] for row in completed if row.get("_entry_decimal") is not None]
     clvs = [row["_clv"] for row in completed if row.get("_clv") is not None]
+    beat_close_values = [row["_beat_close"] for row in completed if row.get("_beat_close") is not None]
     model_probs = [_float(_first(row, ("model_probability", "probability", "confidence"))) for row in completed]
     edges = [_float(_first(row, ("edge", "model_market_edge", "no_vig_edge"))) for row in completed]
     evs = [_float(_first(row, ("EV", "ev", "expected_value", "expected_value_per_unit"))) for row in completed]
@@ -238,6 +248,8 @@ def baseline_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "average_decimal_price": _round_or_none(_average(prices)),
         "average_CLV": _round_or_none(_average(clvs)),
         "CLV_sample_size": len(clvs),
+        "beat_close_sample_size": len(beat_close_values),
+        "beat_close_count": sum(1 for value in beat_close_values if value is True),
         "max_drawdown_units": _drawdown(profits),
         "loss_count": losses,
         "bad_pick_count": losses,
@@ -276,12 +288,16 @@ def _is_combat(row: Mapping[str, Any]) -> bool:
     return any(token in text for token in ("boxing", "mma", "ufc", "combat", "fight", "method", "round", "ko", "submission", "decision", "prop"))
 
 
+def _has_any_decimal(rows: Sequence[Mapping[str, Any]], columns: Sequence[str]) -> bool:
+    return any(_safe_decimal(_first(row, columns)) is not None for row in rows)
+
+
 def _finding(title: str, finding_type: str, **extra: Any) -> dict[str, Any]:
     basis = f"{title}|{finding_type}|{extra.get('sample_size', 0)}|{extra.get('affected_sport', '')}|{extra.get('affected_market_type', '')}"
     result = {
         "finding_id": sha256(basis.encode("utf-8")).hexdigest()[:12],
         "finding_type": finding_type,
-        "candidate_type": finding_type,
+        "candidate_type": extra.pop("candidate_type", finding_type),
         "title": title,
         "description": extra.pop("description", title.replace("_", " ")),
         "affected_sport": extra.pop("affected_sport", ""),
@@ -311,24 +327,25 @@ def _finding(title: str, finding_type: str, **extra: Any) -> dict[str, Any]:
     return result
 
 
-def detect_data_blockers(rows: Sequence[Mapping[str, Any]], candidates: Sequence[Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
+def detect_data_blockers(rows: Sequence[Mapping[str, Any]], candidates: Sequence[Mapping[str, Any]] | None = None, config: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+    cfg = _cfg(config)
     normalized = normalize_backtest_rows(rows)
     metrics = baseline_metrics(normalized)
     blockers: list[dict[str, Any]] = []
     if normalized and metrics["CLV_sample_size"] == 0:
-        blockers.append(_finding("missing_closing_odds", "data_blocker", sample_size=len(normalized), description="Closing odds or comparable CLV data are unavailable for CLV-based evaluation."))
+        blockers.append(_finding("missing_closing_odds", "data_blocker", sample_size=len(normalized), description="Closing odds or comparable CLV data are unavailable for CLV-based evaluation.", data_blockers=["missing_closing_odds"]))
     if metrics["missing_result_count"]:
-        blockers.append(_finding("missing_result_or_grade", "data_blocker", sample_size=metrics["missing_result_count"], description="Rows are missing completed result/grade data."))
+        blockers.append(_finding("missing_result_or_grade", "data_blocker", sample_size=metrics["missing_result_count"], description="Rows are missing completed result/grade data.", data_blockers=["missing_result_or_grade"]))
     if metrics["missing_odds_count"]:
-        blockers.append(_finding("missing_decimal_odds", "data_blocker", sample_size=metrics["missing_odds_count"], description="Rows are missing decimal odds needed for price-based simulation."))
-    if metrics["completed_rows_used"] < int(DEFAULT_CONFIG["minimum_sample_for_candidate"]):
-        blockers.append(_finding("insufficient_completed_result_rows", "data_blocker", sample_size=metrics["completed_rows_used"], description="Completed result rows are below the candidate threshold."))
+        blockers.append(_finding("missing_decimal_odds", "data_blocker", sample_size=metrics["missing_odds_count"], description="Rows are missing decimal odds needed for price-based simulation.", data_blockers=["missing_decimal_odds"]))
+    if metrics["completed_rows_used"] < int(cfg["minimum_sample_for_candidate"]):
+        blockers.append(_finding("insufficient_completed_result_rows", "data_blocker", sample_size=metrics["completed_rows_used"], completed_rows_used=metrics["completed_rows_used"], description="Completed result rows are below the candidate threshold.", data_blockers=["insufficient_completed_result_rows"]))
     soccer_rows = [row for row in normalized if _is_soccer(row)]
     if soccer_rows:
-        if not any(_text(row.get("draw_no_bet_odds")) or _text(row.get("dnb_odds")) for row in soccer_rows):
-            blockers.append(_finding("missing_draw_no_bet_odds", "data_blocker", sample_size=len(soccer_rows), description="DNB repair option cannot be simulated without draw-no-bet odds."))
-        if not any(_text(row.get("double_chance_odds")) or _text(row.get("dc_odds")) for row in soccer_rows):
-            blockers.append(_finding("missing_double_chance_odds", "data_blocker", sample_size=len(soccer_rows), description="Double-chance repair option cannot be simulated without double-chance odds."))
+        if not _has_any_decimal(soccer_rows, DNB_ODDS_COLUMNS):
+            blockers.append(_finding("missing_draw_no_bet_odds", "data_blocker", sample_size=len(soccer_rows), affected_sport="soccer", affected_market_type="draw_no_bet", description="DNB repair option cannot be simulated without draw-no-bet odds.", data_blockers=["missing_draw_no_bet_odds"], unavailable_options=["draw_no_bet_if_available"]))
+        if not _has_any_decimal(soccer_rows, DOUBLE_CHANCE_ODDS_COLUMNS):
+            blockers.append(_finding("missing_double_chance_odds", "data_blocker", sample_size=len(soccer_rows), affected_sport="soccer", affected_market_type="double_chance", description="Double-chance repair option cannot be simulated without double-chance odds.", data_blockers=["missing_double_chance_odds"], unavailable_options=["double_chance_if_available"]))
     return blockers
 
 
@@ -338,7 +355,7 @@ def detect_watchlists(rows: Sequence[Mapping[str, Any]], config: Mapping[str, An
     metrics = baseline_metrics(normalized)
     watchlists: list[dict[str, Any]] = []
     if metrics["completed_rows_used"] < int(cfg["minimum_sample_for_candidate"]):
-        watchlists.append(_finding("insufficient_sample_size", "watchlist", sample_size=metrics["completed_rows_used"], description="Keep collecting completed rows before repair candidacy."))
+        watchlists.append(_finding("insufficient_sample_size", "watchlist", sample_size=metrics["completed_rows_used"], completed_rows_used=metrics["completed_rows_used"], description="Keep collecting completed rows before repair candidacy."))
     combat = [row for row in normalized if _is_combat(row)]
     if combat and len(combat) < int(cfg["minimum_sample_for_candidate"]):
         watchlists.append(_finding("combat_method_round_volatility", "watchlist", affected_sport="combat", affected_market_type="method_round_prop", sample_size=len(combat), description="Combat method/round markets remain capped to watchlist until sample size and ROI gates are met."))
@@ -346,7 +363,7 @@ def detect_watchlists(rows: Sequence[Mapping[str, Any]], config: Mapping[str, An
     if soccer and len(soccer) < int(cfg["minimum_sample_for_candidate"]):
         watchlists.append(_finding("soccer_draw_risk_watchlist", "watchlist", affected_sport="soccer", affected_market_type="moneyline", sample_size=len(soccer), description="Soccer draw-risk signal needs more completed market data before repair candidacy."))
     if normalized and metrics["CLV_sample_size"] == 0:
-        watchlists.append(_finding("clv_unavailable_watchlist", "watchlist", sample_size=len(normalized), description="CLV is unavailable; use ROI-only shadow testing until closing odds exist."))
+        watchlists.append(_finding("clv_unavailable_watchlist", "watchlist", sample_size=len(normalized), description="CLV is unavailable; use ROI-only shadow testing until closing odds exist.", data_blockers=["missing_closing_odds"]))
     return watchlists
 
 
@@ -354,8 +371,8 @@ def classify_findings(rows: Sequence[Mapping[str, Any]], config: Mapping[str, An
     cfg = _cfg(config)
     normalized = normalize_backtest_rows(rows)
     metrics = baseline_metrics(normalized)
-    findings = []
-    findings.extend(detect_data_blockers(normalized))
+    findings: list[dict[str, Any]] = []
+    findings.extend(detect_data_blockers(normalized, config=cfg))
     findings.extend(detect_watchlists(normalized, cfg))
     if metrics["completed_rows_used"] >= int(cfg["minimum_sample_for_candidate"]):
         findings.append(
@@ -398,84 +415,51 @@ def simulate_shadow_repairs(rows: Sequence[Mapping[str, Any]], candidates: Seque
         return []
     risky_soccer = {row["_phase3c_row_id"] for row in normalized if _is_soccer_draw_risk(row, cfg)}
     if not risky_soccer:
-        risky_soccer = {row["_phase3c_row_id"] for row in normalized if _result_category(row) == "loss"}
-    options: list[dict[str, Any]] = []
-    for option, shadow_rows, unavailable in [
+        return []
+    has_dnb = _has_any_decimal(normalized, DNB_ODDS_COLUMNS)
+    has_dc = _has_any_decimal(normalized, DOUBLE_CHANCE_ODDS_COLUMNS)
+    option_specs = [
         ("no_play", _simulate_no_play(normalized, risky_soccer), []),
         ("reduce_stake_50_percent", _simulate_reduce_stake(normalized, risky_soccer, 0.5), []),
-        ("draw_no_bet_if_available", normalized, ["missing_draw_no_bet_odds"]),
-        ("double_chance_if_available", normalized, ["missing_double_chance_odds"]),
-    ]:
-        baseline = baseline_metrics(normalized)
+        ("require_higher_edge", _simulate_no_play(normalized, risky_soccer), []),
+        ("require_higher_model_probability", _simulate_no_play(normalized, risky_soccer), []),
+        ("require_better_price", _simulate_no_play(normalized, risky_soccer), []),
+        ("draw_no_bet_if_available", normalized, [] if has_dnb else ["missing_draw_no_bet_odds"]),
+        ("double_chance_if_available", normalized, [] if has_dc else ["missing_double_chance_odds"]),
+    ]
+    options: list[dict[str, Any]] = []
+    baseline = baseline_metrics(normalized)
+    for option, shadow_rows, unavailable in option_specs:
         shadow = baseline_metrics(shadow_rows)
-        comparison = compare_baseline_to_shadow(baseline, shadow)
-        decision = "data_blocked" if unavailable else classify_shadow_decision(comparison, cfg)["decision"]
+        comparison = compare_baseline_to_shadow(baseline, shadow, cfg)
+        decision = "data_blocked" if unavailable else comparison["decision"]
         options.append(
-            {
-                "finding_id": sha256(option.encode("utf-8")).hexdigest()[:12],
-                "finding_type": "shadow_tested_repair" if not unavailable else "data_blocker",
-                "candidate_type": option,
-                "title": option,
-                "description": f"Shadow simulation for {option}.",
-                "affected_sport": "soccer" if risky_soccer else "",
-                "affected_market_type": "moneyline" if risky_soccer else "",
-                "sample_size": int(baseline["completed_rows_used"]),
-                "completed_rows_used": int(baseline["completed_rows_used"]),
-                "minimum_required_sample": int(cfg["minimum_sample_for_candidate"]),
-                "has_result_data": int(baseline["completed_rows_used"]) > 0,
-                "has_closing_odds": int(baseline["CLV_sample_size"]) > 0,
-                "has_clv": int(baseline["CLV_sample_size"]) > 0,
-                "clv_sample_size": int(baseline["CLV_sample_size"]),
-                "has_shadow_backtest": not unavailable,
-                "data_blockers": list(unavailable),
-                "unavailable_options": [option] if unavailable else [],
-                "baseline_metrics": baseline,
-                "shadow_metrics": shadow,
-                "comparison_metrics": comparison,
-                "decision": decision,
-                "decision_reason": "Required market odds are unavailable." if unavailable else comparison["decision_reason"],
-                "eligible_for_manual_review": decision == "future_manual_review",
-                "live_mutation": FORBIDDEN,
-                "model_training": FORBIDDEN,
-                "stored_data_mutation": FORBIDDEN,
-                "phase": PHASE_3C,
-            }
+            _finding(
+                option,
+                "shadow_tested_repair" if not unavailable else "data_blocker",
+                candidate_type=option,
+                description=f"Shadow simulation for {option}.",
+                affected_sport="soccer",
+                affected_market_type="moneyline",
+                sample_size=int(baseline["completed_rows_used"]),
+                completed_rows_used=int(baseline["completed_rows_used"]),
+                minimum_required_sample=int(cfg["minimum_sample_for_candidate"]),
+                has_result_data=int(baseline["completed_rows_used"]) > 0,
+                has_closing_odds=int(baseline["CLV_sample_size"]) > 0,
+                has_clv=int(baseline["CLV_sample_size"]) > 0,
+                clv_sample_size=int(baseline["CLV_sample_size"]),
+                has_shadow_backtest=not unavailable,
+                data_blockers=list(unavailable),
+                unavailable_options=[option] if unavailable else [],
+                baseline_metrics=baseline,
+                shadow_metrics=shadow,
+                comparison_metrics=comparison,
+                decision=decision,
+                decision_reason="Required market odds are unavailable." if unavailable else comparison["decision_reason"],
+                eligible_for_manual_review=decision == "future_manual_review",
+            )
         )
     return options
-
-
-def compare_baseline_to_shadow(baseline: Mapping[str, Any], shadow: Mapping[str, Any]) -> dict[str, Any]:
-    baseline_roi = baseline.get("ROI")
-    shadow_roi = shadow.get("ROI")
-    baseline_clv = baseline.get("average_CLV")
-    shadow_clv = shadow.get("average_CLV")
-    comparison = {
-        "baseline_sample_size": baseline.get("completed_rows_used", 0),
-        "shadow_sample_size": shadow.get("completed_rows_used", 0),
-        "baseline_win_rate": baseline.get("win_rate"),
-        "shadow_win_rate": shadow.get("win_rate"),
-        "win_rate_delta": _delta(shadow.get("win_rate"), baseline.get("win_rate")),
-        "baseline_profit_units": baseline.get("profit_units", 0.0),
-        "shadow_profit_units": shadow.get("profit_units", 0.0),
-        "profit_units_delta": _delta(shadow.get("profit_units"), baseline.get("profit_units")),
-        "baseline_ROI": baseline_roi,
-        "shadow_ROI": shadow_roi,
-        "ROI_delta": _delta(shadow_roi, baseline_roi),
-        "baseline_losses": baseline.get("losses", 0),
-        "shadow_losses": shadow.get("losses", 0),
-        "losses_delta": _delta(shadow.get("losses"), baseline.get("losses")),
-        "avoided_losses": max(int(baseline.get("losses", 0) or 0) - int(shadow.get("losses", 0) or 0), 0),
-        "avoided_bad_picks": max(int(baseline.get("bad_pick_count", 0) or 0) - int(shadow.get("bad_pick_count", 0) or 0), 0),
-        "baseline_CLV": baseline_clv,
-        "shadow_CLV": shadow_clv,
-        "CLV_delta": _delta(shadow_clv, baseline_clv),
-        "CLV_sample_size": min(int(baseline.get("CLV_sample_size", 0) or 0), int(shadow.get("CLV_sample_size", 0) or 0)),
-        "confidence_level": _confidence_level(int(baseline.get("completed_rows_used", 0) or 0)),
-        "overfit_risk": _overfit_risk(int(baseline.get("completed_rows_used", 0) or 0)),
-    }
-    decision = classify_shadow_decision(comparison)
-    comparison.update(decision)
-    return comparison
 
 
 def _delta(new: Any, old: Any) -> float | None:
@@ -506,6 +490,40 @@ def _overfit_risk(sample_size: int) -> str:
 
 def _delta_value(comparison: Mapping[str, Any], key: str) -> float:
     return _float(comparison.get(key), 0.0) or 0.0
+
+
+def compare_baseline_to_shadow(baseline: Mapping[str, Any], shadow: Mapping[str, Any], config: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    baseline_roi = baseline.get("ROI")
+    shadow_roi = shadow.get("ROI")
+    baseline_clv = baseline.get("average_CLV")
+    shadow_clv = shadow.get("average_CLV")
+    comparison = {
+        "baseline_sample_size": baseline.get("completed_rows_used", 0),
+        "shadow_sample_size": shadow.get("completed_rows_used", 0),
+        "baseline_win_rate": baseline.get("win_rate"),
+        "shadow_win_rate": shadow.get("win_rate"),
+        "win_rate_delta": _delta(shadow.get("win_rate"), baseline.get("win_rate")),
+        "baseline_profit_units": baseline.get("profit_units", 0.0),
+        "shadow_profit_units": shadow.get("profit_units", 0.0),
+        "profit_units_delta": _delta(shadow.get("profit_units"), baseline.get("profit_units")),
+        "baseline_ROI": baseline_roi,
+        "shadow_ROI": shadow_roi,
+        "ROI_delta": _delta(shadow_roi, baseline_roi),
+        "baseline_losses": baseline.get("losses", 0),
+        "shadow_losses": shadow.get("losses", 0),
+        "losses_delta": _delta(shadow.get("losses"), baseline.get("losses")),
+        "avoided_losses": max(int(baseline.get("losses", 0) or 0) - int(shadow.get("losses", 0) or 0), 0),
+        "avoided_bad_picks": max(int(baseline.get("bad_pick_count", 0) or 0) - int(shadow.get("bad_pick_count", 0) or 0), 0),
+        "baseline_CLV": baseline_clv,
+        "shadow_CLV": shadow_clv,
+        "CLV_delta": _delta(shadow_clv, baseline_clv),
+        "CLV_sample_size": min(int(baseline.get("CLV_sample_size", 0) or 0), int(shadow.get("CLV_sample_size", 0) or 0)),
+        "confidence_level": _confidence_level(int(baseline.get("completed_rows_used", 0) or 0)),
+        "overfit_risk": _overfit_risk(int(baseline.get("completed_rows_used", 0) or 0)),
+    }
+    decision = classify_shadow_decision(comparison, config)
+    comparison.update(decision)
+    return comparison
 
 
 def classify_shadow_decision(comparison: Mapping[str, Any], config: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -574,6 +592,7 @@ def build_phase3c_report(rows: Sequence[Mapping[str, Any]], config: Mapping[str,
             "stored_data_mutation": FORBIDDEN,
             "repair_activation": "OFF",
             "live_repairs_applied_count": 0,
+            "repairs_applied_live": 0,
         },
         "summary_counts": summary_counts,
         "generated_at_utc": _utc_now(),
