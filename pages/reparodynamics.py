@@ -27,6 +27,7 @@ from autonomous_betting_agent.reparodynamics_repair_memory import (
     manual_review_decision,
     repair_memory_to_frames,
     save_repair_memory,
+    stable_memory_run_id,
     update_repair_memory,
 )
 from autonomous_betting_agent.reparodynamics_shadow_backtest import build_phase3c_report
@@ -61,7 +62,7 @@ TEXT = {
         "run": "Run Phase 3C Shadow Backtest + save to Repair Memory",
         "success": "Shadow Backtest completed and saved to Repair Memory. Audit event written.",
         "save_memory": "Save Phase 3C results to Repair Memory",
-        "already_saved": "This Phase 3C run is already saved to Repair Memory.",
+        "already_saved": "Already saved to Repair Memory.",
         "memory_saved": "Phase 3C results saved to Repair Memory.",
         "saved": "Rows saved to research ledger",
         "not_saved": "No scan rows were saved to local storage.",
@@ -91,6 +92,7 @@ TEXT = {
         "apply_review": "Save manual review decision",
         "review_saved": "Manual review decision saved. No live repairs were activated.",
         "manual_warning": "Manual approval does not activate live repairs.",
+        "github_memory": "GitHub Repair Memory persistence",
         "final_rule": "ABA may store repair memory and manual review labels, but live repair remains forbidden.",
     },
     "es": {
@@ -147,24 +149,27 @@ TEXT = {
         "apply_review": "Guardar decision de revision manual",
         "review_saved": "Decision de revision manual guardada. No se activaron reparaciones en vivo.",
         "manual_warning": "La aprobacion manual no activa reparaciones en vivo.",
+        "github_memory": "Persistencia GitHub de Repair Memory",
         "final_rule": "ABA puede guardar memoria de reparacion y etiquetas de revision manual, pero la reparacion en vivo sigue prohibida.",
     },
 }
 
 PAGE_COLUMN_LABELS_ES = {
+    "field": "Campo",
+    "value": "Valor",
+    "description": "Descripcion",
     "created_at_utc": "Creado UTC",
     "created at utc": "Creado UTC",
     "event_id": "ID de evento",
     "event id": "ID de evento",
     "event_type": "Tipo de evento",
     "event type": "Tipo de evento",
-    "field": "Campo",
-    "value": "Valor",
-    "description": "Descripcion",
-    "section": "Seccion",
+    "memory_run_id": "ID de corrida de memoria",
     "repair_key": "Clave de reparacion",
     "repair key": "Clave de reparacion",
     "reviewer": "Revisor",
+    "section": "Seccion",
+    "source": "Fuente",
     "memory_status": "Estado de memoria",
     "manual_status": "Estado manual",
     "manual_note": "Nota manual",
@@ -179,6 +184,8 @@ PAGE_COLUMN_LABELS_ES = {
     "avg_ROI_delta": "Cambio ROI promedio",
     "total_profit_units_delta": "Cambio total en unidades de ganancia",
     "total_avoided_losses": "Derrotas evitadas totales",
+    "duplicate_skipped": "Duplicado omitido",
+    "rows_added": "Filas agregadas",
 }
 
 PAGE_VALUE_LABELS_ES = {
@@ -194,6 +201,7 @@ PAGE_VALUE_LABELS_ES = {
     "phase_3d_repair_memory": "Fase 3D Repair Memory",
     "reparodynamics_phase_3d_scan": "Escaneo Reparodynamics Fase 3D",
     "phase3c_saved_to_memory": "Fase 3C guardada en memoria",
+    "phase3c_duplicate_save_skipped": "Guardado duplicado Fase 3C omitido",
     "manual_review_decision": "decision de revision manual",
     "repair_memory_summary": "resumen de Repair Memory",
     "phase4_lockbox_candidate_detected": "candidato lockbox Fase 4 detectado",
@@ -224,16 +232,18 @@ PAGE_VALUE_LABELS_ES = {
     "forbidden": "PROHIBIDO",
     "enabled": "ACTIVADO",
     "preparation_only": "SOLO PREPARACION",
-    "data_blockers": "bloqueadores de datos",
-    "watchlists": "listas de observacion",
     "repair_candidates": "candidatos de reparacion",
-    "shadow_tested_repairs": "reparaciones probadas en Shadow",
     "rejected_repairs": "reparaciones rechazadas",
     "manual_review_queue": "cola de revision manual",
     "missing_closing_odds": "faltan cuotas de cierre",
     "missing_decimal_odds": "faltan cuotas decimales",
     "missing_draw_no_bet_odds": "faltan cuotas draw-no-bet",
     "missing_double_chance_odds": "faltan cuotas de doble oportunidad",
+    "data_blocker": "bloqueador de datos",
+    "watchlist": "lista de observacion",
+    "repair_candidate": "candidato de reparacion",
+    "already_saved": "ya guardado",
+    "saved": "guardado",
 }
 
 
@@ -272,8 +282,7 @@ def display_frame(frame: pd.DataFrame | None) -> pd.DataFrame | None:
     if not str(LANG).lower().startswith("es"):
         return frame
     out = frame.copy()
-    normalized_columns = {column: str(column).strip().replace(" ", "_") for column in out.columns}
-    out = out.rename(columns=normalized_columns)
+    out = out.rename(columns={column: str(column).strip().replace(" ", "_") for column in out.columns})
     if not out.empty:
         for column in out.columns:
             if out[column].dtype == object:
@@ -350,6 +359,13 @@ def memory_counts(memory: dict[str, Any]) -> dict[str, int]:
     }
 
 
+def render_memory_save_status(memory_payload: dict[str, Any]) -> None:
+    if memory_payload.get("last_save_status") == "already_saved":
+        st.info(t("already_saved"))
+    elif memory_payload.get("last_save_status") == "saved":
+        st.success(t("memory_saved"))
+
+
 doctrine = get_reparodynamics_doctrine()
 
 st.title(t("title"))
@@ -381,6 +397,7 @@ mem_cols[2].metric(t("rejected"), counts["rejected"])
 mem_cols[3].metric(t("data_blocked"), counts["data_blocked"])
 mem_cols[4].metric(t("approved"), counts["approved"])
 mem_cols[5].metric(t("phase4"), counts["phase4"])
+st.caption(f"{t('github_memory')}: {metric_value(memory.get('github_persistence_enabled', False))}")
 
 st.subheader(t("controls"))
 st.caption(t("save_warning"))
@@ -401,6 +418,7 @@ if upload is not None:
 if st.button(t("run"), type="primary"):
     scan_rows = build_scan_rows(uploaded_rows, uploaded_name, include_system)
     phase3c_report = build_phase3c_report(scan_rows)
+    phase3c_report["memory_run_id"] = stable_memory_run_id(phase3c_report)
     memory = update_repair_memory(memory, phase3c_report, source="Reparodynamics page")
     memory = save_repair_memory(memory, workspace_id)
     runner_report = run_adaptive_repair_scan(
@@ -413,7 +431,7 @@ if st.button(t("run"), type="primary"):
     st.session_state["phase3c_latest_report"] = phase3c_report
     st.session_state["phase3d_repair_memory"] = memory
     st.session_state["shadow_mode_latest_report"] = runner_report.to_dict()
-    st.success(t("success"))
+    render_memory_save_status(memory)
     if save_scan_rows:
         rows_to_save = uploaded_rows or []
         if rows_to_save and save_confirmed:
@@ -425,11 +443,17 @@ if st.button(t("run"), type="primary"):
             st.info(t("not_saved"))
 
 phase3c = st.session_state.get("phase3c_latest_report")
-if phase3c and st.button(t("save_memory")):
-    memory = update_repair_memory(load_repair_memory(workspace_id), phase3c, source="Manual page save")
-    memory = save_repair_memory(memory, workspace_id)
-    st.session_state["phase3d_repair_memory"] = memory
-    st.success(t("memory_saved"))
+if phase3c:
+    run_id = str(phase3c.get("memory_run_id") or stable_memory_run_id(phase3c))
+    already_saved = run_id in set(str(item) for item in memory.get("saved_run_ids", []))
+    if already_saved:
+        st.info(t("already_saved"))
+    elif st.button(t("save_memory")):
+        phase3c["memory_run_id"] = run_id
+        memory = update_repair_memory(load_repair_memory(workspace_id), phase3c, source="Manual page save")
+        memory = save_repair_memory(memory, workspace_id)
+        st.session_state["phase3d_repair_memory"] = memory
+        render_memory_save_status(memory)
 
 memory = st.session_state.get("phase3d_repair_memory") or load_repair_memory(workspace_id)
 frames = repair_memory_to_frames(memory)
