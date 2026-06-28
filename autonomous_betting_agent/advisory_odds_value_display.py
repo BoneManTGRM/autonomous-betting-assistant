@@ -26,6 +26,22 @@ SAFETY_CONFIRMATION = (
 )
 PLAYABLE_STATUSES = {PLAYABLE_PLUS_EV, WATCHLIST_VALUE, PREDICTION_ONLY_NOT_PLUS_EV}
 STALE_WARNING_STATUSES = {"STALE", "UNKNOWN", "EVENT_STARTED", "HISTORICAL_ROW"}
+EVENT_START_FIELDS = [
+    "event_start_time",
+    "event_start_utc",
+    "commence_time",
+    "start_utc",
+    "start_time",
+    "game_time",
+    "match_time",
+]
+ODDS_FRESHNESS_FIELDS = [
+    "odds_timestamp",
+    "odds_last_update",
+    "last_update",
+    "pulled_at_utc",
+    "created_at_utc",
+]
 IMMUTABLE_FIELDS = [
     "model_probability",
     "model_probability_clean",
@@ -224,7 +240,7 @@ def stale_line_summary(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> pd.D
     if frame.empty or "advisory_stale_line_status" not in frame.columns:
         return pd.DataFrame()
     out = frame[frame["advisory_stale_line_status"].fillna("").astype(str).isin(STALE_WARNING_STATUSES)].copy()
-    timestamp_cols = [col for col in ["odds_timestamp", "odds_last_update", "last_update", "pulled_at_utc", "created_at_utc", "event_start_time", "event_start_utc", "commence_time"] if col in out.columns]
+    timestamp_cols = [col for col in [*ODDS_FRESHNESS_FIELDS, *EVENT_START_FIELDS] if col in out.columns]
     return _select_columns(out, ["event", "prediction", "market_type", "sportsbook", "bookmaker", "advisory_stale_line_status", "advisory_stale_line_reason", *timestamp_cols])
 
 
@@ -265,6 +281,161 @@ def proof_safety_comparison(original_rows: Sequence[Mapping[str, Any]] | pd.Data
     return {"passed": not violations, "violations": violations, "row_count_original": len(original), "row_count_advisory": len(advisory)}
 
 
+def _iso(value: pd.Timestamp | None) -> str | None:
+    if value is None or pd.isna(value):
+        return None
+    return value.isoformat()
+
+
+def _parse_utc(value: Any) -> pd.Timestamp | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "nat"}:
+        return None
+    try:
+        parsed = pd.to_datetime(text, utc=True, errors="coerce")
+    except Exception:
+        return None
+    if pd.isna(parsed):
+        return None
+    return pd.Timestamp(parsed)
+
+
+def _first_datetime_from_fields(row: Mapping[str, Any], fields: Sequence[str]) -> tuple[pd.Timestamp | None, str | None]:
+    for field in fields:
+        if field in row:
+            parsed = _parse_utc(row.get(field))
+            if parsed is not None:
+                return parsed, field
+    return None, None
+
+
+def _detected_fields(rows: Sequence[Mapping[str, Any]], fields: Sequence[str]) -> list[str]:
+    detected: list[str] = []
+    for field in fields:
+        if any(str(row.get(field, "")).strip() not in {"", "nan", "None", "NaT"} for row in rows if field in row):
+            detected.append(field)
+    return detected
+
+
+def _top_blocked_reason(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> dict[str, Any]:
+    blocked = blocked_reason_summary(rows)
+    if blocked.empty:
+        return {"advisory_playable_status": None, "advisory_playable_reason": None, "row_count": 0}
+    top = blocked.iloc[0].to_dict()
+    return {
+        "advisory_playable_status": top.get("advisory_playable_status"),
+        "advisory_playable_reason": top.get("advisory_playable_reason"),
+        "row_count": int(top.get("row_count") or 0),
+    }
+
+
+def advisory_real_file_diagnostics(rows: Sequence[Mapping[str, Any]] | pd.DataFrame, *, now: Any | None = None) -> dict[str, Any]:
+    source = _records(rows)
+    valued = advisory_rows(source)
+    frame = pd.DataFrame(valued)
+    counts = advisory_summary_counts(valued)
+    now_ts = _parse_utc(now) if now is not None else pd.Timestamp.now(tz="UTC")
+    if now_ts is None:
+        now_ts = pd.Timestamp.now(tz="UTC")
+
+    event_times: list[pd.Timestamp] = []
+    odds_times: list[pd.Timestamp] = []
+    for row in valued:
+        event_time, _event_field = _first_datetime_from_fields(row, EVENT_START_FIELDS)
+        odds_time, _odds_field = _first_datetime_from_fields(row, ODDS_FRESHNESS_FIELDS)
+        if event_time is not None:
+            event_times.append(event_time)
+        if odds_time is not None:
+            odds_times.append(odds_time)
+
+    earliest_event = min(event_times) if event_times else None
+    latest_event = max(event_times) if event_times else None
+    earliest_odds = min(odds_times) if odds_times else None
+    latest_odds = max(odds_times) if odds_times else None
+    historical_event_rows = int(sum(1 for item in event_times if item <= now_ts))
+    future_event_rows = int(sum(1 for item in event_times if item > now_ts))
+    total_event_times = len(event_times)
+    if total_event_times == 0:
+        slate_type = "UNKNOWN_EVENT_TIMES"
+    elif future_event_rows == total_event_times:
+        slate_type = "FUTURE_SLATE"
+    elif historical_event_rows == total_event_times:
+        slate_type = "HISTORICAL_ONLY"
+    else:
+        slate_type = "ACTIVE_OR_MIXED_SLATE"
+
+    top = _top_blocked_reason(valued)
+    no_playable_rows = bool(
+        counts["total_advisory_rows"] > 0
+        and counts["PLAYABLE_PLUS_EV"] == 0
+        and counts["WATCHLIST_VALUE"] == 0
+        and counts["PREDICTION_ONLY_NOT_PLUS_EV"] == 0
+    )
+    all_blocked_by_past_events = bool(
+        counts["total_advisory_rows"] > 0
+        and counts["blocked_rows"] == counts["total_advisory_rows"]
+        and str(top.get("advisory_playable_reason") or "") == "event_start_time_is_not_future"
+    )
+    if all_blocked_by_past_events:
+        explanation = (
+            "All rows are blocked because event start times are not future. "
+            "This file is being treated as historical/proof data, not a fresh playable slate."
+        )
+        recommendation = "Upload a fresh future-event odds file to evaluate PLAYABLE_PLUS_EV rows."
+    elif no_playable_rows:
+        explanation = (
+            "No playable advisory rows were found. Review blocked reasons, market completeness, "
+            "future event times, odds freshness, and sportsbook price sources."
+        )
+        recommendation = "Upload a fresh future slate with current odds, complete market sides, and sportsbook/bookmaker prices."
+    else:
+        explanation = "The advisory engine produced at least one playable, watchlist, or prediction-only row."
+        recommendation = "Review advisory tables before any manual promotion in a later phase."
+
+    return {
+        "section_title": "Why no playable +EV rows?",
+        "total_rows": int(counts["total_advisory_rows"]),
+        "playable_plus_ev_rows": int(counts["PLAYABLE_PLUS_EV"]),
+        "watchlist_value_rows": int(counts["WATCHLIST_VALUE"]),
+        "prediction_only_rows": int(counts["PREDICTION_ONLY_NOT_PLUS_EV"]),
+        "blocked_rows": int(counts["blocked_rows"]),
+        "complete_markets": int(counts["complete_markets"]),
+        "incomplete_markets": int(counts["incomplete_markets"]),
+        "top_blocked_status": top.get("advisory_playable_status"),
+        "top_blocked_reason": top.get("advisory_playable_reason"),
+        "top_blocked_row_count": int(top.get("row_count") or 0),
+        "earliest_event_start_time": _iso(earliest_event),
+        "latest_event_start_time": _iso(latest_event),
+        "current_utc_time": _iso(now_ts),
+        "file_slate_classification": slate_type,
+        "historical_or_started_event_rows_with_event_time": historical_event_rows,
+        "future_event_rows_with_event_time": future_event_rows,
+        "event_start_fields_detected": _detected_fields(valued, EVENT_START_FIELDS),
+        "odds_freshness_fields_detected": _detected_fields(valued, ODDS_FRESHNESS_FIELDS),
+        "earliest_odds_timestamp": _iso(earliest_odds),
+        "latest_odds_timestamp": _iso(latest_odds),
+        "odds_freshness_timestamp_available_rows": int(len(odds_times)),
+        "timestamp_rule_confirmation": (
+            "Event-start fields are used only for future/active/historical classification. "
+            "Odds timestamp fields are used only for odds freshness."
+        ),
+        "show_no_playable_warning": bool(no_playable_rows),
+        "all_rows_blocked_by_non_future_events": all_blocked_by_past_events,
+        "explanation": explanation,
+        "recommended_next_action": recommendation,
+        "playable_requirements": [
+            "future event start times",
+            "fresh odds timestamps",
+            "complete market sides",
+            "current sportsbook/bookmaker prices",
+            "valid model probability",
+        ],
+        "proof_safety_check_result": proof_safety_comparison(source, valued),
+    }
+
+
 def validate_advisory_rows(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> dict[str, Any]:
     original = _records(rows)
     valued = advisory_rows(original)
@@ -295,6 +466,7 @@ def advisory_report_text(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> st
     valued = advisory_rows(rows)
     counts = advisory_summary_counts(valued)
     blocked = blocked_reason_summary(valued)
+    diagnostics = advisory_real_file_diagnostics(valued)
     lines = [
         "Advisory Odds Value Report",
         "",
@@ -306,6 +478,12 @@ def advisory_report_text(rows: Sequence[Mapping[str, Any]] | pd.DataFrame) -> st
         "",
         "Prediction-only rows",
         f"- PREDICTION_ONLY_NOT_PLUS_EV: {counts['PREDICTION_ONLY_NOT_PLUS_EV']}",
+        "",
+        "Why no playable +EV rows?",
+        f"- Top blocked reason: {diagnostics['top_blocked_reason']}",
+        f"- Rows affected: {diagnostics['top_blocked_row_count']}",
+        f"- File classification: {diagnostics['file_slate_classification']}",
+        f"- Recommendation: {diagnostics['recommended_next_action']}",
         "",
         "Blocked reasons",
     ]

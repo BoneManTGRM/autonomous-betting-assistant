@@ -14,6 +14,7 @@ from autonomous_betting_agent.advisory_odds_value_display import (
     SAFETY_CONFIRMATION,
     advisory_csv_frame,
     advisory_frame,
+    advisory_real_file_diagnostics,
     advisory_report_text,
     advisory_summary_counts,
     blocked_reason_summary,
@@ -38,7 +39,7 @@ LANG = render_app_sidebar("advisory_odds_value", language_key="advisory_odds_val
 TEXT = {
     "en": {
         "title": "Advisory Odds Value",
-        "caption": "Phase 3E.5.1 proof-safe advisory odds validation and report cleanup.",
+        "caption": "Phase 3E.5.3 proof-safe advisory odds validation, diagnostics, and report cleanup.",
         "input": "Input",
         "test_window": "Test Window ID",
         "use_session": "Use latest saved/session rows",
@@ -47,6 +48,7 @@ TEXT = {
         "none": "none",
         "no_rows": "No rows found. Upload a CSV or run Pro Predictor/Odds Lock Pro first.",
         "safety": "Advisory safety banner",
+        "diagnostics": "Why no playable +EV rows?",
         "summary": "Advisory summary",
         "playable": "Playable +EV advisory picks",
         "watchlist": "Watchlist value picks",
@@ -63,15 +65,16 @@ TEXT = {
     },
     "es": {
         "title": "Valor de Odds Asesoría",
-        "caption": "Fase 3E.5.1 validacion y reporte asesoría sin tocar prueba.",
+        "caption": "Fase 3E.5.3 validacion, diagnostico y reporte asesoría sin tocar prueba.",
         "input": "Entrada",
         "test_window": "ID de ventana de prueba",
         "use_session": "Usar ultimas filas guardadas/sesion",
         "upload": "Subir CSV de predicciones",
         "source": "Fuente de entrada",
         "none": "ninguna",
-        "no_rows": "No hay filas. Sube un CSV o ejecuta Predictor/Odds Lock Pro primero.",
+        "no_rows": "No hay filas. Sube un CSV o ejecuta Predictor Pro/Odds Lock Pro primero.",
         "safety": "Banner de seguridad asesoría",
+        "diagnostics": "Por que no hay filas +EV jugables?",
         "summary": "Resumen asesoría",
         "playable": "Picks asesoría jugables +EV",
         "watchlist": "Picks de valor en watchlist",
@@ -180,6 +183,7 @@ normalized = normalize_frame(raw)
 advisory = advisory_frame(normalized)
 validation = validate_advisory_rows(normalized)
 counts = advisory_summary_counts(advisory)
+diagnostics = advisory_real_file_diagnostics(advisory)
 
 st.caption(f"{t('source')}: {source_name or t('none')}")
 st.subheader(t("safety"))
@@ -192,6 +196,12 @@ st.json({
     "applied_live_count": 0,
     "does_not_feed_official_locks": True,
 })
+
+st.subheader(t("diagnostics"))
+if diagnostics.get("show_no_playable_warning"):
+    st.warning(diagnostics.get("explanation", "No playable advisory rows were found."))
+st.info(diagnostics.get("recommended_next_action", "Review advisory tables before manual promotion in a later phase."))
+st.json(diagnostics)
 
 st.subheader(t("summary"))
 metric_cols = st.columns(9)
