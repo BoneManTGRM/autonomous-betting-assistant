@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import pandas as pd
 
-from autonomous_betting_agent.reparodynamics_shadow_backtest import baseline_metrics, build_phase3c_report, calculate_clv, classify_findings, compare_baseline_to_shadow, simulate_shadow_repairs
+from autonomous_betting_agent.reparodynamics_shadow_backtest import (
+    baseline_metrics,
+    build_phase3c_report,
+    calculate_clv,
+    classify_findings,
+    classify_shadow_decision,
+    compare_baseline_to_shadow,
+    simulate_shadow_repairs,
+)
 from autonomous_betting_agent.ui_i18n import localize_dataframe
 
 
@@ -10,11 +18,14 @@ def sample_rows(count: int = 60, sport: str = "Tennis"):
     return [
         {
             "sport": sport,
+            "league": "FIFA World Cup" if sport == "Soccer" else sport,
             "market_type": "moneyline",
             "result": "win" if index % 2 == 0 else "loss",
             "decimal_price": 2.0,
             "closing_decimal_price": 1.9,
             "stake_units": 1.0,
+            "model_probability": 0.60,
+            "edge": 0.02,
         }
         for index in range(count)
     ]
@@ -49,6 +60,7 @@ def test_baseline_metrics_record_and_roi():
 def test_clv_calculation_and_missing_close():
     assert calculate_clv({"decimal_price": 2.0, "closing_decimal_price": 1.8}) == 0.111111
     assert calculate_clv({"decimal_price": 2.0}) is None
+    assert calculate_clv({"clv_percent": "+5"}) == 0.05
 
 
 def test_shadow_options_and_market_specific_blockers():
@@ -60,6 +72,10 @@ def test_shadow_options_and_market_specific_blockers():
     assert next(item for item in options if item["candidate_type"] == "double_chance_if_available")["decision"] == "data_blocked"
 
 
+def test_non_soccer_rows_do_not_create_fake_loss_filter_repairs():
+    assert simulate_shadow_repairs(sample_rows(60, sport="Tennis")) == []
+
+
 def test_comparison_has_deltas_and_rejects_worse_result():
     comparison = compare_baseline_to_shadow(
         {"completed_rows_used": 60, "ROI": 0.1, "profit_units": 10, "losses": 10, "CLV_sample_size": 0},
@@ -67,6 +83,20 @@ def test_comparison_has_deltas_and_rejects_worse_result():
     )
     assert "ROI_delta" in comparison
     assert comparison["decision"] == "rejected_repair"
+
+
+def test_strong_shadow_improvement_becomes_manual_review_not_live_repair():
+    decision = classify_shadow_decision(
+        {
+            "baseline_sample_size": 60,
+            "ROI_delta": 0.05,
+            "profit_units_delta": 2.0,
+            "losses_delta": -3,
+            "CLV_delta": None,
+            "overfit_risk": "low",
+        }
+    )
+    assert decision["decision"] == "future_manual_review"
 
 
 def test_phase3c_report_safety_invariants():
