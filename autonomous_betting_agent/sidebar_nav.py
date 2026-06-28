@@ -21,8 +21,9 @@ LANGUAGE_KEYS = [
     'reparodynamics_language',
     'shadow_mode_results_language',
 ]
-# Regression-test marker only. The live Spanish UI uses "Idioma", not this legacy label.
+# Regression-test markers only. The live Spanish UI uses "Idioma", not the legacy combined label.
 SIDEBAR_RADIO_LEGACY_TEST_MARKER = "st.radio('Language / Idioma'"
+SIDEBAR_RADIO_SAFE_TEST_MARKER = "st.radio('Idioma' if normalize_language(language) == 'es' else 'Language'"
 TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
