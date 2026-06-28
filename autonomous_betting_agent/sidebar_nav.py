@@ -21,9 +21,6 @@ LANGUAGE_KEYS = [
     'reparodynamics_language',
     'shadow_mode_results_language',
 ]
-# Regression-test markers only. The live Spanish UI uses "Idioma", not the legacy combined label.
-SIDEBAR_RADIO_LEGACY_TEST_MARKER = "st.radio('Language / Idioma'"
-SIDEBAR_RADIO_SAFE_TEST_MARKER = "st.radio('Idioma' if normalize_language(language) == 'es' else 'Language'"
 TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
@@ -37,8 +34,7 @@ TOOLS: tuple[tuple[str, str, str], ...] = (
 )
 REPARODYNAMICS_PAGE = ('Reparodynamics', 'Reparodynamics', 'pages/reparodynamics.py')
 PRO_PREDICTOR_LARGE_LIST_70_DEFAULTS = {'baseline_accuracy_min_books': 1,'baseline_accuracy_min_model_prob': 0.58,'baseline_accuracy_min_edge': -0.03,'baseline_accuracy_strong_edge': 0.04,'baseline_accuracy_min_strength': 38.0,'baseline_accuracy_use_high_conf': True,'baseline_accuracy_max_high_conf': 700,'baseline_accuracy_min_high_prob': 0.58,'baseline_accuracy_min_high_edge': -0.03,'baseline_accuracy_min_high_strength': 38.0,'baseline_accuracy_min_high_agent': 35.0}
-SIDEBAR_CSS = '''
-<style>
+SIDEBAR_CSS = '''<style>
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"] { padding-top: 1.4rem; }
 section[data-testid="stSidebar"] a[href*="pages/"] { display: block; padding: .62rem .82rem; border-radius: .75rem; margin: .18rem 0; text-decoration: none !important; font-weight: 650; }
 section[data-testid="stSidebar"] a[href*="pages/"]:hover { background: rgba(255,255,255,.10); }
@@ -48,8 +44,7 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 { margin
 .aba-safe-download { display:inline-block; padding:.65rem 1rem; border-radius:.7rem; background:#ef5350; color:#fff!important; text-decoration:none!important; font-weight:700; margin:.35rem 0; }
 </style>
 '''
-GLOBAL_UPLOAD_ES_CSS = '''
-<style>
+GLOBAL_UPLOAD_ES_CSS = '''<style>
 div[data-testid="stFileUploader"] button,
 div[data-testid="stFileUploader"] button * {
   font-size: 0 !important;
@@ -137,6 +132,10 @@ def _sidebar_language_option(option: str, language: str) -> str:
     return option
 
 
+def _sidebar_language_label(language: str) -> str:
+    return 'Idioma' if normalize_language(language) == 'es' else 'Language'
+
+
 def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'radio') -> str:
     import streamlit as st
     language = _language_label(_current_language(st))
@@ -151,7 +150,7 @@ def render_app_sidebar(current_page: str, *, language_key: str = 'global_languag
         tagline = APP_TAGLINE if language == 'English' else APP_TAGLINE_ES
         st.markdown(f'<div class="aba-sidebar-tagline">{html.escape(tagline)}</div>', unsafe_allow_html=True)
         language = st.radio(
-            'Idioma' if normalize_language(language) == 'es' else 'Language',
+            _sidebar_language_label(language),
             ['English', 'Español'],
             key=widget_key,
             horizontal=True,
