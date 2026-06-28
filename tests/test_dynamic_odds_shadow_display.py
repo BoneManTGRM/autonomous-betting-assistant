@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+from copy import deepcopy
+from pathlib import Path
+
+import pandas as pd
+
+import autonomous_betting_agent.ui_i18n_phase3e  # noqa: F401
+from autonomous_betting_agent.dynamic_odds_display import (
+    build_dynamic_odds_shadow_row,
+    build_dynamic_odds_shadow_rows,
+    dynamic_odds_shadow_safety_summary,
+)
+from autonomous_betting_agent.ui_i18n import localize_dataframe, localize_value
+
+
+def sample_row() -> dict[str, object]:
+    return {
+        "event": "Team A at Team B",
+        "prediction": "Team A",
+        "market_type": "h2h",
+        "bookmaker": "TestBook",
+        "decimal_price": 2.5,
+        "model_probability": 0.55,
+        "model_market_edge": 0.15,
+        "expected_value_per_unit": 0.375,
+        "lock_ready": True,
+        "publish_ready": True,
+        "official_status_label": "official_plus_ev",
+        "proof_hash": "abc123",
+    }
+
+
+def test_shadow_row_returns_dynamic_math_fields() -> None:
+    row = build_dynamic_odds_shadow_row(sample_row())
+    assert row["dynamic_probability"] is not None
+    assert row["dynamic_edge"] is not None
+    assert row["dynamic_no_vig_edge"] is not None
+    assert row["dynamic_EV"] is not None
+    assert row["book_odds_ratio"] is not None
+    assert row["dynamic_odds_mode"] == "SHADOW ONLY"
+    assert row["dynamic_odds_applied_live_count"] == 0
+
+
+def test_shadow_row_does_not_mutate_input_row_or_live_fields() -> None:
+    original = sample_row()
+    before = deepcopy(original)
+    row = build_dynamic_odds_shadow_row(original)
+    assert original == before
+    assert before["model_probability"] == 0.55
+    assert before["model_market_edge"] == 0.15
+    assert before["expected_value_per_unit"] == 0.375
+    assert before["lock_ready"] is True
+    assert before["publish_ready"] is True
+    assert before["official_status_label"] == "official_plus_ev"
+    assert before["proof_hash"] == "abc123"
+    assert "lock_ready" not in row
+    assert "publish_ready" not in row
+    assert "official_status_label" not in row
+    assert "proof_hash" not in row
+
+
+def test_missing_odds_returns_no_odds_status() -> None:
+    row = build_dynamic_odds_shadow_row({"event": "Team A at Team B", "model_probability": 0.55})
+    assert row["dynamic_signal_status"] == "no_odds"
+    assert row["dynamic_probability"] is None
+
+
+def test_missing_lr_data_defaults_to_shadow_lr_one() -> None:
+    row = build_dynamic_odds_shadow_row(sample_row())
+    assert row["total_LR_multiplier"] == 1.0
+    assert row["dynamic_signal_status"] == "no_lr_data"
+
+
+def test_shadow_rows_and_safety_summary_are_display_only() -> None:
+    rows = build_dynamic_odds_shadow_rows([sample_row()])
+    assert len(rows) == 1
+    safety = dynamic_odds_shadow_safety_summary()
+    assert safety["dynamic_odds_predictor"] == "SHADOW ONLY"
+    assert safety["dynamic_odds_live_activation"] == "OFF"
+    assert safety["dynamic_odds_applied_live"] == 0
+    assert safety["dynamic_odds_applied_live_count"] == 0
+    assert safety["live_mutation"] == "FORBIDDEN"
+    assert safety["model_training"] == "FORBIDDEN"
+    assert safety["stored_data_mutation"] == "FORBIDDEN"
+
+
+def test_ui_sources_include_read_only_dynamic_odds_panel() -> None:
+    odds_lock = Path("pages/odds_lock_pro.py").read_text(encoding="utf-8")
+    what_odds = Path("pages/what_are_the_odds.py").read_text(encoding="utf-8")
+    assert "Dynamic Odds Shadow Math" in odds_lock
+    assert "Matematica Shadow de Dynamic Odds" in odds_lock
+    assert "These values do not change live picks" in odds_lock
+    assert "build_dynamic_odds_shadow_rows" in odds_lock
+    assert "Dynamic Odds Shadow Math" in what_odds
+    assert "Matematica Shadow de Dynamic Odds" in what_odds
+    assert "These values do not change live picks" in what_odds
+
+
+def test_spanish_dynamic_odds_display_labels() -> None:
+    frame = pd.DataFrame([build_dynamic_odds_shadow_row(sample_row())])
+    localized = localize_dataframe(frame, "es")
+    assert "Probabilidad dinamica" in localized.columns
+    assert "EV dinamico" in localized.columns
+    assert "Modo Dynamic Odds" in localized.columns
+    assert localize_value("SHADOW ONLY", "es") == "SOLO SHADOW"
