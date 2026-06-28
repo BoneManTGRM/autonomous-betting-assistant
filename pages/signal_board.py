@@ -12,6 +12,7 @@ from autonomous_betting_agent.pick_hold_store import (
     save_held_rows,
 )
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
+from autonomous_betting_agent.ui_i18n import localize_dataframe
 
 st.set_page_config(page_title='ABA Signal Board', layout='wide')
 LANG = render_app_sidebar('signal_board', language_key='signal_board_language', selector='radio')
@@ -54,18 +55,19 @@ TEXT = {
         'source_pro_predictor_latest': 'Pro Predictor latest',
         'source_what_are_the_odds': 'What Are the Odds',
         'source_latest_predictions': 'Latest predictions',
+        'durable_suffix': 'durable',
     },
     'es': {
         'title': 'ABA Signal Board',
-        'caption': 'Revisa filas de Predictor Pro, clasifícalas, envíalas a cuotas/prueba y mide resultados.',
-        'no_rows': 'No hay predicciones en sesión ni en almacenamiento durable. Ejecuta Predictor Pro primero y vuelve aquí.',
+        'caption': 'Revisa filas de Predictor Pro, clasificalas, envialas a revision de cuotas/prueba y mide resultados.',
+        'no_rows': 'No hay predicciones en sesion ni en almacenamiento guardado. Ejecuta Predictor Pro primero y vuelve aqui.',
         'source': 'Fuente',
         'rows': 'Filas',
         'workspace': 'ID de workspace',
-        'durable_loaded': 'Filas guardadas cargadas desde almacenamiento durable.',
-        'tier_a': 'Nivel A — candidatos más fuertes',
-        'tier_b': 'Nivel B — prueba de alta confianza',
-        'tier_c': 'Nivel C — volumen de investigación',
+        'durable_loaded': 'Filas guardadas cargadas desde almacenamiento guardado.',
+        'tier_a': 'Nivel A - candidatos mas fuertes',
+        'tier_b': 'Nivel B - prueba de alta confianza',
+        'tier_c': 'Nivel C - volumen de investigacion',
         'tier_a_metric': 'Nivel A',
         'tier_b_metric': 'Nivel B',
         'tier_c_metric': 'Nivel C',
@@ -73,18 +75,19 @@ TEXT = {
         'actions': 'Acciones',
         'send_all_lock': 'Enviar A/B/C a Odds Lock Pro',
         'send_a_lock': 'Enviar solo Nivel A a Odds Lock Pro',
-        'send_odds': 'Enviar tablero a What Are the Odds',
-        'sent': 'Filas guardadas en sesión y almacenamiento durable. Abre la página destino desde el menú Tools.',
+        'send_odds': 'Enviar tablero a revision de cuotas',
+        'sent': 'Filas guardadas en sesion y almacenamiento de traspaso. Abre la pagina destino desde el menu de herramientas.',
         'open_predictor': 'Abrir Predictor Pro',
-        'open_odds': 'Abrir What Are the Odds',
+        'open_odds': 'Abrir revision de cuotas',
         'open_lock': 'Abrir Odds Lock Pro',
         'open_threshold': 'Abrir Optimizador de Umbrales',
         'download': 'Descargar CSV del tablero actual',
-        'guide_text': '1) Ejecuta Predictor Pro. 2) Revisa este Signal Board. 3) Envía A/B/C al bloqueo Investigación/Prueba. 4) Califica resultados. 5) Usa el Optimizador para aprender qué buckets ganan.',
+        'guide_text': '1) Ejecuta Predictor Pro. 2) Revisa este tablero de senales. 3) Envia A/B/C al bloqueo investigacion/prueba. 4) Califica resultados. 5) Usa el optimizador para aprender que niveles ganan.',
         'source_pro_predictor_high_confidence': 'Predictor Pro alta confianza',
         'source_pro_predictor_latest': 'Predicciones recientes de Predictor Pro',
-        'source_what_are_the_odds': 'What Are the Odds',
+        'source_what_are_the_odds': 'Revision de cuotas',
         'source_latest_predictions': 'Predicciones recientes',
+        'durable_suffix': 'almacenamiento guardado',
     },
 }
 
@@ -122,7 +125,7 @@ def session_source(workspace_id: str) -> tuple[str, pd.DataFrame]:
     if rows:
         st.session_state[key] = rows
         label_key = next((source_label_key for source_key, source_label_key in HANDOFF_SOURCES if source_key == key), key)
-        return f'{source_label(label_key)} · durable', frame_from_records(rows)
+        return f'{source_label(label_key)} · {t("durable_suffix")}', frame_from_records(rows)
 
     return '', pd.DataFrame()
 
@@ -188,7 +191,8 @@ def show_table(frame: pd.DataFrame) -> None:
         'bookmaker_count', 'api_coverage_score', 'agent_decision', 'agent_score', 'scanner_strength_score',
         'lock_ready', 'decision_reasons'
     ] if col in frame.columns]
-    st.dataframe(frame[cols] if cols else frame, use_container_width=True, hide_index=True)
+    display = frame[cols] if cols else frame
+    st.dataframe(localize_dataframe(display, LANG), use_container_width=True, hide_index=True)
 
 
 st.title(t('title'))
@@ -207,7 +211,7 @@ if raw.empty:
         go_to('pages/pro_predictor.py')
     st.stop()
 
-if 'durable' in source.lower():
+if t('durable_suffix') in source.lower():
     st.success(t('durable_loaded'))
 
 board = enrich(raw)
