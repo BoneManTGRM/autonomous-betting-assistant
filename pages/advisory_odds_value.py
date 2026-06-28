@@ -19,6 +19,7 @@ from autonomous_betting_agent.advisory_odds_value_display import (
     advisory_summary_counts,
     blocked_reason_summary,
     duplicate_conflict_summary,
+    fresh_slate_readiness_check,
     line_shopping_summary,
     playable_table,
     prediction_only_table,
@@ -39,7 +40,7 @@ LANG = render_app_sidebar("advisory_odds_value", language_key="advisory_odds_val
 TEXT = {
     "en": {
         "title": "Advisory Odds Value",
-        "caption": "Phase 3E.5.3 proof-safe advisory odds validation, diagnostics, and report cleanup.",
+        "caption": "Phase 3E.5.4 proof-safe advisory odds readiness, diagnostics, and report cleanup.",
         "input": "Input",
         "test_window": "Test Window ID",
         "use_session": "Use latest saved/session rows",
@@ -48,6 +49,8 @@ TEXT = {
         "none": "none",
         "no_rows": "No rows found. Upload a CSV or run Pro Predictor/Odds Lock Pro first.",
         "safety": "Advisory safety banner",
+        "readiness": "Fresh Slate Readiness",
+        "readiness_details": "Fresh slate readiness details",
         "diagnostics": "Why no playable +EV rows?",
         "summary": "Advisory summary",
         "playable": "Playable +EV advisory picks",
@@ -65,7 +68,7 @@ TEXT = {
     },
     "es": {
         "title": "Valor de Odds Asesoría",
-        "caption": "Fase 3E.5.3 validacion, diagnostico y reporte asesoría sin tocar prueba.",
+        "caption": "Fase 3E.5.4 preparacion, diagnostico y reporte asesoría sin tocar prueba.",
         "input": "Entrada",
         "test_window": "ID de ventana de prueba",
         "use_session": "Usar ultimas filas guardadas/sesion",
@@ -74,6 +77,8 @@ TEXT = {
         "none": "ninguna",
         "no_rows": "No hay filas. Sube un CSV o ejecuta Predictor Pro/Odds Lock Pro primero.",
         "safety": "Banner de seguridad asesoría",
+        "readiness": "Preparacion de slate fresco",
+        "readiness_details": "Detalles de preparacion de slate fresco",
         "diagnostics": "Por que no hay filas +EV jugables?",
         "summary": "Resumen asesoría",
         "playable": "Picks asesoría jugables +EV",
@@ -183,6 +188,7 @@ normalized = normalize_frame(raw)
 advisory = advisory_frame(normalized)
 validation = validate_advisory_rows(normalized)
 counts = advisory_summary_counts(advisory)
+readiness = fresh_slate_readiness_check(advisory)
 diagnostics = advisory_real_file_diagnostics(advisory)
 
 st.caption(f"{t('source')}: {source_name or t('none')}")
@@ -196,6 +202,14 @@ st.json({
     "applied_live_count": 0,
     "does_not_feed_official_locks": True,
 })
+
+st.subheader(t("readiness"))
+score_col, status_col = st.columns(2)
+score_col.metric("Readiness score", f"{readiness['readiness_score']}/100")
+status_col.metric("Readiness status", readiness["readiness_status"])
+st.info(readiness.get("recommended_next_action", "Review advisory tables."))
+with st.expander(t("readiness_details"), expanded=True):
+    st.json(readiness)
 
 st.subheader(t("diagnostics"))
 if diagnostics.get("show_no_playable_warning"):
