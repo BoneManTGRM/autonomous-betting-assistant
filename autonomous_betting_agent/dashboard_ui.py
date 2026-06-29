@@ -376,6 +376,10 @@ def table_from_records(records: Sequence[Mapping[str, Any]] | None, preferred_co
     return frame
 
 
+def operator_top_positive_ev_table(records: Sequence[Mapping[str, Any]] | None) -> pd.DataFrame:
+    return table_from_records(operator_top_positive_ev_picks(records), OPERATOR_TOP_EV_COLUMNS)
+
+
 def summary_table(summary: Mapping[str, Any] | None) -> pd.DataFrame:
     if not summary:
         return pd.DataFrame(columns=["metric", "value"])
@@ -396,7 +400,7 @@ def summary_table(summary: Mapping[str, Any] | None) -> pd.DataFrame:
 
 def dashboard_tables(dashboard: Mapping[str, Any]) -> dict[str, pd.DataFrame]:
     return {
-        "top_positive_ev_picks": table_from_records(operator_top_positive_ev_picks(dashboard.get("top_positive_ev_picks") or []), OPERATOR_TOP_EV_COLUMNS),
+        "top_positive_ev_picks": table_from_records(dashboard.get("top_positive_ev_picks") or [], TOP_PICK_COLUMNS),
         "recent_activity": table_from_records(dashboard.get("recent_activity") or [], ["type", "title", "detail", "timestamp"]),
         "upcoming_events": table_from_records(dashboard.get("upcoming_events") or [], ["start_time", "sport", "event", "market", "pick"]),
         "odds_lock_summary": summary_table(dashboard.get("odds_lock_summary") or {}),
