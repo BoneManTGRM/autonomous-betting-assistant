@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import hashlib
+import io
+
 import pandas as pd
 import streamlit as st
 
+from autonomous_betting_agent import proof_center_control_service
 from autonomous_betting_agent.commercial_platform_tools import load_persistent_ledger, normalize_workspace_id
 from autonomous_betting_agent.event_list_dedupe import collapse_to_event_rows, event_duplicate_summary
 from autonomous_betting_agent.explanations import build_client_safe_pick_summary
 from autonomous_betting_agent.grading_rules import summarize_event_level, summarize_row_level
+from autonomous_betting_agent.ledger_sync_service import SYNC_SOURCE_REGISTRY
 from autonomous_betting_agent.ledger_types import classify_ledger_type, is_future_locked, public_metric_allowed
 from autonomous_betting_agent.local_access import require_streamlit_access
 from autonomous_betting_agent.row_normalizer import safe_text
@@ -17,6 +22,14 @@ from autonomous_betting_agent.ui_i18n import localize_dataframe, localize_value
 st.set_page_config(page_title="Proof Center", layout="wide")
 LANG = render_app_sidebar("proof_center", language_key="proof_center_language")
 require_streamlit_access(st, allow_roles={"admin", "client", "demo"})
+
+PROOF_CENTER_SOURCE_KEY_OPTIONS = tuple(SYNC_SOURCE_REGISTRY.keys())
+PROOF_CENTER_IMPORT_PREVIEW_KEY = "proof_center_import_preview"
+PROOF_CENTER_APPROVAL_KEY = "proof_center_import_approval"
+PROOF_CENTER_INPUT_FINGERPRINT_KEY = "proof_center_import_input_fingerprint"
+PROOF_CENTER_UPLOAD_SNAPSHOT_KEY = "proof_center_upload_snapshot_rows"
+PROOF_CENTER_REQUIRED_UPLOAD_FIELDS = ("event", "pick", "market_type", "sportsbook", "result")
+PROOF_CENTER_ODDS_FIELDS = ("odds", "decimal_odds")
 
 TEXT = {
     "en": {
@@ -29,7 +42,7 @@ TEXT = {
         "row_record": "Row record",
         "events": "Events",
         "event_record": "Event record",
-        "tabs": ["Summary", "Proof ID Verification", "Proof Audit", "Row vs Event Record", "Local Proof Rows"],
+        "tabs": ["Summary", "Proof ID Verification", "Proof Audit", "Row vs Event Record", "Local Proof Rows", "Ledger Control"],
         "public_summary": "Public proof summary",
         "no_rows": "No local or ledger proof rows found yet.",
         "public_safe_rows": "Public-safe rows",
@@ -58,6 +71,37 @@ TEXT = {
         "duplicate_events": "Events with multiple rows",
         "duplicate_event_rows": "Extra row-level market rows",
         "download_rows": "Download proof rows",
+        "ledger_control": "Ledger Control",
+        "ledger_workspace_id": "Ledger workspace ID",
+        "source_key": "Source key",
+        "upload_csv": "Upload proof/performance CSV",
+        "upload_status": "Upload status",
+        "rows_detected": "Rows detected",
+        "columns_detected": "Columns detected",
+        "missing_fields": "Missing recommended fields",
+        "empty_upload": "Uploaded CSV is empty. Approval is blocked.",
+        "malformed_upload": "Malformed CSV. Approval is blocked.",
+        "no_upload": "Upload a CSV to preview or approve an import.",
+        "dry_run_preview": "Dry-run preview",
+        "approve_import": "Approve import",
+        "approval_confirmation": "I understand this writes rows to the append-only ledger.",
+        "approval_reason": "Approval reason",
+        "preview_summary": "Preview summary",
+        "approval_metadata": "Approval metadata",
+        "ledger_health": "Ledger health",
+        "dashboard_readiness": "Dashboard readiness",
+        "duplicate_review": "Duplicate review",
+        "correction_review": "Correction review",
+        "public_exports": "Public-safe exports",
+        "private_exports": "Private exports",
+        "download_public_csv": "Download public-safe CSV",
+        "download_public_json": "Download public-safe JSON",
+        "download_private_csv": "Download private CSV",
+        "download_private_json": "Download private JSON",
+        "approval_blocked": "Approval blocked until a valid preview exists and confirmation is checked.",
+        "stale_preview": "Current upload/input does not match the stored preview. Run a new preview before approval.",
+        "preview_ready": "Preview stored. Approval uses this preview_hash until inputs change.",
+        "writes_warning": "Approval writes new non-duplicate rows to the append-only ledger.",
     },
     "es": {
         "title": "Centro de Prueba",
@@ -69,7 +113,7 @@ TEXT = {
         "row_record": "Récord por fila",
         "events": "Eventos",
         "event_record": "Récord por evento",
-        "tabs": ["Resumen", "Verificación de ID", "Auditoría de prueba", "Fila vs evento", "Filas locales"],
+        "tabs": ["Resumen", "Verificación de ID", "Auditoría de prueba", "Fila vs evento", "Filas locales", "Control de ledger"],
         "public_summary": "Resumen de prueba pública",
         "no_rows": "Todavía no hay filas locales ni de ledger.",
         "public_safe_rows": "Filas seguras para público",
@@ -98,6 +142,37 @@ TEXT = {
         "duplicate_events": "Eventos con varias filas",
         "duplicate_event_rows": "Filas extra por mercado",
         "download_rows": "Descargar filas de prueba",
+        "ledger_control": "Control de ledger",
+        "ledger_workspace_id": "ID de workspace del ledger",
+        "source_key": "source_key",
+        "upload_csv": "Subir CSV de prueba/rendimiento",
+        "upload_status": "Estado de carga",
+        "rows_detected": "Filas detectadas",
+        "columns_detected": "Columnas detectadas",
+        "missing_fields": "Campos recomendados faltantes",
+        "empty_upload": "El CSV subido está vacío. La aprobación está bloqueada.",
+        "malformed_upload": "CSV malformado. La aprobación está bloqueada.",
+        "no_upload": "Sube un CSV para previsualizar o aprobar una importación.",
+        "dry_run_preview": "Vista previa dry-run",
+        "approve_import": "Aprobar importación",
+        "approval_confirmation": "Entiendo que esto escribe filas al ledger append-only.",
+        "approval_reason": "Motivo de aprobación",
+        "preview_summary": "Resumen de vista previa",
+        "approval_metadata": "Metadatos de aprobación",
+        "ledger_health": "Salud del ledger",
+        "dashboard_readiness": "Preparación del dashboard",
+        "duplicate_review": "Revisión de duplicados",
+        "correction_review": "Revisión de correcciones",
+        "public_exports": "Exportaciones seguras para público",
+        "private_exports": "Exportaciones privadas",
+        "download_public_csv": "Descargar CSV público seguro",
+        "download_public_json": "Descargar JSON público seguro",
+        "download_private_csv": "Descargar CSV privado",
+        "download_private_json": "Descargar JSON privado",
+        "approval_blocked": "Aprobación bloqueada hasta que exista una vista previa válida y la confirmación esté marcada.",
+        "stale_preview": "La carga/entrada actual no coincide con la vista previa guardada. Ejecuta una nueva vista previa antes de aprobar.",
+        "preview_ready": "Vista previa guardada. La aprobación usa este preview_hash hasta que cambien las entradas.",
+        "writes_warning": "La aprobación escribe filas nuevas no duplicadas al ledger append-only.",
     },
 }
 
@@ -131,6 +206,74 @@ def merge_rows(*parts: list[dict]) -> list[dict]:
                 seen.add(key)
             rows.append(dict(row))
     return rows
+
+
+def _uploaded_file_bytes(uploaded_file) -> bytes:
+    if uploaded_file is None:
+        return b""
+    return uploaded_file.getvalue()
+
+
+def proof_center_upload_fingerprint(uploaded_file, workspace_id: str, source_key: str, source_file: str) -> str:
+    payload = "|".join([
+        safe_text(getattr(uploaded_file, "name", source_file)),
+        hashlib.sha256(_uploaded_file_bytes(uploaded_file)).hexdigest(),
+        safe_text(workspace_id),
+        safe_text(source_key),
+        safe_text(source_file),
+    ])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def validate_uploaded_proof_csv(uploaded_file) -> tuple[pd.DataFrame, list[str], list[str]]:
+    warnings: list[str] = []
+    errors: list[str] = []
+    if uploaded_file is None:
+        return pd.DataFrame(), warnings, errors
+    try:
+        data = _uploaded_file_bytes(uploaded_file)
+        frame = pd.read_csv(io.BytesIO(data))
+    except Exception as exc:
+        return pd.DataFrame(), warnings, [f"{t('malformed_upload')}: {exc}"]
+    if frame.empty:
+        errors.append(t("empty_upload"))
+        return frame, warnings, errors
+    columns = {str(column).strip().lower() for column in frame.columns}
+    missing = [field for field in PROOF_CENTER_REQUIRED_UPLOAD_FIELDS if field not in columns]
+    if not any(field in columns for field in PROOF_CENTER_ODDS_FIELDS):
+        missing.append("odds/decimal_odds")
+    if missing:
+        warnings.append(f"{t('missing_fields')}: {', '.join(missing)}")
+    return frame, warnings, errors
+
+
+def _preview_matches_current_input(current_fingerprint: str) -> bool:
+    preview = st.session_state.get(PROOF_CENTER_IMPORT_PREVIEW_KEY) or {}
+    return bool(preview) and st.session_state.get(PROOF_CENTER_INPUT_FINGERPRINT_KEY) == current_fingerprint
+
+
+def _display_dict(title: str, value: dict):
+    st.markdown(f"**{title}**")
+    st.json(value or {})
+
+
+def _approval_blocked(preview: dict, current_fingerprint: str, upload_errors: list[str], source_key: str, confirmed: bool) -> tuple[bool, list[str]]:
+    reasons: list[str] = []
+    if source_key not in PROOF_CENTER_SOURCE_KEY_OPTIONS:
+        reasons.append("unsupported source_key")
+    if upload_errors:
+        reasons.extend(upload_errors)
+    if not preview:
+        reasons.append("no preview exists")
+    elif preview.get("errors"):
+        reasons.append("preview has errors")
+    elif int(preview.get("rows_to_add", 0) or 0) <= 0:
+        reasons.append("preview rows_to_add is 0")
+    elif not _preview_matches_current_input(current_fingerprint):
+        reasons.append(t("stale_preview"))
+    if not confirmed:
+        reasons.append("approval confirmation is required")
+    return bool(reasons), reasons
 
 
 st.title(t("title"))
@@ -248,3 +391,104 @@ with tabs[4]:
         st.download_button(t("download_rows"), df.to_csv(index=False).encode("utf-8"), file_name="local_proof_rows.csv", mime="text/csv")
     else:
         st.info(t("no_rows"))
+
+with tabs[5]:
+    st.subheader(t("ledger_control"))
+    control_workspace = normalize_workspace_id(st.text_input(t("ledger_workspace_id"), value=workspace_id, key="proof_center_ledger_workspace_id"))
+    source_key = st.selectbox(t("source_key"), PROOF_CENTER_SOURCE_KEY_OPTIONS, index=PROOF_CENTER_SOURCE_KEY_OPTIONS.index("uploaded_csv"), key="proof_center_source_key")
+    uploaded_csv = st.file_uploader(t("upload_csv"), type=["csv"], key="proof_center_import_upload")
+    source_file = safe_text(getattr(uploaded_csv, "name", "uploaded.csv")) or "uploaded.csv"
+    approval_reason = st.text_input(t("approval_reason"), value="", key="proof_center_approval_reason")
+    upload_frame, upload_warnings, upload_errors = validate_uploaded_proof_csv(uploaded_csv)
+    current_fingerprint = proof_center_upload_fingerprint(uploaded_csv, control_workspace, source_key, source_file) if uploaded_csv is not None else ""
+
+    st.markdown(f"**{t('upload_status')}**")
+    if uploaded_csv is None:
+        st.info(t("no_upload"))
+    else:
+        c1, c2 = st.columns(2)
+        c1.metric(t("rows_detected"), len(upload_frame))
+        c2.metric(t("columns_detected"), len(upload_frame.columns) if not upload_frame.empty else 0)
+        st.write(list(upload_frame.columns) if not upload_frame.empty else [])
+        for warning in upload_warnings:
+            st.warning(warning)
+        for error in upload_errors:
+            st.error(error)
+
+    if st.button(t("dry_run_preview"), disabled=uploaded_csv is None or bool(upload_errors), key="proof_center_dry_run_preview"):
+        preview = proof_center_control_service.preview_ledger_import(upload_frame, control_workspace, source_key, source_file=source_file)
+        duplicate_review = proof_center_control_service.review_duplicate_rows(upload_frame, control_workspace, source_key, source_file=source_file)
+        correction_review = proof_center_control_service.review_correction_rows(upload_frame, control_workspace, source_key, source_file=source_file)
+        st.session_state[PROOF_CENTER_IMPORT_PREVIEW_KEY] = preview
+        st.session_state[PROOF_CENTER_INPUT_FINGERPRINT_KEY] = current_fingerprint
+        st.session_state[PROOF_CENTER_UPLOAD_SNAPSHOT_KEY] = upload_frame.to_dict("records")
+        st.session_state["proof_center_duplicate_review"] = duplicate_review
+        st.session_state["proof_center_correction_review"] = correction_review
+        st.info(t("preview_ready"))
+
+    preview = st.session_state.get(PROOF_CENTER_IMPORT_PREVIEW_KEY, {})
+    duplicate_review = st.session_state.get("proof_center_duplicate_review", {})
+    correction_review = st.session_state.get("proof_center_correction_review", {})
+    approval_result = st.session_state.get(PROOF_CENTER_APPROVAL_KEY, {})
+
+    if preview:
+        _display_dict(t("preview_summary"), {
+            "rows_seen": preview.get("rows_seen"),
+            "rows_to_add": preview.get("rows_to_add"),
+            "duplicates_detected": preview.get("duplicates_detected"),
+            "rejected_rows": preview.get("rejected_rows"),
+            "correction_rows_detected": preview.get("correction_rows_detected"),
+            "preview_hash": preview.get("preview_hash"),
+            "warnings": preview.get("warnings"),
+            "errors": preview.get("errors"),
+        })
+    _display_dict(t("ledger_health"), proof_center_control_service.get_ledger_health(control_workspace))
+    _display_dict(t("dashboard_readiness"), proof_center_control_service.get_dashboard_readiness(control_workspace))
+    _display_dict(t("duplicate_review"), duplicate_review)
+    _display_dict(t("correction_review"), correction_review)
+
+    st.warning(t("writes_warning"))
+    confirmed = st.checkbox(t("approval_confirmation"), value=False, key="proof_center_approval_confirmation")
+    blocked, block_reasons = _approval_blocked(preview, current_fingerprint, upload_errors, source_key, confirmed)
+    if block_reasons:
+        st.info(f"{t('approval_blocked')}: {'; '.join(block_reasons)}")
+
+    if st.button(t("approve_import"), disabled=blocked, key="proof_center_approve_import"):
+        if not _preview_matches_current_input(current_fingerprint):
+            st.error(t("stale_preview"))
+        else:
+            snapshot_rows = st.session_state.get(PROOF_CENTER_UPLOAD_SNAPSHOT_KEY, [])
+            approval_result = proof_center_control_service.approve_ledger_import(
+                snapshot_rows,
+                control_workspace,
+                source_key,
+                source_file=source_file,
+                approval_reason=approval_reason,
+            )
+            st.session_state[PROOF_CENTER_APPROVAL_KEY] = approval_result
+
+    if approval_result:
+        _display_dict(t("approval_metadata"), {
+            "approved": approval_result.get("approved"),
+            "approved_at_utc": approval_result.get("approved_at_utc"),
+            "approval_reason": approval_result.get("approval_reason"),
+            "blocked_reason": approval_result.get("blocked_reason"),
+            "write_attempted": approval_result.get("write_attempted"),
+            "write_successful": approval_result.get("write_successful"),
+            "preview_hash": approval_result.get("preview_hash"),
+            "rows_to_add": (approval_result.get("write_result") or {}).get("rows_to_add"),
+            "duplicates_detected": (approval_result.get("write_result") or {}).get("duplicates_detected"),
+            "rejected_rows": (approval_result.get("write_result") or {}).get("rejected_rows"),
+        })
+
+    public_exports = proof_center_control_service.get_public_proof_exports(control_workspace)
+    private_exports = proof_center_control_service.get_private_proof_exports(control_workspace)
+    left, right = st.columns(2)
+    with left:
+        st.markdown(f"**{t('public_exports')}**")
+        st.download_button(t("download_public_csv"), public_exports["csv"].encode("utf-8"), file_name="public_safe_proof_export.csv", mime="text/csv")
+        st.download_button(t("download_public_json"), public_exports["json"].encode("utf-8"), file_name="public_safe_proof_export.json", mime="application/json")
+    with right:
+        st.markdown(f"**{t('private_exports')}**")
+        st.download_button(t("download_private_csv"), private_exports["csv"].encode("utf-8"), file_name="private_proof_export.csv", mime="text/csv")
+        st.download_button(t("download_private_json"), private_exports["json"].encode("utf-8"), file_name="private_proof_export.json", mime="application/json")
