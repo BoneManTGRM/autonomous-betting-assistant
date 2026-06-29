@@ -22,6 +22,8 @@ LINE_PAIRING_MISSING = "LINE_PAIRING_MISSING"
 LINE_PAIRING_MISMATCHED = "LINE_PAIRING_MISMATCHED"
 
 REAL_SPORTSBOOK = "REAL_SPORTSBOOK"
+CONSENSUS_ONLY = "CONSENSUS_ONLY"
+UNKNOWN_SOURCE = "UNKNOWN_SOURCE"
 
 MARKET_COMPLETENESS_COLUMNS = [
     "advisory_market_completeness_status",
@@ -42,7 +44,8 @@ EVENT_FIELDS = ("event_id", "game_id", "matchup", "event", "event_name", "game")
 MARKET_FIELDS = ("market_type", "market", "bet_type")
 SELECTION_FIELDS = ("selection", "prediction", "pick", "public_pick", "outcome", "name", "team")
 LINE_FIELDS = ("line", "point", "points", "spread", "handicap", "total", "total_points")
-SPORTSBOOK_FIELDS = ("advisory_normalized_sportsbook", "sportsbook", "bookmaker", "book", "odds_source")
+RAW_SPORTSBOOK_FIELDS = ("sportsbook", "bookmaker", "book", "book_name", "odds_source", "provider", "source", "sportsbook_name", "casino", "bookie")
+SPORTSBOOK_FIELDS = ("advisory_normalized_sportsbook", *RAW_SPORTSBOOK_FIELDS)
 ODDS_FIELDS = ("advisory_current_decimal_odds", "decimal_odds", "decimal_price", "price_decimal", "odds_decimal", "odds", "price")
 
 H2H_ALIASES = {"h2h", "moneyline", "money_line", "ml", "winner", "match_winner", "head_to_head"}
@@ -50,6 +53,8 @@ THREE_WAY_ALIASES = {"1x2", "three_way", "3way", "3_way", "soccer_1x2", "match_r
 TOTAL_ALIASES = {"total", "totals", "over_under", "ou", "game_total"}
 SPREAD_ALIASES = {"spread", "spreads", "handicap", "asian_handicap", "puck_line", "run_line"}
 FUTURE_ALIASES = {"future", "futures", "outright", "outrights", "championship", "winner_market"}
+CONSENSUS_SOURCE_TOKENS = {"consensus", "consensus_average", "average", "market_average", "aggregated", "aggregate", "median", "market_consensus", "consensus_price"}
+UNKNOWN_SOURCE_TOKENS = {"", "unknown", "none", "null", "nan", "n/a", "na"}
 
 OVER_ALIASES = {"over", "o"}
 UNDER_ALIASES = {"under", "u"}
@@ -219,13 +224,19 @@ def _line_bucket(row: Mapping[str, Any]) -> str:
     return ""
 
 
+def _sportsbook_identity(row: Mapping[str, Any]) -> str:
+    return _norm(_first_value(row, SPORTSBOOK_FIELDS)) or "unknown_sportsbook"
+
+
 def build_market_pairing_key(row: Mapping[str, Any]) -> str:
-    sportsbook = _norm(_first_value(row, SPORTSBOOK_FIELDS)) or "unknown_sportsbook"
-    return "|".join([_event_identity(row), _market_type(row), sportsbook, _line_bucket(row)])
+    # Deliberately does not include line value. Totals/spreads need all sides in
+    # one same-book group so mismatched lines can be diagnosed instead of hidden
+    # as separate one-sided groups.
+    return "|".join([_event_identity(row), _market_type(row), _sportsbook_identity(row)])
 
 
 def _cross_sportsbook_key(row: Mapping[str, Any]) -> str:
-    return "|".join([_event_identity(row), _market_type(row), _line_bucket(row)])
+    return "|".join([_event_identity(row), _market_type(row)])
 
 
 def _source_is_real(row: Mapping[str, Any]) -> bool:
@@ -234,7 +245,13 @@ def _source_is_real(row: Mapping[str, Any]) -> bool:
         return value
     if str(value).strip().lower() in {"true", "1", "yes"}:
         return True
-    return str(row.get("advisory_sportsbook_source_type") or "") == REAL_SPORTSBOOK
+    source_type = str(row.get("advisory_sportsbook_source_type") or "")
+    if source_type:
+        return source_type == REAL_SPORTSBOOK
+    raw = _norm(_first_value(row, RAW_SPORTSBOOK_FIELDS))
+    if raw in UNKNOWN_SOURCE_TOKENS or raw in CONSENSUS_SOURCE_TOKENS:
+        return False
+    return bool(raw)
 
 
 def _valid_decimal_odds(row: Mapping[str, Any]) -> bool:
@@ -285,7 +302,8 @@ def _status_for_group(group: list[dict[str, Any]], *, mixed_sportsbook: bool = F
         blocker = "mixed_sportsbook_market"
         line_status = LINE_PAIRING_NOT_REQUIRED
     elif market == "totals":
-        if any(value is None for value in [extract_line_value(row) for row in group]):
+        raw_lines = [extract_line_value(row) for row in group]
+        if any(value is None for value in raw_lines):
             status = MISSING_LINE_VALUE
             blocker = "missing_line_value"
             line_status = LINE_PAIRING_MISSING
@@ -302,7 +320,8 @@ def _status_for_group(group: list[dict[str, Any]], *, mixed_sportsbook: bool = F
             blocker = "none"
             line_status = LINE_PAIRING_MATCHED
     elif market == "spread":
-        if any(value is None for value in [extract_line_value(row) for row in group]):
+        raw_lines = [extract_line_value(row) for row in group]
+        if any(value is None for value in raw_lines):
             status = MISSING_LINE_VALUE
             blocker = "missing_line_value"
             line_status = LINE_PAIRING_MISSING
@@ -348,10 +367,7 @@ def _status_for_group(group: list[dict[str, Any]], *, mixed_sportsbook: bool = F
         missing = ["opposing_side"]
 
     no_vig_available = bool(status == COMPLETE_MARKET and real and valid_odds)
-    if no_vig_available:
-        no_vig_blocker = "none"
-    else:
-        no_vig_blocker = blocker if blocker != "none" else "market_incomplete_no_vig_unavailable"
+    no_vig_blocker = "none" if no_vig_available else (blocker if blocker != "none" else "market_incomplete_no_vig_unavailable")
 
     return {
         "status": status,
@@ -384,7 +400,7 @@ def market_completeness_diagnostics(rows_or_frame: Sequence[Mapping[str, Any]] |
 
     cross_has_multiple_books: dict[str, bool] = {}
     for key, group in cross_groups.items():
-        books = {_norm(_first_value(row, SPORTSBOOK_FIELDS)) for row in group if _norm(_first_value(row, SPORTSBOOK_FIELDS))}
+        books = {_sportsbook_identity(row) for row in group if _sportsbook_identity(row)}
         cross_has_multiple_books[key] = len(books) > 1
 
     out: list[dict[str, Any]] = []
