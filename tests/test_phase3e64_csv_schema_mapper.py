@@ -41,7 +41,7 @@ def test_common_aliases_map_to_canonical_schema():
     assert row["model_probability"] == 0.72
     assert row["result"] == "win"
     assert row["schema_mapper_status"] == SCHEMA_READY
-    assert row["schema_mapper_ready_for_advisory_pipeline"] is True
+    assert bool(row["schema_mapper_ready_for_advisory_pipeline"]) is True
 
 
 def test_missing_required_fields_detected_safely():
@@ -53,7 +53,7 @@ def test_missing_required_fields_detected_safely():
     assert "market_type" in missing
     assert "bookmaker" in missing
     assert "model_probability" in missing
-    assert repaired.iloc[0]["schema_mapper_ready_for_advisory_pipeline"] is False
+    assert bool(repaired.iloc[0]["schema_mapper_ready_for_advisory_pipeline"]) is False
 
 
 def test_probability_and_decimal_odds_normalize_safely():
@@ -99,7 +99,7 @@ def test_duplicate_rows_are_detected_without_blocking_export():
     repaired = map_and_repair_frame(frame)
     assert repaired.iloc[0]["schema_mapper_status"] == SCHEMA_PARTIAL
     assert int(repaired.iloc[0]["schema_mapper_duplicate_count"]) == 2
-    assert repaired.iloc[0]["schema_mapper_ready_for_advisory_pipeline"] is True
+    assert bool(repaired.iloc[0]["schema_mapper_ready_for_advisory_pipeline"]) is True
 
 
 def test_original_input_not_mutated_and_summary_report_export_fields_exist():
