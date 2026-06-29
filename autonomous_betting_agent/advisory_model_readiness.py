@@ -6,7 +6,7 @@ import pandas as pd
 
 from autonomous_betting_agent.model_status_constants import *
 from autonomous_betting_agent.model_status_results import brier_score, outcome_value
-from autonomous_betting_agent.model_status_utils import PICK_FIELDS, PROB_FIELDS, detect_event_identity, present, records, result_column
+from autonomous_betting_agent.model_status_utils import EVENT_FIELDS, PICK_FIELDS, PROB_FIELDS, clean, present, records, result_column
 
 PREFIX = "advisory_shadow_"
 
@@ -15,12 +15,20 @@ def k(name: str) -> str:
     return PREFIX + name
 
 
+def _event_identity(row: Mapping[str, Any]) -> str:
+    for field in EVENT_FIELDS:
+        value = clean(row.get(field))
+        if value:
+            return value.lower().replace(" ", "_")
+    return ""
+
+
 def model_readiness_diagnostics(rows_or_frame: Sequence[Mapping[str, Any]] | pd.DataFrame, config: Mapping[str, Any] | None = None) -> dict[str, Any]:
     rows = records(rows_or_frame)
     result_field = result_column(rows)
     prob_present = bool(present(rows, PROB_FIELDS))
     pick_present = bool(present(rows, PICK_FIELDS))
-    event_ids = [detect_event_identity(row) for row in rows]
+    event_ids = [_event_identity(row) for row in rows]
     event_present = any(event_ids)
     unique_events = {event for event in event_ids if event}
     results = [outcome_value(row.get(result_field)) for row in rows] if result_field else []
