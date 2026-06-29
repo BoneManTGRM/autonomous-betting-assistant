@@ -16,6 +16,12 @@ from autonomous_betting_agent.advisory_candidate_review import (
     candidate_review_rows,
     candidate_review_summary,
 )
+from autonomous_betting_agent.advisory_clv_tracking import (
+    apply_manual_clv_fields,
+    manual_clv_group_summary,
+    manual_clv_report_section,
+    manual_clv_summary,
+)
 from autonomous_betting_agent.advisory_explanation_engine import (
     advisory_explanation_reason_counts,
     advisory_explanation_report_section,
@@ -68,7 +74,7 @@ LANG = render_app_sidebar("advisory_odds_value", language_key="advisory_odds_val
 TEXT = {
     "en": {
         "title": "Advisory Odds Value",
-        "caption": "Phase 3E.6 proof-safe advisory odds readiness, explanations, and local candidate review.",
+        "caption": "Phase 3E.6.1 proof-safe advisory odds readiness, explanations, local candidate review, and manual CLV tracking.",
         "input": "Input",
         "test_window": "Test Window ID",
         "use_session": "Use latest saved/session rows",
@@ -99,6 +105,12 @@ TEXT = {
         "blocked_candidates": "Blocked Candidate Rows",
         "watchlist_candidates": "Watchlist-Only Rows",
         "prediction_only_candidates": "Prediction-Only Rows",
+        "clv_tracking": "Manual CLV Tracking",
+        "clv_summary": "Manual CLV Summary",
+        "clv_by_book": "CLV by Sportsbook",
+        "clv_by_market": "CLV by Market",
+        "clv_by_explanation": "CLV by Explanation Status",
+        "clv_rows": "Row-Level Manual CLV",
         "diagnostics": "Why no playable +EV rows?",
         "summary": "Advisory summary",
         "playable": "Original playable +EV advisory picks",
@@ -116,7 +128,7 @@ TEXT = {
     },
     "es": {
         "title": "Valor de Odds Asesoría",
-        "caption": "Fase 3E.6 preparación, explicaciones y revisión local de candidatos sin tocar prueba.",
+        "caption": "Fase 3E.6.1 preparación, explicaciones, revisión local de candidatos y CLV manual sin tocar prueba.",
         "input": "Entrada",
         "test_window": "ID de ventana de prueba",
         "use_session": "Usar ultimas filas guardadas/sesion",
@@ -147,6 +159,12 @@ TEXT = {
         "blocked_candidates": "Filas candidatas bloqueadas",
         "watchlist_candidates": "Filas solo watchlist",
         "prediction_only_candidates": "Filas solo prediccion",
+        "clv_tracking": "Seguimiento CLV manual",
+        "clv_summary": "Resumen CLV manual",
+        "clv_by_book": "CLV por sportsbook",
+        "clv_by_market": "CLV por mercado",
+        "clv_by_explanation": "CLV por estado de explicación",
+        "clv_rows": "CLV manual por fila",
         "diagnostics": "Por que no hay filas +EV jugables?",
         "summary": "Resumen asesoría",
         "playable": "Picks asesoría +EV originales",
@@ -293,6 +311,7 @@ explained_rows = explain_advisory_rows(calibrated_rows)
 explained_frame = pd.DataFrame(explained_rows)
 candidate_base_rows = candidate_review_rows(explained_rows)
 candidate_base_frame = pd.DataFrame(candidate_base_rows)
+clv_base_rows = apply_manual_clv_fields(candidate_base_rows)
 impact = threshold_impact_summary(advisory, calibrated_rows)
 validation = validate_advisory_rows(normalized)
 counts = advisory_summary_counts(advisory)
@@ -301,6 +320,8 @@ explanation_summary_frame = advisory_explanation_summary(explained_rows)
 top_explanation = explanation_summary_frame.iloc[0].to_dict() if not explanation_summary_frame.empty else {}
 candidate_summary_base = candidate_review_summary(candidate_base_rows)
 top_candidate = candidate_summary_base.iloc[0].to_dict() if not candidate_summary_base.empty else {}
+clv_base_summary = manual_clv_summary(clv_base_rows)
+top_clv = clv_base_summary.iloc[0].to_dict() if not clv_base_summary.empty else {}
 readiness.update({
     "threshold_preset_used": threshold_config.get("advisory_threshold_preset"),
     "calibrated_playable_count": impact.get("calibrated_PLAYABLE_PLUS_EV", 0),
@@ -314,6 +335,10 @@ readiness.update({
     "manual_candidate_review_available": True,
     "manual_candidate_review_row_count": len(candidate_base_rows),
     "top_manual_candidate_review_status": top_candidate.get("advisory_manual_review_status"),
+    "manual_clv_tracking_available": True,
+    "manual_clv_row_count": len(clv_base_rows),
+    "top_manual_clv_status": top_clv.get("advisory_clv_status"),
+    "manual_clv_note": "Manual CLV fields are informational and do not make Fresh Slate Readiness stricter.",
 })
 diagnostics = advisory_real_file_diagnostics(advisory)
 
@@ -327,6 +352,8 @@ st.json({
     "threshold_calibration_only": True,
     "explanation_only": True,
     "manual_candidate_review_only": True,
+    "manual_clv_tracking_only": True,
+    "odds_polling": "OFF",
     "live_application": "OFF",
     "applied_live_count": 0,
     "does_not_feed_official_locks": True,
@@ -406,6 +433,21 @@ show_table(t("blocked_candidates"), blocked_candidate_frame[[col for col in cand
 show_table(t("watchlist_candidates"), watchlist_candidate_frame[[col for col in candidate_cols if col in watchlist_candidate_frame.columns]].copy() if not watchlist_candidate_frame.empty else pd.DataFrame(columns=candidate_cols))
 show_table(t("prediction_only_candidates"), prediction_candidate_frame[[col for col in candidate_cols if col in prediction_candidate_frame.columns]].copy() if not prediction_candidate_frame.empty else pd.DataFrame(columns=candidate_cols))
 
+st.subheader(t("clv_tracking"))
+st.warning("Manual CLV tracking uses uploaded/manual closing odds only. It does not poll odds, create official locks, publish proof, change result grading, change bankroll/staking, or place bets.")
+clv_rows = apply_manual_clv_fields(candidate_rows)
+clv_frame = pd.DataFrame(clv_rows)
+show_table(t("clv_summary"), manual_clv_summary(clv_rows))
+show_table(t("clv_by_book"), manual_clv_group_summary(clv_rows, "bookmaker"))
+show_table(t("clv_by_market"), manual_clv_group_summary(clv_rows, "market_type"))
+show_table(t("clv_by_explanation"), manual_clv_group_summary(clv_rows, "advisory_explanation_status"))
+clv_cols = [
+    "event", "prediction", "market_type", "sportsbook", "bookmaker", "advisory_candidate_review_status",
+    "advisory_opening_decimal_odds", "advisory_closing_decimal_odds", "advisory_clv_decimal_delta",
+    "advisory_clv_percent_delta", "advisory_clv_status", "advisory_clv_missing_reason", "advisory_clv_notes",
+]
+show_table(t("clv_rows"), clv_frame[[col for col in clv_cols if col in clv_frame.columns]].copy() if not clv_frame.empty else pd.DataFrame(columns=clv_cols))
+
 st.subheader(t("diagnostics"))
 if diagnostics.get("show_no_playable_warning"):
     st.warning(diagnostics.get("explanation", "No playable advisory rows were found."))
@@ -436,7 +478,7 @@ show_table(t("conflicts"), duplicate_conflict_summary(advisory))
 st.subheader(t("validation"))
 st.json(validation)
 
-csv_link(t("download"), advisory_csv_frame(candidate_frame), f"advisory_odds_value_{workspace_id}.csv")
+csv_link(t("download"), advisory_csv_frame(clv_frame), f"advisory_odds_value_{workspace_id}.csv")
 st.subheader(t("report"))
 combined_report = (
     advisory_report_text(advisory)
@@ -446,5 +488,7 @@ combined_report = (
     + advisory_explanation_report_section(explained_rows)
     + "\n\n"
     + candidate_review_report_section(candidate_rows)
+    + "\n\n"
+    + manual_clv_report_section(clv_rows)
 )
-st.text_area(t("report"), value=combined_report, height=560)
+st.text_area(t("report"), value=combined_report, height=580)
