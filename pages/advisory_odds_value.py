@@ -21,6 +21,7 @@ from autonomous_betting_agent.advisory_odds_value_display import (
     duplicate_conflict_summary,
     fresh_slate_readiness_check,
     line_shopping_summary,
+    market_completeness_summary,
     playable_table,
     prediction_only_table,
     sportsbook_hold_summary,
@@ -41,7 +42,7 @@ LANG = render_app_sidebar("advisory_odds_value", language_key="advisory_odds_val
 TEXT = {
     "en": {
         "title": "Advisory Odds Value",
-        "caption": "Phase 3E.5.5 proof-safe advisory odds readiness, sportsbook source normalization, diagnostics, and report cleanup.",
+        "caption": "Phase 3E.5.6 proof-safe advisory odds readiness, sportsbook source normalization, market completeness diagnostics, and report cleanup.",
         "input": "Input",
         "test_window": "Test Window ID",
         "use_session": "Use latest saved/session rows",
@@ -53,6 +54,7 @@ TEXT = {
         "readiness": "Fresh Slate Readiness",
         "readiness_details": "Fresh slate readiness details",
         "source_summary": "Sportsbook Source Summary",
+        "market_summary": "Market Completeness Summary",
         "diagnostics": "Why no playable +EV rows?",
         "summary": "Advisory summary",
         "playable": "Playable +EV advisory picks",
@@ -70,7 +72,7 @@ TEXT = {
     },
     "es": {
         "title": "Valor de Odds Asesoría",
-        "caption": "Fase 3E.5.5 preparacion, fuentes sportsbook, diagnostico y reporte asesoría sin tocar prueba.",
+        "caption": "Fase 3E.5.6 preparacion, fuentes sportsbook, diagnostico de mercado y reporte asesoría sin tocar prueba.",
         "input": "Entrada",
         "test_window": "ID de ventana de prueba",
         "use_session": "Usar ultimas filas guardadas/sesion",
@@ -82,6 +84,7 @@ TEXT = {
         "readiness": "Preparacion de slate fresco",
         "readiness_details": "Detalles de preparacion de slate fresco",
         "source_summary": "Resumen de fuente sportsbook",
+        "market_summary": "Resumen de mercado completo",
         "diagnostics": "Por que no hay filas +EV jugables?",
         "summary": "Resumen asesoría",
         "playable": "Picks asesoría jugables +EV",
@@ -215,6 +218,7 @@ with st.expander(t("readiness_details"), expanded=True):
     st.json(readiness)
 
 show_table(t("source_summary"), sportsbook_source_summary(advisory))
+show_table(t("market_summary"), market_completeness_summary(advisory))
 
 st.subheader(t("diagnostics"))
 if diagnostics.get("show_no_playable_warning"):
