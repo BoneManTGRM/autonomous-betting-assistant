@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 
 import pandas as pd
 import streamlit as st
@@ -11,9 +12,9 @@ from autonomous_betting_agent.commercial_platform_tools import load_persistent_l
 from autonomous_betting_agent.event_list_dedupe import collapse_to_event_rows, event_duplicate_summary
 from autonomous_betting_agent.explanations import build_client_safe_pick_summary
 from autonomous_betting_agent.grading_rules import summarize_event_level, summarize_row_level
-from autonomous_betting_agent.ledger_sync_service import SYNC_SOURCE_REGISTRY
 from autonomous_betting_agent.ledger_types import classify_ledger_type, is_future_locked, public_metric_allowed
 from autonomous_betting_agent.local_access import require_streamlit_access
+from autonomous_betting_agent.proof_package_integrity_service import build_proof_package_qa_report, run_e2e_proof_package_checks
 from autonomous_betting_agent.proof_package_service import (
     build_client_summary_package,
     build_internal_review_package,
@@ -54,8 +55,25 @@ PROOF_CENTER_UPLOAD_SNAPSHOT_KEY = "proof_center_upload_snapshot_rows"
 PROOF_CENTER_PACKAGE_PREVIEW_KEY = "proof_center_package_preview"
 PROOF_CENTER_PACKAGE_FINGERPRINT_KEY = "proof_center_package_input_fingerprint"
 PROOF_CENTER_PACKAGE_META_KEY = "proof_center_package_preview_meta"
+PROOF_CENTER_QA_PREVIEW_KEY = "proof_center_qa_preview"
+PROOF_CENTER_QA_FINGERPRINT_KEY = "proof_center_qa_input_fingerprint"
+PROOF_CENTER_E2E_QA_PREVIEW_KEY = "proof_center_e2e_qa_preview"
+PROOF_CENTER_E2E_QA_FINGERPRINT_KEY = "proof_center_e2e_input_fingerprint"
 PROOF_CENTER_REQUIRED_UPLOAD_FIELDS = ("event", "pick", "market_type", "sportsbook", "result")
 PROOF_CENTER_ODDS_FIELDS = ("odds", "decimal_odds")
+QA_STATUS_FIELDS = (
+    "export_integrity_passed",
+    "redaction_passed",
+    "public_client_safety_passed",
+    "private_internal_isolation_passed",
+    "report_publisher_integrity_passed",
+    "hash_stability_passed",
+    "proof_grade_rules_passed",
+    "top_positive_ev_safety_passed",
+    "download_bundle_passed",
+    "stale_preview_contract_passed",
+    "no_write_paths_detected",
+)
 
 TEXT = {
     "en": {
@@ -146,6 +164,49 @@ TEXT = {
         "download_package_json": "Download package JSON",
         "download_package_markdown": "Download package Markdown",
         "download_package_csv": "Download package CSV",
+        "proof_qa_control_panel": "Proof QA Control Panel",
+        "qa_caption": "Read-only QA visibility for package integrity, redaction, hashes, proof grade, Top +EV safety, and download readiness.",
+        "qa_workspace_id": "QA workspace ID",
+        "qa_package_type": "QA package_type",
+        "run_selected_package_qa": "Run selected package QA",
+        "run_full_e2e_qa": "Run full E2E QA",
+        "selected_qa_ready": "Selected package QA stored. The qa_report_hash identifies this QA result until inputs change.",
+        "e2e_qa_ready": "Full E2E QA stored. The E2E fingerprint identifies this QA result until inputs change.",
+        "selected_package_qa": "Selected package QA",
+        "full_e2e_qa": "Full E2E QA",
+        "stale_qa": "Stored QA does not match the current workspace/package type. Rerun QA before relying on it.",
+        "stale_e2e_qa": "Stored E2E QA does not match the current workspace. Rerun E2E QA before relying on it.",
+        "qa_passed": "QA PASSED",
+        "qa_failed": "QA FAILED",
+        "public_client_safe": "PUBLIC/CLIENT SAFE",
+        "public_client_blocked": "PUBLIC/CLIENT BLOCKED",
+        "private_internal_only": "PRIVATE/INTERNAL ONLY",
+        "proof_ready_status": "PROOF READY",
+        "not_proof_ready_status": "NOT PROOF READY",
+        "export_valid": "EXPORT VALID",
+        "export_failed": "EXPORT FAILED",
+        "redaction_passed_status": "REDACTION PASSED",
+        "redaction_failed_status": "REDACTION FAILED",
+        "hash_stable": "HASH STABLE",
+        "hash_failed": "HASH FAILED",
+        "no_write_paths": "NO WRITE PATHS",
+        "write_path_warning": "WRITE PATH WARNING",
+        "failed_qa_final_warning": "This package failed QA and must not be treated as final proof.",
+        "not_proof_ready_qa_warning": "This package is not proof-ready. It may be provisional, empty, fallback-backed, or blocked by integrity checks.",
+        "redaction_blocked_warning": "Public/client exports are blocked because redaction validation failed.",
+        "read_only_failed_warning": "Read-only safety failed. Review write/mutation path warnings before release.",
+        "generic_redaction_warning": "Redaction failed. Private or unsafe fields were detected. Review private/internal QA in Proof Center.",
+        "qa_status_checks": "QA status checks",
+        "qa_safe_summary": "Sanitized public/client QA summary",
+        "qa_private_details": "PRIVATE/INTERNAL ONLY QA details",
+        "failed_checks": "failed_checks",
+        "warning_count": "warning_count",
+        "error_count": "error_count",
+        "blocked_terms_count": "blocked_terms_count",
+        "blocked_paths_count": "blocked_paths_count",
+        "checked_outputs": "checked_outputs",
+        "download_selected_qa_json": "Download selected QA JSON",
+        "download_e2e_qa_json": "Download E2E QA JSON",
     },
     "es": {
         "title": "Centro de Prueba",
@@ -235,6 +296,49 @@ TEXT = {
         "download_package_json": "Descargar JSON del paquete",
         "download_package_markdown": "Descargar Markdown del paquete",
         "download_package_csv": "Descargar CSV del paquete",
+        "proof_qa_control_panel": "Panel de Control QA de Prueba",
+        "qa_caption": "Visibilidad QA solo lectura para integridad, redacción, hashes, proof grade, seguridad Top +EV y preparación de descarga.",
+        "qa_workspace_id": "ID de workspace QA",
+        "qa_package_type": "QA package_type",
+        "run_selected_package_qa": "Ejecutar QA del paquete seleccionado",
+        "run_full_e2e_qa": "Ejecutar QA E2E completo",
+        "selected_qa_ready": "QA del paquete seleccionado guardado. El qa_report_hash identifica este resultado hasta que cambien las entradas.",
+        "e2e_qa_ready": "QA E2E completo guardado. La huella E2E identifica este resultado hasta que cambien las entradas.",
+        "selected_package_qa": "QA del paquete seleccionado",
+        "full_e2e_qa": "QA E2E completo",
+        "stale_qa": "El QA guardado no coincide con el workspace/package type actual. Ejecuta QA otra vez antes de confiar en él.",
+        "stale_e2e_qa": "El QA E2E guardado no coincide con el workspace actual. Ejecuta QA E2E otra vez antes de confiar en él.",
+        "qa_passed": "QA PASSED",
+        "qa_failed": "QA FAILED",
+        "public_client_safe": "PUBLIC/CLIENT SAFE",
+        "public_client_blocked": "PUBLIC/CLIENT BLOCKED",
+        "private_internal_only": "PRIVATE/INTERNAL ONLY",
+        "proof_ready_status": "PROOF READY",
+        "not_proof_ready_status": "NOT PROOF READY",
+        "export_valid": "EXPORT VALID",
+        "export_failed": "EXPORT FAILED",
+        "redaction_passed_status": "REDACTION PASSED",
+        "redaction_failed_status": "REDACTION FAILED",
+        "hash_stable": "HASH STABLE",
+        "hash_failed": "HASH FAILED",
+        "no_write_paths": "NO WRITE PATHS",
+        "write_path_warning": "WRITE PATH WARNING",
+        "failed_qa_final_warning": "Este paquete falló QA y no debe tratarse como prueba final.",
+        "not_proof_ready_qa_warning": "Este paquete no está listo como prueba. Puede ser provisional, vacío, fallback-backed o bloqueado por revisiones de integridad.",
+        "redaction_blocked_warning": "Las exportaciones public/client están bloqueadas porque falló la validación de redacción.",
+        "read_only_failed_warning": "Falló la seguridad de solo lectura. Revisa advertencias de rutas de escritura/mutación antes de liberar.",
+        "generic_redaction_warning": "Falló la redacción. Se detectaron campos privados o inseguros. Revisa QA private/internal en Proof Center.",
+        "qa_status_checks": "Revisiones de estado QA",
+        "qa_safe_summary": "Resumen QA sanitizado public/client",
+        "qa_private_details": "Detalles QA PRIVATE/INTERNAL ONLY",
+        "failed_checks": "failed_checks",
+        "warning_count": "warning_count",
+        "error_count": "error_count",
+        "blocked_terms_count": "blocked_terms_count",
+        "blocked_paths_count": "blocked_paths_count",
+        "checked_outputs": "checked_outputs",
+        "download_selected_qa_json": "Descargar JSON del QA seleccionado",
+        "download_e2e_qa_json": "Descargar JSON del QA E2E",
     },
 }
 
@@ -289,6 +393,18 @@ def proof_center_upload_fingerprint(uploaded_file, workspace_id: str, source_key
 
 def proof_center_package_fingerprint(workspace_id: str, package_type: str, package_id: str, package_hash: str) -> str:
     payload = "|".join([safe_text(workspace_id), safe_text(package_type), safe_text(package_id), safe_text(package_hash)])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def proof_center_qa_fingerprint(workspace_id: str, package_type: str, qa_report_id: str, qa_report_hash: str) -> str:
+    payload = "|".join([safe_text(workspace_id), safe_text(package_type), safe_text(qa_report_id), safe_text(qa_report_hash)])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def proof_center_e2e_qa_fingerprint(workspace_id: str, e2e_result: dict) -> str:
+    package_type_results = e2e_result.get("package_type_results") or {}
+    hashes = [safe_text((package_type_results.get(package_type) or {}).get("qa_report_hash")) for package_type in PROOF_CENTER_PACKAGE_TYPE_OPTIONS]
+    payload = "|".join([safe_text(workspace_id), *hashes])
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -370,9 +486,207 @@ def _package_matches_current(package: dict, workspace_id: str, package_type: str
     return st.session_state.get(PROOF_CENTER_PACKAGE_FINGERPRINT_KEY) == current
 
 
+def _qa_matches_current(report: dict, workspace_id: str, package_type: str) -> bool:
+    if not report:
+        return False
+    current = proof_center_qa_fingerprint(workspace_id, package_type, safe_text(report.get("qa_report_id")), safe_text(report.get("qa_report_hash")))
+    return st.session_state.get(PROOF_CENTER_QA_FINGERPRINT_KEY) == current
+
+
+def _e2e_qa_matches_current(e2e_result: dict, workspace_id: str) -> bool:
+    if not e2e_result:
+        return False
+    return st.session_state.get(PROOF_CENTER_E2E_QA_FINGERPRINT_KEY) == proof_center_e2e_qa_fingerprint(workspace_id, e2e_result)
+
+
 def _redaction_passed(package: dict) -> bool:
     status = validate_public_package_redactions(package)
     return bool(status.get("passed"))
+
+
+def _qa_failed_checks(report: dict) -> list[str]:
+    return [field for field in QA_STATUS_FIELDS if not bool(report.get(field))]
+
+
+def _qa_blocked_counts(report: dict) -> tuple[int, int]:
+    blocked_terms = 0
+    blocked_paths = 0
+    for result in (report.get("validation_results") or {}).values():
+        details = result.get("details") or {}
+        blocked_terms += len(details.get("blocked_terms_found") or [])
+        blocked_paths += len(details.get("blocked_paths_found") or [])
+    return blocked_terms, blocked_paths
+
+
+def _qa_safe_summary(report: dict) -> dict:
+    blocked_terms, blocked_paths = _qa_blocked_counts(report)
+    return {
+        "qa_report_id": report.get("qa_report_id"),
+        "qa_report_hash": report.get("qa_report_hash"),
+        "generated_at_utc": report.get("generated_at_utc"),
+        "workspace_id": report.get("workspace_id"),
+        "package_type": report.get("package_type"),
+        "package_id": report.get("package_id"),
+        "package_hash": report.get("package_hash"),
+        "public_export_hash": report.get("public_export_hash"),
+        "proof_ready": report.get("proof_ready"),
+        "proof_grade": report.get("proof_grade"),
+        "selected_source": report.get("selected_source"),
+        "ledger_backed": report.get("ledger_backed"),
+        "ledger_integrity_status": report.get("ledger_integrity_status"),
+        "dashboard_ready": report.get("dashboard_ready"),
+        "overall_passed": report.get("overall_passed"),
+        "checked_outputs": report.get("checked_outputs") or [],
+        "warning_count": len(report.get("warnings") or []),
+        "error_count": len(report.get("errors") or []),
+        "failed_checks": _qa_failed_checks(report),
+        "blocked_terms_count": blocked_terms,
+        "blocked_paths_count": blocked_paths,
+        "redaction_passed": report.get("redaction_passed"),
+        "public_client_safety_passed": report.get("public_client_safety_passed"),
+    }
+
+
+def _qa_private_summary(report: dict) -> dict:
+    private_summary = dict(_qa_safe_summary(report))
+    private_summary["private_export_hash"] = report.get("private_export_hash")
+    private_summary["warnings"] = report.get("warnings") or []
+    private_summary["errors"] = report.get("errors") or []
+    private_summary["validation_results"] = report.get("validation_results") or {}
+    return private_summary
+
+
+def _qa_status_labels(report: dict) -> list[str]:
+    labels = [t("qa_passed") if report.get("overall_passed") else t("qa_failed")]
+    labels.append(t("proof_ready_status") if report.get("proof_ready") else t("not_proof_ready_status"))
+    labels.append(t("export_valid") if report.get("export_integrity_passed") else t("export_failed"))
+    labels.append(t("redaction_passed_status") if report.get("redaction_passed") else t("redaction_failed_status"))
+    labels.append(t("hash_stable") if report.get("hash_stability_passed") else t("hash_failed"))
+    labels.append(t("no_write_paths") if report.get("no_write_paths_detected") else t("write_path_warning"))
+    if safe_text(report.get("package_type")) in PROOF_CENTER_PRIVATE_PACKAGE_TYPES:
+        labels.append(t("private_internal_only"))
+    else:
+        labels.append(t("public_client_safe") if report.get("public_client_safety_passed") else t("public_client_blocked"))
+    return labels
+
+
+def _qa_report_download_payload(report: dict) -> dict:
+    if safe_text(report.get("package_type")) in PROOF_CENTER_PRIVATE_PACKAGE_TYPES:
+        return _qa_private_summary(report)
+    return _qa_safe_summary(report)
+
+
+def _qa_download_filename(report: dict, suffix: str = "json") -> str:
+    workspace = safe_text(report.get("workspace_id")) or "default"
+    package_type = safe_text(report.get("package_type")) or "public"
+    hash_fragment = safe_text(report.get("qa_report_hash")).split("_")[-1][:12] or "nohash"
+    return f"aba_proof_qa_{workspace}_{package_type}_{hash_fragment}.{suffix}"
+
+
+def _e2e_download_filename(workspace_id: str, e2e_result: dict, suffix: str = "json") -> str:
+    hashes = [safe_text((e2e_result.get("package_type_results") or {}).get(package_type, {}).get("qa_report_hash")) for package_type in PROOF_CENTER_PACKAGE_TYPE_OPTIONS]
+    hash_fragment = hashlib.sha256("|".join(hashes).encode("utf-8")).hexdigest()[:12]
+    return f"aba_proof_qa_{workspace_id}_e2e_{hash_fragment}.{suffix}"
+
+
+def _render_qa_status_checks(report: dict) -> None:
+    st.markdown(f"**{t('qa_status_checks')}**")
+    status_rows = [{"check": field, "passed": bool(report.get(field))} for field in QA_STATUS_FIELDS]
+    st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
+
+
+def _render_selected_qa_report(report: dict, stale: bool) -> None:
+    if stale:
+        st.error(t("stale_qa"))
+    if not report.get("overall_passed"):
+        st.warning(t("failed_qa_final_warning"))
+    if not report.get("proof_ready"):
+        st.warning(t("not_proof_ready_qa_warning"))
+    package_type = safe_text(report.get("package_type"))
+    if package_type in PROOF_CENTER_PUBLIC_PACKAGE_TYPES and not report.get("redaction_passed"):
+        st.error(t("redaction_blocked_warning"))
+        st.warning(t("generic_redaction_warning"))
+    if not report.get("no_write_paths_detected"):
+        st.error(t("read_only_failed_warning"))
+
+    st.write({label: True for label in _qa_status_labels(report)})
+    metrics = st.columns(4)
+    metrics[0].metric("qa_report_id", safe_text(report.get("qa_report_id"))[:24])
+    metrics[1].metric("qa_report_hash", safe_text(report.get("qa_report_hash"))[:24])
+    metrics[2].metric("overall_passed", str(bool(report.get("overall_passed"))))
+    metrics[3].metric("proof_grade", safe_text(report.get("proof_grade")))
+
+    st.write({
+        "qa_report_id": report.get("qa_report_id"),
+        "qa_report_hash": report.get("qa_report_hash"),
+        "generated_at_utc": report.get("generated_at_utc"),
+        "workspace_id": report.get("workspace_id"),
+        "package_type": report.get("package_type"),
+        "package_id": report.get("package_id"),
+        "package_hash": report.get("package_hash"),
+        "public_export_hash": report.get("public_export_hash"),
+        "private_export_hash": report.get("private_export_hash") if package_type in PROOF_CENTER_PRIVATE_PACKAGE_TYPES else "",
+        "proof_ready": report.get("proof_ready"),
+        "proof_grade": report.get("proof_grade"),
+        "selected_source": report.get("selected_source"),
+        "ledger_backed": report.get("ledger_backed"),
+        "ledger_integrity_status": report.get("ledger_integrity_status"),
+        "dashboard_ready": report.get("dashboard_ready"),
+        "overall_passed": report.get("overall_passed"),
+    })
+    _render_qa_status_checks(report)
+
+    if package_type in PROOF_CENTER_PRIVATE_PACKAGE_TYPES:
+        st.warning(t("private_internal_only"))
+        _display_dict(t("qa_private_details"), _qa_private_summary(report))
+    else:
+        _display_dict(t("qa_safe_summary"), _qa_safe_summary(report))
+
+    download_payload = json.dumps(_qa_report_download_payload(report), sort_keys=True, indent=2)
+    st.download_button(
+        t("download_selected_qa_json"),
+        download_payload.encode("utf-8"),
+        file_name=_qa_download_filename(report),
+        mime="application/json",
+        disabled=stale,
+        key=f"proof_center_selected_qa_json_{safe_text(report.get('qa_report_hash'))}",
+    )
+
+
+def _render_e2e_qa_report(e2e_result: dict, workspace_id: str, stale: bool) -> None:
+    if stale:
+        st.error(t("stale_e2e_qa"))
+    if not e2e_result.get("overall_passed"):
+        st.warning(t("failed_qa_final_warning"))
+    package_type_results = e2e_result.get("package_type_results") or {}
+    rows = []
+    for package_type in PROOF_CENTER_PACKAGE_TYPE_OPTIONS:
+        result = package_type_results.get(package_type) or {}
+        rows.append({
+            "package_type": package_type,
+            "package_id": result.get("package_id"),
+            "package_hash": result.get("package_hash"),
+            "qa_report_hash": result.get("qa_report_hash"),
+            "proof_ready": result.get("proof_ready"),
+            "proof_grade": result.get("proof_grade"),
+            "overall_passed": result.get("overall_passed"),
+            "failed_checks": ", ".join(_qa_failed_checks(result)),
+            "warning_count": len(result.get("warnings") or []),
+            "error_count": len(result.get("errors") or []),
+        })
+    st.metric("overall_passed", str(bool(e2e_result.get("overall_passed"))))
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    _display_dict(t("warnings_errors"), {"warning_count": len(e2e_result.get("warnings") or []), "error_count": len(e2e_result.get("errors") or [])})
+    payload = json.dumps({"overall_passed": e2e_result.get("overall_passed"), "package_type_results": rows, "warning_count": len(e2e_result.get("warnings") or []), "error_count": len(e2e_result.get("errors") or [])}, sort_keys=True, indent=2)
+    e2e_hash = proof_center_e2e_qa_fingerprint(workspace_id, e2e_result)
+    st.download_button(
+        t("download_e2e_qa_json"),
+        payload.encode("utf-8"),
+        file_name=_e2e_download_filename(workspace_id, e2e_result),
+        mime="application/json",
+        disabled=stale,
+        key=f"proof_center_e2e_qa_json_{e2e_hash}",
+    )
 
 
 def _render_package_downloads(package: dict, stale: bool, private_confirmed: bool) -> None:
@@ -687,3 +1001,39 @@ with tabs[6]:
         _render_package_downloads(package, stale_package, private_confirmed)
     else:
         st.info(t("no_rows"))
+
+    st.divider()
+    st.subheader(t("proof_qa_control_panel"))
+    st.caption(t("qa_caption"))
+    qa_workspace = normalize_workspace_id(st.text_input(t("qa_workspace_id"), value=workspace_id, key="proof_center_qa_workspace_id"))
+    qa_package_type = st.selectbox(t("qa_package_type"), PROOF_CENTER_PACKAGE_TYPE_OPTIONS, index=0, key="proof_center_qa_package_type")
+    qa_left, qa_right = st.columns(2)
+    with qa_left:
+        if st.button(t("run_selected_package_qa"), key="proof_center_run_selected_package_qa"):
+            qa_report = build_proof_package_qa_report(qa_workspace, qa_package_type)
+            qa_fingerprint = proof_center_qa_fingerprint(qa_workspace, qa_package_type, safe_text(qa_report.get("qa_report_id")), safe_text(qa_report.get("qa_report_hash")))
+            qa_report["qa_input_fingerprint"] = qa_fingerprint
+            st.session_state[PROOF_CENTER_QA_PREVIEW_KEY] = qa_report
+            st.session_state[PROOF_CENTER_QA_FINGERPRINT_KEY] = qa_fingerprint
+            st.info(t("selected_qa_ready"))
+    with qa_right:
+        if st.button(t("run_full_e2e_qa"), key="proof_center_run_full_e2e_qa"):
+            e2e_result = run_e2e_proof_package_checks(qa_workspace)
+            e2e_fingerprint = proof_center_e2e_qa_fingerprint(qa_workspace, e2e_result)
+            e2e_result["workspace_id"] = qa_workspace
+            e2e_result["e2e_input_fingerprint"] = e2e_fingerprint
+            st.session_state[PROOF_CENTER_E2E_QA_PREVIEW_KEY] = e2e_result
+            st.session_state[PROOF_CENTER_E2E_QA_FINGERPRINT_KEY] = e2e_fingerprint
+            st.info(t("e2e_qa_ready"))
+
+    selected_qa_report = st.session_state.get(PROOF_CENTER_QA_PREVIEW_KEY, {})
+    if selected_qa_report:
+        st.markdown(f"### {t('selected_package_qa')}")
+        stale_qa = not _qa_matches_current(selected_qa_report, qa_workspace, qa_package_type)
+        _render_selected_qa_report(selected_qa_report, stale_qa)
+
+    e2e_qa_result = st.session_state.get(PROOF_CENTER_E2E_QA_PREVIEW_KEY, {})
+    if e2e_qa_result:
+        st.markdown(f"### {t('full_e2e_qa')}")
+        stale_e2e = not _e2e_qa_matches_current(e2e_qa_result, qa_workspace)
+        _render_e2e_qa_report(e2e_qa_result, qa_workspace, stale_e2e)
