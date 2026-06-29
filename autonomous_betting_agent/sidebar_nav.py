@@ -9,6 +9,7 @@ APP_TAGLINE_ES = 'Impulsado por Reparodynamics'
 GLOBAL_LANGUAGE_KEY = 'aba_global_language'
 LANGUAGE_KEYS = [
     'global_language',
+    'dashboard_language',
     'signal_board_language',
     'pro_predictor_language',
     'odds_lock_pro_language',
@@ -23,6 +24,7 @@ LANGUAGE_KEYS = [
     'shadow_mode_results_language',
 ]
 TOOLS: tuple[tuple[str, str, str], ...] = (
+    ('Dashboard', 'Dashboard', 'pages/dashboard.py'),
     ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
     ('Odds Lock Pro', 'Odds Lock Pro', 'pages/odds_lock_pro.py'),
