@@ -138,11 +138,18 @@ def test_english_and_spanish_text_keys_exist_for_new_ui():
         "stale_preview",
         "preview_ready",
         "writes_warning",
+        "proof_packages",
+        "package_workspace_id",
+        "package_type",
+        "build_package_preview",
+        "package_caption",
+        "redaction_status",
+        "verification_manifest",
     }
     assert required.issubset(text["en"])
     assert required.issubset(text["es"])
-    assert len(text["en"]["tabs"]) == 6
-    assert len(text["es"]["tabs"]) == 6
+    assert len(text["en"]["tabs"]) == 7
+    assert len(text["es"]["tabs"]) == 7
 
 
 def test_no_fake_demo_data_and_no_automatic_write_signals():
