@@ -23,6 +23,8 @@ from autonomous_betting_agent.advisory_threshold_calibration import (
 def _row(**overrides):
     base = {
         "event": "Team A vs Team B",
+        "prediction": "Team A",
+        "selection": "Team A",
         "sport": "basketball",
         "market_type": "h2h",
         "bookmaker": "Caliente",
