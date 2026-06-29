@@ -30,6 +30,19 @@ from autonomous_betting_agent.advisory_odds_value_display import (
     validate_advisory_rows,
     watchlist_table,
 )
+from autonomous_betting_agent.advisory_threshold_calibration import (
+    PLAYABLE_PLUS_EV,
+    PREDICTION_ONLY_NOT_PLUS_EV,
+    WATCHLIST_VALUE,
+    advisory_threshold_presets,
+    apply_advisory_thresholds,
+    calibrated_blocked_reason_summary,
+    calibrated_status_table,
+    normalize_threshold_config,
+    threshold_calibration_summary,
+    threshold_impact_summary,
+    threshold_report_text,
+)
 from autonomous_betting_agent.commercial_platform_tools import normalize_workspace_id
 from autonomous_betting_agent.pick_hold_store import load_first_available
 from autonomous_betting_agent.row_normalizer import normalize_frame
@@ -42,7 +55,7 @@ LANG = render_app_sidebar("advisory_odds_value", language_key="advisory_odds_val
 TEXT = {
     "en": {
         "title": "Advisory Odds Value",
-        "caption": "Phase 3E.5.6 proof-safe advisory odds readiness, sportsbook source normalization, market completeness diagnostics, and report cleanup.",
+        "caption": "Phase 3E.5.7 proof-safe advisory odds readiness, market completeness, and threshold calibration.",
         "input": "Input",
         "test_window": "Test Window ID",
         "use_session": "Use latest saved/session rows",
@@ -55,13 +68,20 @@ TEXT = {
         "readiness_details": "Fresh slate readiness details",
         "source_summary": "Sportsbook Source Summary",
         "market_summary": "Market Completeness Summary",
+        "thresholds": "Advisory Threshold Calibration",
+        "threshold_summary": "Threshold Calibration Summary",
+        "threshold_report": "Threshold calibration report",
+        "calibrated_playable": "Calibrated playable +EV rows",
+        "calibrated_watchlist": "Calibrated watchlist rows",
+        "calibrated_prediction_only": "Calibrated prediction-only rows",
+        "calibrated_blocked": "Calibrated blocked / failed-threshold rows",
         "diagnostics": "Why no playable +EV rows?",
         "summary": "Advisory summary",
-        "playable": "Playable +EV advisory picks",
-        "watchlist": "Watchlist value picks",
-        "prediction_only": "Prediction-only rows",
+        "playable": "Original playable +EV advisory picks",
+        "watchlist": "Original watchlist value picks",
+        "prediction_only": "Original prediction-only rows",
         "prediction_only_note": "These may be good predictions, but the current price does not show playable positive EV.",
-        "blocked": "Blocked rows by reason",
+        "blocked": "Original blocked rows by reason",
         "hold": "Sportsbook hold table",
         "line_shopping": "Best-price line-shopping table",
         "stale": "Stale-line warnings",
@@ -72,7 +92,7 @@ TEXT = {
     },
     "es": {
         "title": "Valor de Odds Asesoría",
-        "caption": "Fase 3E.5.6 preparacion, fuentes sportsbook, diagnostico de mercado y reporte asesoría sin tocar prueba.",
+        "caption": "Fase 3E.5.7 preparación, mercados completos y calibración de umbrales asesoría sin tocar prueba.",
         "input": "Entrada",
         "test_window": "ID de ventana de prueba",
         "use_session": "Usar ultimas filas guardadas/sesion",
@@ -85,13 +105,20 @@ TEXT = {
         "readiness_details": "Detalles de preparacion de slate fresco",
         "source_summary": "Resumen de fuente sportsbook",
         "market_summary": "Resumen de mercado completo",
+        "thresholds": "Calibracion de umbrales asesoría",
+        "threshold_summary": "Resumen de calibracion de umbrales",
+        "threshold_report": "Reporte de calibracion de umbrales",
+        "calibrated_playable": "Filas +EV jugables calibradas",
+        "calibrated_watchlist": "Filas watchlist calibradas",
+        "calibrated_prediction_only": "Filas solo prediccion calibradas",
+        "calibrated_blocked": "Filas bloqueadas / umbral fallado calibradas",
         "diagnostics": "Por que no hay filas +EV jugables?",
         "summary": "Resumen asesoría",
-        "playable": "Picks asesoría jugables +EV",
-        "watchlist": "Picks de valor en watchlist",
-        "prediction_only": "Filas solo prediccion",
+        "playable": "Picks asesoría +EV originales",
+        "watchlist": "Picks watchlist originales",
+        "prediction_only": "Filas solo prediccion originales",
         "prediction_only_note": "Pueden ser buenas predicciones, pero el precio actual no muestra EV positivo jugable.",
-        "blocked": "Filas bloqueadas por razon",
+        "blocked": "Filas bloqueadas originales por razon",
         "hold": "Tabla hold de sportsbook",
         "line_shopping": "Tabla mejor precio line-shopping",
         "stale": "Alertas de linea vieja",
@@ -176,6 +203,30 @@ def show_table(title: str, frame: pd.DataFrame, *, note: str | None = None) -> N
         st.dataframe(display_frame(frame), use_container_width=True, hide_index=True)
 
 
+def threshold_controls() -> dict[str, Any]:
+    presets = advisory_threshold_presets()
+    st.subheader(t("thresholds"))
+    st.warning("This calibration panel changes advisory classifications only. It does not change official locks, proof history, bankroll, staking, ledgers, or live betting.")
+    preset_name = st.selectbox("Preset", ["Balanced", "Conservative", "Aggressive", "Custom"], index=0)
+    base = normalize_threshold_config(presets.get(preset_name, presets["Balanced"]))
+    if preset_name == "Custom":
+        base["advisory_threshold_preset"] = "Custom"
+    cols = st.columns(2)
+    with cols[0]:
+        base["advisory_threshold_min_raw_ev"] = st.number_input("Minimum raw EV", value=float(base["advisory_threshold_min_raw_ev"]), step=0.005, format="%.3f")
+        base["advisory_threshold_min_best_price_ev"] = st.number_input("Minimum best-price EV", value=float(base["advisory_threshold_min_best_price_ev"]), step=0.005, format="%.3f")
+        base["advisory_threshold_min_no_vig_edge"] = st.number_input("Minimum no-vig edge", value=float(base["advisory_threshold_min_no_vig_edge"]), step=0.005, format="%.3f")
+        base["advisory_threshold_max_market_hold"] = st.number_input("Maximum sportsbook hold", value=float(base["advisory_threshold_max_market_hold"]), step=0.005, format="%.3f")
+        base["advisory_threshold_min_model_probability"] = st.number_input("Minimum model probability", value=float(base["advisory_threshold_min_model_probability"]), step=0.005, format="%.3f")
+    with cols[1]:
+        base["advisory_threshold_min_line_shopping_gain"] = st.number_input("Minimum line-shopping gain", value=float(base["advisory_threshold_min_line_shopping_gain"]), step=0.005, format="%.3f")
+        base["advisory_threshold_max_odds_age_minutes"] = st.number_input("Maximum odds age minutes", value=float(base["advisory_threshold_max_odds_age_minutes"]), step=5.0, format="%.0f")
+        base["advisory_threshold_watchlist_min_raw_ev"] = st.number_input("Watchlist minimum raw EV", value=float(base["advisory_threshold_watchlist_min_raw_ev"]), step=0.005, format="%.3f")
+        base["advisory_threshold_watchlist_min_no_vig_edge"] = st.number_input("Watchlist minimum no-vig edge", value=float(base["advisory_threshold_watchlist_min_no_vig_edge"]), step=0.005, format="%.3f")
+        base["advisory_threshold_max_risk_flags"] = st.number_input("Maximum risk flags", value=int(base["advisory_threshold_max_risk_flags"]), step=1, min_value=0, max_value=25)
+    return normalize_threshold_config(base)
+
+
 st.title(t("title"))
 st.caption(t("caption"))
 
@@ -192,9 +243,20 @@ if raw.empty:
 
 normalized = normalize_frame(raw)
 advisory = advisory_frame(normalized)
+threshold_config = threshold_controls()
+calibrated_rows = apply_advisory_thresholds(advisory, threshold_config)
+calibrated_frame = pd.DataFrame(calibrated_rows)
+impact = threshold_impact_summary(advisory, calibrated_rows)
 validation = validate_advisory_rows(normalized)
 counts = advisory_summary_counts(advisory)
 readiness = fresh_slate_readiness_check(advisory)
+readiness.update({
+    "threshold_preset_used": threshold_config.get("advisory_threshold_preset"),
+    "calibrated_playable_count": impact.get("calibrated_PLAYABLE_PLUS_EV", 0),
+    "calibrated_watchlist_count": impact.get("calibrated_WATCHLIST_VALUE", 0),
+    "calibrated_prediction_only_count": impact.get("calibrated_prediction_only_rows", 0),
+    "threshold_calibration_note": "Threshold calibration is informational and does not make Fresh Slate Readiness stricter.",
+})
 diagnostics = advisory_real_file_diagnostics(advisory)
 
 st.caption(f"{t('source')}: {source_name or t('none')}")
@@ -204,6 +266,7 @@ st.info(SAFETY_CONFIRMATION)
 st.json({
     "advisory_only": True,
     "proof_preserving": True,
+    "threshold_calibration_only": True,
     "live_application": "OFF",
     "applied_live_count": 0,
     "does_not_feed_official_locks": True,
@@ -219,6 +282,21 @@ with st.expander(t("readiness_details"), expanded=True):
 
 show_table(t("source_summary"), sportsbook_source_summary(advisory))
 show_table(t("market_summary"), market_completeness_summary(advisory))
+
+st.subheader("Threshold impact summary")
+impact_cols = st.columns(6)
+impact_cols[0].metric("Original playable", impact["original_PLAYABLE_PLUS_EV"])
+impact_cols[1].metric("Calibrated playable", impact["calibrated_PLAYABLE_PLUS_EV"])
+impact_cols[2].metric("Original watchlist", impact["original_WATCHLIST_VALUE"])
+impact_cols[3].metric("Calibrated watchlist", impact["calibrated_WATCHLIST_VALUE"])
+impact_cols[4].metric("Downgraded", impact["downgraded_by_thresholds"])
+impact_cols[5].metric("Upgraded", impact["upgraded_by_thresholds"])
+st.json(impact)
+show_table(t("threshold_summary"), threshold_calibration_summary(advisory, threshold_config))
+show_table(t("calibrated_playable"), calibrated_status_table(calibrated_rows, PLAYABLE_PLUS_EV, threshold_config))
+show_table(t("calibrated_watchlist"), calibrated_status_table(calibrated_rows, WATCHLIST_VALUE, threshold_config))
+show_table(t("calibrated_prediction_only"), calibrated_status_table(calibrated_rows, PREDICTION_ONLY_NOT_PLUS_EV, threshold_config))
+show_table(t("calibrated_blocked"), calibrated_blocked_reason_summary(calibrated_rows, threshold_config))
 
 st.subheader(t("diagnostics"))
 if diagnostics.get("show_no_playable_warning"):
@@ -250,6 +328,7 @@ show_table(t("conflicts"), duplicate_conflict_summary(advisory))
 st.subheader(t("validation"))
 st.json(validation)
 
-csv_link(t("download"), advisory_csv_frame(advisory), f"advisory_odds_value_{workspace_id}.csv")
+csv_link(t("download"), advisory_csv_frame(calibrated_frame), f"advisory_odds_value_{workspace_id}.csv")
 st.subheader(t("report"))
-st.text_area(t("report"), value=advisory_report_text(advisory), height=360)
+combined_report = advisory_report_text(advisory) + "\n\n" + threshold_report_text(calibrated_rows, threshold_config)
+st.text_area(t("report"), value=combined_report, height=480)
