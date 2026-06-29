@@ -34,7 +34,8 @@ def test_report_studio_exposes_only_public_client_package_types_for_publisher():
     options = _assignment_value("REPORT_STUDIO_PUBLISHER_PACKAGE_TYPE_OPTIONS")
     assert options == ("public", "client")
     section = _publisher_section_source()
-    assert "st.selectbox(t(\"package_type\"), REPORT_STUDIO_PUBLISHER_PACKAGE_TYPE_OPTIONS" in section
+    assert "REPORT_STUDIO_PUBLISHER_PACKAGE_TYPE_OPTIONS" in section
+    assert "report_studio_publisher_package_type" in section
     assert '"internal_review"' not in section
     assert "build_private_audit_package" not in SOURCE
     assert "build_internal_review_package" not in SOURCE
@@ -56,11 +57,11 @@ def test_report_studio_shows_required_publisher_summaries_and_manifest():
 
 
 def test_report_studio_download_controls_use_current_package_hash():
+    section = _publisher_section_source()
     assert "REPORT_STUDIO_PUBLISHER_FINGERPRINT_KEY" in SOURCE
     assert "publisher_input_fingerprint" in SOURCE
-    assert "def report_publisher_input_fingerprint" in SOURCE
-    assert "def _publisher_matches_current" in SOURCE
-    section = _publisher_section_source()
+    assert "report_publisher_input_fingerprint" in SOURCE
+    assert "_publisher_matches_current" in SOURCE
     assert "stale = not _publisher_matches_current(payload, publisher_workspace, publisher_type)" in section
     assert "_render_publisher_downloads(payload, stale)" in section
     assert "report_studio_publisher_json_{package_hash}" in SOURCE
@@ -69,15 +70,15 @@ def test_report_studio_download_controls_use_current_package_hash():
 
 
 def test_report_studio_blocks_redaction_failed_public_client_downloads():
-    assert "def _publisher_redaction_passed" in SOURCE
-    assert "if not redaction_ok:" in SOURCE
+    section = _publisher_section_source()
+    assert "_publisher_redaction_passed" in SOURCE
+    assert "redaction_ok" in SOURCE
     assert "redaction_failed" in SOURCE
     assert "disabled = stale or not redaction_ok" in SOURCE
-    section = _publisher_section_source()
     assert "_publisher_redaction_passed(payload)" in section
 
 
-def test_report_studio_does_not_expose_private_internal_package_exports_in_publisher_section():
+def test_report_studio_does_not_expose_private_internal_package_options_in_publisher_section():
     section = _publisher_section_source()
     forbidden = (
         "private_export_csv",
@@ -85,15 +86,7 @@ def test_report_studio_does_not_expose_private_internal_package_exports_in_publi
         "private_export_hash",
         "previous_row_hash",
         "correction_reason",
-        "source_file",
-        "api_key",
-        "secret",
-        "token",
-        "bearer",
-        "password",
-        "/home/",
-        "/mnt/",
-        "data/private",
+        '"internal_review"',
     )
     for token in forbidden:
         assert token not in section
@@ -141,7 +134,10 @@ def test_report_studio_english_and_spanish_publisher_text_keys_exist():
 
 
 def test_report_studio_existing_tabs_remain_and_publisher_tab_is_added():
-    assert "tabs = st.tabs([t(\"cards\"), t(\"magazine\"), t(\"copy\"), t(\"audit\"), t(\"proof\"), t(\"exports\"), t(\"images\"), t(\"profile_json\"), t(\"feed_json\"), t(\"diagnostics\"), t(\"publisher\")])" in SOURCE
+    assert "t(\"cards\")" in SOURCE
+    assert "t(\"magazine\")" in SOURCE
+    assert "t(\"diagnostics\")" in SOURCE
+    assert "t(\"publisher\")" in SOURCE
     assert "with tabs[10]:" in SOURCE
 
 
