@@ -29,3 +29,8 @@ def present(rows: Sequence[Mapping[str, Any]], fields: Sequence[str]) -> str | N
         if any(clean(row.get(field)) for row in rows if field in row):
             return field
     return None
+
+
+def result_column(row_or_frame: Mapping[str, Any] | Sequence[Mapping[str, Any]] | pd.DataFrame) -> str | None:
+    rows = [row_or_frame] if isinstance(row_or_frame, Mapping) else records(row_or_frame)
+    return present(rows, RESULT_FIELDS)
