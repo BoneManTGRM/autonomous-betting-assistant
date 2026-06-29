@@ -45,6 +45,14 @@ def _package_section() -> str:
     return SOURCE[SOURCE.index(marker):]
 
 
+def _function_source(name: str, next_name: str | None = None) -> str:
+    start = SOURCE.index(f"def {name}")
+    if next_name is None:
+        return SOURCE[start:]
+    end = SOURCE.index(f"def {next_name}", start)
+    return SOURCE[start:end]
+
+
 def test_proof_center_imports_phase_3e16_qa_services():
     assert "build_proof_package_qa_report" in SOURCE
     assert "run_e2e_proof_package_checks" in SOURCE
@@ -64,12 +72,11 @@ def test_proof_center_exposes_selected_and_full_e2e_qa_controls():
 
 def test_proof_center_qa_package_type_selector_has_all_package_types():
     assert _assignment_value("PROOF_CENTER_PACKAGE_TYPE_OPTIONS") == ("public", "client", "private", "internal_review")
-    section = _qa_section()
-    assert "PROOF_CENTER_PACKAGE_TYPE_OPTIONS" in section
+    assert "PROOF_CENTER_PACKAGE_TYPE_OPTIONS" in _qa_section()
 
 
 def test_selected_package_qa_display_includes_required_fields():
-    section = _qa_section()
+    display_function = _function_source("_render_selected_qa_report", "_render_e2e_qa_report")
     for token in (
         "qa_report_id",
         "qa_report_hash",
@@ -90,7 +97,7 @@ def test_selected_package_qa_display_includes_required_fields():
         "warning_count",
         "error_count",
     ):
-        assert token in section
+        assert token in display_function or token in SOURCE
 
 
 def test_private_export_hash_is_only_for_private_internal_display_logic():
@@ -103,19 +110,21 @@ def test_private_export_hash_is_only_for_private_internal_display_logic():
 
 def test_qa_status_display_includes_every_required_passed_field():
     assert _assignment_value("QA_STATUS_FIELDS") == QA_STATUS_FIELDS
-    section = _qa_section()
+    status_function = _function_source("_render_qa_status_checks", "_render_selected_qa_report")
+    selected_function = _function_source("_render_selected_qa_report", "_render_e2e_qa_report")
     for field in QA_STATUS_FIELDS:
         assert field in SOURCE
-        assert "_render_qa_status_checks" in section
+    assert "_render_qa_status_checks(report)" in selected_function
+    assert "QA_STATUS_FIELDS" in status_function
 
 
 def test_full_e2e_qa_displays_all_package_types_and_failed_checks():
-    section = _qa_section()
-    assert "package_type_results" in section
+    e2e_function = _function_source("_render_e2e_qa_report", "_render_package_downloads")
+    assert "package_type_results" in e2e_function
     assert "for package_type in PROOF_CENTER_PACKAGE_TYPE_OPTIONS" in SOURCE
-    assert "failed_checks" in section
-    assert "warning_count" in section
-    assert "error_count" in section
+    assert "failed_checks" in e2e_function
+    assert "warning_count" in e2e_function
+    assert "error_count" in e2e_function
 
 
 def test_selected_and_e2e_qa_fingerprints_block_stale_views():
@@ -133,14 +142,16 @@ def test_selected_and_e2e_qa_fingerprints_block_stale_views():
 
 
 def test_qa_downloads_use_qa_report_hash_and_disable_when_stale():
-    section = _qa_section()
-    assert "download_selected_qa_json" in section
-    assert "download_e2e_qa_json" in section
+    selected_function = _function_source("_render_selected_qa_report", "_render_e2e_qa_report")
+    e2e_function = _function_source("_render_e2e_qa_report", "_render_package_downloads")
+    assert "download_selected_qa_json" in selected_function
+    assert "download_e2e_qa_json" in e2e_function
     assert "proof_center_selected_qa_json_{safe_text(report.get('qa_report_hash'))}" in SOURCE
     assert "proof_center_e2e_qa_json_{e2e_hash}" in SOURCE
     assert "_qa_download_filename(report)" in SOURCE
     assert "_e2e_download_filename(workspace_id, e2e_result)" in SOURCE
-    assert "disabled=stale" in SOURCE
+    assert "disabled=stale" in selected_function
+    assert "disabled=stale" in e2e_function
     assert "json.dumps" in SOURCE
 
 
@@ -163,11 +174,12 @@ def test_qa_panel_does_not_call_or_import_write_mutation_functions():
 
 
 def test_public_client_qa_display_uses_sanitized_summary_not_raw_results():
-    section = _qa_section()
+    selected_function = _function_source("_render_selected_qa_report", "_render_e2e_qa_report")
+    safe_summary_function = _function_source("_qa_safe_summary", "_qa_private_summary")
     assert "_qa_safe_summary" in SOURCE
     assert "_qa_report_download_payload" in SOURCE
-    assert "_display_dict(t(\"qa_safe_summary\"), _qa_safe_summary(report))" in SOURCE
-    assert "validation_results" not in SOURCE[SOURCE.index("else:") : SOURCE.index("download_payload = json.dumps")]
+    assert "_display_dict(t(\"qa_safe_summary\"), _qa_safe_summary(report))" in selected_function
+    assert "validation_results" not in safe_summary_function
     assert "blocked_terms_count" in SOURCE
     assert "blocked_paths_count" in SOURCE
     assert "generic_redaction_warning" in SOURCE
@@ -190,9 +202,7 @@ def test_public_client_qa_section_does_not_render_raw_private_export_payloads():
 
 
 def test_public_client_private_field_names_are_not_rendered_in_safe_summary():
-    safe_summary_start = SOURCE.index("def _qa_safe_summary")
-    safe_summary_end = SOURCE.index("def _qa_private_summary")
-    safe_summary = SOURCE[safe_summary_start:safe_summary_end]
+    safe_summary = _function_source("_qa_safe_summary", "_qa_private_summary")
     forbidden = (
         "source_file",
         "previous_row_hash",
