@@ -14,6 +14,17 @@ from autonomous_betting_agent.grading_rules import summarize_event_level, summar
 from autonomous_betting_agent.ledger_sync_service import SYNC_SOURCE_REGISTRY
 from autonomous_betting_agent.ledger_types import classify_ledger_type, is_future_locked, public_metric_allowed
 from autonomous_betting_agent.local_access import require_streamlit_access
+from autonomous_betting_agent.proof_package_service import (
+    build_client_summary_package,
+    build_internal_review_package,
+    build_private_audit_package,
+    build_public_proof_package,
+    export_proof_package_csv_bundle,
+    export_proof_package_json,
+    export_proof_package_markdown,
+    package_is_proof_ready,
+    validate_public_package_redactions,
+)
 from autonomous_betting_agent.row_normalizer import safe_text
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 from autonomous_betting_agent.storage import LocalStorage
@@ -33,10 +44,16 @@ PROOF_CENTER_SOURCE_KEY_OPTIONS = (
     "generated_pick",
     "manual_review",
 )
+PROOF_CENTER_PACKAGE_TYPE_OPTIONS = ("public", "client", "private", "internal_review")
+PROOF_CENTER_PRIVATE_PACKAGE_TYPES = {"private", "internal_review"}
+PROOF_CENTER_PUBLIC_PACKAGE_TYPES = {"public", "client"}
 PROOF_CENTER_IMPORT_PREVIEW_KEY = "proof_center_import_preview"
 PROOF_CENTER_APPROVAL_KEY = "proof_center_import_approval"
 PROOF_CENTER_INPUT_FINGERPRINT_KEY = "proof_center_import_input_fingerprint"
 PROOF_CENTER_UPLOAD_SNAPSHOT_KEY = "proof_center_upload_snapshot_rows"
+PROOF_CENTER_PACKAGE_PREVIEW_KEY = "proof_center_package_preview"
+PROOF_CENTER_PACKAGE_FINGERPRINT_KEY = "proof_center_package_input_fingerprint"
+PROOF_CENTER_PACKAGE_META_KEY = "proof_center_package_preview_meta"
 PROOF_CENTER_REQUIRED_UPLOAD_FIELDS = ("event", "pick", "market_type", "sportsbook", "result")
 PROOF_CENTER_ODDS_FIELDS = ("odds", "decimal_odds")
 
@@ -51,7 +68,7 @@ TEXT = {
         "row_record": "Row record",
         "events": "Events",
         "event_record": "Event record",
-        "tabs": ["Summary", "Proof ID Verification", "Proof Audit", "Row vs Event Record", "Local Proof Rows", "Ledger Control"],
+        "tabs": ["Summary", "Proof ID Verification", "Proof Audit", "Row vs Event Record", "Local Proof Rows", "Ledger Control", "Proof Packages"],
         "public_summary": "Public proof summary",
         "no_rows": "No local or ledger proof rows found yet.",
         "public_safe_rows": "Public-safe rows",
@@ -111,6 +128,24 @@ TEXT = {
         "stale_preview": "Current upload/input does not match the stored preview. Run a new preview before approval.",
         "preview_ready": "Preview stored. Approval uses this preview_hash until inputs change.",
         "writes_warning": "Approval writes new non-duplicate rows to the append-only ledger.",
+        "proof_packages": "Proof Packages",
+        "package_workspace_id": "Package workspace ID",
+        "package_type": "package_type",
+        "build_package_preview": "Build package preview",
+        "package_caption": "Ledger-backed packages are proof-grade only when proof_ready=true. Provisional or empty packages are not final proof.",
+        "package_preview_ready": "Package preview built. Downloads use this package_hash until inputs change.",
+        "package_summary": "Package summary",
+        "proof_ready_warning": "Package is not proof-ready. Do not present this as final proof.",
+        "stale_package": "Current workspace/package type does not match the stored package preview. Build a new preview before downloading.",
+        "redaction_failed": "Redaction validation failed. Public/client downloads are blocked.",
+        "redaction_status": "redaction_status",
+        "verification_manifest": "verification_manifest",
+        "warnings_errors": "Warnings / errors",
+        "private_confirmation": "I understand private/internal packages may contain audit-only fields and are not public/client-safe.",
+        "private_package_warning": "Private/internal review package. Do not share as public/client proof.",
+        "download_package_json": "Download package JSON",
+        "download_package_markdown": "Download package Markdown",
+        "download_package_csv": "Download package CSV",
     },
     "es": {
         "title": "Centro de Prueba",
@@ -122,7 +157,7 @@ TEXT = {
         "row_record": "Récord por fila",
         "events": "Eventos",
         "event_record": "Récord por evento",
-        "tabs": ["Resumen", "Verificación de ID", "Auditoría de prueba", "Fila vs evento", "Filas locales", "Control de ledger"],
+        "tabs": ["Resumen", "Verificación de ID", "Auditoría de prueba", "Fila vs evento", "Filas locales", "Control de ledger", "Paquetes de prueba"],
         "public_summary": "Resumen de prueba pública",
         "no_rows": "Todavía no hay filas locales ni de ledger.",
         "public_safe_rows": "Filas seguras para público",
@@ -182,6 +217,24 @@ TEXT = {
         "stale_preview": "La carga/entrada actual no coincide con la vista previa guardada. Ejecuta una nueva vista previa antes de aprobar.",
         "preview_ready": "Vista previa guardada. La aprobación usa este preview_hash hasta que cambien las entradas.",
         "writes_warning": "La aprobación escribe filas nuevas no duplicadas al ledger append-only.",
+        "proof_packages": "Paquetes de prueba",
+        "package_workspace_id": "ID de workspace del paquete",
+        "package_type": "package_type",
+        "build_package_preview": "Crear vista previa del paquete",
+        "package_caption": "Los paquetes respaldados por ledger son de grado prueba solo cuando proof_ready=true. Los paquetes provisionales o vacíos no son prueba final.",
+        "package_preview_ready": "Vista previa del paquete creada. Las descargas usan este package_hash hasta que cambien las entradas.",
+        "package_summary": "Resumen del paquete",
+        "proof_ready_warning": "El paquete no está listo como prueba. No lo presentes como prueba final.",
+        "stale_package": "El workspace/package type actual no coincide con la vista previa guardada. Crea una nueva vista previa antes de descargar.",
+        "redaction_failed": "Falló la validación de redacción. Las descargas public/client están bloqueadas.",
+        "redaction_status": "redaction_status",
+        "verification_manifest": "verification_manifest",
+        "warnings_errors": "Advertencias / errores",
+        "private_confirmation": "Entiendo que los paquetes private/internal pueden contener campos solo para auditoría y no son seguros para público/clientes.",
+        "private_package_warning": "Paquete private/internal review. No compartir como prueba pública/cliente.",
+        "download_package_json": "Descargar JSON del paquete",
+        "download_package_markdown": "Descargar Markdown del paquete",
+        "download_package_csv": "Descargar CSV del paquete",
     },
 }
 
@@ -234,6 +287,11 @@ def proof_center_upload_fingerprint(uploaded_file, workspace_id: str, source_key
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def proof_center_package_fingerprint(workspace_id: str, package_type: str, package_id: str, package_hash: str) -> str:
+    payload = "|".join([safe_text(workspace_id), safe_text(package_type), safe_text(package_id), safe_text(package_hash)])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def validate_uploaded_proof_csv(uploaded_file) -> tuple[pd.DataFrame, list[str], list[str]]:
     warnings: list[str] = []
     errors: list[str] = []
@@ -283,6 +341,81 @@ def _approval_blocked(preview: dict, current_fingerprint: str, upload_errors: li
     if not confirmed:
         reasons.append("approval confirmation is required")
     return bool(reasons), reasons
+
+
+def _proof_package_builder(package_type: str):
+    builders = {
+        "public": build_public_proof_package,
+        "client": build_client_summary_package,
+        "private": build_private_audit_package,
+        "internal_review": build_internal_review_package,
+    }
+    return builders[package_type]
+
+
+def _hash_fragment(package: dict) -> str:
+    return safe_text(package.get("package_hash")).split("_")[-1][:12] or "nohash"
+
+
+def _download_filename(package: dict, suffix: str) -> str:
+    workspace = safe_text(package.get("workspace_id")) or "default"
+    package_type = safe_text(package.get("package_type")) or "public"
+    return f"aba_proof_package_{workspace}_{package_type}_{_hash_fragment(package)}.{suffix}"
+
+
+def _package_matches_current(package: dict, workspace_id: str, package_type: str) -> bool:
+    if not package:
+        return False
+    current = proof_center_package_fingerprint(workspace_id, package_type, safe_text(package.get("package_id")), safe_text(package.get("package_hash")))
+    return st.session_state.get(PROOF_CENTER_PACKAGE_FINGERPRINT_KEY) == current
+
+
+def _redaction_passed(package: dict) -> bool:
+    status = validate_public_package_redactions(package)
+    return bool(status.get("passed"))
+
+
+def _render_package_downloads(package: dict, stale: bool, private_confirmed: bool) -> None:
+    package_type = safe_text(package.get("package_type")) or "public"
+    package_hash = safe_text(package.get("package_hash")) or "nohash"
+    is_private = package_type in PROOF_CENTER_PRIVATE_PACKAGE_TYPES
+    redaction_ok = True if is_private else _redaction_passed(package)
+    if stale:
+        st.error(t("stale_package"))
+    if not redaction_ok:
+        st.error(t("redaction_failed"))
+    if is_private and not private_confirmed:
+        st.warning(t("private_package_warning"))
+    disabled = stale or (not redaction_ok) or (is_private and not private_confirmed)
+    json_text = export_proof_package_json(package)
+    markdown_text = export_proof_package_markdown(package)
+    csv_bundle = export_proof_package_csv_bundle(package)
+    c1, c2 = st.columns(2)
+    c1.download_button(
+        t("download_package_json"),
+        json_text.encode("utf-8"),
+        file_name=_download_filename(package, "json"),
+        mime="application/json",
+        disabled=disabled,
+        key=f"proof_center_package_json_{package_hash}",
+    )
+    c2.download_button(
+        t("download_package_markdown"),
+        markdown_text.encode("utf-8"),
+        file_name=_download_filename(package, "md"),
+        mime="text/markdown",
+        disabled=disabled,
+        key=f"proof_center_package_markdown_{package_hash}",
+    )
+    for filename, csv_text in csv_bundle.items():
+        st.download_button(
+            f"{t('download_package_csv')}: {filename}",
+            str(csv_text).encode("utf-8"),
+            file_name=f"{_download_filename(package, 'csv').rsplit('.', 1)[0]}_{filename}",
+            mime="text/csv",
+            disabled=disabled,
+            key=f"proof_center_package_csv_{package_hash}_{filename}",
+        )
 
 
 st.title(t("title"))
@@ -501,3 +634,56 @@ with tabs[5]:
         st.markdown(f"**{t('private_exports')}**")
         st.download_button(t("download_private_csv"), private_exports["csv"].encode("utf-8"), file_name="private_proof_export.csv", mime="text/csv")
         st.download_button(t("download_private_json"), private_exports["json"].encode("utf-8"), file_name="private_proof_export.json", mime="application/json")
+
+with tabs[6]:
+    st.subheader(t("proof_packages"))
+    st.caption(t("package_caption"))
+    package_workspace = normalize_workspace_id(st.text_input(t("package_workspace_id"), value=workspace_id, key="proof_center_package_workspace_id"))
+    package_type = st.selectbox(t("package_type"), PROOF_CENTER_PACKAGE_TYPE_OPTIONS, index=0, key="proof_center_package_type")
+    if st.button(t("build_package_preview"), key="proof_center_build_package_preview"):
+        package = _proof_package_builder(package_type)(package_workspace)
+        package_fingerprint = proof_center_package_fingerprint(package_workspace, package_type, safe_text(package.get("package_id")), safe_text(package.get("package_hash")))
+        st.session_state[PROOF_CENTER_PACKAGE_PREVIEW_KEY] = package
+        st.session_state[PROOF_CENTER_PACKAGE_FINGERPRINT_KEY] = package_fingerprint
+        st.session_state[PROOF_CENTER_PACKAGE_META_KEY] = {
+            "package_id": package.get("package_id"),
+            "package_hash": package.get("package_hash"),
+            "workspace_id": package_workspace,
+            "package_type": package_type,
+            "package_input_fingerprint": package_fingerprint,
+        }
+        st.info(t("package_preview_ready"))
+
+    package = st.session_state.get(PROOF_CENTER_PACKAGE_PREVIEW_KEY, {})
+    if package:
+        stale_package = not _package_matches_current(package, package_workspace, package_type)
+        proof_ready = package_is_proof_ready(package)
+        if not proof_ready:
+            st.warning(t("proof_ready_warning"))
+        if stale_package:
+            st.error(t("stale_package"))
+        if package_type in PROOF_CENTER_PRIVATE_PACKAGE_TYPES:
+            st.warning(t("private_package_warning"))
+        metrics = st.columns(4)
+        metrics[0].metric("package_id", safe_text(package.get("package_id")))
+        metrics[1].metric("package_hash", safe_text(package.get("package_hash"))[:22])
+        metrics[2].metric("proof_ready", str(proof_ready))
+        metrics[3].metric("proof_grade", safe_text(package.get("proof_grade")))
+        st.write({
+            "package_id": package.get("package_id"),
+            "package_hash": package.get("package_hash"),
+            "public_export_hash": package.get("public_export_hash"),
+            "private_export_hash": package.get("private_export_hash") if package_type in PROOF_CENTER_PRIVATE_PACKAGE_TYPES else "",
+            "proof_ready": proof_ready,
+            "proof_grade": package.get("proof_grade"),
+            "package_type": package.get("package_type"),
+        })
+        _display_dict(t("redaction_status"), package.get("redaction_status") or {})
+        _display_dict(t("verification_manifest"), package.get("verification_manifest") or {})
+        _display_dict(t("warnings_errors"), {"warnings": package.get("warnings") or [], "errors": package.get("errors") or []})
+        private_confirmed = True
+        if package_type in PROOF_CENTER_PRIVATE_PACKAGE_TYPES:
+            private_confirmed = st.checkbox(t("private_confirmation"), value=False, key="proof_center_private_package_confirmation")
+        _render_package_downloads(package, stale_package, private_confirmed)
+    else:
+        st.info(t("no_rows"))

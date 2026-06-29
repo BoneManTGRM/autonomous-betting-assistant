@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import hashlib
 import importlib
 
 import pandas as pd
@@ -15,6 +16,7 @@ from autonomous_betting_agent.magazine_sale_ready_patch import apply_magazine_sa
 from autonomous_betting_agent.pick_hold_store import load_first_available
 from autonomous_betting_agent.report_feed_service import save_report_feed
 from autonomous_betting_agent.report_product_layer import MagazineBrand, event_text, safe_text, value_text
+from autonomous_betting_agent.report_publisher_service import build_report_publisher_payload
 from autonomous_betting_agent.report_studio_service import ReportStudioFilters, build_report_studio_state, report_studio_summary
 from autonomous_betting_agent.report_studio_spanish_ui import render_sport_league_filter
 from autonomous_betting_agent.report_studio_ui import render_premium_card_deck, render_status_dashboard
@@ -29,6 +31,10 @@ st.set_page_config(page_title="Report Studio", layout="wide")
 LANG = render_app_sidebar("report_studio", language_key="report_studio_language", selector="radio")
 NO_MARKET_EXPORT_VERSION = "no_market_metric_v10"
 ACTIVE_EXPORT_VERSION = f"{magazine_book_export.MAGAZINE_STYLE_VERSION}:{NO_MARKET_EXPORT_VERSION}:{ENRICHMENT_VERSION}"
+REPORT_STUDIO_PUBLISHER_PACKAGE_TYPE_OPTIONS = ("public", "client")
+REPORT_STUDIO_PUBLISHER_PREVIEW_KEY = "report_studio_publisher_preview"
+REPORT_STUDIO_PUBLISHER_FINGERPRINT_KEY = "report_studio_publisher_input_fingerprint"
+REPORT_STUDIO_PUBLISHER_META_KEY = "report_studio_publisher_preview_meta"
 if st.session_state.get("report_studio_active_export_version") != ACTIVE_EXPORT_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -96,6 +102,25 @@ TEXT = {
         "download_zip": "Download Full Magazine ZIP",
         "download_page": "Download Full Magazine Page",
         "select_page": "Select one pick to render",
+        "publisher": "Proof Publisher",
+        "publisher_workspace_id": "Publisher workspace ID",
+        "package_type": "package_type",
+        "build_publisher_payload": "Build report publisher payload",
+        "publisher_caption": "Ledger-backed packages are proof-grade only when proof_ready=true. Provisional or empty packages are not final proof.",
+        "publisher_preview_ready": "Publisher preview built. Downloads use this package_hash until inputs change.",
+        "stale_publisher": "Current workspace/package type does not match the stored publisher preview. Build a new preview before downloading.",
+        "redaction_failed": "Redaction validation failed. Public/client downloads are blocked.",
+        "headline_summary": "headline_summary",
+        "performance_summary": "performance_summary",
+        "roi_summary": "roi_summary",
+        "clv_summary": "clv_summary",
+        "risk_summary": "risk_summary",
+        "top_positive_ev_summary": "top_positive_ev_summary",
+        "proof_disclaimer": "proof_disclaimer",
+        "verification_manifest": "verification_manifest",
+        "download_report_json": "Download report JSON",
+        "download_report_markdown": "Download report Markdown",
+        "download_report_csv": "Download report CSV",
     },
     "es": {
         "title": "Report Studio",
@@ -146,7 +171,7 @@ TEXT = {
         "background_ready": "Fondo personalizado activo.",
         "background_preview": "Vista previa del fondo subido",
         "generated_preview": "Vista previa del reporte revista generado",
-        "feed_saved": "Feed unificado y legado guardados.",
+        "feed_saved": "Feed unificado y legado guardado.",
         "copy_label": "Copy corto",
         "no_audit": "Aun no hay datos gradados para calibracion.",
         "build_book": "Crear libro revista completo",
@@ -156,6 +181,25 @@ TEXT = {
         "download_zip": "Descargar ZIP revista",
         "download_page": "Descargar pagina revista",
         "select_page": "Seleccionar una jugada para renderizar",
+        "publisher": "Publicador de prueba",
+        "publisher_workspace_id": "ID de workspace del publicador",
+        "package_type": "package_type",
+        "build_publisher_payload": "Crear payload del publicador",
+        "publisher_caption": "Los paquetes respaldados por ledger son de grado prueba solo cuando proof_ready=true. Los paquetes provisionales o vacíos no son prueba final.",
+        "publisher_preview_ready": "Vista previa del publicador creada. Las descargas usan este package_hash hasta que cambien las entradas.",
+        "stale_publisher": "El workspace/package type actual no coincide con la vista previa guardada. Crea una nueva vista previa antes de descargar.",
+        "redaction_failed": "Falló la validación de redacción. Las descargas public/client están bloqueadas.",
+        "headline_summary": "headline_summary",
+        "performance_summary": "performance_summary",
+        "roi_summary": "roi_summary",
+        "clv_summary": "clv_summary",
+        "risk_summary": "risk_summary",
+        "top_positive_ev_summary": "top_positive_ev_summary",
+        "proof_disclaimer": "proof_disclaimer",
+        "verification_manifest": "verification_manifest",
+        "download_report_json": "Descargar JSON del reporte",
+        "download_report_markdown": "Descargar Markdown del reporte",
+        "download_report_csv": "Descargar CSV del reporte",
     },
 }
 
@@ -270,6 +314,74 @@ def with_report_branding(rowd: dict, brand_name: str, report_title: str, languag
     data["report_brand_name"] = brand_name
     data["report_title"] = report_title
     return data
+
+
+def report_publisher_input_fingerprint(workspace_id: str, package_type: str, report_id: str, package_hash: str) -> str:
+    payload = "|".join([safe_text(workspace_id), safe_text(package_type), safe_text(report_id), safe_text(package_hash)])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _publisher_matches_current(payload: dict, workspace_id: str, package_type: str) -> bool:
+    if not payload:
+        return False
+    current = report_publisher_input_fingerprint(workspace_id, package_type, safe_text(payload.get("report_id")), safe_text(payload.get("package_hash")))
+    return st.session_state.get(REPORT_STUDIO_PUBLISHER_FINGERPRINT_KEY) == current
+
+
+def _hash_fragment(value: str) -> str:
+    return safe_text(value).split("_")[-1][:12] or "nohash"
+
+
+def _publisher_filename(payload: dict, suffix: str) -> str:
+    workspace = safe_workspace_name(safe_text(payload.get("workspace_id")) or "default")
+    package_type = safe_text(payload.get("package_type")) or "public"
+    return f"aba_report_publisher_{workspace}_{package_type}_{_hash_fragment(payload.get('package_hash'))}.{suffix}"
+
+
+def _publisher_redaction_passed(payload: dict) -> bool:
+    package = payload.get("public_package") or {}
+    status = package.get("redaction_status") or {}
+    return bool(status.get("passed", False))
+
+
+def _render_publisher_downloads(payload: dict, stale: bool) -> None:
+    package_hash = safe_text(payload.get("package_hash")) or "nohash"
+    redaction_ok = _publisher_redaction_passed(payload)
+    if stale:
+        st.error(t("stale_publisher"))
+    if not redaction_ok:
+        st.error(t("redaction_failed"))
+    disabled = stale or not redaction_ok
+    export_files = payload.get("export_files") or {}
+    json_file = export_files.get("json") or {}
+    markdown_file = export_files.get("markdown") or {}
+    csv_bundle = export_files.get("csv_bundle") or {}
+    c1, c2 = st.columns(2)
+    c1.download_button(
+        t("download_report_json"),
+        safe_text(json_file.get("content")).encode("utf-8"),
+        file_name=_publisher_filename(payload, "json"),
+        mime="application/json",
+        disabled=disabled,
+        key=f"report_studio_publisher_json_{package_hash}",
+    )
+    c2.download_button(
+        t("download_report_markdown"),
+        safe_text(markdown_file.get("content")).encode("utf-8"),
+        file_name=_publisher_filename(payload, "md"),
+        mime="text/markdown",
+        disabled=disabled,
+        key=f"report_studio_publisher_markdown_{package_hash}",
+    )
+    for filename, csv_text in csv_bundle.items():
+        st.download_button(
+            f"{t('download_report_csv')}: {filename}",
+            safe_text(csv_text).encode("utf-8"),
+            file_name=f"{_publisher_filename(payload, 'csv').rsplit('.', 1)[0]}_{filename}",
+            mime="text/csv",
+            disabled=disabled,
+            key=f"report_studio_publisher_csv_{package_hash}_{filename}",
+        )
 
 
 def api_enrichment_diagnostics(rows: list[dict]) -> dict:
@@ -404,7 +516,7 @@ safe_workspace = safe_workspace_name(workspace_id)
 report_background_bytes = profile_background_bytes
 magazine_pdf_bytes = magazine_book_export.render_full_magazine_book_pdf(cards_as_rows, background_image=report_background_bytes, report_name=magazine_report_name, language=LANG)
 magazine_tab_png = magazine_book_export.render_full_pick_magazine_page_png(cards_as_rows[0], background_image=report_background_bytes, report_name=magazine_report_name, page_number=1, total_pages=len(cards_as_rows), language=LANG) if cards_as_rows else b""
-tabs = st.tabs([t("cards"), t("magazine"), t("copy"), t("audit"), t("proof"), t("exports"), t("images"), t("profile_json"), t("feed_json"), t("diagnostics")])
+tabs = st.tabs([t("cards"), t("magazine"), t("copy"), t("audit"), t("proof"), t("exports"), t("images"), t("profile_json"), t("feed_json"), t("diagnostics"), t("publisher")])
 
 with tabs[0]:
     st.markdown(render_premium_card_deck(cards, language=LANG), unsafe_allow_html=True)
@@ -478,3 +590,55 @@ with tabs[8]:
     st.json(feed)
 with tabs[9]:
     st.json({"summary": summary, "diagnostics": asdict(state.diagnostics), "api_enrichment": api_diagnostics, "filters": asdict(state.filters), "source": source_note, "unified_feed_paths": unified_feed.get("saved_paths", {}), "legacy_feed_paths": legacy_feed.get("saved_paths", {})})
+with tabs[10]:
+    st.subheader(t("publisher"))
+    st.caption(t("publisher_caption"))
+    publisher_workspace = normalize_workspace_id(st.text_input(t("publisher_workspace_id"), value=workspace_id, key="report_studio_publisher_workspace_id"))
+    publisher_type = st.selectbox(t("package_type"), REPORT_STUDIO_PUBLISHER_PACKAGE_TYPE_OPTIONS, index=0, key="report_studio_publisher_package_type")
+    if st.button(t("build_publisher_payload"), key="report_studio_build_report_publisher_payload"):
+        payload = build_report_publisher_payload(publisher_workspace, package_type=publisher_type)
+        fingerprint = report_publisher_input_fingerprint(publisher_workspace, publisher_type, safe_text(payload.get("report_id")), safe_text(payload.get("package_hash")))
+        st.session_state[REPORT_STUDIO_PUBLISHER_PREVIEW_KEY] = payload
+        st.session_state[REPORT_STUDIO_PUBLISHER_FINGERPRINT_KEY] = fingerprint
+        st.session_state[REPORT_STUDIO_PUBLISHER_META_KEY] = {
+            "report_id": payload.get("report_id"),
+            "package_hash": payload.get("package_hash"),
+            "workspace_id": publisher_workspace,
+            "package_type": publisher_type,
+            "publisher_input_fingerprint": fingerprint,
+        }
+        st.info(t("publisher_preview_ready"))
+    payload = st.session_state.get(REPORT_STUDIO_PUBLISHER_PREVIEW_KEY, {})
+    if payload:
+        stale = not _publisher_matches_current(payload, publisher_workspace, publisher_type)
+        if stale:
+            st.error(t("stale_publisher"))
+        if not _publisher_redaction_passed(payload):
+            st.error(t("redaction_failed"))
+        st.write({
+            "report_id": payload.get("report_id"),
+            "package_id": payload.get("package_id"),
+            "package_hash": payload.get("package_hash"),
+            "proof_ready": payload.get("proof_ready"),
+            "proof_grade": payload.get("proof_grade"),
+            "ledger_backed": payload.get("ledger_backed"),
+        })
+        st.markdown(f"**{t('headline_summary')}**")
+        st.write(payload.get("headline_summary"))
+        st.markdown(f"**{t('performance_summary')}**")
+        st.json(payload.get("performance_summary") or {})
+        st.markdown(f"**{t('roi_summary')}**")
+        st.json(payload.get("roi_summary") or {})
+        st.markdown(f"**{t('clv_summary')}**")
+        st.json(payload.get("clv_summary") or {})
+        st.markdown(f"**{t('risk_summary')}**")
+        st.json(payload.get("risk_summary") or {})
+        st.markdown(f"**{t('top_positive_ev_summary')}**")
+        st.json(payload.get("top_positive_ev_summary") or {})
+        st.markdown(f"**{t('proof_disclaimer')}**")
+        st.write(payload.get("proof_disclaimer"))
+        st.markdown(f"**{t('verification_manifest')}**")
+        st.json(payload.get("verification_manifest") or {})
+        _render_publisher_downloads(payload, stale)
+    else:
+        st.info(t("empty"))
