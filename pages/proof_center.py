@@ -23,7 +23,16 @@ st.set_page_config(page_title="Proof Center", layout="wide")
 LANG = render_app_sidebar("proof_center", language_key="proof_center_language")
 require_streamlit_access(st, allow_roles={"admin", "client", "demo"})
 
-PROOF_CENTER_SOURCE_KEY_OPTIONS = tuple(SYNC_SOURCE_REGISTRY.keys())
+PROOF_CENTER_SOURCE_KEY_OPTIONS = (
+    "odds_lock",
+    "pro_predictor",
+    "report_studio",
+    "proof_center",
+    "learning_page",
+    "uploaded_csv",
+    "generated_pick",
+    "manual_review",
+)
 PROOF_CENTER_IMPORT_PREVIEW_KEY = "proof_center_import_preview"
 PROOF_CENTER_APPROVAL_KEY = "proof_center_import_approval"
 PROOF_CENTER_INPUT_FINGERPRINT_KEY = "proof_center_import_input_fingerprint"
