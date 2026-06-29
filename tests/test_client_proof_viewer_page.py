@@ -184,11 +184,12 @@ def test_client_proof_viewer_english_and_spanish_text_keys_exist():
     assert required.issubset(text["es"])
 
 
-def test_client_proof_viewer_sidebar_navigation_contract_is_expected():
-    # Phase 3E.18 expects this page to be reachable via Streamlit's native pages directory.
-    # A sidebar link may be added separately when the navigation file can be safely patched.
+def test_client_proof_viewer_sidebar_navigation_is_wired():
     assert PAGE.exists()
-    assert "pages/client_proof_viewer.py" not in SIDEBAR or "Client Proof Viewer" in SIDEBAR
+    assert "client_proof_viewer_language" in SIDEBAR
+    assert "Client Proof Viewer" in SIDEBAR
+    assert "Visor de Prueba para Cliente" in SIDEBAR
+    assert "pages/client_proof_viewer.py" in SIDEBAR
 
 
 def test_client_proof_viewer_has_no_fake_demo_values():
