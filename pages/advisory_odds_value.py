@@ -9,6 +9,12 @@ import streamlit as st
 
 import autonomous_betting_agent.advisory_i18n_phase3e5  # noqa: F401
 import autonomous_betting_agent.ui_i18n_phase3e  # noqa: F401
+from autonomous_betting_agent.advisory_explanation_engine import (
+    advisory_explanation_reason_counts,
+    advisory_explanation_report_section,
+    advisory_explanation_summary,
+    explain_advisory_rows,
+)
 from autonomous_betting_agent.advisory_odds_value_display import (
     ADVISORY_WARNING,
     SAFETY_CONFIRMATION,
@@ -55,7 +61,7 @@ LANG = render_app_sidebar("advisory_odds_value", language_key="advisory_odds_val
 TEXT = {
     "en": {
         "title": "Advisory Odds Value",
-        "caption": "Phase 3E.5.7 proof-safe advisory odds readiness, market completeness, and threshold calibration.",
+        "caption": "Phase 3E.5.9 proof-safe advisory odds readiness, threshold calibration, and explanations.",
         "input": "Input",
         "test_window": "Test Window ID",
         "use_session": "Use latest saved/session rows",
@@ -70,11 +76,14 @@ TEXT = {
         "market_summary": "Market Completeness Summary",
         "thresholds": "Advisory Threshold Calibration",
         "threshold_summary": "Threshold Calibration Summary",
-        "threshold_report": "Threshold calibration report",
         "calibrated_playable": "Calibrated playable +EV rows",
         "calibrated_watchlist": "Calibrated watchlist rows",
         "calibrated_prediction_only": "Calibrated prediction-only rows",
         "calibrated_blocked": "Calibrated blocked / failed-threshold rows",
+        "explanations": "Advisory Explanation Engine",
+        "explanation_summary": "Explanation Summary",
+        "reason_counts": "Reason Code Counts",
+        "row_explanations": "Row-Level Explanations",
         "diagnostics": "Why no playable +EV rows?",
         "summary": "Advisory summary",
         "playable": "Original playable +EV advisory picks",
@@ -92,7 +101,7 @@ TEXT = {
     },
     "es": {
         "title": "Valor de Odds Asesoría",
-        "caption": "Fase 3E.5.7 preparación, mercados completos y calibración de umbrales asesoría sin tocar prueba.",
+        "caption": "Fase 3E.5.9 preparación, umbrales y explicaciones asesoría sin tocar prueba.",
         "input": "Entrada",
         "test_window": "ID de ventana de prueba",
         "use_session": "Usar ultimas filas guardadas/sesion",
@@ -107,11 +116,14 @@ TEXT = {
         "market_summary": "Resumen de mercado completo",
         "thresholds": "Calibracion de umbrales asesoría",
         "threshold_summary": "Resumen de calibracion de umbrales",
-        "threshold_report": "Reporte de calibracion de umbrales",
         "calibrated_playable": "Filas +EV jugables calibradas",
         "calibrated_watchlist": "Filas watchlist calibradas",
         "calibrated_prediction_only": "Filas solo prediccion calibradas",
         "calibrated_blocked": "Filas bloqueadas / umbral fallado calibradas",
+        "explanations": "Motor de explicacion asesoría",
+        "explanation_summary": "Resumen de explicaciones",
+        "reason_counts": "Conteo de codigos de razon",
+        "row_explanations": "Explicaciones por fila",
         "diagnostics": "Por que no hay filas +EV jugables?",
         "summary": "Resumen asesoría",
         "playable": "Picks asesoría +EV originales",
@@ -246,16 +258,24 @@ advisory = advisory_frame(normalized)
 threshold_config = threshold_controls()
 calibrated_rows = apply_advisory_thresholds(advisory, threshold_config)
 calibrated_frame = pd.DataFrame(calibrated_rows)
+explained_rows = explain_advisory_rows(calibrated_rows)
+explained_frame = pd.DataFrame(explained_rows)
 impact = threshold_impact_summary(advisory, calibrated_rows)
 validation = validate_advisory_rows(normalized)
 counts = advisory_summary_counts(advisory)
 readiness = fresh_slate_readiness_check(advisory)
+explanation_summary_frame = advisory_explanation_summary(explained_rows)
+top_explanation = explanation_summary_frame.iloc[0].to_dict() if not explanation_summary_frame.empty else {}
 readiness.update({
     "threshold_preset_used": threshold_config.get("advisory_threshold_preset"),
     "calibrated_playable_count": impact.get("calibrated_PLAYABLE_PLUS_EV", 0),
     "calibrated_watchlist_count": impact.get("calibrated_WATCHLIST_VALUE", 0),
     "calibrated_prediction_only_count": impact.get("calibrated_prediction_only_rows", 0),
     "threshold_calibration_note": "Threshold calibration is informational and does not make Fresh Slate Readiness stricter.",
+    "explanation_engine_available": True,
+    "explained_row_count": len(explained_rows),
+    "top_explanation_status": top_explanation.get("explanation_status"),
+    "top_explanation_blocker": top_explanation.get("most_common_primary_reason"),
 })
 diagnostics = advisory_real_file_diagnostics(advisory)
 
@@ -267,6 +287,7 @@ st.json({
     "advisory_only": True,
     "proof_preserving": True,
     "threshold_calibration_only": True,
+    "explanation_only": True,
     "live_application": "OFF",
     "applied_live_count": 0,
     "does_not_feed_official_locks": True,
@@ -298,6 +319,18 @@ show_table(t("calibrated_watchlist"), calibrated_status_table(calibrated_rows, W
 show_table(t("calibrated_prediction_only"), calibrated_status_table(calibrated_rows, PREDICTION_ONLY_NOT_PLUS_EV, threshold_config))
 show_table(t("calibrated_blocked"), calibrated_blocked_reason_summary(calibrated_rows, threshold_config))
 
+st.subheader(t("explanations"))
+st.warning("Explanations are advisory-only. They do not create official locks, change proof history, change bankroll/staking, or place bets.")
+show_table(t("explanation_summary"), explanation_summary_frame)
+show_table(t("reason_counts"), advisory_explanation_reason_counts(explained_rows))
+explanation_cols = [
+    "event", "prediction", "market_type", "sportsbook", "bookmaker", "advisory_playable_status",
+    "advisory_calibrated_playable_status", "advisory_explanation_status", "advisory_explanation_summary",
+    "advisory_explanation_primary_reason", "advisory_explanation_reason_codes", "advisory_explanation_blockers",
+    "advisory_explanation_warnings", "advisory_explanation_next_action",
+]
+show_table(t("row_explanations"), explained_frame[[col for col in explanation_cols if col in explained_frame.columns]].copy() if not explained_frame.empty else pd.DataFrame(columns=explanation_cols))
+
 st.subheader(t("diagnostics"))
 if diagnostics.get("show_no_playable_warning"):
     st.warning(diagnostics.get("explanation", "No playable advisory rows were found."))
@@ -328,7 +361,7 @@ show_table(t("conflicts"), duplicate_conflict_summary(advisory))
 st.subheader(t("validation"))
 st.json(validation)
 
-csv_link(t("download"), advisory_csv_frame(calibrated_frame), f"advisory_odds_value_{workspace_id}.csv")
+csv_link(t("download"), advisory_csv_frame(explained_frame), f"advisory_odds_value_{workspace_id}.csv")
 st.subheader(t("report"))
-combined_report = advisory_report_text(advisory) + "\n\n" + threshold_report_text(calibrated_rows, threshold_config)
-st.text_area(t("report"), value=combined_report, height=480)
+combined_report = advisory_report_text(advisory) + "\n\n" + threshold_report_text(calibrated_rows, threshold_config) + "\n\n" + advisory_explanation_report_section(explained_rows)
+st.text_area(t("report"), value=combined_report, height=520)
