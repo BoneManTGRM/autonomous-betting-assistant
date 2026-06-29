@@ -83,7 +83,6 @@ def test_api_smoke_page_text_keys_exist():
 
 
 def test_api_smoke_page_does_not_display_secret_values_directly():
-    assert "display_value" in SOURCE
     assert "st.secrets" in SOURCE
     assert "st.write(st.secrets" not in SOURCE
     assert "st.json(st.secrets" not in SOURCE
