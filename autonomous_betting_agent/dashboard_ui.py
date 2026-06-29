@@ -184,9 +184,9 @@ def missing_dashboard_fields(dashboard: Mapping[str, Any], required_fields: Sequ
 def assert_no_demo_dashboard_values(dashboard: Mapping[str, Any]) -> bool:
     """Return True when the dashboard object does not contain known demo-only mock values.
 
-    This checks for the sample mock dashboard values from the design image so tests can verify
-    the helper output is driven by caller-supplied data, not cosmetic placeholders.
+    This checks specific sample strings from the design image so tests can verify the helper
+    output is driven by caller-supplied data, not cosmetic placeholders.
     """
     payload = dashboard_json_text(dashboard)
-    demo_tokens = ("184", "John Doe", "NY Liberty -120", "158", "19", "+8.4%")
+    demo_tokens = ("John Doe", "NY Liberty -120", "Aces vs Liberty", "Events Scanned\": 184", "Avoid Picks\": 158", "+8.4%")
     return not any(token in payload for token in demo_tokens)
