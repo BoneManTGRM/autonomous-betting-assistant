@@ -10,22 +10,13 @@ from autonomous_betting_agent.data_reconciliation_preview_service import build_d
 Transport = Callable[[Mapping[str, Any]], Mapping[str, Any]]
 
 SCHEMA_VERSION = "update_flow_v1"
-FLOW_STATUS_READY = "READY TO APPLY"
+FLOW_STATUS_READY = "READY TO EXPORT"
 FLOW_STATUS_REVIEW = "REVIEW REQUIRED"
 FLOW_STATUS_EMPTY = "NO ROWS"
 
 
 def _text(value: Any) -> str:
     return str(value or "").strip()
-
-
-def _float(value: Any, default: float = 0.0) -> float:
-    try:
-        if value in (None, ""):
-            return default
-        return float(value)
-    except Exception:
-        return default
 
 
 def _safe(value: Any) -> Any:
@@ -101,7 +92,7 @@ def build_update_flow_report(
     validation = validate_data_reconciliation_report(reconciliation)
     ready = bool(reconciliation.get("overall_passed")) and validation.get("passed") is True
     status = FLOW_STATUS_READY if ready else FLOW_STATUS_REVIEW if rows else FLOW_STATUS_EMPTY
-    proposed_updates = [
+    proposed_exports = [
         {
             "proof_id": row.get("proof_id"),
             "row_key": row.get("row_key"),
@@ -120,9 +111,9 @@ def build_update_flow_report(
         "schema_version": SCHEMA_VERSION,
         "workspace_id": _text(workspace_id) or "default",
         "status": status,
-        "safe_to_apply": ready,
+        "safe_to_export": ready,
         "preview_only": True,
-        "writes_performed": False,
+        "changed_records": 0,
         "frozen_selection_logic": True,
         "row_count": reconciliation.get("row_count", 0),
         "unique_events": reconciliation.get("unique_events", 0),
@@ -133,7 +124,7 @@ def build_update_flow_report(
         "review_count": reconciliation.get("review_count", 0),
         "reconciliation_report_hash": reconciliation.get("report_hash"),
         "validation_passed": validation.get("passed"),
-        "proposed_updates": proposed_updates,
+        "proposed_exports": proposed_exports,
         "warnings": list(reconciliation.get("warnings") or []),
         "errors": list(reconciliation.get("errors") or []) + list(validation.get("errors") or []),
     }
@@ -147,9 +138,9 @@ def build_dashboard_update_payload(report: Mapping[str, Any]) -> dict[str, Any]:
         "duplicate_row_count": report.get("duplicate_row_count", 0),
         "ready_count": report.get("ready_count", 0),
         "review_count": report.get("review_count", 0),
-        "safe_to_apply": report.get("safe_to_apply"),
+        "safe_to_export": report.get("safe_to_export"),
         "preview_only": report.get("preview_only"),
-        "writes_performed": report.get("writes_performed"),
+        "changed_records": report.get("changed_records"),
         "frozen_selection_logic": report.get("frozen_selection_logic"),
         "reconciliation_report_hash": report.get("reconciliation_report_hash"),
     }
@@ -160,7 +151,7 @@ def export_update_flow_json(report: Mapping[str, Any]) -> str:
 
 
 def export_proposed_updates_csv(report: Mapping[str, Any]) -> str:
-    rows = list(report.get("proposed_updates") or [])
+    rows = list(report.get("proposed_exports") or [])
     fields = ["proof_id", "row_key", "source", "confirmation_value", "confirmed_at_utc", "confidence", "latest_value", "delta_percent", "review_required", "frozen_selection_logic"]
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=fields)
