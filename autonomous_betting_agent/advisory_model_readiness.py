@@ -51,12 +51,12 @@ def model_readiness_diagnostics(rows_or_frame: Sequence[Mapping[str, Any]] | pd.
         status = NEEDS_EVENT_IDENTITY
     elif usable == 0:
         status = NEEDS_GRADED_ROWS
+    elif duplicate_rate > 0.25:
+        status = DUPLICATE_HEAVY_SAMPLE
     elif completed_events < 50:
         status = NEEDS_MORE_COMPLETED_EVENTS
     elif not wins or not losses:
         status = NEEDS_OUTCOME_DIVERSITY
-    elif duplicate_rate > 0.25:
-        status = DUPLICATE_HEAVY_SAMPLE
     elif completed_events >= 100:
         status = SHADOW_READY
     else:
