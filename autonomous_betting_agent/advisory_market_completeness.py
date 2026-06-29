@@ -427,7 +427,9 @@ def market_completeness_diagnostics(rows_or_frame: Sequence[Mapping[str, Any]] |
 
 def _is_precomputed_advisory_output(rows: Sequence[Mapping[str, Any]]) -> bool:
     return any(
-        "advisory_market_completeness_status" in row and "advisory_playable_status" in row
+        "advisory_market_completeness_status" in row
+        and "advisory_playable_status" in row
+        and "advisory_odds_math_mode" not in row
         for row in rows
     )
 
@@ -435,8 +437,6 @@ def _is_precomputed_advisory_output(rows: Sequence[Mapping[str, Any]]) -> bool:
 def apply_market_completeness_fields(rows_or_frame: Sequence[Mapping[str, Any]] | pd.DataFrame) -> list[dict[str, Any]]:
     source = _records(rows_or_frame)
     if _is_precomputed_advisory_output(source):
-        # Preserve already-generated advisory fixtures and legacy diagnostic rows.
-        # Raw rows without advisory completeness still receive Phase 3E.5.6 diagnostics.
         return source
     rows = market_completeness_diagnostics(source)
     for row in rows:
