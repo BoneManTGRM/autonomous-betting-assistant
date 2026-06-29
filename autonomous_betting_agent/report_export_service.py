@@ -113,7 +113,7 @@ def build_report_export_bundle(cards: pd.DataFrame, brand: MagazineBrand | Mappi
     whatsapp = render_whatsapp_report(cards, brand)
     json_text = cards_to_json(cards_with_summary)
     csv_text = summary.csv_text
-    pdf_bytes = render_report_pdf(cards, brand, mode=mode)
+    pdf_bytes = render_report_pdf(cards, brand, mode=mode, summary_markdown=summary.markdown)
     feed = build_report_feed(cards, brand, mode=mode, public=public)
     return ReportExportBundle(
         html=html,

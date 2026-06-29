@@ -42,7 +42,28 @@ def _brand_dict(brand: MagazineBrand | Mapping[str, Any]) -> dict[str, Any]:
     return {}
 
 
-def _pdf_lines(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *, mode: str = 'consumer') -> list[str]:
+def _summary_pdf_lines(summary_markdown: str | None) -> list[str]:
+    text = safe_text(summary_markdown)
+    if not text:
+        return []
+    lines = ['', 'Report Summary / Explanations', '-----------------------------']
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            lines.append('')
+            continue
+        if line.startswith('## '):
+            lines.append(line[3:].strip())
+            lines.append('-' * min(len(line[3:].strip()), 72))
+            continue
+        if line.startswith('- '):
+            line = '* ' + line[2:].strip()
+        for wrapped in _wrap(line, 92):
+            lines.append(wrapped)
+    return lines
+
+
+def _pdf_lines(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *, mode: str = 'consumer', summary_markdown: str | None = None) -> list[str]:
     brand_data = _brand_dict(brand)
     language = safe_text(brand_data.get('language')) or 'en'
     es = language.lower().startswith('es') or 'español' in language.lower()
@@ -91,6 +112,9 @@ def _pdf_lines(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *,
                 for wrapped in _wrap(detail, 96):
                     lines.append('  ' + wrapped)
             lines.append('')
+    summary_lines = _summary_pdf_lines(summary_markdown)
+    if summary_lines:
+        lines += summary_lines
     disclaimer = value_text(brand_data.get('disclaimer'), language)
     if disclaimer:
         lines += ['', disclaimer]
@@ -109,13 +133,13 @@ def _content_stream(page_lines: Iterable[str]) -> str:
     return '\n'.join(commands)
 
 
-def render_report_pdf(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *, mode: str = 'consumer') -> bytes:
+def render_report_pdf(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *, mode: str = 'consumer', summary_markdown: str | None = None) -> bytes:
     """Create a dependency-free, valid text PDF for report downloads.
 
     This intentionally uses a simple built-in PDF writer instead of optional browser or OS tools,
     so Streamlit can offer a one-click PDF download without weakening fail-closed report logic.
     """
-    all_lines = _pdf_lines(cards, brand, mode=mode)
+    all_lines = _pdf_lines(cards, brand, mode=mode, summary_markdown=summary_markdown)
     pages = [all_lines[i:i + 52] for i in range(0, len(all_lines), 52)] or [['Sin filas de reporte.' if safe_text(_brand_dict(brand).get('language')).lower().startswith('es') else 'No report rows.']]
     objects: list[str] = []
     objects.append('<< /Type /Catalog /Pages 2 0 R >>')
