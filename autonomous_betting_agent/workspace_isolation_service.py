@@ -72,9 +72,17 @@ def normalize_workspace_scope(workspace_id: str | None) -> str:
 
 
 def validate_workspace_id(workspace_id: str | None) -> dict[str, Any]:
+    raw = str(workspace_id or "default").strip()
     normalized = normalize_workspace_scope(workspace_id)
     errors: list[str] = []
     warnings: list[str] = []
+    raw_lowered = raw.lower()
+    if raw_lowered in {"all", "global", "*", "any", "none", "null"}:
+        errors.append("workspace_id uses a reserved cross-workspace value.")
+    if ".." in raw or "/" in raw or "\\" in raw:
+        errors.append("workspace_id must not contain path separators or traversal markers.")
+    if raw != normalized and any(marker in raw for marker in ("/", "\\", "..", "*")):
+        errors.append("workspace_id contains unsafe raw characters before normalization.")
     if not WORKSPACE_ID_PATTERN.match(normalized):
         errors.append("workspace_id contains unsupported characters or length.")
     lowered = normalized.lower()
@@ -87,9 +95,9 @@ def validate_workspace_id(workspace_id: str | None) -> dict[str, Any]:
     return {
         "passed": not errors,
         "workspace_id": normalized,
-        "checked_outputs": ["workspace_id", "reserved_values", "path_traversal"],
+        "checked_outputs": ["workspace_id", "reserved_values", "path_traversal", "raw_input"],
         "warnings": warnings,
-        "errors": errors,
+        "errors": sorted(set(errors)),
         "details": {"pattern": WORKSPACE_ID_PATTERN.pattern},
     }
 
@@ -184,7 +192,7 @@ def filter_workspace_objects(workspace_id: str | None, items: Sequence[Mapping[s
 
 def build_workspace_isolation_report(workspace_id: str | None, artifacts: Mapping[str, Any] | None = None, *, public_client: bool = True) -> dict[str, Any]:
     expected = normalize_workspace_scope(workspace_id)
-    workspace_check = validate_workspace_id(expected)
+    workspace_check = validate_workspace_id(workspace_id)
     artifact_map = dict(artifacts or {})
     object_results: list[dict[str, Any]] = []
     leakage_count = 0
