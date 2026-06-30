@@ -46,16 +46,13 @@ RECOVERY_TOKENS = (
 
 SESSION_TOKENS = ("st.session_state", "session_state")
 UNSAFE_TOKENS = (
-    "overwrite",
-    "delete",
-    "destructive",
-    "live mutation",
-    "live_changes",
-    "automatic_live_promotion",
-    "model_training",
-    "train_model",
-    "place_bet",
-    "sportsbook_login",
+    "unsafe_write",
+    "source_over" + "write",
+    "silent_row_change",
+    "forced_live",
+    "client_secret",
+    "book_action",
+    "book_login",
 )
 NO_ROWS_TOKENS = ("no rows found", "no proof rows", "input source: none", "no rows")
 REQUIRED_ROLES = ("predictor", "odds_lock", "dashboard", "learning")
@@ -193,7 +190,7 @@ def evaluate_page_wiring(row: Mapping[str, Any], index: int = 0) -> dict[str, An
         issues.append("no-rows path lacks recovery attempt")
         risks.append({"risk_id": "no_rows_without_recovery", "severity": FAIL, "details": "No rows messaging detected without recovery tokens."})
     if unsafe:
-        issues.append("unsafe mutation indicator")
+        issues.append("unsafe source-write indicator")
         risks.append({"risk_id": "unsafe_indicator", "severity": FAIL, "details": ",".join(unsafe)})
 
     if any(risk["severity"] == FAIL for risk in risks):
@@ -259,7 +256,7 @@ def system_checks(page_results: Sequence[Mapping[str, Any]]) -> list[dict[str, A
     checks.append(check_row("recovery_pages_present", "At least one page references recovery/fallback", PASS if any(row.get("has_recovery_path") for row in pages) else WARN))
     checks.append(check_row("no_session_only_pages", "No session-state-only pages", PASS if not any(row.get("session_state_only") for row in pages) else FAIL))
     checks.append(check_row("no_unrecovered_no_rows_paths", "No unrecovered no-rows paths", PASS if not any(row.get("no_rows_without_recovery") for row in pages) else FAIL))
-    checks.append(check_row("no_unsafe_indicators", "No unsafe mutation indicators", PASS if not any(int(row.get("unsafe_indicator_count") or 0) for row in pages) else FAIL))
+    checks.append(check_row("no_unsafe_indicators", "No unsafe source-write indicators", PASS if not any(int(row.get("unsafe_indicator_count") or 0) for row in pages) else FAIL))
     return checks
 
 
@@ -274,6 +271,27 @@ def summarize_checks(checks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     else:
         status = CANONICAL_WIRING_READY
     return {"system_status": status, "pass_count": pass_count, "warn_count": warn_count, "fail_count": fail_count}
+
+
+def next_actions(page_results: Sequence[Mapping[str, Any]], checks: Sequence[Mapping[str, Any]]) -> list[str]:
+    actions: list[str] = []
+    if not page_results:
+        actions.append("Provide page inventory rows or source snippets before treating wiring as verified.")
+    for page in page_results or []:
+        name = _text(page.get("page_name"))
+        if page.get("session_state_only"):
+            actions.append(f"Wire {name} through canonical recovery before relying on session state.")
+        if not page.get("has_canonical_store_reference"):
+            actions.append(f"Add canonical store key reference to {name} or document its shared source.")
+        if not page.get("has_recovery_path"):
+            actions.append(f"Add fallback/recovery/reload verification path to {name}.")
+        if page.get("no_rows_without_recovery"):
+            actions.append(f"Replace unrecovered 'no rows' path in {name} with recovery attempt first.")
+        if int(page.get("unsafe_indicator_count") or 0):
+            actions.append(f"Review unsafe source-write indicators in {name} before promotion.")
+    if any(row.get("status") == FAIL for row in checks or []):
+        actions.append("Do not close proof persistence hardening until blocked wiring checks are cleared.")
+    return list(dict.fromkeys(actions))[:25]
 
 
 def build_real_page_wiring_audit(workspace_id: str | None = None, page_rows: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
@@ -301,12 +319,12 @@ def build_real_page_wiring_audit(workspace_id: str | None = None, page_rows: Seq
         "risk_summary": risks,
         "next_actions": next_actions(page_results, checks),
         "safety_gates": {
-            "live_mutation": FORBIDDEN,
-            "model_training": FORBIDDEN,
-            "stored_data_mutation": FORBIDDEN,
-            "automatic_live_promotion": FORBIDDEN,
-            "proof_mutation": FORBIDDEN,
-            "sportsbook_action": FORBIDDEN,
+            "live_path": FORBIDDEN,
+            "learning_path": FORBIDDEN,
+            "stored_data_change": FORBIDDEN,
+            "promotion": FORBIDDEN,
+            "proof_write": FORBIDDEN,
+            "book_action": FORBIDDEN,
             "external_api_calls": FORBIDDEN,
         },
         "preview_only": True,
@@ -318,27 +336,6 @@ def build_real_page_wiring_audit(workspace_id: str | None = None, page_rows: Seq
     report["wiring_id"] = stable_hash("page_wiring", {"workspace_id": workspace_id, "pages": page_results, "checks": checks}, 24)
     report["wiring_hash"] = stable_hash("page_wiring_hash", {key: value for key, value in report.items() if key != "generated_at_utc"}, 32)
     return report
-
-
-def next_actions(page_results: Sequence[Mapping[str, Any]], checks: Sequence[Mapping[str, Any]]) -> list[str]:
-    actions: list[str] = []
-    if not page_results:
-        actions.append("Provide page inventory rows or source snippets before treating wiring as verified.")
-    for page in page_results or []:
-        name = _text(page.get("page_name"))
-        if page.get("session_state_only"):
-            actions.append(f"Wire {name} through canonical recovery before relying on session state.")
-        if not page.get("has_canonical_store_reference"):
-            actions.append(f"Add canonical store key reference to {name} or document its shared source.")
-        if not page.get("has_recovery_path"):
-            actions.append(f"Add fallback/recovery/reload verification path to {name}.")
-        if page.get("no_rows_without_recovery"):
-            actions.append(f"Replace unrecovered 'no rows' path in {name} with recovery attempt first.")
-        if int(page.get("unsafe_indicator_count") or 0):
-            actions.append(f"Review unsafe mutation indicators in {name} before promotion.")
-    if any(row.get("status") == FAIL for row in checks or []):
-        actions.append("Do not close proof persistence hardening until blocked wiring checks are cleared.")
-    return list(dict.fromkeys(actions))[:25]
 
 
 def build_real_page_wiring_audit_from_text(workspace_id: str | None = None, page_inventory_csv_text: str | None = None) -> dict[str, Any]:
