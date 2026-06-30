@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 try:
+    from autonomous_betting_agent.proof_persistence_patch import install_proof_persistence_patch
+    install_proof_persistence_patch()
+except Exception:
+    pass
+
+try:
     from autonomous_betting_agent.sidebar_tools import install_sidebar_tools
     install_sidebar_tools()
 except Exception:
