@@ -148,3 +148,9 @@ VALUE_COLUMNS.update({
     "decision_reason",
     "event_type",
 })
+
+try:
+    from autonomous_betting_agent.ledger_source_guard import install as _install_ledger_source_guard
+    _install_ledger_source_guard()
+except Exception:
+    pass
