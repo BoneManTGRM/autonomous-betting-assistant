@@ -7,6 +7,7 @@ from typing import Any
 APP_TAGLINE = 'Powered by Reparodynamics'
 APP_TAGLINE_ES = 'Impulsado por Reparodynamics'
 GLOBAL_LANGUAGE_KEY = 'aba_global_language'
+ADVANCED_NAV_KEY = 'aba_show_advanced_tools'
 LANGUAGE_KEYS = [
     'global_language',
     'dashboard_language',
@@ -34,23 +35,25 @@ LANGUAGE_KEYS = [
     'reparodynamics_language',
     'shadow_mode_results_language',
 ]
-TOOLS: tuple[tuple[str, str, str], ...] = (
+CORE_TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Dashboard', 'Dashboard', 'pages/dashboard.py'),
     ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
     ('Odds Lock Pro', 'Odds Lock Pro', 'pages/odds_lock_pro.py'),
     ('Fresh Odds Slate Builder', 'Constructor de Slate de Odds Frescas', 'pages/fresh_odds_slate_builder.py'),
     ('Market Optimizer', 'Market Optimizer', 'pages/market_optimizer.py'),
-    ('Market Dashboard Bridge', 'Market Dashboard Bridge', 'pages/market_dashboard_bridge.py'),
-    ('Market Workflow Integration', 'Market Workflow Integration', 'pages/market_workflow_integration.py'),
     ('Pro Recommendation Cards', 'Pro Recommendation Cards', 'pages/pro_recommendation_cards.py'),
     ('Subscriber Intelligence', 'Subscriber Intelligence', 'pages/subscriber_intelligence.py'),
     ('Subscriber Ledger', 'Subscriber Ledger', 'pages/subscriber_ledger.py'),
     ('Subscriber Export Center', 'Subscriber Export Center', 'pages/subscriber_export_center.py'),
-    ('Real Page Wiring Audit', 'Real Page Wiring Audit', 'pages/real_page_wiring_audit.py'),
-    ('Proof Hardening Closeout', 'Proof Hardening Closeout', 'pages/proof_hardening_closeout.py'),
     ('Report Studio', 'Report Studio', 'pages/report_studio.py'),
     ('Proof Center', 'Centro de Prueba', 'pages/proof_center.py'),
+)
+ADVANCED_TOOLS: tuple[tuple[str, str, str], ...] = (
+    ('Market Dashboard Bridge', 'Market Dashboard Bridge', 'pages/market_dashboard_bridge.py'),
+    ('Market Workflow Integration', 'Market Workflow Integration', 'pages/market_workflow_integration.py'),
+    ('Real Page Wiring Audit', 'Real Page Wiring Audit', 'pages/real_page_wiring_audit.py'),
+    ('Proof Hardening Closeout', 'Proof Hardening Closeout', 'pages/proof_hardening_closeout.py'),
     ('Public Proof Share', 'Compartir Prueba Pública', 'pages/public_proof_share.py'),
     ('Client Proof Viewer', 'Visor de Prueba para Cliente', 'pages/client_proof_viewer.py'),
     ('Local Control Center', 'Centro de Control Local', 'pages/local_control_center.py'),
@@ -58,6 +61,7 @@ TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Storage Diagnostics', 'Diagnóstico de Almacenamiento', 'pages/storage_diagnostics.py'),
     ('Reset Storage', 'Reiniciar almacenamiento', 'pages/reset_storage.py'),
 )
+TOOLS: tuple[tuple[str, str, str], ...] = CORE_TOOLS + ADVANCED_TOOLS
 REPARODYNAMICS_PAGE = ('Reparodynamics', 'Reparodynamics', 'pages/reparodynamics.py')
 PRO_PREDICTOR_LARGE_LIST_70_DEFAULTS = {'baseline_accuracy_min_books': 1,'baseline_accuracy_min_model_prob': 0.58,'baseline_accuracy_min_edge': -0.03,'baseline_accuracy_strong_edge': 0.04,'baseline_accuracy_min_strength': 38.0,'baseline_accuracy_use_high_conf': True,'baseline_accuracy_max_high_conf': 700,'baseline_accuracy_min_high_prob': 0.58,'baseline_accuracy_min_high_edge': -0.03,'baseline_accuracy_min_high_strength': 38.0,'baseline_accuracy_min_high_agent': 35.0}
 SIDEBAR_CSS = '''<style>
@@ -67,6 +71,7 @@ section[data-testid="stSidebar"] a[href*="pages/"]:hover { background: rgba(255,
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 { margin-top: .65rem; }
 .aba-sidebar-title { font-size: 1.45rem; line-height: 1.2; font-weight: 850; margin: .35rem 0 .25rem 0; background: linear-gradient(90deg, #f6d365 0%, #fda085 40%, #70e1f5 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .aba-sidebar-tagline { color: rgba(255,255,255,.62); margin-bottom: 1rem; }
+.aba-sidebar-section { color: rgba(255,255,255,.56); font-size: .78rem; font-weight: 800; letter-spacing: .08rem; text-transform: uppercase; margin: .85rem 0 .25rem 0; }
 .aba-safe-download { display:inline-block; padding:.65rem 1rem; border-radius:.7rem; background:#ef5350; color:#fff!important; text-decoration:none!important; font-weight:700; margin:.35rem 0; }
 </style>
 '''
@@ -162,6 +167,14 @@ def _sidebar_language_label(language: str) -> str:
     return 'Idioma' if normalize_language(language) == 'es' else 'Language'
 
 
+def _advanced_toggle_label(language: str) -> str:
+    return 'Mostrar herramientas avanzadas' if normalize_language(language) == 'es' else 'Show advanced tools'
+
+
+def _section_label(text_en: str, text_es: str, language: str) -> str:
+    return text_es if normalize_language(language) == 'es' else text_en
+
+
 def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'radio') -> str:
     import streamlit as st
     language = _language_label(_current_language(st))
@@ -188,9 +201,15 @@ def render_app_sidebar(current_page: str, *, language_key: str = 'global_languag
         if normalize_language(language) == 'es':
             st.markdown(GLOBAL_UPLOAD_ES_CSS, unsafe_allow_html=True)
         st.markdown('---')
-        for item in TOOLS:
+        st.markdown(f'<div class="aba-sidebar-section">{html.escape(_section_label("Core", "Principal", language))}</div>', unsafe_allow_html=True)
+        for item in CORE_TOOLS:
             _render_page_link(st, item, language, current_page)
-        _render_page_link(st, REPARODYNAMICS_PAGE, language, current_page)
+        show_advanced = bool(st.checkbox(_advanced_toggle_label(language), value=bool(st.session_state.get(ADVANCED_NAV_KEY, False)), key=ADVANCED_NAV_KEY))
+        if show_advanced:
+            st.markdown(f'<div class="aba-sidebar-section">{html.escape(_section_label("Advanced / Admin", "Avanzado / Admin", language))}</div>', unsafe_allow_html=True)
+            for item in ADVANCED_TOOLS:
+                _render_page_link(st, item, language, current_page)
+            _render_page_link(st, REPARODYNAMICS_PAGE, language, current_page)
     return normalize_language(language)
 
 
