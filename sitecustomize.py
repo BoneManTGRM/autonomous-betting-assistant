@@ -13,6 +13,12 @@ _ORIGINAL_RELOAD = importlib.reload
 
 
 def get_secret(*names: str) -> str:
+    """Read secrets without exposing key values.
+
+    This file intentionally does not monkey-patch Streamlit widgets. Uploaders,
+    buttons, forms, text inputs, radios, and selectboxes must stay native so the
+    app remains stable on mobile and desktop.
+    """
     try:
         import streamlit as st
     except Exception:
