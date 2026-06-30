@@ -332,6 +332,27 @@ def _install_result_grade_aliases() -> None:
     rn._aba_pending_raw_proof_guard_v1 = True
 
 
+def _install_final_enriched_report_rows() -> None:
+    try:
+        from . import magazine_live_api_enrichment as live
+    except Exception:
+        return
+    if getattr(live, '_aba_final_enriched_report_rows_v1', False):
+        return
+    original = live.enrich_rows_with_live_api_data
+
+    def final_enriched_rows(rows):
+        enriched = original(rows)
+        try:
+            from .magazine_pipeline_runtime import build_final_enriched_picks_df
+            return build_final_enriched_picks_df(enriched, force_refresh=True).to_dict('records')
+        except Exception:
+            return enriched
+
+    live.enrich_rows_with_live_api_data = final_enriched_rows
+    live._aba_final_enriched_report_rows_v1 = True
+
+
 _install_price_normalizer()
 _install_adaptive_learning_area_key_normalizer()
 _install_magazine_renderer_patches()
@@ -340,3 +361,4 @@ _install_chain_notes()
 _install_magazine_dynamic_sources_and_autosizer()
 _install_weather_compaction_patch()
 _install_result_grade_aliases()
+_install_final_enriched_report_rows()
