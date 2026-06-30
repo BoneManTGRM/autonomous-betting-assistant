@@ -37,28 +37,28 @@ LANGUAGE_KEYS = [
 ]
 CORE_TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Dashboard', 'Dashboard', 'pages/dashboard.py'),
-    ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
     ('Odds Lock Pro', 'Odds Lock Pro', 'pages/odds_lock_pro.py'),
+    ('Proof Center', 'Centro de Prueba', 'pages/proof_center.py'),
+    ('Report Studio', 'Report Studio', 'pages/report_studio.py'),
+    ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory_safe.py'),
+)
+ADVANCED_TOOLS: tuple[tuple[str, str, str], ...] = (
+    ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
     ('Fresh Odds Slate Builder', 'Constructor de Slate de Odds Frescas', 'pages/fresh_odds_slate_builder.py'),
     ('Market Optimizer', 'Market Optimizer', 'pages/market_optimizer.py'),
+    ('Market Dashboard Bridge', 'Market Dashboard Bridge', 'pages/market_dashboard_bridge.py'),
+    ('Market Workflow Integration', 'Market Workflow Integration', 'pages/market_workflow_integration.py'),
     ('Pro Recommendation Cards', 'Pro Recommendation Cards', 'pages/pro_recommendation_cards.py'),
     ('Subscriber Intelligence', 'Subscriber Intelligence', 'pages/subscriber_intelligence.py'),
     ('Subscriber Ledger', 'Subscriber Ledger', 'pages/subscriber_ledger.py'),
     ('Subscriber Export Center', 'Subscriber Export Center', 'pages/subscriber_export_center.py'),
-    ('Report Studio', 'Report Studio', 'pages/report_studio.py'),
-    ('Proof Center', 'Centro de Prueba', 'pages/proof_center.py'),
-)
-ADVANCED_TOOLS: tuple[tuple[str, str, str], ...] = (
-    ('Market Dashboard Bridge', 'Market Dashboard Bridge', 'pages/market_dashboard_bridge.py'),
-    ('Market Workflow Integration', 'Market Workflow Integration', 'pages/market_workflow_integration.py'),
-    ('Real Page Wiring Audit', 'Real Page Wiring Audit', 'pages/real_page_wiring_audit.py'),
-    ('Proof Hardening Closeout', 'Proof Hardening Closeout', 'pages/proof_hardening_closeout.py'),
-    ('Public Proof Share', 'Compartir Prueba Pública', 'pages/public_proof_share.py'),
+    ('Public Proof Share', 'Compartir Prueba Publica', 'pages/public_proof_share.py'),
     ('Client Proof Viewer', 'Visor de Prueba para Cliente', 'pages/client_proof_viewer.py'),
     ('Local Control Center', 'Centro de Control Local', 'pages/local_control_center.py'),
-    ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory_safe.py'),
-    ('Storage Diagnostics', 'Diagnóstico de Almacenamiento', 'pages/storage_diagnostics.py'),
+    ('Real Page Wiring Audit', 'Real Page Wiring Audit', 'pages/real_page_wiring_audit.py'),
+    ('Proof Hardening Closeout', 'Proof Hardening Closeout', 'pages/proof_hardening_closeout.py'),
+    ('Storage Diagnostics', 'Diagnostico de Almacenamiento', 'pages/storage_diagnostics.py'),
     ('Reset Storage', 'Reiniciar almacenamiento', 'pages/reset_storage.py'),
 )
 TOOLS: tuple[tuple[str, str, str], ...] = CORE_TOOLS + ADVANCED_TOOLS
@@ -72,6 +72,7 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 { margin
 .aba-sidebar-title { font-size: 1.45rem; line-height: 1.2; font-weight: 850; margin: .35rem 0 .25rem 0; background: linear-gradient(90deg, #f6d365 0%, #fda085 40%, #70e1f5 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .aba-sidebar-tagline { color: rgba(255,255,255,.62); margin-bottom: 1rem; }
 .aba-sidebar-section { color: rgba(255,255,255,.56); font-size: .78rem; font-weight: 800; letter-spacing: .08rem; text-transform: uppercase; margin: .85rem 0 .25rem 0; }
+.aba-sidebar-help { color: rgba(255,255,255,.58); font-size: .84rem; line-height: 1.35; margin: .25rem 0 .75rem 0; }
 .aba-safe-download { display:inline-block; padding:.65rem 1rem; border-radius:.7rem; background:#ef5350; color:#fff!important; text-decoration:none!important; font-weight:700; margin:.35rem 0; }
 </style>
 '''
@@ -175,6 +176,12 @@ def _section_label(text_en: str, text_es: str, language: str) -> str:
     return text_es if normalize_language(language) == 'es' else text_en
 
 
+def _workflow_help(language: str) -> str:
+    if normalize_language(language) == 'es':
+        return 'Usa estas paginas en orden. Las herramientas avanzadas son solo para diagnostico.'
+    return 'Use these pages in order. Advanced tools are for diagnostics only.'
+
+
 def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'radio') -> str:
     import streamlit as st
     language = _language_label(_current_language(st))
@@ -201,7 +208,8 @@ def render_app_sidebar(current_page: str, *, language_key: str = 'global_languag
         if normalize_language(language) == 'es':
             st.markdown(GLOBAL_UPLOAD_ES_CSS, unsafe_allow_html=True)
         st.markdown('---')
-        st.markdown(f'<div class="aba-sidebar-section">{html.escape(_section_label("Core", "Principal", language))}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="aba-sidebar-section">{html.escape(_section_label("Main Workflow", "Flujo Principal", language))}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="aba-sidebar-help">{html.escape(_workflow_help(language))}</div>', unsafe_allow_html=True)
         for item in CORE_TOOLS:
             _render_page_link(st, item, language, current_page)
         show_advanced = bool(st.checkbox(_advanced_toggle_label(language), value=bool(st.session_state.get(ADVANCED_NAV_KEY, False)), key=ADVANCED_NAV_KEY))
