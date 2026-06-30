@@ -30,6 +30,10 @@ CLV_VALUE_FIELDS = ['clv_percent', 'closing_line_value_percent', 'clv']
 BEAT_CLOSE_FIELDS = ['beat_close', 'beat_closing_line', 'beat_closing_price']
 TRUTHY_VALUES = {'true', '1', 'yes', 'y', 'pass', 'ok'}
 RESOLVED_STATUSES = {'win', 'loss', 'void'}
+PENDING_STATUSES = {'pending', 'unknown', 'scheduled', 'live', '', 'needs_review', 'nan'}
+HIGH_CONFIDENCE_FIELDS = ['ledger_type', 'proof_type', 'row_type', 'confidence_bucket', 'confidence_tier', 'public_confidence', 'volume_tier', 'profit_lane']
+HIGH_CONFIDENCE_TERMS = ('high_confidence', 'high confidence', 'b_high_confidence_test', 'high_confidence_test', 'all_high_confidence', 'ultra', 'premium', 'elite', 'official', 'qualified')
+_LAST_LEDGER_SOURCE_DIAGNOSTICS: dict[str, Any] = {}
 
 
 def normalize_workspace_id(v: Any) -> str:
@@ -59,6 +63,44 @@ def _first_text(row: Mapping[str, Any], names: list[str]) -> str:
     return ''
 
 
+def _event_start_text(row: Mapping[str, Any]) -> str:
+    return _first_text(row, ['event_start_utc', 'event_start_time', 'known_start_utc', 'commence_time', 'start', 'game_start', 'match_start', 'scheduled_start'])
+
+
+def _locked_at_text(row: Mapping[str, Any]) -> str:
+    return _first_text(row, ['locked_at_utc', 'lock_time', 'prediction_timestamp', 'odds_timestamp', 'verified_updated_utc', 'created_at'])
+
+
+def _canonicalize_result_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    try:
+        out = normalize_frame(frame)
+    except Exception:
+        out = frame.copy()
+    if out.empty:
+        return out
+    rows = []
+    for raw in out.to_dict('records'):
+        item = dict(raw)
+        item['result_status'] = result_status(item)
+        if _event_start_text(item) and not safe_text(item.get('event_start_utc')):
+            item['event_start_utc'] = _event_start_text(item)
+        rows.append(item)
+    return pd.DataFrame(rows)
+
+
+def _row_high_confidence(row: Mapping[str, Any]) -> bool:
+    for field in HIGH_CONFIDENCE_FIELDS:
+        value = safe_text(row.get(field)).lower()
+        if value and any(term in value for term in HIGH_CONFIDENCE_TERMS):
+            return True
+    for field in ['profit_official_ok', 'profit_elite_ok', 'ultra80_candidate', 'strict_ultra80_candidate', 'official_lock_ready']:
+        if _truthy(row.get(field)):
+            return True
+    return False
+
+
 def _lock_ready_mask(frame: pd.DataFrame) -> pd.Series:
     if frame.empty:
         return pd.Series(dtype=bool)
@@ -66,12 +108,12 @@ def _lock_ready_mask(frame: pd.DataFrame) -> pd.Series:
     for field in ['lock_ready', 'official_lock_ready', 'research_lock_ready', 'profit_volume_safe']:
         if field in frame.columns:
             mask = mask | frame[field].map(_truthy).fillna(False)
-    # Verified tracker files without proof_id can still be analyzed as lock-ready
-    # rows when they carry a verified/pending grade. They are not hidden behind a
-    # stale proof ledger.
     if 'verified_grade' in frame.columns:
         grade = frame['verified_grade'].map(safe_text).str.lower()
-        mask = mask | grade.isin(['win', 'loss', 'void', 'push', 'pending'])
+        mask = mask | grade.isin(['win', 'loss', 'void', 'push', 'pending', 'needs_review'])
+    if 'result_status' in frame.columns:
+        status = frame['result_status'].map(safe_text).str.lower()
+        mask = mask | status.isin(['win', 'loss', 'void', 'push', 'pending', 'needs_review'])
     return mask
 
 
@@ -80,7 +122,7 @@ def _synthetic_proof_id(row: Mapping[str, Any]) -> str:
     key = '|'.join([
         event_id,
         safe_text(row.get('event')),
-        safe_text(row.get('event_start_utc')),
+        _event_start_text(row),
         safe_text(row.get('sport')),
         safe_text(row.get('market_type')),
         safe_text(row.get('line_point')),
@@ -95,19 +137,21 @@ def _synthetic_proof_id(row: Mapping[str, Any]) -> str:
 def _ensure_lock_identity(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame
-    out = frame.copy()
-    for column in ['proof_id', 'locked_at_utc', 'proof_status', 'proof_hash']:
+    out = _canonicalize_result_columns(frame)
+    for column in ['proof_id', 'locked_at_utc', 'proof_status', 'proof_hash', 'event_start_utc']:
         if column not in out.columns:
             out[column] = ''
     rows = []
     for raw in out.to_dict('records'):
         item = dict(raw)
         synthetic = False
+        if _event_start_text(item) and not safe_text(item.get('event_start_utc')):
+            item['event_start_utc'] = _event_start_text(item)
         if not safe_text(item.get('proof_id')):
             item['proof_id'] = _synthetic_proof_id(item)
             synthetic = True
         if not safe_text(item.get('locked_at_utc')):
-            item['locked_at_utc'] = _first_text(item, ['prediction_timestamp', 'odds_timestamp', 'verified_updated_utc', 'created_at'])
+            item['locked_at_utc'] = _locked_at_text(item)
             synthetic = True
         if synthetic:
             item['proof_source_type'] = 'lock_ready_verified_tracker'
@@ -121,6 +165,7 @@ def _ensure_lock_identity(frame: pd.DataFrame) -> pd.DataFrame:
                 item['proof_hash'] = proof_hash(item)
             except Exception:
                 item['proof_hash'] = ''
+        item['result_status'] = result_status(item)
         rows.append(item)
     return pd.DataFrame(rows)
 
@@ -129,37 +174,68 @@ def _result_rank(row: Mapping[str, Any]) -> int:
     """Higher is better. Prevent an ungraded sync row from replacing a graded row."""
     status = result_status(row)
     if status in {'win', 'loss'}:
-        return 4
+        return 5
     if status == 'void':
+        return 4
+    if status == 'needs_review':
         return 3
     if safe_text(row.get('graded_at_utc')):
         return 2
-    if status in {'pending', 'unknown', 'scheduled', 'live', '', 'needs_review'}:
+    if status in PENDING_STATUSES:
         return 1
     return 0
+
+
+def _scope_rank(row: Mapping[str, Any]) -> int:
+    if _row_high_confidence(row):
+        return 3
+    if _truthy(row.get('lock_ready')) or _truthy(row.get('official_lock_ready')) or _truthy(row.get('research_lock_ready')):
+        return 2
+    if _result_rank(row) >= 3:
+        return 1
+    return 0
+
+
+def _valid_lock_rank(row: Mapping[str, Any]) -> int:
+    status = safe_text(row.get('proof_status')) or lock_status(row)
+    return 1 if status == 'locked_before_start' else 0
 
 
 def _sort_for_result_preservation(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame
     out = frame.copy()
-    out['_aba_result_rank'] = [_result_rank(row) for row in out.to_dict('records')]
+    rows = out.to_dict('records')
+    out['_aba_scope_rank'] = [_scope_rank(row) for row in rows]
+    out['_aba_result_rank'] = [_result_rank(row) for row in rows]
+    out['_aba_valid_lock_rank'] = [_valid_lock_rank(row) for row in rows]
     if 'graded_at_utc' in out.columns:
         out['_aba_graded_at_sort'] = pd.to_datetime(out['graded_at_utc'], errors='coerce', utc=True)
     else:
         out['_aba_graded_at_sort'] = pd.NaT
-    return out.sort_values(['_aba_result_rank', '_aba_graded_at_sort'], ascending=[True, True], na_position='first')
+    if 'locked_at_utc' in out.columns:
+        out['_aba_locked_at_sort'] = pd.to_datetime(out['locked_at_utc'], errors='coerce', utc=True)
+    else:
+        out['_aba_locked_at_sort'] = pd.NaT
+    return out.sort_values(
+        ['_aba_scope_rank', '_aba_result_rank', '_aba_valid_lock_rank', '_aba_graded_at_sort', '_aba_locked_at_sort'],
+        ascending=[True, True, True, True, True],
+        na_position='first',
+    )
 
 
 def _drop_helper_columns(frame: pd.DataFrame) -> pd.DataFrame:
-    return frame.drop(columns=[col for col in ['_aba_result_rank', '_aba_graded_at_sort'] if col in frame.columns], errors='ignore')
+    return frame.drop(columns=[col for col in ['_aba_scope_rank', '_aba_result_rank', '_aba_valid_lock_rank', '_aba_graded_at_sort', '_aba_locked_at_sort'] if col in frame.columns], errors='ignore')
 
 
 def filter_locked_proof_rows(frame):
     raw = pd.DataFrame(frame) if isinstance(frame, list) else frame
-    out = update_profit_columns(raw) if raw is not None and not raw.empty else pd.DataFrame()
+    out = _canonicalize_result_columns(raw) if raw is not None and not raw.empty else pd.DataFrame()
+    out = update_profit_columns(out) if not out.empty else pd.DataFrame()
     if out.empty:
         return pd.DataFrame()
+    if 'event_start_time' in out.columns and 'event_start_utc' not in out.columns:
+        out['event_start_utc'] = out['event_start_time']
     if PROOF_REQUIRED_COLUMNS.issubset(out.columns):
         proof = out[out['proof_id'].map(safe_text).ne('') & out['locked_at_utc'].map(safe_text).ne('')].copy()
         if not proof.empty:
@@ -175,10 +251,38 @@ def has_locked_proof_rows(frame) -> bool:
 
 
 def latest_active_list(frame):
-    # Do not silently narrow a loaded CSV to the last batch/list. The caller has
-    # already chosen the source. Hidden narrowing caused rows=145 but record=31-3.
     out = filter_locked_proof_rows(frame)
     return out.copy() if not out.empty else pd.DataFrame()
+
+
+def _dedupe_on(frame: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    existing = [c for c in cols if c in frame.columns]
+    if not existing:
+        return frame
+    subset = frame[existing].fillna('').astype(str).apply(lambda s: s.str.strip().str.lower())
+    usable = subset.apply(lambda row: any(bool(v) for v in row), axis=1)
+    if not bool(usable.any()):
+        return frame
+    keep_part = frame[usable].drop_duplicates(subset=existing, keep='last')
+    untouched = frame[~usable]
+    return pd.concat([untouched, keep_part], ignore_index=True, sort=False)
+
+
+def _resolved_count(frame: pd.DataFrame) -> int:
+    if frame is None or frame.empty:
+        return 0
+    return int(sum(result_status(row) in RESOLVED_STATUSES for row in frame.to_dict('records')))
+
+
+def _status_counts(frame: pd.DataFrame) -> dict[str, int]:
+    if frame is None or frame.empty:
+        return {'wins': 0, 'losses': 0, 'voids': 0, 'pending': 0, 'resolved': 0}
+    statuses = [result_status(row) for row in frame.to_dict('records')]
+    wins = statuses.count('win')
+    losses = statuses.count('loss')
+    voids = statuses.count('void')
+    pending = sum(status in PENDING_STATUSES for status in statuses)
+    return {'wins': wins, 'losses': losses, 'voids': voids, 'pending': int(pending), 'resolved': wins + losses + voids}
 
 
 def merge_ledgers(*frames, active_only: bool = False):
@@ -195,26 +299,120 @@ def merge_ledgers(*frames, active_only: bool = False):
         return pd.DataFrame()
     out = pd.concat(parts, ignore_index=True, sort=False)
     out = _sort_for_result_preservation(out)
-    if 'proof_id' in out.columns:
-        out = out.drop_duplicates(subset=['proof_id'], keep='last')
-    cols = [c for c in ['event', 'prediction', 'event_start_utc', 'market_type', 'line_point'] if c in out.columns]
-    if cols:
-        out = out.drop_duplicates(subset=cols, keep='last')
+    out = _dedupe_on(out, ['proof_id'])
+    out = _dedupe_on(out, ['event_id', 'market_type', 'line_point', 'prediction'])
+    out = _dedupe_on(out, ['event', 'prediction', 'event_start_utc', 'market_type', 'line_point'])
+    out = _dedupe_on(out, ['event', 'prediction', 'market_type', 'line_point'])
     out = _drop_helper_columns(out)
     out = filter_locked_proof_rows(out)
     return latest_active_list(out) if active_only else out
 
 
+def _source_summary(label: str, frame: pd.DataFrame) -> dict[str, Any]:
+    locked = filter_locked_proof_rows(frame)
+    counts = _status_counts(locked)
+    high_conf = int(sum(_row_high_confidence(row) for row in locked.to_dict('records'))) if not locked.empty else 0
+    return {
+        'source': label,
+        'rows': int(len(frame)) if frame is not None else 0,
+        'locked_rows': int(len(locked)),
+        'high_confidence_rows': high_conf,
+        'wins': counts['wins'],
+        'losses': counts['losses'],
+        'voids': counts['voids'],
+        'pending': counts['pending'],
+        'resolved': counts['resolved'],
+    }
+
+
+def _load_local_storage_ledger() -> pd.DataFrame:
+    try:
+        from .storage import LocalStorage
+
+        rows = LocalStorage().load_rows()
+        return filter_locked_proof_rows(pd.DataFrame(rows)) if rows else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+
+def _load_session_ledger() -> pd.DataFrame:
+    try:
+        import streamlit as st
+    except Exception:
+        return pd.DataFrame()
+    frames = []
+    for key in [LOCKED_STORE_KEY, REFRESH_STORE_KEY]:
+        try:
+            value = st.session_state.get(key)
+            if value:
+                frames.append(pd.DataFrame(value))
+        except Exception:
+            pass
+    return merge_ledgers(*frames) if frames else pd.DataFrame()
+
+
+def _set_source_diagnostics(workspace_id: Any, sources: list[tuple[str, pd.DataFrame]], merged: pd.DataFrame) -> None:
+    global _LAST_LEDGER_SOURCE_DIAGNOSTICS
+    summaries = [_source_summary(label, frame) for label, frame in sources]
+    counts = _status_counts(merged)
+    dropped = sum(1 for item in summaries if item['locked_rows'] > 0 and item['resolved'] == 0 and counts['resolved'] > 0)
+    best = max(summaries, key=lambda item: (item['high_confidence_rows'] > 0, item['resolved'], item['locked_rows'], item['rows']), default={'source': ''})
+    _LAST_LEDGER_SOURCE_DIAGNOSTICS = {
+        'workspace_id': normalize_workspace_id(workspace_id),
+        'disk_rows': next((s['rows'] for s in summaries if s['source'] == 'disk_csv'), 0),
+        'held_locked_rows': next((s['rows'] for s in summaries if s['source'] == LOCKED_STORE_KEY), 0),
+        'held_refresh_rows': next((s['rows'] for s in summaries if s['source'] == REFRESH_STORE_KEY), 0),
+        'sqlite_rows': next((s['rows'] for s in summaries if s['source'] == 'local_sqlite_or_csv'), 0),
+        'session_rows': next((s['rows'] for s in summaries if s['source'] == 'streamlit_session'), 0),
+        'active_rows_chosen': int(len(merged)),
+        'active_source_chosen': safe_text(best.get('source')),
+        'active_source_resolved_count': counts['resolved'],
+        'active_source_wins': counts['wins'],
+        'active_source_losses': counts['losses'],
+        'active_source_voids': counts['voids'],
+        'active_source_pending': counts['pending'],
+        'dropped_stale_ungraded_sources': int(dropped),
+        'proof_scope_used': 'high_confidence_lock_ready_first',
+        'dashboard_synced': False,
+        'source_summaries': summaries,
+    }
+
+
+def ledger_source_diagnostics(workspace_id: Any = '') -> dict[str, Any]:
+    return dict(_LAST_LEDGER_SOURCE_DIAGNOSTICS or {'workspace_id': normalize_workspace_id(workspace_id)})
+
+
 def load_persistent_ledger(path: Path = DEFAULT_LEDGER_PATH, workspace_id: Any = '', active_only: bool = False):
-    disk = pd.DataFrame()
+    sources: list[tuple[str, pd.DataFrame]] = []
     p = persistent_ledger_path(workspace_id, path)
     try:
         if p.exists():
-            disk = pd.read_csv(p)
+            sources.append(('disk_csv', pd.read_csv(p)))
     except Exception:
         pass
-    held = load_held_rows(LOCKED_STORE_KEY, workspace_id) or load_held_rows(REFRESH_STORE_KEY, workspace_id)
-    return merge_ledgers(disk, held, active_only=active_only)
+    held_locked = load_held_rows(LOCKED_STORE_KEY, workspace_id)
+    held_refresh = load_held_rows(REFRESH_STORE_KEY, workspace_id)
+    if held_locked:
+        sources.append((LOCKED_STORE_KEY, pd.DataFrame(held_locked)))
+    if held_refresh:
+        sources.append((REFRESH_STORE_KEY, pd.DataFrame(held_refresh)))
+    local = _load_local_storage_ledger()
+    if not local.empty:
+        sources.append(('local_sqlite_or_csv', local))
+    session = _load_session_ledger()
+    if not session.empty:
+        sources.append(('streamlit_session', session))
+    if not sources:
+        _set_source_diagnostics(workspace_id, [], pd.DataFrame())
+        return pd.DataFrame()
+    merged = merge_ledgers(*[frame for _, frame in sources], active_only=False)
+    _set_source_diagnostics(workspace_id, sources, merged)
+    return latest_active_list(merged) if active_only else merged
+
+
+def _write_held_proof_rows(frame: pd.DataFrame, workspace_id: Any) -> None:
+    save_held_rows(LOCKED_STORE_KEY, frame, workspace_id)
+    save_held_rows(REFRESH_STORE_KEY, frame, workspace_id)
 
 
 def save_persistent_ledger(frame, path: Path = DEFAULT_LEDGER_PATH, workspace_id: Any = ''):
@@ -222,9 +420,17 @@ def save_persistent_ledger(frame, path: Path = DEFAULT_LEDGER_PATH, workspace_id
     if incoming.empty:
         return pd.DataFrame()
     existing = load_persistent_ledger(path=path, workspace_id=workspace_id, active_only=False)
+    if _resolved_count(existing) > 0 and _resolved_count(incoming) == 0:
+        _write_held_proof_rows(existing, workspace_id)
+        return existing
     out = merge_ledgers(existing, incoming) if not existing.empty else incoming
-    save_held_rows(LOCKED_STORE_KEY, out, workspace_id)
-    save_held_rows(REFRESH_STORE_KEY, out, workspace_id)
+    _write_held_proof_rows(out, workspace_id)
+    try:
+        from .storage import LocalStorage
+
+        LocalStorage().save_rows(out.to_dict('records'))
+    except Exception:
+        pass
     try:
         p = persistent_ledger_path(workspace_id, path)
         ensure_data_dir(p)
