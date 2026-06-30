@@ -31,39 +31,33 @@ API_SECRET_DEFS = {
 }
 
 FALLBACK_TOKENS = (
-    "context unavailable",
-    "no sdio event id",
-    "sdio checked",
-    "no provider event id",
-    "api-fb lookup checked",
-    "api-fb team lookup checked",
-    "no fixture match",
-    "no match returned",
-    "simple news aggregator",
-    "uploaded/cached row",
-    "uploaded row",
-    "no live",
-    "not returned for this event",
-    "data not returned",
-    "player data not returned",
-    "api key missing",
-    "payment required",
+    "context unavailable", "no sdio event id", "sdio checked", "no provider event id",
+    "api-fb lookup checked", "api-fb team lookup checked", "no fixture match", "no match returned",
+    "simple news aggregator", "uploaded/cached row", "uploaded row", "no live",
+    "not returned for this event", "data not returned", "player data not returned",
+    "api key missing", "payment required",
 )
-
-WRONG_SPORT_TOKENS = (
-    "api-mma",
-    "api mma",
-    "matching fight",
-    "fighter data",
-    "weight cut",
-    "camp updates",
-    "fight news",
-)
-
+WRONG_SPORT_TOKENS = ("api-mma", "api mma", "matching fight", "fighter data", "weight cut", "camp updates", "fight news")
 MOJIBAKE_REPLACEMENTS = {
     "Ã¡": "á", "Ã©": "é", "Ã­": "í", "Ã³": "ó", "Ãº": "ú", "Ã±": "ñ", "Ã¼": "ü",
     "ÃÁ": "Á", "Ã‰": "É", "Ã‘": "Ñ", "Ã": "", "Â": "",
     "â€™": "'", "â€œ": '"', "â€�": '"', "â€“": "-", "â€”": "-", "â€¦": "…", "�": "",
+}
+ES = {
+    "PAGE 1 OF 75": "PÁGINA 1 DE 75",
+    "WATCHLIST": "LISTA DE SEGUIMIENTO",
+    "No SDIO event ID.": "Sin ID de evento SDIO.",
+    "No lineup/injury headline returned.": "Sin titular de lesiones/alineación.",
+    "API-FB: no fixture match.": "API-FB: sin coincidencia de partido.",
+    "API-FB lookup checked; no fixture match.": "API-FB revisada; sin coincidencia de partido.",
+    "consensus average": "promedio consenso",
+    "Negative edge at current price.": "Ventaja negativa con la cuota actual.",
+    "Do not play unless price improves.": "No jugar salvo que la cuota mejore.",
+    "Recheck odds and key news.": "Revisar cuotas y noticias clave.",
+    "Do not chain negative-EV picks.": "No encadenar señales con VE negativo.",
+    "Avoid parlays unless edge turns positive.": "Evitar parlays salvo que la ventaja sea positiva.",
+    "Recheck price before including.": "Revisar la cuota antes de incluir.",
+    "Price check required before entry.": "Revisar cuota antes de entrar.",
 }
 
 
@@ -499,17 +493,7 @@ def _clean_items(row: Mapping[str, Any], values: Iterable[Any], *, limit: int = 
 
 
 def resolve_magazine_context(row: Mapping[str, Any]) -> tuple[str, str]:
-    for source, key in (
-        ("Perplexity", "perplexity_context"),
-        ("Perplexity", "perplexity_summary"),
-        ("NewsAPI", "newsapi_summary"),
-        ("NewsAPI", "news_summary"),
-        ("WeatherAPI", "weather_summary"),
-        ("Input", "sports_context_summary"),
-        ("Input", "preview_summary"),
-        ("Input", "game_summary"),
-        ("Input", "short_reason"),
-    ):
+    for source, key in (("Perplexity", "perplexity_context"), ("Perplexity", "perplexity_summary"), ("NewsAPI", "newsapi_summary"), ("NewsAPI", "news_summary"), ("WeatherAPI", "weather_summary"), ("Input", "sports_context_summary"), ("Input", "preview_summary"), ("Input", "game_summary"), ("Input", "short_reason")):
         value = row.get(key)
         if not _bad_context(value, row):
             return source, _shorten(str(value), 180)
@@ -526,7 +510,7 @@ def _apply_odds_truth(row: dict[str, Any], refresh_time: str) -> None:
     if prob is not None:
         row["model_probability"] = prob
     live_marker = str(row.get("odds_status") or row.get("odds_source") or row.get("odds_api_status") or "").strip().lower()
-    live_odds = live_marker in {"live", "live_api", "odds api", "the odds api", "live_source", "live_api"}
+    live_odds = live_marker in {"live", "live_api", "odds api", "the odds api", "live_source"}
     if not _secret(*API_SECRET_DEFS["Odds API"]):
         row.setdefault("odds_api_status", "API_KEY_MISSING")
     elif not live_odds:
@@ -658,19 +642,95 @@ def _renderer_matchup_items(row_like: Any) -> list[str]:
 
 def _renderer_pairs(row_like: Any, lang: str) -> list[tuple[str, str]]:
     row = _row(row_like)
-    return [
-        ("REPORT SOURCE", _get(row, "report_source", default="final_enriched_picks_df")),
-        ("ODDS ROW", _get(row, "odds_source", default="UPLOADED_ROW")),
-        ("CONTEXT", _get(row, "context_source", default="EMPTY_WITH_REASON")),
-        ("RUN", _get(row, "report_run_id", default="no_run_id")[:22]),
-        ("REFRESH", _get(row, "last_api_refresh_time", default="no_refresh")[:22]),
-    ]
+    return [("REPORT SOURCE", _get(row, "report_source", default="final_enriched_picks_df")), ("ODDS ROW", _get(row, "odds_source", default="UPLOADED_ROW")), ("CONTEXT", _get(row, "context_source", default="EMPTY_WITH_REASON")), ("RUN", _get(row, "report_run_id", default="no_run_id")[:22]), ("REFRESH", _get(row, "last_api_refresh_time", default="no_refresh")[:22])]
+
+
+def _is_spanish(row: Mapping[str, Any]) -> bool:
+    text = _get(row, "report_language", "language", "lang").lower()
+    return text.startswith("es") or "spanish" in text or "español" in text or "espanol" in text
+
+
+def _tr_es(value: Any) -> str:
+    text = _clean_text(value)
+    if text in ES:
+        return ES[text]
+    m = re.fullmatch(r"PAGE\s+(\d+)\s+OF\s+(\d+)", text, flags=re.I)
+    if m:
+        return f"PÁGINA {m.group(1)} DE {m.group(2)}"
+    replacements = (
+        ("Model projects", "El modelo proyecta"),
+        ("Market-implied probability checks at", "La probabilidad implícita del mercado es"),
+        ("Measured edge", "Ventaja medida"),
+        ("Expected value", "Valor esperado"),
+        ("Negative edge at current price", "Ventaja negativa con la cuota actual"),
+        ("Do not play unless price improves", "No jugar salvo que la cuota mejore"),
+        ("Recheck odds and key news", "Revisar cuotas y noticias clave"),
+        ("Do not chain negative-EV picks", "No encadenar señales con VE negativo"),
+        ("Avoid parlays unless edge turns positive", "Evitar parlays salvo que la ventaja sea positiva"),
+        ("Recheck price before including", "Revisar la cuota antes de incluir"),
+        ("Do not play at the listed price", "No jugar con la cuota listada"),
+    )
+    for old, new in replacements:
+        text = re.sub(re.escape(old), new, text, flags=re.I)
+    return text
+
+
+def _fmt_pct(value: Any, signed: bool = False) -> str:
+    parsed = _safe_float(value)
+    if parsed is None:
+        return ""
+    parsed = parsed / 100 if abs(parsed) > 1 else parsed
+    return f"{parsed:+.1%}" if signed else f"{parsed:.0%}"
+
+
+def _fmt_ev(value: Any) -> str:
+    parsed = _safe_float(value)
+    return "" if parsed is None else f"{parsed:+.3f}"
+
+
+def _apply_spanish(row: dict[str, Any]) -> dict[str, Any]:
+    if not _is_spanish(row):
+        return row
+    pick = _get(row, "public_pick", "prediction", "pick", "selection", default="esta selección")
+    row["final_decision"] = _tr_es(row.get("final_decision", "")) or row.get("final_decision", "")
+    row["bookmaker"] = _tr_es(row.get("bookmaker", "")) or row.get("bookmaker", "")
+    for key in ("news_injury_summary", "api_football_summary", "why_lose", "risk_reason", "chain_notes", "parlay_notes", "final_explanation", "final_decision", "bookmaker"):
+        if key in row and isinstance(row[key], str):
+            row[key] = _tr_es(row[key])
+    row["why_bullets"] = "\n".join([
+        f"El modelo proyecta {_fmt_pct(_get(row, 'learned_model_probability', 'model_probability_clean', 'model_probability', 'final_probability'))} de probabilidad para {pick}.",
+        f"La probabilidad implícita del mercado es {_fmt_pct(_get(row, 'market_probability', 'market_implied_probability'))}.",
+        f"Ventaja medida: {_fmt_pct(_get(row, 'model_market_edge', 'edge'), signed=True)}.",
+        f"Valor esperado: {_fmt_ev(_get(row, 'expected_value_per_unit', 'profit_expected_value', 'expected_value', 'ev'))}.",
+    ])
+    row.setdefault("final_explanation", "No jugar con la cuota listada. Revisar si mejora la línea.")
+    if "No jugar con la cuota listada" not in str(row.get("final_explanation", "")):
+        row["final_explanation"] = str(row.get("final_explanation", "")) + "\nNo jugar con la cuota listada."
+    return row
+
+
+def _install_spanish_renderer_patch() -> None:
+    try:
+        import autonomous_betting_agent.magazine_book_export as module
+    except Exception:
+        return
+    original = getattr(module, "_tr", None)
+    if callable(original) and getattr(original, "_aba_live_es_patch", False):
+        return
+
+    def patched_tr(value: Any, lang: str) -> str:
+        if str(lang).lower().startswith("es"):
+            return _tr_es(value)
+        return original(value, lang) if callable(original) else _clean_text(value)
+
+    setattr(patched_tr, "_aba_live_es_patch", True)
+    module._tr = patched_tr
 
 
 def enrich_row_with_live_api_data(row_like: Any, *, report_run_id: str | None = None, last_api_refresh_time: str | None = None) -> dict[str, Any]:
     row = _row(row_like)
     if row.get("_live_api_enriched") == ENRICHMENT_VERSION and row.get("report_source") == "final_enriched_picks_df":
-        return _render_cleanup(row)
+        return _apply_spanish(_render_cleanup(row))
     report_run_id = report_run_id or f"aba_mag_{int(time.time())}_{_hash_payload(row)}"
     last_api_refresh_time = last_api_refresh_time or datetime.now(timezone.utc).isoformat(timespec="seconds")
     _enrich_sportsdataio(row)
@@ -680,7 +740,8 @@ def enrich_row_with_live_api_data(row_like: Any, *, report_run_id: str | None = 
     _enrich_perplexity(row)
     _apply_truth_fields(row, report_run_id, last_api_refresh_time)
     row["_live_api_enriched"] = ENRICHMENT_VERSION
-    return _render_cleanup(row)
+    _install_spanish_renderer_patch()
+    return _apply_spanish(_render_cleanup(row))
 
 
 def _report_page_priority(row: Mapping[str, Any]) -> int:
@@ -714,6 +775,7 @@ def enrich_rows_with_live_api_data(rows: list[Any] | tuple[Any, ...]) -> list[di
     report_run_id, refresh_time = _new_run_meta(rows)
     enriched = _dedupe_report_page_rows([enrich_row_with_live_api_data(row, report_run_id=report_run_id, last_api_refresh_time=refresh_time) for row in rows])
     _ensure_renderer_patch()
+    _install_spanish_renderer_patch()
     return enriched
 
 
@@ -734,7 +796,6 @@ def install(module: Any) -> Any:
     original_render = getattr(module, "render_full_pick_magazine_page", None)
     original_png = getattr(module, "_png", None)
     original_metric_cells = getattr(module, "magazine_metric_cells", None)
-
     if callable(original_metric_cells):
         def metric_cells(odds: str, conf: str, edge: str, ev: str, units: str, risk: str):
             cells = list(original_metric_cells(odds, conf, edge, ev, units, risk))
@@ -754,17 +815,14 @@ def install(module: Any) -> Any:
                 fixed.append((label, value, color, x, width))
             return fixed
         module.magazine_metric_cells = metric_cells
-
     if callable(original_render):
         def render(row_like: Any, *args: Any, **kwargs: Any):
             return original_render(_render_cleanup(enrich_row_with_live_api_data(row_like)), *args, **kwargs)
         module.render_full_pick_magazine_page = render
-
     if callable(original_png) and callable(getattr(module, "render_full_pick_magazine_page", None)):
         def render_png(row_like: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
             return original_png(module.render_full_pick_magazine_page(row_like, background_image, report_name, page_number, total_pages, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
         module.render_full_pick_magazine_page_png = render_png
-
     module._useful = _useful
     module._team_items = _renderer_team_items
     module._injury_items = _renderer_injury_items
@@ -778,6 +836,7 @@ def install(module: Any) -> Any:
     module._LIVE_API_ENRICHMENT_PATCHED_VERSION = ENRICHMENT_VERSION
     if ENRICHMENT_VERSION not in str(getattr(module, "MAGAZINE_STYLE_VERSION", "")):
         module.MAGAZINE_STYLE_VERSION = f"{module.MAGAZINE_STYLE_VERSION}_{ENRICHMENT_VERSION}"
+    _install_spanish_renderer_patch()
     return module
 
 
