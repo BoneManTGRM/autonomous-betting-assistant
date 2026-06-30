@@ -302,6 +302,24 @@ def _install_weather_compaction_patch() -> None:
     mas._aba_weather_compaction_patch_v1 = True
 
 
+def _install_result_grade_aliases() -> None:
+    try:
+        from . import row_normalizer as rn
+    except Exception:
+        return
+    aliases = list(rn.ALIASES.get('result_status', ()))
+    extra_aliases = [
+        'verified_outcome', 'verified_result_status', 'grade', 'final_grade',
+        'proof_grade', 'pick_grade', 'row_grade', 'result_grade', 'manual_grade',
+    ]
+    rn.ALIASES['result_status'] = tuple(dict.fromkeys(extra_aliases + aliases))
+    rn.RESULT_MAP.update({
+        'ungraded': 'pending',
+        'not_graded': 'pending',
+        'not graded': 'pending',
+    })
+
+
 _install_price_normalizer()
 _install_adaptive_learning_area_key_normalizer()
 _install_magazine_renderer_patches()
@@ -309,3 +327,4 @@ _install_mexico_spanish_terms()
 _install_chain_notes()
 _install_magazine_dynamic_sources_and_autosizer()
 _install_weather_compaction_patch()
+_install_result_grade_aliases()
