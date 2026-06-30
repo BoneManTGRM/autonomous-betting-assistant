@@ -4,8 +4,6 @@ import hashlib
 import json
 import os
 import re
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
 import pandas as pd
@@ -126,3 +124,41 @@ def _teams(row: Mapping[str, Any]) -> tuple[str, str]:
                 left, right = event.split(sep, 1)
                 return left.strip(), right.strip()
     return away, home
+
+
+def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False) -> pd.DataFrame:
+    from .magazine_pipeline_runtime import build_final_enriched_picks_df as _runtime_builder
+    return _runtime_builder(raw_picks_df, force_refresh=force_refresh)
+
+
+def validate_report_pipeline(final_enriched_picks_df: Any) -> list[str]:
+    from .magazine_pipeline_runtime import validate_report_pipeline as _runtime_validator
+    return _runtime_validator(final_enriched_picks_df)
+
+
+def prepare_report_rows(rows: Any, force_refresh: bool = False) -> list[dict[str, Any]]:
+    from .magazine_pipeline_runtime import prepare_report_rows as _runtime_prepare
+    return _runtime_prepare(rows, force_refresh=force_refresh)
+
+
+def final_report_diagnostics(final_enriched_picks_df: Any) -> dict[str, Any]:
+    frame = _frame(final_enriched_picks_df)
+    if frame.empty:
+        return {'final_enriched_row_count': 0}
+    event_key_count = int(frame['event_key'].nunique()) if 'event_key' in frame else 0
+    return {
+        'raw_row_count': int(len(frame)),
+        'unique_event_count': event_key_count,
+        'duplicate_row_count': int(len(frame) - event_key_count),
+        'final_enriched_row_count': int(len(frame)),
+        'report_run_id': _txt(frame['report_run_id'].iloc[0]) if 'report_run_id' in frame else '',
+        'last_api_refresh_time': _txt(frame['last_api_refresh_time'].iloc[0]) if 'last_api_refresh_time' in frame else '',
+        'raw_input_hash': _txt(frame['raw_input_hash'].iloc[0]) if 'raw_input_hash' in frame else '',
+        'enrichment_input_hash': _txt(frame['enrichment_input_hash'].iloc[0]) if 'enrichment_input_hash' in frame else '',
+        'fallback_rows': int(frame['fallback_used'].astype(bool).sum()) if 'fallback_used' in frame else 0,
+    }
+
+
+def install() -> None:
+    from .magazine_pipeline_runtime import install as _runtime_install
+    _runtime_install()
