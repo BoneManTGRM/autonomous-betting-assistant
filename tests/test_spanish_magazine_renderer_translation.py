@@ -13,6 +13,7 @@ def test_spanish_report_enrichment_translates_dynamic_text_fields():
         "market_probability": 0.73,
         "model_market_edge": -0.021,
         "expected_value_per_unit": -0.029,
+        "decimal_odds": 1.37,
         "odds_status": "LIVE",
         "odds_source": "LIVE_API",
         "final_decision": "WATCHLIST",
