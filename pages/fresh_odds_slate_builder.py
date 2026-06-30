@@ -21,52 +21,80 @@ from autonomous_betting_agent.ui_i18n import localize_dataframe
 st.set_page_config(page_title="Fresh Odds Slate Builder", layout="wide")
 LANG = render_app_sidebar("fresh_odds_slate_builder", language_key="fresh_odds_slate_builder_language", selector="radio")
 
+SPORT_PRESETS = {
+    "NBA": {"sport_key": "basketball_nba", "regions": "us", "markets": "h2h,spreads,totals"},
+    "WNBA": {"sport_key": "basketball_wnba", "regions": "us", "markets": "h2h,spreads,totals"},
+    "MLB": {"sport_key": "baseball_mlb", "regions": "us", "markets": "h2h,spreads,totals"},
+    "NFL": {"sport_key": "americanfootball_nfl", "regions": "us", "markets": "h2h,spreads,totals"},
+    "NHL": {"sport_key": "icehockey_nhl", "regions": "us", "markets": "h2h,spreads,totals"},
+    "EPL Soccer": {"sport_key": "soccer_epl", "regions": "us,uk,eu", "markets": "h2h,spreads,totals"},
+}
+MARKET_LABELS = {
+    "Moneyline / winner": "h2h",
+    "Spread / handicap": "spreads",
+    "Game total": "totals",
+}
+
 TEXT = {
     "en": {
         "title": "Fresh Odds Slate Builder",
-        "caption": "Phase 3E.6.3 Streamlit/session-only future-event slate builder.",
-        "safety": "Safety",
-        "fetch": "Fetch from The Odds API",
-        "manual": "Upload API JSON payload",
-        "sport_key": "The Odds API sport key",
+        "caption": "Pull a fresh sportsbook slate and send it to Odds Lock Pro. Most of the time, use Pro Predictor first; use this page only when you need a manual fresh-odds pull.",
+        "quick_start": "What to do",
+        "quick_start_text": "Choose the sport, choose the bet types, press Fetch odds, then send the ready rows to Odds Lock Pro. You normally do not need the raw JSON tools.",
+        "fetch": "Simple fresh-odds fetch",
+        "sport_preset": "Sport",
+        "bet_types": "Bet types to include",
+        "fetch_button": "Fetch odds for selected sport",
+        "missing_key": "ODDS_API_KEY is not configured in Streamlit secrets. Add it before fetching.",
+        "advanced_fetch": "Advanced API settings — usually leave closed",
+        "sport_key": "Custom The Odds API sport key",
         "regions": "Regions",
-        "markets": "Markets",
-        "bookmakers": "Bookmakers filter, optional",
-        "fetch_button": "Fetch fresh odds slate now",
-        "missing_key": "ODDS_API_KEY is not configured in Streamlit secrets. Enter it in secrets before fetching.",
+        "markets": "Raw markets string",
+        "bookmakers": "Bookmaker filter — optional",
+        "manual": "Advanced: import raw API JSON — usually skip",
         "upload": "Upload JSON from an API response",
         "api_name": "API payload type",
-        "summary": "Slate Builder Summary",
-        "rows": "Generated Slate Rows",
-        "ready": "Rows ready for advisory pipeline",
-        "missing": "Rows missing fields",
-        "report": "Copy/paste slate report",
-        "send": "Send ready rows to advisory session rows",
-        "sent": "Ready rows were copied into session rows for advisory review.",
+        "summary": "Slate summary",
+        "rows": "All generated rows",
+        "ready": "Ready rows to send forward",
+        "missing": "Rows needing review",
+        "report": "Technical report — optional",
+        "send": "Send ready rows to Odds Lock Pro",
+        "sent": "Ready rows were copied to the next-step session for Odds Lock Pro / advisory review.",
         "download": "Download slate CSV",
+        "safety_details": "Advanced safety details",
+        "safety_warning": "Session-only page. It uses user-triggered API calls only. It does not place bets, mutate proof, run background jobs, expose API keys, or change bankroll/staking.",
+        "empty_rows": "No rows yet. Fetch odds or import JSON first.",
     },
     "es": {
         "title": "Constructor de Slate de Odds Frescas",
-        "caption": "Fase 3E.6.3 constructor de slate futuro solo Streamlit/sesion.",
-        "safety": "Seguridad",
-        "fetch": "Consultar The Odds API",
-        "manual": "Subir payload JSON de API",
-        "sport_key": "Clave deporte The Odds API",
-        "regions": "Regiones",
-        "markets": "Mercados",
-        "bookmakers": "Filtro bookmakers, opcional",
-        "fetch_button": "Consultar slate de odds frescas ahora",
+        "caption": "Consulta una lista fresca de momios y enviala a Odds Lock Pro. Normalmente usa Predictor Pro primero; usa esta pagina solo cuando necesitas consultar momios frescos manualmente.",
+        "quick_start": "Qué hacer",
+        "quick_start_text": "Elige deporte, elige tipos de apuesta, presiona Consultar momios y envia las filas listas a Odds Lock Pro. Normalmente no necesitas las herramientas JSON.",
+        "fetch": "Consulta simple de momios frescos",
+        "sport_preset": "Deporte",
+        "bet_types": "Tipos de apuesta a incluir",
+        "fetch_button": "Consultar momios del deporte seleccionado",
         "missing_key": "ODDS_API_KEY no esta configurada en Streamlit secrets. Agregala antes de consultar.",
+        "advanced_fetch": "Configuracion API avanzada — normalmente dejar cerrado",
+        "sport_key": "Clave personalizada The Odds API",
+        "regions": "Regiones",
+        "markets": "Texto raw de mercados",
+        "bookmakers": "Filtro bookmaker — opcional",
+        "manual": "Avanzado: importar JSON raw — normalmente omitir",
         "upload": "Subir JSON de una respuesta API",
         "api_name": "Tipo de payload API",
-        "summary": "Resumen del constructor de slate",
-        "rows": "Filas generadas",
-        "ready": "Filas listas para asesoría",
-        "missing": "Filas con campos faltantes",
-        "report": "Reporte de slate para copiar/pegar",
-        "send": "Enviar filas listas a sesion asesoría",
-        "sent": "Las filas listas fueron copiadas a la sesion para revisión asesoría.",
+        "summary": "Resumen del slate",
+        "rows": "Todas las filas generadas",
+        "ready": "Filas listas para enviar",
+        "missing": "Filas para revisar",
+        "report": "Reporte tecnico — opcional",
+        "send": "Enviar filas listas a Odds Lock Pro",
+        "sent": "Las filas listas fueron copiadas para Odds Lock Pro / revision asesoría.",
         "download": "Descargar CSV de slate",
+        "safety_details": "Detalles de seguridad avanzados",
+        "safety_warning": "Pagina solo de sesion. Usa llamadas API activadas por el usuario. No apuesta, no muta pruebas, no corre trabajos de fondo, no expone API keys ni cambia bankroll/staking.",
+        "empty_rows": "Aun no hay filas. Consulta momios o importa JSON primero.",
     },
 }
 
@@ -93,7 +121,7 @@ def csv_link(label: str, frame: pd.DataFrame, filename: str) -> None:
 def show_table(title: str, frame: pd.DataFrame) -> None:
     st.subheader(title)
     if frame.empty:
-        st.info("No rows.")
+        st.info(t("empty_rows"))
     else:
         st.dataframe(display_frame(frame), use_container_width=True, hide_index=True)
 
@@ -105,53 +133,79 @@ def _load_json_upload(upload: Any) -> Any:
     return json.loads(content)
 
 
+def _selected_markets(labels: list[str]) -> str:
+    values = [MARKET_LABELS[label] for label in labels if label in MARKET_LABELS]
+    return ",".join(values) or "h2h"
+
+
+def _current_fetch_settings() -> tuple[str, str, str, str]:
+    preset = st.session_state.get("fosb_sport_preset") or "NBA"
+    defaults = SPORT_PRESETS.get(str(preset), SPORT_PRESETS["NBA"])
+    sport_key = str(st.session_state.get("fosb_custom_sport_key") or defaults["sport_key"]).strip()
+    regions = str(st.session_state.get("fosb_regions") or defaults["regions"]).strip()
+    markets = str(st.session_state.get("fosb_markets") or defaults["markets"]).strip()
+    bookmakers = str(st.session_state.get("fosb_bookmakers") or "").strip()
+    return sport_key, regions, markets, bookmakers
+
+
 st.title(t("title"))
 st.caption(t("caption"))
+st.info(f"**{t('quick_start')}** — {t('quick_start_text')}")
 
-st.subheader(t("safety"))
-st.warning(
-    "Fresh Odds Slate Builder is Streamlit/session-only. It uses user-triggered API calls only. "
-    "It does not expose API keys, create a server, database, scheduler, background worker, persistent cache, "
-    "subscriber API layer, proof mutation, result mutation, live betting, or bankroll/staking action."
-)
-st.json({
-    "phase": "3E.6.3",
-    "streamlit_session_only": True,
-    "user_triggered_only": True,
-    "api_key_exposed": False,
-    "server_added": False,
-    "database_added": False,
-    "scheduled_polling": False,
-    "live_betting": False,
-    "proof_mutation": False,
-})
+with st.expander(t("safety_details"), expanded=False):
+    st.warning(t("safety_warning"))
+    st.json({
+        "streamlit_session_only": True,
+        "user_triggered_only": True,
+        "api_key_exposed": False,
+        "database_added": False,
+        "scheduled_polling": False,
+        "live_betting": False,
+        "proof_mutation": False,
+    })
 
 rows: list[dict[str, Any]] = []
 
-with st.expander(t("fetch"), expanded=True):
-    sport_key = st.text_input(t("sport_key"), value="basketball_nba")
-    regions = st.text_input(t("regions"), value="us")
-    markets = st.text_input(t("markets"), value="h2h")
-    bookmakers = st.text_input(t("bookmakers"), value="")
-    if st.button(t("fetch_button")):
-        api_key = str(st.secrets.get("ODDS_API_KEY", "") or "")
-        if not api_key:
-            st.warning(t("missing_key"))
-        else:
-            try:
-                payload = fetch_the_odds_api_payload(
-                    api_key,
-                    sport_key=sport_key,
-                    regions=regions,
-                    markets=markets,
-                    bookmakers=bookmakers,
-                )
-                rows = normalize_the_odds_api_events(payload, sport=sport_key, market=markets.split(",")[0].strip(), bookmaker_filter=bookmakers.strip())
-                st.session_state["fresh_odds_slate_builder_rows"] = rows
-            except Exception as exc:
-                st.error(f"Fresh odds fetch failed: {type(exc).__name__}")
+st.subheader(t("fetch"))
+selected_sport = st.selectbox(t("sport_preset"), list(SPORT_PRESETS.keys()), index=0, key="fosb_sport_preset")
+selected_markets = st.multiselect(
+    t("bet_types"),
+    list(MARKET_LABELS.keys()),
+    default=["Moneyline / winner", "Spread / handicap", "Game total"],
+    key="fosb_market_labels",
+)
+defaults = SPORT_PRESETS.get(selected_sport, SPORT_PRESETS["NBA"])
+st.session_state.setdefault("fosb_custom_sport_key", defaults["sport_key"])
+st.session_state.setdefault("fosb_regions", defaults["regions"])
+st.session_state["fosb_markets"] = _selected_markets(selected_markets)
+
+with st.expander(t("advanced_fetch"), expanded=False):
+    st.text_input(t("sport_key"), value=defaults["sport_key"], key="fosb_custom_sport_key")
+    st.text_input(t("regions"), value=defaults["regions"], key="fosb_regions")
+    st.text_input(t("markets"), value=_selected_markets(selected_markets), key="fosb_markets")
+    st.text_input(t("bookmakers"), value="", key="fosb_bookmakers")
+
+if st.button(t("fetch_button"), type="primary"):
+    sport_key, regions, markets, bookmakers = _current_fetch_settings()
+    api_key = str(st.secrets.get("ODDS_API_KEY", "") or "")
+    if not api_key:
+        st.warning(t("missing_key"))
+    else:
+        try:
+            payload = fetch_the_odds_api_payload(
+                api_key,
+                sport_key=sport_key,
+                regions=regions,
+                markets=markets,
+                bookmakers=bookmakers,
+            )
+            rows = normalize_the_odds_api_events(payload, sport=sport_key, market=markets.split(",")[0].strip(), bookmaker_filter=bookmakers)
+            st.session_state["fresh_odds_slate_builder_rows"] = rows
+        except Exception as exc:
+            st.error(f"Fresh odds fetch failed: {type(exc).__name__}")
 
 with st.expander(t("manual"), expanded=False):
+    st.caption("Use this only when another tool already gave you a raw API response file.")
     api_name = st.selectbox(t("api_name"), ["The Odds API", "SportsDataIO"], index=0)
     upload = st.file_uploader(t("upload"), type=["json"])
     if upload is not None:
@@ -175,12 +229,13 @@ show_table(t("ready"), ready_frame)
 show_table(t("missing"), missing_frame)
 
 if not ready_frame.empty:
-    if st.button(t("send")):
+    if st.button(t("send"), type="primary"):
         ready_rows = ready_frame.to_dict("records")
         st.session_state["fresh_odds_slate_builder_rows"] = ready_rows
         st.session_state["pro_predictor_latest_rows"] = ready_rows
+        st.session_state["odds_lock_pro_candidate_rows"] = ready_rows
         st.success(t("sent"))
     csv_link(t("download"), frame, "fresh_odds_slate_builder.csv")
 
-st.subheader(t("report"))
-st.text_area(t("report"), value=slate_builder_report_section(rows), height=260)
+with st.expander(t("report"), expanded=False):
+    st.text_area(t("report"), value=slate_builder_report_section(rows), height=260)
