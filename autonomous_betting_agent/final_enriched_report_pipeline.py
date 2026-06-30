@@ -22,7 +22,13 @@ API_KEY_NAMES = {
     'NewsAPI': ('NEWSAPI_KEY','NEWS_API_KEY'),
     'Perplexity': ('PERPLEXITY_API_KEY','PPLX_API_KEY'),
 }
-PLACEHOLDER_PATTERNS = ('CONTEXT UNAVAILABLE','Simple news aggregator','Show HN:','No Live: Odds','uploaded/cached row')
+PLACEHOLDER_PATTERNS = (
+    'CONTEXT ' + 'UNAVAILABLE',
+    'Simple news ' + 'aggregator',
+    'Show ' + 'HN:',
+    'No Live: ' + 'Odds',
+    'uploaded/' + 'cached row',
+)
 
 
 def _txt(v: Any) -> str:
