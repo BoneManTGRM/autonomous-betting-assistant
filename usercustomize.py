@@ -7,6 +7,12 @@ except Exception:
     pass
 
 try:
+    from autonomous_betting_agent.magazine_report_cleanup_patch import install as install_magazine_report_cleanup
+    install_magazine_report_cleanup()
+except Exception:
+    pass
+
+try:
     from autonomous_betting_agent.sidebar_tools import install_sidebar_tools
     install_sidebar_tools()
 except Exception:
