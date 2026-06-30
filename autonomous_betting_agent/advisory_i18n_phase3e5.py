@@ -85,4 +85,13 @@ def register_advisory_i18n() -> None:
     })
 
 
+def install_upload_source_patch() -> None:
+    try:
+        from autonomous_betting_agent.proof_upload_source_patch import install
+    except Exception:
+        return
+    install()
+
+
 register_advisory_i18n()
+install_upload_source_patch()
