@@ -13,6 +13,8 @@ def test_spanish_report_enrichment_translates_dynamic_text_fields():
         "market_probability": 0.73,
         "model_market_edge": -0.021,
         "expected_value_per_unit": -0.029,
+        "odds_status": "LIVE",
+        "odds_source": "LIVE_API",
         "final_decision": "WATCHLIST",
         "bookmaker": "consensus average",
         "news_injury_summary": "No lineup/injury headline returned.",
@@ -50,6 +52,7 @@ def test_spanish_renderer_translation_is_installed_after_row_enrichment():
     assert module._tr("No SDIO event ID.", "es") == "Sin ID de evento SDIO."
     assert module._tr("API-FB: no fixture match.", "es") == "API-FB: sin coincidencia de partido."
 
+
 def test_base_magazine_renderer_spanish_fallbacks_and_version():
     import autonomous_betting_agent.magazine_book_export as renderer
 
@@ -85,4 +88,3 @@ def test_base_magazine_renderer_translates_row_sourced_items():
     assert "Revisar la cuota antes de incluir" in combined
     assert "Negative edge" not in combined
     assert "Do not chain" not in combined
-
