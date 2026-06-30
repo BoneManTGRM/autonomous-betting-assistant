@@ -147,6 +147,15 @@ def _patch_commercial_pending_proof_mask() -> None:
     cpt._aba_pending_proof_mask_runtime_v4 = True
 
 
+def _install_report_cleanup(module: ModuleType | None = None) -> ModuleType | None:
+    try:
+        from autonomous_betting_agent.magazine_report_cleanup_patch import install_live_cleanup, install_renderer_cleanup
+        install_live_cleanup()
+        return install_renderer_cleanup(module) if module is not None else module
+    except Exception:
+        return module
+
+
 def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
     if module is None or getattr(module, '__name__', '') != _TARGET:
         return module
@@ -164,6 +173,7 @@ def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
 
         module = apply_magazine_api_patch(module)
         module = install_live_api_enrichment(module)
+        module = _install_report_cleanup(module) or module
         module = apply_magazine_auto_sizer(module)
         module = install_headline_safety(module)
         module = apply_magazine_sale_ready_patch(module)
@@ -172,6 +182,7 @@ def _apply_if_target(module: ModuleType | None) -> ModuleType | None:
         module = install_combo_section(module)
         module = install_parlay_footer_override(module)
         module = install_truth_status_patch(module) or module
+        module = _install_report_cleanup(module) or module
         install_spanish_magazine_fixes()
         return module
     except Exception:
@@ -184,6 +195,8 @@ def _patched_import(name: str, globals: dict[str, Any] | None = None, locals: di
         _apply_if_target(sys.modules.get(_TARGET))
     if name == 'autonomous_betting_agent.pick_hold_store' or (name == 'autonomous_betting_agent' and 'pick_hold_store' in fromlist):
         _patch_proof_hold_store()
+    if name == 'autonomous_betting_agent.magazine_live_api_enrichment' or (name == 'autonomous_betting_agent' and 'magazine_live_api_enrichment' in fromlist):
+        _install_report_cleanup(None)
     if name == 'autonomous_betting_agent.commercial_platform_tools' or (name == 'autonomous_betting_agent' and 'commercial_platform_tools' in fromlist):
         _patch_proof_hold_store()
         _patch_commercial_pending_proof_mask()
@@ -197,6 +210,8 @@ def _patched_reload(module: ModuleType) -> ModuleType:
         reloaded = _apply_if_target(reloaded) or reloaded
     if name == 'autonomous_betting_agent.pick_hold_store':
         _patch_proof_hold_store()
+    if name == 'autonomous_betting_agent.magazine_live_api_enrichment':
+        _install_report_cleanup(None)
     if name == 'autonomous_betting_agent.commercial_platform_tools':
         _patch_proof_hold_store()
         _patch_commercial_pending_proof_mask()
@@ -204,11 +219,12 @@ def _patched_reload(module: ModuleType) -> ModuleType:
 
 
 builtins.get_secret = get_secret
-if getattr(builtins, '_ABA_MAGAZINE_IMPORT_AND_RELOAD_PATCHED_V2', False) is not True:
+if getattr(builtins, '_ABA_MAGAZINE_IMPORT_AND_RELOAD_PATCHED_V3', False) is not True:
     builtins.__import__ = _patched_import
     importlib.reload = _patched_reload
-    builtins._ABA_MAGAZINE_IMPORT_AND_RELOAD_PATCHED_V2 = True
+    builtins._ABA_MAGAZINE_IMPORT_AND_RELOAD_PATCHED_V3 = True
 
 _patch_proof_hold_store()
 _patch_commercial_pending_proof_mask()
+_install_report_cleanup(None)
 _apply_if_target(sys.modules.get(_TARGET))
