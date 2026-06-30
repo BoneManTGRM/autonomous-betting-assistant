@@ -26,11 +26,8 @@ _impl.COUNTRY_ES.update({
     "ivory coast": "Costa de Marfil", "tunisia": "Túnez",
 })
 
-_PROVIDER_BRANDS = {"The Odds API", "Odds API", "SportsDataIO", "WeatherAPI", "API-Football", "NewsAPI", "Perplexity", "Playdoit"}
-
 TEXT_ES = {
     "No recent matching news returned.": "Sin noticias recientes relacionadas.",
-    "No recent matching Noticias returned.": "Sin noticias recientes relacionadas.",
     "No lineup/injury headline returned.": "Sin titular de lesiones/alineación.",
     "No SDIO event ID.": "Sin ID de evento SDIO.",
     "API-FB: no fixture match.": "API-FB: sin coincidencia de partido.",
@@ -42,23 +39,15 @@ TEXT_ES = {
     DN + "chain " + NEG_EV + " picks.": "No encadenar señales con VE negativo.",
     "Avoid " + P + "s unless edge turns positive.": "Evitar " + P + "s salvo que la ventaja sea positiva.",
     "Recheck price before including.": "Revisar la cuota antes de incluir.",
-    "No " + P + " recommended": "No se recomienda " + P,
-    "No " + P + " recommended.": "No se recomienda " + P + ".",
-    "Not enough compatible selections.": "No hay suficientes selecciones compatibles.",
-    "Verified odds are missing.": "Faltan momios verificados.",
     "ACTIVE:": "ACTIVO:", "NO LIVE:": "SIN EN VIVO:", "Odds": "Cuotas", "The Cuotas API": "The Odds API",
 }
 _impl.TEXT_ES.update(TEXT_ES)
 
 SPANISH_REPLACEMENTS = (
-    ("Light rain", "lluvia ligera"), ("Rain", "lluvia"), ("Weather", "Clima"),
-    ("wind", "viento"), ("Wind", "Viento"), ("Location", "Ubicación"),
-    ("Temperature", "Temperatura"), ("Humidity", "Humedad"), ("Forecast", "Pronóstico"),
+    ("Weather", "Clima"), ("wind", "viento"), ("Location", "Ubicación"),
     ("News checked", "Noticias revisadas"), ("no recent matching articles", "sin artículos recientes relacionados"),
-    ("no recent related articles", "sin artículos recientes relacionados"),
     ("no injury/lineup headline", "sin titular de lesiones/alineación"),
-    ("Philadelphia", "Filadelfia"), ("United States of America", "Estados Unidos"),
-    ("United States", "Estados Unidos"), ("USA", "Estados Unidos"),
+    ("United States of America", "Estados Unidos"), ("United States", "Estados Unidos"),
 )
 
 
@@ -94,15 +83,13 @@ def _num(row: Any, *keys: str) -> float | None:
 
 def _edge_state(row: Any) -> tuple[float | None, float | None, bool, bool]:
     edge = _num(row, "model_market_edge", "edge")
-    ev = _num(row, "expected_value_per_unit", "profit_expected_value", "expected_value", "ev")
+    ev = _num(row, "expected_value_per_unit", "profit_expected_value", "expected_value", "EV", "ev")
     return edge, ev, (edge is not None and edge < 0) or (ev is not None and ev < 0), edge is None or ev is None
 
 
 def _es(value: Any, lang: str = "es") -> str:
     text = re.sub(r"\s+", " ", str(value or "").strip())
     if lang != "es" or not text:
-        return text
-    if text in _PROVIDER_BRANDS:
         return text
     if text in TEXT_ES:
         return TEXT_ES[text]
@@ -111,7 +98,7 @@ def _es(value: Any, lang: str = "es") -> str:
         return TEXT_ES[text]
     for source, target in SPANISH_REPLACEMENTS:
         text = re.sub(r"(?<![\w])" + re.escape(source) + r"(?![\w])", target, text, flags=re.I)
-    return text.replace("PA, Estados Unidos", "Pennsylvania, Estados Unidos")
+    return text
 
 
 def translate_country_name(value: Any, lang: str = "es") -> str:
@@ -155,124 +142,76 @@ def sale_ready_recommendation(row: Any) -> tuple[str, str, bool]:
     return action, explanation, playable
 
 
+def _items_from_status(row: Any, source_key: str, reason_key: str, fallback: str) -> list[str]:
+    data = _row(row)
+    status = str(data.get(source_key, "") or "").strip()
+    reason = str(data.get(reason_key, "") or "").strip()
+    if status or reason:
+        return [f"{source_key}: {status or 'EMPTY_WITH_REASON'}", reason or fallback]
+    return [fallback]
+
+
 def sale_ready_team_items(row: Any, side: str = "") -> list[str]:
     lang = _impl._lang(row)
-    raw = [str(item or "") for item in api_sources.team_items(row, side)] or ["No SDIO event ID.", "API-FB lookup checked; no fixture match.", "No recent matching news returned."]
-    mapped = []
-    for item in raw:
-        low = item.lower()
-        if low.startswith("sdio checked"):
-            mapped.append("No SDIO event ID.")
-        elif low.startswith("api-fb") or low.startswith("api-football"):
-            mapped.append("API-FB lookup checked; no fixture match.")
-        elif low.startswith("news checked") or low.startswith("newsapi checked"):
-            mapped.append("No recent matching news returned.")
-        else:
-            mapped.append(item)
-    return _wrap(_dedupe(mapped)[:3], lang)
+    data = _row(row)
+    explicit = _split(data.get(f"{side}_team_form")) + _split(data.get(f"{side}_team_record")) + _split(data.get("team_snapshot_home")) + _split(data.get("team_snapshot_away"))
+    if explicit:
+        return _wrap(_dedupe(explicit)[:3], lang)
+    return _wrap(_items_from_status(data, "sportsdataio_match_status", "sportsdataio_failure_reason", "Team data unavailable because no provider team context reached final_enriched_picks_df."), lang)
 
 
 def sale_ready_injury_items(row: Any, prefix: str = "") -> list[str]:
     lang = _impl._lang(row)
-    raw = [str(item or "") for item in api_sources.injury_items(row, prefix)] or ["No lineup/injury headline returned."]
-    mapped = ["No lineup/injury headline returned." if "injury/lineup" in item.lower() or "lineup" in item.lower() else item for item in raw]
-    return _wrap(_dedupe(mapped)[:2], lang)
-
-
-def _compact_weather_item(item: str) -> list[str]:
-    body = item.split(":", 1)[1].strip() if ":" in item else item
-    location = ""
-    match = re.search(r"\bLocation:\s*(.+)$", body, flags=re.I)
-    if match:
-        location = match.group(1).strip(" .")
-        body = body[: match.start()].strip(" .")
-    temp_match = re.search(r"-?\d+(?:\.\d+)?\s*°\s*[CF]\b", body, flags=re.I)
-    wind_match = re.search(r"\bwind\s+[0-9.]+\s*kph\b", body, flags=re.I)
-    temperature = temp_match.group(0).replace(" ", "") if temp_match else ""
-    wind = wind_match.group(0).lower() if wind_match else ""
-    condition = ""
-    if temp_match:
-        before_temp = body[: temp_match.start()]
-        condition = re.sub(r"[,.;\s]+$", "", before_temp).strip(" ,.;").split(",")[0].strip(" .").lower()
-    lines = []
-    if temperature or condition or wind:
-        lines.append("Weather: " + ", ".join(part for part in (temperature, condition, wind) if part) + ".")
-    if location:
-        lines.append("Location: " + api_sources._shorten_location(location) + ".")
-    return lines
+    data = _row(row)
+    explicit = _split(data.get("injury_notes")) + _split(data.get(f"{prefix}_injuries")) + _split(data.get("injury_report"))
+    return _wrap(_dedupe(explicit)[:2] if explicit else [data.get("context_failure_reason") or "Injury data unavailable because no injury source reached final_enriched_picks_df."], lang)
 
 
 def sale_ready_matchup_items(row: Any) -> list[str]:
     lang = _impl._lang(row)
-    items = []
-    for item in [str(item or "") for item in api_sources.matchup_items(row)]:
-        low = item.lower()
-        if low.startswith("weather:"):
-            items.extend(_compact_weather_item(item))
-        elif low.startswith("api-fb") or low.startswith("api-football"):
-            items.append("API-FB lookup checked; no fixture match.")
-        elif low.startswith("news checked") or low.startswith("newsapi checked"):
-            items.append("No recent matching news returned.")
-        else:
-            items.append(item)
-    return _wrap(_dedupe(items)[:3], lang)
+    data = _row(row)
+    explicit = _split(data.get("matchup_notes")) + _split(data.get("weather_summary")) + _split(data.get("news_summary")) + _split(data.get("perplexity_context"))
+    if explicit:
+        return _wrap(_dedupe(explicit)[:3], lang)
+    return _wrap([data.get("context_failure_reason") or "Context unavailable because no matchup source reached final_enriched_picks_df."], lang)
 
 
 def sale_ready_risk_items(row: Any) -> list[str]:
     lang = _impl._lang(row)
+    data = _row(row)
+    if data.get("risk_reasons"):
+        return _wrap(_split(data.get("risk_reasons"))[:3], lang)
     _edge, _ev, negative, missing = _edge_state(row)
     if negative:
-        items = ["Negative edge at current price.", DN + "play unless price improves.", "Recheck odds and key news."]
-    elif missing:
-        items = ["Research only: edge incomplete.", DN + "combine unverified picks.", "Wait for verified odds."]
-    else:
-        items = ["Risk status: VOLUME OK.", "Recheck odds before entry.", "Avoid if key news changes."]
-    return _wrap(items, lang)
-
-
-def _has_chain_context(row: Any) -> bool:
-    data = _row(row)
-    keys = ("api_sources_active", "api_sources_inactive", "odds_source", "bookmaker", "combo_note", P + "_note", "risk")
-    return any(not _bad(data.get(key)) for key in keys)
+        return _wrap(["Negative edge at current price.", DN + "play unless price improves.", "Recheck odds and key news."], lang)
+    if missing:
+        return _wrap(["Research only: edge incomplete.", DN + "combine unverified picks.", "Wait for verified odds."], lang)
+    return _wrap(["Risk status: VOLUME OK.", "Recheck odds before entry.", "Avoid if key news changes."], lang)
 
 
 def sale_ready_chain_items(row: Any) -> list[str]:
     lang = _impl._lang(row)
-    data = _row(row)
-    explicit = []
-    for key in ("combo_magazine_items", P + "_magazine_items", "combo_recommendation", P + "_recommendation", "combo_note", P + "_note"):
-        explicit.extend(_split(data.get(key)))
-    if explicit:
-        return _wrap(_dedupe(explicit)[:3], lang)
     _edge, _ev, negative, missing = _edge_state(row)
     if negative:
-        if _has_chain_context(row):
-            items = [DN + "chain " + NEG_EV + " picks.", "Avoid " + P + "s unless edge turns positive.", "Recheck price before including."]
-        else:
-            items = ["No " + P + " recommended", "Not enough compatible selections.", "Verified odds are missing."]
-    elif missing:
-        items = ["Research only: edge incomplete.", DN + "combine unverified picks.", "Wait for verified odds."]
-    else:
-        items = ["Straight only: research.", "Avoid " + P + "s unless all legs are +EV.", "Recheck price before including."]
-    return _wrap(items, lang)
+        return _wrap([DN + "chain " + NEG_EV + " picks.", "Avoid " + P + "s unless edge turns positive.", "Recheck price before including."], lang)
+    if missing:
+        return _wrap(["Research only: edge incomplete.", DN + "combine unverified picks.", "Wait for verified odds."], lang)
+    return _wrap(["Straight only: research.", "Avoid " + P + "s unless all legs are +EV.", "Recheck price before including."], lang)
 
 
 def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limit: int, lang: str = "en") -> list[str]:
-    key_tuple = tuple(keys)
-    data = dict(_row(row))
-    explicit = []
-    for key in key_tuple:
+    data = dict(_row(row)); explicit = []
+    for key in tuple(keys):
         explicit.extend(_split(data.get(key)))
     if explicit:
         return _wrap(explicit[:limit], lang)
-    data["report_language"] = lang
-    if any(key in key_tuple for key in ("risk", "risk_level", "risk_label", "profit_guard_status", "risk_note", "risk_notes", "why_lose", "hidden_risk")):
+    if any(k in tuple(keys) for k in ("risk", "risk_level", "risk_label", "risk_note", "risk_notes", "why_lose", "hidden_risk")):
         items = sale_ready_risk_items(data)
-    elif any(key in key_tuple for key in ("chain_note", "chain_notes", P + "_note", P + "_notes", "combo_note", "combo_magazine_items", P + "_magazine_items", "main_read", "add_on_legs")):
+    elif any(k in tuple(keys) for k in ("chain_note", "chain_notes", P + "_note", P + "_notes", "combo_note", "combo_magazine_items", P + "_magazine_items", "main_read", "add_on_legs")):
         items = sale_ready_chain_items(data)
-    elif "matchup_note" in key_tuple or "sports_context_summary" in key_tuple or "weather_summary" in key_tuple:
+    elif "matchup_note" in tuple(keys) or "sports_context_summary" in tuple(keys) or "weather_summary" in tuple(keys):
         items = sale_ready_matchup_items(data)
-    elif "injury_report" in key_tuple or "lineup_status" in key_tuple or "key_players" in key_tuple:
+    elif "injury_report" in tuple(keys) or "lineup_status" in tuple(keys) or "key_players" in tuple(keys):
         items = sale_ready_injury_items(data, "away")
     else:
         items = sale_ready_team_items(data)
@@ -319,6 +258,11 @@ def apply_magazine_sale_ready_patch(module):
 
     patched._tr = patched_tr
     patched.render_full_pick_magazine_page = patched_render
+    try:
+        from .magazine_pipeline_runtime import install as install_final_enriched_pipeline
+        install_final_enriched_pipeline()
+    except Exception:
+        pass
     if not str(getattr(patched, "MAGAZINE_STYLE_VERSION", "")).endswith("_sale_ready_risk_chain_v4"):
         base = re.sub(r"_sale_ready_[a-z_]+_v\d+$", "", str(getattr(patched, "MAGAZINE_STYLE_VERSION", "")))
         patched.MAGAZINE_STYLE_VERSION = f"{base}_sale_ready_risk_chain_v4"
