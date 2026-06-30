@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any, Mapping
 
 import pandas as pd
@@ -70,6 +71,8 @@ DEDUPLICATION_COLUMNS = [
     'bookmaker',
     'decimal_price',
 ]
+
+TRUTHY_VALUES = {'true', '1', 'yes', 'y', 'pass', 'ok'}
 
 
 def clean_key(value: Any) -> str:
@@ -169,6 +172,44 @@ def normalize_row(row: Mapping[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _truthy(value: Any) -> bool:
+    return safe_text(value).lower() in TRUTHY_VALUES
+
+
+def _needs_synthetic_proof(row: Mapping[str, Any]) -> bool:
+    if safe_text(row.get('proof_id')) and safe_text(row.get('locked_at_utc')):
+        return False
+    grade = safe_text(row.get('verified_grade')).lower()
+    return _truthy(row.get('lock_ready')) or grade in {'win', 'loss', 'void', 'push', 'pending'}
+
+
+def _synthetic_proof_id(row: Mapping[str, Any]) -> str:
+    key = '|'.join([
+        safe_text(row.get('event_id')),
+        safe_text(row.get('event')),
+        safe_text(row.get('event_start_utc')),
+        safe_text(row.get('sport')),
+        safe_text(row.get('market_type')),
+        safe_text(row.get('line_point')),
+        safe_text(row.get('prediction')),
+        safe_text(row.get('decimal_price')),
+    ])
+    return 'OLP-SYN-' + hashlib.sha256(key.encode('utf-8')).hexdigest()[:12].upper()
+
+
+def _add_synthetic_proof_fields(item: dict[str, Any]) -> None:
+    if not _needs_synthetic_proof(item):
+        return
+    if not safe_text(item.get('proof_id')):
+        item['proof_id'] = _synthetic_proof_id(item)
+    if not safe_text(item.get('locked_at_utc')):
+        item['locked_at_utc'] = safe_text(item.get('prediction_timestamp') or item.get('odds_timestamp') or item.get('verified_updated_utc') or item.get('created_at'))
+    if not safe_text(item.get('proof_source_type')):
+        item['proof_source_type'] = 'lock_ready_verified_tracker'
+    if not safe_text(item.get('proof_status')):
+        item['proof_status'] = 'locked_before_start'
+
+
 def _dedupe_key(row: Mapping[str, Any]) -> tuple[str, ...]:
     proof_id = safe_text(row.get('proof_id'))
     if proof_id:
@@ -210,5 +251,6 @@ def normalize_frame(frame: pd.DataFrame) -> pd.DataFrame:
             if key not in item or not safe_text(item.get(key)):
                 item[key] = value
         item['result_status'] = normalized['result_status']
+        _add_synthetic_proof_fields(item)
         rows.append(item)
     return dedupe_frame(pd.DataFrame(rows))
