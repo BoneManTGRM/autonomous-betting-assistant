@@ -158,14 +158,16 @@ def has_void_label(row: Mapping[str, Any]) -> bool:
 
 def result_status(row: Mapping[str, Any]) -> str:
     statuses = _mapped_status_values(row)
+    # A void/push/cancellation label is a terminal settlement state and must not
+    # be counted as a loss even when another legacy field still says loss.
+    if has_void_label(row):
+        return 'void'
     # API/result sync can set result_status=win/loss while older upload fields
     # like verified_grade remain pending. Never let a pending alias overwrite a
     # later resolved grade.
     for status in statuses:
-        if status in RESOLVED_RESULT_STATUSES:
+        if status in {'win', 'loss'}:
             return status
-    if has_void_label(row):
-        return 'void'
     for status in statuses:
         if status and status not in PENDING_RESULT_STATUSES:
             return status
@@ -173,7 +175,7 @@ def result_status(row: Mapping[str, Any]) -> str:
     winner = first_text(row, 'winner').lower()
     if pick and winner:
         return 'win' if pick == winner else 'loss'
-    return 'pending' if statuses else 'pending'
+    return 'pending'
 
 
 def normalize_row(row: Mapping[str, Any]) -> dict[str, Any]:
