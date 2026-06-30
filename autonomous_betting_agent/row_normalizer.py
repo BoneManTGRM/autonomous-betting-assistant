@@ -20,9 +20,11 @@ ALIASES = {
     'prediction_timestamp': ('prediction_timestamp', 'locked_at_utc', 'odds_timestamp', 'created_at', 'scan_timestamp'),
     'event_start_utc': ('event_start_utc', 'known_start_utc', 'start', 'commence_time', 'game_start', 'match_start', 'scheduled_start'),
     'odds_timestamp': ('odds_timestamp', 'price_timestamp', 'last_odds_update', 'last_update'),
-    # Keep verified_grade before generic status fields so manually verified CSVs are
-    # the source of truth instead of stale pending/result fields.
-    'result_status': ('verified_grade', 'verified_result', 'verified_status', 'result_status', 'outcome', 'result', 'win_loss', 'graded_result', 'status', 'resultado'),
+    'result_status': (
+        'verified_grade', 'verified_result', 'verified_status', 'verified_outcome', 'verified_result_status',
+        'grade', 'final_grade', 'proof_grade', 'pick_grade', 'row_grade', 'result_grade', 'manual_grade',
+        'result_status', 'outcome', 'result', 'win_loss', 'graded_result', 'status', 'resultado',
+    ),
     'winner': ('winner', 'actual_winner', 'winning_side', 'final_winner', 'ganador'),
     'final_score': ('verified_final_result', 'final_score', 'score', 'actual_score', 'result_note'),
     'stake_units': ('stake_units', 'recommended_stake_units', 'suggested_stake_units', 'stake'),
@@ -51,13 +53,16 @@ VOID_LABELS = {
 }
 
 RESULT_MAP = {
-    'won': 'win', 'win': 'win', 'w': 'win', 'correct': 'win', 'hit': 'win', 'true': 'win', 'yes': 'win', '1': 'win', '1.0': 'win',
+    'won': 'win', 'winner': 'win', 'winning': 'win', 'win': 'win', 'w': 'win', 'correct': 'win', 'hit': 'win', 'true': 'win', 'yes': 'win', '1': 'win', '1.0': 'win',
     'ganada': 'win', 'gano': 'win', 'ganó': 'win', 'victoria': 'win', 'acierto': 'win',
-    'lost': 'loss', 'loss': 'loss', 'l': 'loss', 'incorrect': 'loss', 'miss': 'loss', 'false': 'loss', 'no': 'loss', '0': 'loss', '0.0': 'loss',
+    'lost': 'loss', 'loser': 'loss', 'losing': 'loss', 'loss': 'loss', 'l': 'loss', 'incorrect': 'loss', 'miss': 'loss', 'false': 'loss', 'no': 'loss', '0': 'loss', '0.0': 'loss',
     'perdida': 'loss', 'perdio': 'loss', 'perdió': 'loss', 'derrota': 'loss', 'fallo': 'loss',
     **{label: 'void' for label in VOID_LABELS},
-    'pending': 'pending', 'unknown': 'pending', 'scheduled': 'pending', 'live': 'pending', 'unverified_or_pending': 'pending',
+    'pending': 'pending', 'ungraded': 'pending', 'not_graded': 'pending', 'not graded': 'pending', 'unknown': 'pending', 'scheduled': 'pending', 'live': 'pending', 'unverified_or_pending': 'pending',
 }
+
+RESOLVED_RESULT_STATUSES = {'win', 'loss', 'void'}
+PENDING_RESULT_STATUSES = {'pending', 'unknown', 'scheduled', 'live', '', 'needs_review'}
 
 DEDUPLICATION_COLUMNS = [
     'proof_id',
@@ -125,6 +130,17 @@ def probability_value(row: Mapping[str, Any], canonical_name: str = 'model_proba
     return None
 
 
+def _mapped_status_values(row: Mapping[str, Any]) -> list[str]:
+    normalized = normalized_mapping(row)
+    statuses: list[str] = []
+    for alias in ALIASES['result_status']:
+        raw = safe_text(normalized.get(clean_key(alias))).lower()
+        if not raw:
+            continue
+        statuses.append(RESULT_MAP.get(raw, raw))
+    return statuses
+
+
 def has_void_label(row: Mapping[str, Any]) -> bool:
     normalized = normalized_mapping(row)
     aliases = ALIASES['result_status'] + ALIASES['final_score']
@@ -132,7 +148,8 @@ def has_void_label(row: Mapping[str, Any]) -> bool:
         value = safe_text(normalized.get(clean_key(alias))).lower()
         if not value:
             continue
-        if value in VOID_LABELS:
+        mapped = RESULT_MAP.get(value, value)
+        if mapped == 'void' or value in VOID_LABELS:
             return True
         if any(label in value for label in VOID_LABELS):
             return True
@@ -140,16 +157,23 @@ def has_void_label(row: Mapping[str, Any]) -> bool:
 
 
 def result_status(row: Mapping[str, Any]) -> str:
+    statuses = _mapped_status_values(row)
+    # API/result sync can set result_status=win/loss while older upload fields
+    # like verified_grade remain pending. Never let a pending alias overwrite a
+    # later resolved grade.
+    for status in statuses:
+        if status in RESOLVED_RESULT_STATUSES:
+            return status
     if has_void_label(row):
         return 'void'
-    raw = first_text(row, 'result_status').lower()
-    if raw in RESULT_MAP:
-        return RESULT_MAP[raw]
+    for status in statuses:
+        if status and status not in PENDING_RESULT_STATUSES:
+            return status
     pick = first_text(row, 'prediction').lower()
     winner = first_text(row, 'winner').lower()
     if pick and winner:
         return 'win' if pick == winner else 'loss'
-    return raw or 'pending'
+    return 'pending' if statuses else 'pending'
 
 
 def normalize_row(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -179,8 +203,8 @@ def _truthy(value: Any) -> bool:
 def _needs_synthetic_proof(row: Mapping[str, Any]) -> bool:
     if safe_text(row.get('proof_id')) and safe_text(row.get('locked_at_utc')):
         return False
-    grade = safe_text(row.get('verified_grade')).lower()
-    return _truthy(row.get('lock_ready')) or grade in {'win', 'loss', 'void', 'push', 'pending'}
+    status = result_status(row)
+    return _truthy(row.get('lock_ready')) or status in {'win', 'loss', 'void', 'pending'}
 
 
 def _synthetic_proof_id(row: Mapping[str, Any]) -> str:
