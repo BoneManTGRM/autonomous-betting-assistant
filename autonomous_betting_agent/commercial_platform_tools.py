@@ -29,6 +29,7 @@ LOCKED_VALUE_FIELDS = ['locked_decimal_price', 'lock_decimal_price', 'decimal_pr
 CLV_VALUE_FIELDS = ['clv_percent', 'closing_line_value_percent', 'clv']
 BEAT_CLOSE_FIELDS = ['beat_close', 'beat_closing_line', 'beat_closing_price']
 TRUTHY_VALUES = {'true', '1', 'yes', 'y', 'pass', 'ok'}
+RESOLVED_STATUSES = {'win', 'loss', 'void'}
 
 
 def normalize_workspace_id(v: Any) -> str:
@@ -124,6 +125,36 @@ def _ensure_lock_identity(frame: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _result_rank(row: Mapping[str, Any]) -> int:
+    """Higher is better. Prevent an ungraded sync row from replacing a graded row."""
+    status = result_status(row)
+    if status in {'win', 'loss'}:
+        return 4
+    if status == 'void':
+        return 3
+    if safe_text(row.get('graded_at_utc')):
+        return 2
+    if status in {'pending', 'unknown', 'scheduled', 'live', '', 'needs_review'}:
+        return 1
+    return 0
+
+
+def _sort_for_result_preservation(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    out = frame.copy()
+    out['_aba_result_rank'] = [_result_rank(row) for row in out.to_dict('records')]
+    if 'graded_at_utc' in out.columns:
+        out['_aba_graded_at_sort'] = pd.to_datetime(out['graded_at_utc'], errors='coerce', utc=True)
+    else:
+        out['_aba_graded_at_sort'] = pd.NaT
+    return out.sort_values(['_aba_result_rank', '_aba_graded_at_sort'], ascending=[True, True], na_position='first')
+
+
+def _drop_helper_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    return frame.drop(columns=[col for col in ['_aba_result_rank', '_aba_graded_at_sort'] if col in frame.columns], errors='ignore')
+
+
 def filter_locked_proof_rows(frame):
     raw = pd.DataFrame(frame) if isinstance(frame, list) else frame
     out = update_profit_columns(raw) if raw is not None and not raw.empty else pd.DataFrame()
@@ -163,11 +194,13 @@ def merge_ledgers(*frames, active_only: bool = False):
     if not parts:
         return pd.DataFrame()
     out = pd.concat(parts, ignore_index=True, sort=False)
+    out = _sort_for_result_preservation(out)
     if 'proof_id' in out.columns:
         out = out.drop_duplicates(subset=['proof_id'], keep='last')
     cols = [c for c in ['event', 'prediction', 'event_start_utc', 'market_type', 'line_point'] if c in out.columns]
     if cols:
         out = out.drop_duplicates(subset=cols, keep='last')
+    out = _drop_helper_columns(out)
     out = filter_locked_proof_rows(out)
     return latest_active_list(out) if active_only else out
 
@@ -185,9 +218,11 @@ def load_persistent_ledger(path: Path = DEFAULT_LEDGER_PATH, workspace_id: Any =
 
 
 def save_persistent_ledger(frame, path: Path = DEFAULT_LEDGER_PATH, workspace_id: Any = ''):
-    out = filter_locked_proof_rows(frame)
-    if out.empty:
+    incoming = filter_locked_proof_rows(frame)
+    if incoming.empty:
         return pd.DataFrame()
+    existing = load_persistent_ledger(path=path, workspace_id=workspace_id, active_only=False)
+    out = merge_ledgers(existing, incoming) if not existing.empty else incoming
     save_held_rows(LOCKED_STORE_KEY, out, workspace_id)
     save_held_rows(REFRESH_STORE_KEY, out, workspace_id)
     try:
@@ -256,12 +291,17 @@ def apply_result_updates(ledger, results):
                 matched.add('k:' + key)
         if match:
             r = _result_from_row(match, safe_text(item.get('prediction')))
+            current = result_status(item)
+            if r == 'pending' and current in RESOLVED_STATUSES:
+                rows.append(item)
+                continue
             _copy_optional_market_close_fields(item, match)
             if r in {'win', 'loss', 'void', 'pending'}:
                 item['result_status'] = r
                 item['winner'] = safe_text(match.get('winner') or match.get('actual_winner') or match.get('final_winner') or item.get('winner'))
                 item['final_score'] = safe_text(match.get('verified_final_result') or match.get('final_score') or match.get('score') or item.get('final_score'))
-                item['graded_at_utc'] = pd.Timestamp.utcnow().isoformat()
+                if r in RESOLVED_STATUSES:
+                    item['graded_at_utc'] = pd.Timestamp.utcnow().isoformat()
                 item['profit_units'] = compute_profit_units(item)
                 updated += 1
         rows.append(item)
