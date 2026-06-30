@@ -271,6 +271,20 @@ def _active_identity(frame: pd.DataFrame) -> dict[str, Any]:
     return out
 
 
+def _should_sync_dashboard(*, actual_changed: int, stats: dict[str, Any], before_counts: dict[str, int], after_counts: dict[str, int]) -> bool:
+    if actual_changed > 0:
+        return True
+    updated_rows = int(stats.get('updated_rows') or 0)
+    if updated_rows <= 0:
+        return False
+    if int(after_counts.get('resolved') or 0) > int(before_counts.get('resolved') or 0):
+        return True
+    # Some current locked-game rows arrive with non-canonical/pending legacy grade fields.
+    # If the grader reports concrete updates, persist the normalized result frame even
+    # when the row-key delta check misses the change.
+    return True
+
+
 def full_update_and_sync(*, workspace_id: Any = '', api_key_override: str = '', days_from: int = 7, sport_key: str = '') -> tuple[pd.DataFrame, dict[str, Any]]:
     ledger_all = load_persistent_ledger(workspace_id=workspace_id, active_only=False)
     locked = latest_active_list(ledger_all)
@@ -284,9 +298,12 @@ def full_update_and_sync(*, workspace_id: Any = '', api_key_override: str = '', 
     if not updated.empty:
         updated, protected_wins = _protect_existing_wins(locked, updated)
         actual_changed = _changed_rows(locked, updated)
-        if actual_changed > 0:
-            updated = sync_dashboard_state(updated, workspace_id=workspace_id)
     after_counts = _status_counts(updated if not updated.empty else locked)
+    dashboard_synced = False
+    if not updated.empty and _should_sync_dashboard(actual_changed=actual_changed, stats=stats, before_counts=before_counts, after_counts=after_counts):
+        updated = sync_dashboard_state(updated, workspace_id=workspace_id)
+        dashboard_synced = True
+        after_counts = _status_counts(updated)
     ok_sports = [item for item in sport_stats if str(item.get('status', '')).startswith('ok')]
     errored_sports = [item for item in sport_stats if not str(item.get('status', '')).startswith('ok')]
     if results.empty and errored_sports and not ok_sports:
@@ -295,6 +312,8 @@ def full_update_and_sync(*, workspace_id: Any = '', api_key_override: str = '', 
         reason = 'no_completed_results_found'
     elif int(stats.get('matched_rows') or 0) <= 0:
         reason = 'completed_results_found_but_no_ledger_matches'
+    elif dashboard_synced:
+        reason = 'results_updated'
     elif actual_changed <= 0:
         reason = 'matches_found_but_no_new_changes'
     else:
@@ -311,6 +330,7 @@ def full_update_and_sync(*, workspace_id: Any = '', api_key_override: str = '', 
         'regraded_resolved_rows': True,
         'protected_existing_wins': protected_wins,
         'actual_changed_rows': actual_changed,
+        'dashboard_synced': dashboard_synced,
         'before_counts': before_counts,
         'after_counts': after_counts,
         'reason': reason,
