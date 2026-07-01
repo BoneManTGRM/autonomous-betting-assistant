@@ -149,17 +149,8 @@ def install_sale_ready_polish() -> None:
         pass
 
 
-def install_fresh_handoff_guard() -> None:
-    try:
-        from autonomous_betting_agent.report_studio_fresh_handoff_patch import install as install_guard
-        install_guard()
-    except Exception:
-        pass
-
-
 def install() -> None:
     install_sale_ready_polish()
-    install_fresh_handoff_guard()
 
 
 install()
