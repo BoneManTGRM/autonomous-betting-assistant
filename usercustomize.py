@@ -18,6 +18,12 @@ else:
         pass
 
     try:
+        from autonomous_betting_agent.magazine_provider_usage_patch import install as install_magazine_provider_usage
+        install_magazine_provider_usage()
+    except Exception:
+        pass
+
+    try:
         from autonomous_betting_agent.magazine_report_polish_patch import install as install_magazine_report_polish
         install_magazine_report_polish()
     except Exception:
