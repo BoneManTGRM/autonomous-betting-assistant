@@ -24,7 +24,8 @@ BAD_CONTEXT_TOKENS = (
     "fight news", "no provider event id", "sdio checked", "no sdio event id",
     "simple news aggregator", "show hn", "uploaded/cached row", "data not returned",
     "player data not returned", "not returned for this event", "context unavailable",
-    "news checked", "no injury/lineup headline",
+    "news checked", "no injury/lineup headline", "no lineup/injury headline",
+    "odds are not live.",
 )
 POSTGAME_TOKENS = (
     " ended ", " defeated ", " beat ", " won ", " lost ", " victory ",
@@ -49,12 +50,15 @@ TEXT_ES = {
     "No recent matching Noticias returned.": "Sin noticias recientes relacionadas.",
     "No lineup/injury headline returned.": "Sin titular de lesiones/alineación.",
     "No verified lineup/injury note returned.": "Sin nota verificada de alineación/lesión.",
+    "No verified lineup/injury update returned.": "Sin actualización verificada de alineación/lesión.",
+    "No live team snapshot returned.": "Sin resumen de equipo en vivo.",
     "No SDIO event ID.": "Sin ID de evento SDIO.",
     "API-FB lookup checked; no fixture match.": "API-FB revisada; sin coincidencia de partido.",
     "API-FB: no fixture match.": "API-FB: sin coincidencia de partido.",
     "Team data not matched to a live provider.": "Datos de equipo no vinculados a proveedor en vivo.",
     "Verify lineup/news before entry.": "Verificar alineación/noticias antes de entrar.",
     "Verify before entry.": "Verificar antes de entrar.",
+    "Fallback report: verify current odds and news before entry.": "Reporte fallback: verificar cuotas actuales y noticias antes de entrar.",
     "No parlay recommended": "No se recomienda parlay",
     "Not enough compatible selections.": "No hay suficientes selecciones compatibles.",
     "Verified odds are missing.": "Faltan cuotas verificadas.",
@@ -261,14 +265,14 @@ def sale_ready_team_items(row: Any, side: str = "") -> list[str]:
     lang = _impl._lang(row)
     keys = (f"{side}_team_form", f"{side}_team_record", f"{side}_recent_results", "team_snapshot_home", "team_snapshot_away", "team_stats_summary", "recent_results", "perplexity_context")
     items = _source_items(row, keys, 3, 62)
-    return _wrap(items or ["No SDIO event ID."], lang)
+    return _wrap(items or ["No live team snapshot returned.", "Verify lineup/news before entry."], lang)
 
 
 def sale_ready_injury_items(row: Any, prefix: str = "") -> list[str]:
     lang = _impl._lang(row)
     keys = (f"{prefix}_injuries", f"{prefix}_injury_report", f"{prefix}_lineup_status", f"{prefix}_player_notes", "injury_report", "injuries", "lineup_status", "key_players", "perplexity_context")
     items = _source_items(row, keys, 2, 66)
-    return _wrap(items or ["No lineup/injury headline returned."], lang)
+    return _wrap(items or ["No verified lineup/injury update returned.", "Verify before entry."], lang)
 
 
 def _compact_location(raw: str, lang: str) -> str | None:
@@ -321,7 +325,7 @@ def _compact_weather(raw: str, lang: str) -> list[str]:
 def _compact_api_fb(row: Any, lang: str) -> str | None:
     data = _row(row)
     raw = _clean_text(data.get("api_football_summary") or data.get("api_football_team_summary") or "")
-    if raw and ("api-fb" in raw.lower() or "api football" in raw.lower()):
+    if raw and ("api-fb" in raw.lower() or "api football" in raw.lower()) and not _bad_context(raw, row):
         return _es("API-FB lookup checked; no fixture match.", lang)
     return None
 
@@ -331,7 +335,7 @@ def sale_ready_matchup_items(row: Any) -> list[str]:
     items: list[str] = []
     if _explicit_fallback_odds(row):
         items.append("Odds are not live; verify current price before entry.")
-    items.extend(_source_items(row, ("perplexity_context", "perplexity_summary", "sports_context_summary", "preview_summary", "game_summary", "short_reason", "matchup_note", "matchup_notes"), 1, 82))
+    items.extend(_source_items(row, ("perplexity_context", "perplexity_summary", "sports_context_summary", "preview_summary", "game_summary", "short_reason", "matchup_note"), 1, 82))
     items.extend(_compact_weather(str(_row(row).get("weather_summary", "") or ""), lang))
     api_fb = _compact_api_fb(row, lang)
     if api_fb:
@@ -412,9 +416,12 @@ def _sanitize_pick(data: Any) -> Any:
         row["risk_level"] = "FALLBACK MODE"
         row["risk_label"] = "FALLBACK MODE"
         row["final_decision"] = "WATCHLIST"
+        row["sports_context_summary"] = "Fallback report: verify current odds and news before entry."
+        row["preview_summary"] = "Fallback report: verify current odds and news before entry."
+        row["short_reason"] = "Fallback report: verify current odds and news before entry."
         row["why_lose"] = "\n".join(["Fallback data used.", "Verify live odds before entry.", "Do not use until the price is confirmed."])
         row["chain_notes"] = "\n".join(["No parlay recommended", "Not enough compatible selections.", "Verified odds are missing."])
-    for key in ("perplexity_context", "perplexity_summary", "newsapi_summary", "news_summary", "sports_context_summary", "preview_summary", "game_summary", "short_reason", "matchup_note", "matchup_notes", "team_snapshot_home", "team_snapshot_away", "sportsdataio_context", "sportsdataio_team_summary", "api_football_summary"):
+    for key in ("perplexity_context", "perplexity_summary", "newsapi_summary", "news_summary", "game_summary", "matchup_note", "matchup_notes", "team_snapshot_home", "team_snapshot_away", "sportsdataio_context", "sportsdataio_team_summary", "api_football_summary"):
         if _bad_context(row.get(key), row):
             row[key] = ""
     row["matchup_notes"] = "\n".join(sale_ready_matchup_items(row))
