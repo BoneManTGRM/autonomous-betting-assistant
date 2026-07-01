@@ -4,6 +4,6 @@
   "workspace_id": "test_01",
   "key": "latest_pro_predictor_high_confidence_rows",
   "parts": 3,
-  "rows_count": 148,
+  "rows_count": 146,
   "chunk_size": 50
 }
