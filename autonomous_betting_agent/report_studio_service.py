@@ -54,6 +54,64 @@ class ReportStudioState:
     context_note: str = ""
 
 
+_SOURCE_COPY = {
+    "en": {
+        "current-run": (
+            "Current run / session rows",
+            "Current slate",
+            "Current session rows are being used. Verify live odds and news before publishing.",
+            "INFO",
+        ),
+        "uploaded": (
+            "Uploaded fallback rows",
+            "Uploaded report input",
+            "Uploaded rows are being used. Treat as verification-only unless API fields show LIVE.",
+            "VERIFY",
+        ),
+        "saved-handoff": (
+            "Saved handoff rows",
+            "Saved current handoff",
+            "Saved handoff rows are being used. Confirm this is the newest run before publishing.",
+            "VERIFY",
+        ),
+        "ledger-history": (
+            "Proof ledger history",
+            "Historical proof ledger",
+            "This is proof-ledger history, not a live current-slate magazine. Run Pro Predictor/Odds Lock Pro or upload the newest CSV before publishing.",
+            "HISTORY_ONLY",
+        ),
+        "none": ("No report source", "No rows loaded", "No report source is loaded.", "BLOCKED"),
+    },
+    "es": {
+        "current-run": (
+            "Filas actuales de sesión",
+            "Cartelera actual",
+            "Se usan filas actuales de sesión. Verificar cuotas y noticias antes de publicar.",
+            "INFO",
+        ),
+        "uploaded": (
+            "Filas subidas / fallback",
+            "Entrada subida para reporte",
+            "Se usan filas subidas. Tratar como solo verificación salvo que los campos API muestren LIVE.",
+            "VERIFICAR",
+        ),
+        "saved-handoff": (
+            "Filas guardadas de traspaso",
+            "Traspaso actual guardado",
+            "Se usan filas guardadas de traspaso. Confirmar que es la corrida más reciente antes de publicar.",
+            "VERIFICAR",
+        ),
+        "ledger-history": (
+            "Historial del ledger de prueba",
+            "Ledger histórico de prueba",
+            "Esto es historial del ledger de prueba, no una revista en vivo de la cartelera actual. Ejecuta Pro Predictor/Odds Lock Pro o sube el CSV más reciente antes de publicar.",
+            "SOLO_HISTORIAL",
+        ),
+        "none": ("Sin fuente de reporte", "Sin filas cargadas", "No hay fuente de reporte cargada.", "BLOQUEADO"),
+    },
+}
+
+
 def _to_frame(rows: pd.DataFrame | Sequence[Mapping[str, Any]] | None) -> pd.DataFrame:
     if rows is None:
         return pd.DataFrame()
@@ -67,6 +125,69 @@ def _brand_from(value: MagazineBrand | Mapping[str, Any]) -> MagazineBrand:
         return value
     allowed = set(MagazineBrand.__dataclass_fields__)
     return MagazineBrand(**{key: val for key, val in dict(value).items() if key in allowed})
+
+
+def _source_mode(source_note: str) -> str:
+    text = safe_text(source_note).lower()
+    if text.startswith("uploaded:"):
+        return "uploaded"
+    if text.startswith("session:"):
+        return "current-run"
+    if text.startswith("saved:"):
+        return "saved-handoff"
+    if "persistent_proof_ledger" in text or "ledger-history" in text:
+        return "ledger-history"
+    return "none"
+
+
+def _source_contract(source_note: str, language: str) -> dict[str, str]:
+    lang = lang_code(language)
+    mode = _source_mode(source_note)
+    label, scope, warning, severity = _SOURCE_COPY.get(lang, _SOURCE_COPY["en"]).get(mode, _SOURCE_COPY.get(lang, _SOURCE_COPY["en"])["none"])
+    return {
+        "report_source_mode": mode,
+        "report_source_label": label,
+        "report_data_scope": scope,
+        "report_truth_warning": warning,
+        "report_truth_severity": severity,
+        "report_source_note": safe_text(source_note) or "none",
+    }
+
+
+def _has_live_odds(row: Mapping[str, Any]) -> bool:
+    marker = " ".join(safe_text(row.get(key)).lower() for key in ("odds_status", "odds_source", "odds_api_status", "data_source"))
+    return "live" in marker and "uploaded" not in marker and "fallback" not in marker
+
+
+def _has_live_context(row: Mapping[str, Any]) -> bool:
+    blocked = ("context unavailable", "not returned", "data unavailable", "uploaded row", "no live")
+    for key in ("perplexity_context", "newsapi_summary", "weather_summary", "api_football_summary", "sportsdataio_context", "sports_context_summary"):
+        text = safe_text(row.get(key)).lower()
+        if text and not any(token in text for token in blocked):
+            return True
+    return False
+
+
+def _annotate_source_contract(frame: pd.DataFrame, *, source_note: str, language: str) -> pd.DataFrame:
+    if frame.empty:
+        return frame.copy()
+    contract = _source_contract(source_note, language)
+    rows: list[dict[str, Any]] = []
+    for row in frame.to_dict("records"):
+        data = dict(row)
+        for key, value in contract.items():
+            data[key] = data.get(key) or value
+        data["report_live_odds_detected"] = str(_has_live_odds(data))
+        data["report_live_context_detected"] = str(_has_live_context(data))
+        data["model_mutation_status"] = data.get("model_mutation_status") or "DISABLED_SAFE_MODE"
+        data["model_mutation_label"] = data.get("model_mutation_label") or ("Model mutation disabled / safe mode" if lang_code(language) == "en" else "Mutación del modelo desactivada / modo seguro")
+        data["gate_status_label"] = data.get("gate_status_label") or ("Gate status" if lang_code(language) == "en" else "Estado del filtro")
+        if not _has_live_context(data):
+            for key in ("sports_context_summary", "preview_summary", "game_summary", "short_reason", "matchup_note"):
+                if not safe_text(data.get(key)):
+                    data[key] = contract["report_truth_warning"]
+        rows.append(data)
+    return pd.DataFrame(rows)
 
 
 def _filter_sports(frame: pd.DataFrame, selected_sports: Sequence[str]) -> pd.DataFrame:
@@ -168,12 +289,13 @@ def _data_issues(frame: pd.DataFrame) -> int:
     return int(frame["data_issue_reason"].map(lambda value: bool(safe_text(value))).sum())
 
 
-def build_report_studio_cards(raw_rows: pd.DataFrame | Sequence[Mapping[str, Any]] | None, filters: ReportStudioFilters | None = None) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def build_report_studio_cards(raw_rows: pd.DataFrame | Sequence[Mapping[str, Any]] | None, filters: ReportStudioFilters | None = None, source_note: str = "") -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     filters = filters or ReportStudioFilters()
     raw = _to_frame(raw_rows)
     if raw.empty:
         empty = pd.DataFrame()
         return raw, empty, empty, empty
+    raw = _annotate_source_contract(raw, source_note=source_note, language=filters.language)
     normalized = normalize_frame(raw)
     filtered = _filter_sports(normalized, filters.selected_sports).head(max(int(filters.max_rows or 1), 1)).copy()
     contextual = _apply_context(filtered, language=filters.language, enabled=filters.include_sports_context)
@@ -187,7 +309,7 @@ def build_report_studio_cards(raw_rows: pd.DataFrame | Sequence[Mapping[str, Any
 def build_report_studio_state(raw_rows: pd.DataFrame | Sequence[Mapping[str, Any]] | None, brand: MagazineBrand | Mapping[str, Any], *, filters: ReportStudioFilters | None = None, source_note: str = "") -> ReportStudioState:
     filters = filters or ReportStudioFilters()
     brand_obj = _brand_from(brand)
-    raw, normalized, filtered, cards = build_report_studio_cards(raw_rows, filters)
+    raw, normalized, filtered, cards = build_report_studio_cards(raw_rows, filters, source_note=source_note)
     groups = grouped_report(cards) if not cards.empty else {"best_plays": pd.DataFrame(), "watchlist": pd.DataFrame(), "no_play": pd.DataFrame()}
     audit = calibration_audit(cards, min_sample=10) if not cards.empty else {}
     exports = build_report_export_bundle(cards, brand_obj, mode=filters.mode, public=filters.public_feed)
@@ -203,7 +325,12 @@ def build_report_studio_state(raw_rows: pd.DataFrame | Sequence[Mapping[str, Any
         data_issues=_data_issues(cards),
         source_note=source_note,
     )
-    context_note = "El contexto deportivo se agrega cuando hay campos o JSON configurado disponible; el contexto no disponible se etiqueta explícitamente." if lang_code(filters.language) == "es" else "Sports context added when fields or configured JSON context are available; unavailable context is labeled explicitly."
+    source_contract = _source_contract(source_note, filters.language)
+    context_note = (
+        f"Fuente del reporte: {source_contract['report_source_label']} · Alcance: {source_contract['report_data_scope']} · {source_contract['report_truth_warning']}"
+        if lang_code(filters.language) == "es"
+        else f"Report source: {source_contract['report_source_label']} · Scope: {source_contract['report_data_scope']} · {source_contract['report_truth_warning']}"
+    )
     return ReportStudioState(
         raw=raw,
         normalized=normalized,
