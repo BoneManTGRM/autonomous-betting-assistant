@@ -1,3 +1,5 @@
 import autonomous_betting_agent.public_proof_dashboard_app as dashboard_app
+from autonomous_betting_agent.dashboard_current_rows_patch import install as install_current_rows_patch
 
+install_current_rows_patch(dashboard_app)
 getattr(dashboard_app, 'run')()
