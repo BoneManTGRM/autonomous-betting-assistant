@@ -1,13 +1,13 @@
 {
-  "accuracy_after": 0.7272727272727273,
-  "accuracy_before": 0.7272727272727273,
-  "brier_after": 0.1998217222222222,
-  "brier_before": 0.1998217222222222,
+  "accuracy_after": 0.7320574162679426,
+  "accuracy_before": 0.7320574162679426,
+  "brier_after": 0.19905976555023916,
+  "brier_before": 0.19905976555023916,
   "calibration_strength": 0.0,
-  "events_trained": 198,
+  "events_trained": 209,
   "intercept": 0.0,
-  "log_loss_after": 0.5892545610699206,
-  "log_loss_before": 0.5892545610699206,
+  "log_loss_after": 0.5878781714638485,
+  "log_loss_before": 0.5878781714638485,
   "notes": [
     "Learns probability calibration from graded historical predictions.",
     "Uses sample-size shrinkage to reduce overfitting on small datasets.",
@@ -15,11 +15,11 @@
     "This does not prove betting profitability; use untouched forward tests before making performance claims."
   ],
   "slope": 1.0,
-  "source": "pro_predictor_large_list_volume_9_9_UPDATED_VERIFIED_2026-06-29.csv",
-  "trained_at_utc": "2026-06-30T04:19:01+00:00",
-  "training_strategy": "cross_validated_logistic_calibration_l2=0.15_identity_fallback",
-  "validation_brier_after": 0.20284760971450005,
-  "validation_brier_before": 0.19982172222222225,
-  "validation_log_loss_after": 0.5979027761358686,
-  "validation_log_loss_before": 0.58925456106992
+  "source": "auto_learning_cycle_all_lists:test_01",
+  "trained_at_utc": "2026-07-01T01:50:20+00:00",
+  "training_strategy": "cross_validated_logistic_calibration_l2=0.08_identity_fallback",
+  "validation_brier_after": 0.20210660184420748,
+  "validation_brier_before": 0.19905976555023933,
+  "validation_log_loss_after": 0.5967330178955416,
+  "validation_log_loss_before": 0.5878781714638481
 }
