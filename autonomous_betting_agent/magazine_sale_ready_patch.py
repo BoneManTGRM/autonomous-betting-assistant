@@ -145,19 +145,6 @@ def _explicit_fallback_odds(row: Any) -> bool:
     return any(token in source or token in status for token in ("uploaded", "fallback", "cached", "missing"))
 
 
-def _is_live_odds(row: Any) -> bool:
-    data = _row(row)
-    if _explicit_fallback_odds(data):
-        return False
-    status = _clean_text(data.get("odds_status") or "").lower()
-    source = _clean_text(data.get("odds_source") or data.get("data_source") or "").lower()
-    if source in {"live_api", "odds api", "the odds api", "live_source"}:
-        return True
-    if status in {"live", "live_api"}:
-        return True
-    return source == "" and status == ""
-
-
 def _bad_context(value: Any, row: Any) -> bool:
     text = f" {_clean_text(value).lower()} "
     if not text.strip():
@@ -256,23 +243,18 @@ def sale_ready_recommendation(row: Any) -> tuple[str, str, bool]:
     return action, explanation, playable
 
 
-def _has_sale_ready_context(data: dict[str, Any]) -> bool:
-    keys = ("final_decision", "recommended_action", "consumer_action", "api_sources_active", "newsapi_summary", "weather_summary", "perplexity_context")
-    return any(not _bad(data.get(key)) and not _bad_context(data.get(key), data) for key in keys)
-
-
 def sale_ready_team_items(row: Any, side: str = "") -> list[str]:
     lang = _impl._lang(row)
     keys = (f"{side}_team_form", f"{side}_team_record", f"{side}_recent_results", "team_snapshot_home", "team_snapshot_away", "team_stats_summary", "recent_results", "perplexity_context")
     items = _source_items(row, keys, 3, 62)
-    return _wrap(items or ["No live team snapshot returned.", "Verify lineup/news before entry."], lang)
+    return _wrap(items or ["Live team feed not linked to this row.", "Use as watchlist until provider match is verified."], lang)
 
 
 def sale_ready_injury_items(row: Any, prefix: str = "") -> list[str]:
     lang = _impl._lang(row)
     keys = (f"{prefix}_injuries", f"{prefix}_injury_report", f"{prefix}_lineup_status", f"{prefix}_player_notes", "injury_report", "injuries", "lineup_status", "key_players", "perplexity_context")
     items = _source_items(row, keys, 2, 66)
-    return _wrap(items or ["No verified lineup/injury update returned.", "Verify before entry."], lang)
+    return _wrap(items or ["Lineup/injury feed not verified for this row.", "Check team news before entry."], lang)
 
 
 def _compact_location(raw: str, lang: str) -> str | None:
@@ -296,28 +278,14 @@ def _compact_weather(raw: str, lang: str) -> list[str]:
     text = _clean_text(raw)
     temp = re.search(r"(-?\d+(?:\.\d+)?°C)", text)
     wind = re.search(r"wind\s*([\d\.]+\s*kph)", text, flags=re.I)
-    condition = ""
-    if temp:
-        before = text[: temp.start()]
-        before = re.sub(r"^Weather:\s*", "", before, flags=re.I).strip(" ,.;")
-        condition = before.split(".")[-1].strip(" ,.;") or "partly cloudy"
     weather = None
     if temp:
-        if lang == "es":
-            condition_es = _es(condition.lower(), "es") if condition else ""
-            bits = [temp.group(1)]
-            if condition_es:
-                bits.append(condition_es)
-            if wind:
-                bits.append("viento " + wind.group(1))
-            weather = "Clima: " + ", ".join(bits) + "."
-        else:
-            bits = [temp.group(1)]
-            if condition:
-                bits.append(condition.lower())
-            if wind:
-                bits.append("wind " + wind.group(1))
-            weather = "Weather: " + ", ".join(bits) + "."
+        before = re.sub(r"^Weather:\s*", "", text[: temp.start()], flags=re.I).strip(" ,.;")
+        condition = before.split(".")[-1].strip(" ,.;") or "partly cloudy"
+        bits = [temp.group(1), _es(condition.lower(), lang) if lang == "es" else condition.lower()]
+        if wind:
+            bits.append(("viento " if lang == "es" else "wind ") + wind.group(1))
+        weather = ("Clima: " if lang == "es" else "Weather: ") + ", ".join([b for b in bits if b]) + "."
     loc = _compact_location(text, lang)
     return [item for item in (weather, loc) if item]
 
@@ -348,9 +316,8 @@ def sale_ready_matchup_items(row: Any) -> list[str]:
 def sale_ready_risk_items(row: Any) -> list[str]:
     lang = _impl._lang(row)
     if _explicit_fallback_odds(row):
-        return _wrap(["Fallback data used.", "Verify live odds before entry.", "Do not use until the price is confirmed."], lang)
-    data = _row(row)
-    explicit = _source_items(data, ("risk_reasons",), 3, 86)
+        return _wrap(["Fallback/watchlist only.", "Confirm current price before entry.", "Watchlist only: current price and live context need verification."], lang)
+    explicit = _source_items(row, ("risk_reasons",), 3, 86)
     if explicit:
         return _wrap(explicit, lang)
     _edge, _ev, negative, missing = _edge_state(row)
@@ -363,17 +330,14 @@ def sale_ready_risk_items(row: Any) -> list[str]:
 
 def sale_ready_chain_items(row: Any) -> list[str]:
     lang = _impl._lang(row)
-    data = _row(row)
-    explicit = _source_items(data, ("combo_magazine_items", P + "_magazine_items"), 3, 86)
+    explicit = _source_items(row, ("combo_magazine_items", P + "_magazine_items", "chain_notes", P + "_notes", "main_read", "add_on_legs"), 3, 86)
     if explicit:
         return _wrap(explicit, lang)
     if _explicit_fallback_odds(row):
-        return _wrap(["No parlay recommended", "Not enough compatible selections.", "Verified odds are missing."], lang)
-    _edge, _ev, negative, missing = _edge_state(data)
-    if negative and _has_sale_ready_context(data):
-        return _wrap([DN + "chain " + NEG_EV + " picks.", "Avoid " + P + "s unless edge turns positive.", "Recheck price before including."], lang)
+        return _wrap(["Straight watchlist only.", "Do not parlay fallback rows.", "Wait for verified odds and compatible legs."], lang)
+    _edge, _ev, negative, missing = _edge_state(row)
     if negative:
-        return _wrap(["No parlay recommended", "Not enough compatible selections.", "Verified odds are missing."], lang)
+        return _wrap([DN + "chain " + NEG_EV + " picks.", "Avoid " + P + "s unless edge turns positive.", "Recheck price before including."], lang)
     if missing:
         return _wrap(["Research only: edge incomplete.", DN + "combine unverified picks.", "Wait for verified odds."], lang)
     return _wrap(["Straight only: research.", "Avoid " + P + "s unless all legs are +EV.", "Recheck price before including."], lang)
@@ -414,34 +378,7 @@ def _set_if_missing_or_bad(row: dict[str, Any], key: str, value: str) -> None:
         row[key] = value
 
 
-def _install_final_renderer_guards(patched: Any) -> None:
-    try:
-        from .magazine_second_page_patch import install as install_second_page
-        install_second_page(patched)
-    except Exception:
-        return
-    try:
-        from autonomous_betting_agent import magazine_report_polish_patch as polish
-    except Exception:
-        return
-    original = getattr(polish, "install_sale_ready_polish", None)
-    if not callable(original) or getattr(original, "_ABA_FINAL_RENDERER_GUARD", False):
-        return
-
-    def guarded_install_sale_ready_polish(*args: Any, **kwargs: Any) -> Any:
-        result = original(*args, **kwargs)
-        try:
-            from .magazine_second_page_patch import install as install_second_page_after_polish
-            install_second_page_after_polish(patched)
-        except Exception:
-            pass
-        return result
-
-    guarded_install_sale_ready_polish._ABA_FINAL_RENDERER_GUARD = True  # type: ignore[attr-defined]
-    polish.install_sale_ready_polish = guarded_install_sale_ready_polish  # type: ignore[assignment]
-
-
-def _sanitize_pick(data: Any) -> Any:
+def _sanitize_pick(data: Any) -> dict[str, Any]:
     row = dict(_row(data))
     if _explicit_fallback_odds(row):
         fallback_context = "Fallback report: verify current odds and news before entry."
@@ -449,16 +386,22 @@ def _sanitize_pick(data: Any) -> Any:
         row["risk_level"] = "FALLBACK MODE"
         row["risk_label"] = "FALLBACK MODE"
         row["final_decision"] = "WATCHLIST"
-        # Preserve useful weather/news/matchup context. Only write the generic fallback line when the row truly lacks context.
         for key in ("sports_context_summary", "preview_summary", "short_reason"):
             _set_if_missing_or_bad(row, key, fallback_context)
-        row["why_lose"] = "\n".join(["Fallback data used.", "Verify live odds before entry.", "Do not use until the price is confirmed."])
-        row["chain_notes"] = "\n".join(["No parlay recommended", "Not enough compatible selections.", "Verified odds are missing."])
+        row["why_lose"] = "\n".join(["Fallback/watchlist only.", "Confirm current price before entry.", "Watchlist only: current price and live context need verification."])
+        row["chain_notes"] = "\n".join(["Straight watchlist only.", "Do not parlay fallback rows.", "Wait for verified odds and compatible legs."])
     for key in ("perplexity_context", "perplexity_summary", "newsapi_summary", "news_summary", "game_summary", "matchup_note", "matchup_notes", "team_snapshot_home", "team_snapshot_away", "sportsdataio_context", "sportsdataio_team_summary", "api_football_summary"):
         if _bad_context(row.get(key), row):
             row[key] = ""
     row["matchup_notes"] = "\n".join(sale_ready_matchup_items(row))
     return row
+
+
+def _set_style_version(module: Any) -> None:
+    current = str(getattr(module, "MAGAZINE_STYLE_VERSION", ""))
+    base = re.sub(r"(?:_direct_two_page)?_sale_ready_[a-z_]+_v\d+(?:_[a-z_]+)*", "", current)
+    base = re.sub(r"_sale_ready_direct_multileg_v\d+", "", base)
+    module.MAGAZINE_STYLE_VERSION = f"{base or 'magazine'}_sale_ready_risk_chain_v4"
 
 
 def apply_magazine_sale_ready_patch(module):
@@ -495,7 +438,11 @@ def apply_magazine_sale_ready_patch(module):
         install_final_enriched_pipeline()
     except Exception:
         pass
-    base = re.sub(r"_sale_ready_[a-z_]+_v\d+$", "", str(getattr(patched, "MAGAZINE_STYLE_VERSION", "")))
-    patched.MAGAZINE_STYLE_VERSION = f"{base}_sale_ready_risk_chain_v5_context_safe"
-    _install_final_renderer_guards(patched)
+    try:
+        from .magazine_second_page_patch import install as install_second_page
+        install_second_page(patched)
+    except Exception:
+        pass
+    _set_style_version(patched)
+    setattr(patched, "_ABA_SALE_READY_DIRECT_MULTI_LEG_APPLIED", True)
     return patched
