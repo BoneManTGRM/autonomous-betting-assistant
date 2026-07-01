@@ -14,6 +14,17 @@ HANDOFF_KEYS = (
 )
 
 
+def _rowish(value: Any) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    sample = [item for item in value[:5] if isinstance(item, dict)]
+    if not sample:
+        return False
+    keys = {str(key).lower() for item in sample for key in item.keys()}
+    hints = {"event", "event_name", "game", "matchup", "selection", "sport", "market_type", "confidence"}
+    return bool(keys & hints)
+
+
 def _has_fresh_handoff_rows() -> bool:
     try:
         import streamlit as st
@@ -22,8 +33,15 @@ def _has_fresh_handoff_rows() -> bool:
     try:
         for key in HANDOFF_KEYS:
             rows = st.session_state.get(key) or []
-            if rows:
+            if _rowish(rows):
                 st.session_state["report_studio_preferred_source"] = f"session:{key}"
+                return True
+        for key, value in list(st.session_state.items()):
+            text_key = str(key)
+            if text_key.startswith("report_studio_"):
+                continue
+            if _rowish(value):
+                st.session_state["report_studio_preferred_source"] = f"session:{text_key}"
                 return True
     except Exception:
         return False
