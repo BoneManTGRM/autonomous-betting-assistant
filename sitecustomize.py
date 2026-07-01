@@ -3,9 +3,9 @@ from __future__ import annotations
 import builtins
 import os
 
-# Keep this lightweight: Python imports sitecustomize before Streamlit pages.
-# Runtime hooks stay disabled in CI, but production loads the current-row routing
-# before Report Studio binds its ledger imports.
+# This file intentionally does not monkey-patch Streamlit widgets.
+# Keep it lightweight: Python imports sitecustomize before CI compile/import
+# checks, so runtime app behavior should live in app/page code instead.
 
 
 def get_secret(*names: str) -> str:
@@ -32,10 +32,3 @@ def get_secret(*names: str) -> str:
 
 
 builtins.get_secret = get_secret
-
-if os.getenv("CI", "").lower() not in {"1", "true", "yes"}:
-    try:
-        from autonomous_betting_agent.report_studio_fresh_handoff_patch import install as install_current_run_routing
-        install_current_run_routing()
-    except Exception:
-        pass
