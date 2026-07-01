@@ -217,10 +217,11 @@ def odds_lock_summary(top_picks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 def recent_activity(rows: Sequence[Mapping[str, Any]], metrics: Mapping[str, Any], learning_rows_scanned: int, generated_at: str | None = None) -> list[dict[str, Any]]:
     timestamp = generated_at or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lane_counts = metrics.get("lane_counts", {})
+    tracking = int(lane_counts.get("watchlist", 0) or 0) + int(lane_counts.get("prediction_only", 0) or 0)
     activity = [
         {
             "type": "picks",
-            "title": f"Generated {lane_counts.get('playable', 0)} playable picks",
+            "title": f"Tracking {tracking} rows; {lane_counts.get('playable', 0)} official playable picks",
             "detail": f"{metrics.get('unique_event_count', 0)} unique events scanned",
             "timestamp": timestamp,
         },
@@ -241,8 +242,8 @@ def recent_activity(rows: Sequence[Mapping[str, Any]], metrics: Mapping[str, Any
     if rows:
         activity.append({
             "type": "proof",
-            "title": "Proof ledger summary generated",
-            "detail": f"{metrics.get('duplicate_count', 0)} duplicate rows detected",
+            "title": "Proof summary generated",
+            "detail": f"{metrics.get('wins', 0)}W-{metrics.get('losses', 0)}L | {metrics.get('duplicate_count', 0)} duplicates",
             "timestamp": timestamp,
         })
     return activity
@@ -277,10 +278,14 @@ def upcoming_events(rows: Sequence[Mapping[str, Any]], explicit_events: Sequence
 
 def dashboard_pick_counts(rows: Sequence[Mapping[str, Any]], top_picks: Sequence[Mapping[str, Any]], metrics: Mapping[str, Any]) -> dict[str, int]:
     lane_counts = metrics.get("lane_counts", {})
+    watchlist = int(lane_counts.get("watchlist", 0) or 0)
+    prediction_only = int(lane_counts.get("prediction_only", 0) or 0)
+    avoid = int(lane_counts.get("avoid", 0) or 0)
+    tracking_rows = watchlist + prediction_only
     return {
         "positive_ev_picks": len(top_picks),
-        "watchlist_picks": int(lane_counts.get("watchlist", 0)),
-        "avoid_picks": int(lane_counts.get("avoid", 0)),
+        "watchlist_picks": tracking_rows,
+        "avoid_picks": avoid,
     }
 
 
