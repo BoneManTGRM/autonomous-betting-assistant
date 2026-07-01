@@ -7,6 +7,10 @@ def _report_studio_text() -> str:
     return (ROOT / "pages" / "report_studio.py").read_text(encoding="utf-8")
 
 
+def _polish_text() -> str:
+    return (ROOT / "autonomous_betting_agent" / "magazine_report_polish_patch.py").read_text(encoding="utf-8")
+
+
 def test_report_studio_full_feature_tabs_are_restored():
     page = _report_studio_text()
     for token in (
@@ -51,3 +55,18 @@ def test_startup_hooks_do_not_control_report_studio_source_selection():
     assert "intentionally does not monkey-patch Streamlit widgets" in sitecustomize
     assert "report_studio_fresh_handoff_patch" not in sitecustomize
     assert "report_studio_fresh_handoff_patch" not in usercustomize
+
+
+def test_fallback_magazine_copy_is_presentation_safe():
+    polish = _polish_text()
+    for token in (
+        "Watchlist only: current price and live context need verification.",
+        "Live team feed not linked to this row.",
+        "Lineup/injury feed not verified for this row.",
+        "Fallback/watchlist only.",
+        "Straight watchlist only.",
+        "Do not parlay fallback rows.",
+        "no verified live match",
+    ):
+        assert token in polish
+    assert "module.api_provenance = polished_api_provenance" in polish
