@@ -9,47 +9,23 @@ APP_TAGLINE_ES = 'Impulsado por Reparodynamics'
 GLOBAL_LANGUAGE_KEY = 'aba_global_language'
 ADVANCED_NAV_KEY = 'aba_show_advanced_tools'
 LANGUAGE_KEYS = [
-    'global_language',
-    'dashboard_language',
-    'signal_board_language',
-    'pro_predictor_language',
-    'odds_lock_pro_language',
-    'fresh_odds_slate_builder_language',
-    'market_optimizer_language',
-    'market_dashboard_bridge_language',
-    'market_workflow_integration_language',
-    'pro_recommendation_cards_language',
-    'subscriber_intelligence_language',
-    'subscriber_ledger_language',
-    'subscriber_export_center_language',
-    'real_page_wiring_audit_language',
-    'proof_hardening_closeout_language',
-    'report_studio_language',
-    'proof_center_language',
-    'public_proof_share_language',
-    'client_proof_viewer_language',
-    'local_control_center_language',
-    'learning_memory_language',
-    'storage_diagnostics_language',
-    'reset_storage_language',
-    'reparodynamics_language',
-    'shadow_mode_results_language',
+    'global_language','dashboard_language','signal_board_language','pro_predictor_language','odds_lock_pro_language','fresh_odds_slate_builder_language','market_optimizer_language','market_dashboard_bridge_language','market_workflow_integration_language','pro_recommendation_cards_language','subscriber_intelligence_language','subscriber_ledger_language','subscriber_export_center_language','real_page_wiring_audit_language','proof_hardening_closeout_language','report_studio_language','proof_center_language','public_proof_share_language','client_proof_viewer_language','local_control_center_language','learning_memory_language','storage_diagnostics_language','reset_storage_language','reparodynamics_language','shadow_mode_results_language',
 ]
 CORE_TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Dashboard', 'Dashboard', 'pages/dashboard.py'),
-    ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
     ('Odds Lock Pro', 'Odds Lock Pro', 'pages/odds_lock_pro.py'),
+    ('Report Studio', 'Report Studio', 'pages/report_studio.py'),
+    ('Proof Center', 'Centro de Prueba', 'pages/proof_center.py'),
+)
+ADVANCED_TOOLS: tuple[tuple[str, str, str], ...] = (
+    ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
     ('Fresh Odds Slate Builder', 'Constructor de Slate de Odds Frescas', 'pages/fresh_odds_slate_builder.py'),
     ('Market Optimizer', 'Market Optimizer', 'pages/market_optimizer.py'),
     ('Pro Recommendation Cards', 'Pro Recommendation Cards', 'pages/pro_recommendation_cards.py'),
     ('Subscriber Intelligence', 'Subscriber Intelligence', 'pages/subscriber_intelligence.py'),
     ('Subscriber Ledger', 'Subscriber Ledger', 'pages/subscriber_ledger.py'),
     ('Subscriber Export Center', 'Subscriber Export Center', 'pages/subscriber_export_center.py'),
-    ('Report Studio', 'Report Studio', 'pages/report_studio.py'),
-    ('Proof Center', 'Centro de Prueba', 'pages/proof_center.py'),
-)
-ADVANCED_TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Market Dashboard Bridge', 'Market Dashboard Bridge', 'pages/market_dashboard_bridge.py'),
     ('Market Workflow Integration', 'Market Workflow Integration', 'pages/market_workflow_integration.py'),
     ('Real Page Wiring Audit', 'Real Page Wiring Audit', 'pages/real_page_wiring_audit.py'),
@@ -77,40 +53,19 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 { margin
 '''
 GLOBAL_UPLOAD_ES_CSS = '''<style>
 div[data-testid="stFileUploader"] button,
-div[data-testid="stFileUploader"] button * {
-  font-size: 0 !important;
-  line-height: 0 !important;
-}
-div[data-testid="stFileUploader"] button::after {
-  content: "Subir";
-  font-size: 1rem !important;
-  line-height: 1.2 !important;
-  white-space: nowrap !important;
-}
+div[data-testid="stFileUploader"] button * { font-size: 0 !important; line-height: 0 !important; }
+div[data-testid="stFileUploader"] button::after { content: "Subir"; font-size: 1rem !important; line-height: 1.2 !important; white-space: nowrap !important; }
 body div[data-testid="stFileUploader"] button div p::after,
 body div[data-testid="stFileUploader"] button p::after,
 body div[data-testid="stFileUploader"] button span::after,
-body div[data-testid="stFileUploader"] button *::after {
-  content: none !important;
-  display: none !important;
-}
+body div[data-testid="stFileUploader"] button *::after { content: none !important; display: none !important; }
 div[data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"],
-div[data-testid="stFileUploader"] small {
-  font-size: 0 !important;
-}
-div[data-testid="stFileUploader"] small::after {
-  content: "Archivo compatible";
-  font-size: .9rem !important;
-}
+div[data-testid="stFileUploader"] small { font-size: 0 !important; }
+div[data-testid="stFileUploader"] small::after { content: "Archivo compatible"; font-size: .9rem !important; }
 div[data-testid="stFileUploader"] section > div > span,
-div[data-testid="stFileUploader"] section > div > div > span {
-  font-size: 0 !important;
-}
+div[data-testid="stFileUploader"] section > div > div > span { font-size: 0 !important; }
 div[data-testid="stFileUploader"] section > div > span::after,
-div[data-testid="stFileUploader"] section > div > div > span::after {
-  content: "200 MB por archivo";
-  font-size: .9rem !important;
-}
+div[data-testid="stFileUploader"] section > div > div > span::after { content: "200 MB por archivo"; font-size: .9rem !important; }
 </style>
 '''
 
