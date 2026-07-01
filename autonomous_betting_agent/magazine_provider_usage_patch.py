@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
-PATCH_VERSION = "magazine_provider_usage_v1"
+PATCH_VERSION = "magazine_provider_usage_v1_guard_bridge"
 
 
 def _team(value: Any) -> tuple[str, str]:
@@ -24,6 +24,32 @@ def _date_hint(row: Mapping[str, Any]) -> str:
 def _norm(value: Any) -> str:
     import autonomous_betting_agent.magazine_live_api_enrichment as live
     return live._normalize_text(value)
+
+
+def _install_display_guard() -> None:
+    try:
+        from autonomous_betting_agent.magazine_display_guard import install as install_display_guard
+        install_display_guard()
+    except Exception:
+        pass
+
+
+def _patch_report_polish_install() -> None:
+    try:
+        import autonomous_betting_agent.magazine_report_polish_patch as polish
+    except Exception:
+        return
+    original = getattr(polish, "install", None)
+    if not callable(original) or getattr(original, "_ABA_DISPLAY_GUARD_BRIDGE", False):
+        return
+
+    def install_and_guard(*args: Any, **kwargs: Any):
+        result = original(*args, **kwargs)
+        _install_display_guard()
+        return result
+
+    install_and_guard._ABA_DISPLAY_GUARD_BRIDGE = True
+    polish.install = install_and_guard  # type: ignore[assignment]
 
 
 def _api_football_team(team: str, key: str) -> dict[str, Any]:
@@ -151,12 +177,9 @@ def _patched_weather(row: dict[str, Any]) -> None:
 
 def install() -> None:
     import autonomous_betting_agent.magazine_live_api_enrichment as live
+    _patch_report_polish_install()
     if getattr(live, "_PROVIDER_USAGE_PATCH", "") == PATCH_VERSION:
-        try:
-            from autonomous_betting_agent.magazine_display_guard import install as install_display_guard
-            install_display_guard()
-        except Exception:
-            pass
+        _install_display_guard()
         return
     if not hasattr(live, "_enrich_weather_original_provider_usage"):
         live._enrich_weather_original_provider_usage = live._enrich_weather  # type: ignore[attr-defined]
@@ -166,8 +189,6 @@ def install() -> None:
     original_enrich = live.enrich_row_with_live_api_data
 
     def enrich_row(row_like: Any, *, report_run_id: str | None = None, last_api_refresh_time: str | None = None) -> dict[str, Any]:
-        # Preserve already-enriched rows, but keep the provider order useful for new rows:
-        # API-Football can discover the venue; WeatherAPI can then use that venue.
         row = live._row(row_like)
         if row.get("_live_api_enriched") == live.ENRICHMENT_VERSION and row.get("report_source") == "final_enriched_picks_df":
             return original_enrich(row, report_run_id=report_run_id, last_api_refresh_time=last_api_refresh_time)
@@ -185,8 +206,4 @@ def install() -> None:
 
     live.enrich_row_with_live_api_data = enrich_row  # type: ignore[assignment]
     live._PROVIDER_USAGE_PATCH = PATCH_VERSION
-    try:
-        from autonomous_betting_agent.magazine_display_guard import install as install_display_guard
-        install_display_guard()
-    except Exception:
-        pass
+    _install_display_guard()
