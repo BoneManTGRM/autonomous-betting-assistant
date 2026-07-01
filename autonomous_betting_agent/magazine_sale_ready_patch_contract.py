@@ -133,6 +133,22 @@ TEXT_ES = {
     DN + "combine unverified picks.": "No combinar selecciones sin verificar.",
     "Do not combine unverified picks.": "No combinar selecciones sin verificar.",
     "Wait for verified odds.": "Esperar cuotas verificadas.",
+    "REPORT SOURCE": "FUENTE",
+    "DATA SCOPE": "ALCANCE",
+    "TRUTH": "VERDAD",
+    "ODDS STATUS": "CUOTAS",
+    "CONTEXT STATUS": "CONTEXTO",
+    "Current run / session rows": "Filas actuales de sesión",
+    "Uploaded fallback rows": "Filas subidas / fallback",
+    "Saved handoff rows": "Filas guardadas de traspaso",
+    "Proof ledger history": "Historial del ledger de prueba",
+    "Current slate": "Cartelera actual",
+    "Uploaded report input": "Entrada subida",
+    "Saved current handoff": "Traspaso actual guardado",
+    "Historical proof ledger": "Ledger histórico de prueba",
+    "HISTORY_ONLY": "SOLO_HISTORIAL",
+    "VERIFY": "VERIFICAR",
+    "BLOCKED": "BLOQUEADO",
     "ACTIVE:": "ACTIVO:",
     "NO LIVE:": "SIN EN VIVO:",
     "Odds": "Cuotas",
@@ -293,6 +309,31 @@ def _dedupe(items: Iterable[str]) -> list[str]:
             out.append(text)
             seen.add(key)
     return out
+
+
+def _first(data: dict[str, Any], *keys: str, default: str = "") -> str:
+    for key in keys:
+        value = _clean_text(data.get(key))
+        if value:
+            return value
+    return default
+
+
+def sale_ready_source_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
+    data = dict(_row(row))
+    source_label = _first(data, "report_source_label", "report_source_mode", "report_source", default="Report source unknown")
+    scope = _first(data, "report_data_scope", "report_source_mode", default="Current/fallback status unknown")
+    truth = _first(data, "report_truth_severity", "fallback_used", "data_freshness_status", default="VERIFY")
+    odds = _first(data, "odds_status", "odds_source", "data_source", default="MISSING")
+    context = _first(data, "context_status", "context_source", "report_live_context_detected", default="VERIFY")
+    pairs = [
+        ("REPORT SOURCE", source_label),
+        ("DATA SCOPE", scope),
+        ("TRUTH", truth),
+        ("ODDS STATUS", odds),
+        ("CONTEXT STATUS", context),
+    ]
+    return [(_es(label, lang), _es(value, lang)) for label, value in pairs]
 
 
 def _edge_state(row: Any) -> tuple[float | None, float | None, bool, bool]:
@@ -469,7 +510,7 @@ def _set_if_missing_or_bad(row: dict[str, Any], key: str, value: str) -> None:
 def _sanitize_pick(data: Any) -> dict[str, Any]:
     row = dict(_row(data))
     if _explicit_fallback_odds(row):
-        fallback_context = "Fallback report: verify current odds and news before entry."
+        fallback_context = _clean_text(row.get("report_truth_warning")) or "Fallback report: verify current odds and news before entry."
         row["risk"] = "FALLBACK MODE"
         row["risk_level"] = "FALLBACK MODE"
         row["risk_label"] = "FALLBACK MODE"
@@ -489,7 +530,7 @@ def _set_style_version(module: Any) -> None:
     current = str(getattr(module, "MAGAZINE_STYLE_VERSION", ""))
     base = re.sub(r"(?:_direct_two_page)?_sale_ready_[a-z_]+_v\d+(?:_[a-z_]+)*", "", current)
     base = re.sub(r"_sale_ready_direct_multileg_v\d+", "", base)
-    module.MAGAZINE_STYLE_VERSION = f"{base or 'magazine'}_sale_ready_risk_chain_v4"
+    module.MAGAZINE_STYLE_VERSION = f"{base or 'magazine'}_sale_ready_risk_chain_truth_v5"
 
 
 def apply_magazine_sale_ready_patch(module):
@@ -505,6 +546,7 @@ def apply_magazine_sale_ready_patch(module):
     patched._risk_items = sale_ready_risk_items
     patched._chain_items = sale_ready_chain_items
     patched._items = _items_from_context
+    patched._pairs = sale_ready_source_pairs
     patched.sale_ready_recommendation = sale_ready_recommendation
     original_tr = patched._tr
     original_render = patched.render_full_pick_magazine_page
