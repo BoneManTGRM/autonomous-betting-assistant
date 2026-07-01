@@ -7,24 +7,34 @@ def test_clean_sidebar_has_core_and_advanced_groups():
     assert len(sidebar_nav.CORE_TOOLS) < len(sidebar_nav.TOOLS)
 
 
-def test_clean_sidebar_keeps_core_user_pages_visible():
+def test_clean_sidebar_keeps_production_pages_visible():
     core_paths = {item[2] for item in sidebar_nav.CORE_TOOLS}
-    required = {
+    required_core = {
         "pages/dashboard.py",
-        "pages/signal_board.py",
         "pages/pro_predictor_volume.py",
         "pages/odds_lock_pro.py",
+        "pages/report_studio.py",
+        "pages/proof_center.py",
+    }
+
+    assert required_core.issubset(core_paths)
+
+
+def test_clean_sidebar_moves_extra_user_pages_to_advanced_group():
+    core_paths = {item[2] for item in sidebar_nav.CORE_TOOLS}
+    advanced_paths = {item[2] for item in sidebar_nav.ADVANCED_TOOLS}
+    extra_user_pages = {
+        "pages/signal_board.py",
         "pages/fresh_odds_slate_builder.py",
         "pages/market_optimizer.py",
         "pages/pro_recommendation_cards.py",
         "pages/subscriber_intelligence.py",
         "pages/subscriber_ledger.py",
         "pages/subscriber_export_center.py",
-        "pages/report_studio.py",
-        "pages/proof_center.py",
     }
 
-    assert required.issubset(core_paths)
+    assert extra_user_pages.isdisjoint(core_paths)
+    assert extra_user_pages.issubset(advanced_paths)
 
 
 def test_clean_sidebar_hides_internal_tools_by_default_group():
