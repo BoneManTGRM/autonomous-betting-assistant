@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-PATCH_VERSION = "magazine_display_guard_v1"
+PATCH_VERSION = "magazine_display_guard_v2_decimal_odds_richer_context"
 GOLD = (241, 184, 45)
 
 
@@ -45,7 +45,7 @@ def _needs_verification(row: Any) -> bool:
 
 def _generic(text: str) -> bool:
     low = _clean(text).lower()
-    return not low or any(token in low for token in ("not returned", "not verified", "data unavailable", "fallback report", "this is a 2026 fifa world cup"))
+    return not low or any(token in low for token in ("not returned", "data unavailable", "fallback report"))
 
 
 def _dedupe(items: list[str]) -> list[str]:
@@ -62,15 +62,32 @@ def _dedupe(items: list[str]) -> list[str]:
     return out
 
 
-def _short_context(data: dict[str, Any], limit: int = 2) -> list[str]:
+def _trim(text: str, length: int = 88) -> str:
+    text = _clean(text)
+    if len(text) <= length:
+        return text
+    return (text[: length - 1].rsplit(" ", 1)[0] or text[: length - 1]).rstrip(".,;:") + "…"
+
+
+def _short_context(data: dict[str, Any], limit: int = 3) -> list[str]:
     items: list[str] = []
-    for key in ("weather_summary", "venue_note", "api_football_summary", "newsapi_summary", "perplexity_summary", "perplexity_context", "sports_context_summary", "matchup_note"):
+    for key in (
+        "weather_summary",
+        "venue_note",
+        "weather_location",
+        "api_football_summary",
+        "api_football_context",
+        "newsapi_summary",
+        "news_summary",
+        "perplexity_summary",
+        "perplexity_context",
+        "sports_context_summary",
+        "matchup_note",
+    ):
         for item in _split(data.get(key)):
             if _generic(item):
                 continue
-            if len(item) > 68:
-                item = (item[:67].rsplit(" ", 1)[0] or item[:67]).rstrip(".,;:") + "…"
-            items.append(item)
+            items.append(_trim(item, 78))
             if len(items) >= limit:
                 return _dedupe(items)
     return []
@@ -105,35 +122,112 @@ def _state(row: Any) -> tuple[str, tuple[int, int, int], tuple[int, int, int], s
     return "PLAY", (61, 205, 84), (61, 205, 84), note
 
 
+def _decimal_odds_text(value: Any) -> str | None:
+    raw = _clean(value).replace(",", "")
+    if not raw:
+        return None
+    try:
+        num = float(raw)
+    except Exception:
+        return None
+    if num <= -100:
+        decimal = 1.0 + 100.0 / abs(num)
+    elif num >= 100:
+        decimal = 1.0 + num / 100.0
+    elif num > 1:
+        decimal = num
+    else:
+        return None
+    return f"{decimal:.2f}".rstrip("0").rstrip(".")
+
+
+def _install_metric_overrides(module: Any) -> None:
+    original_fmt = getattr(module, "_fmt", None)
+    if callable(original_fmt) and not getattr(original_fmt, "_ABA_DECIMAL_ODDS_GUARD", False):
+        def fmt_decimal_first(value: Any, kind: str = "") -> str:
+            if kind == "odds":
+                decimal = _decimal_odds_text(value)
+                if decimal:
+                    return decimal
+            return original_fmt(value, kind)
+
+        fmt_decimal_first._ABA_DECIMAL_ODDS_GUARD = True
+        module._fmt = fmt_decimal_first
+
+    original_cells = getattr(module, "magazine_metric_cells", None)
+    if callable(original_cells) and not getattr(original_cells, "_ABA_RISK_COLOR_GUARD", False):
+        def metric_cells(odds: str, conf: str, edge: str, ev: str, units: str, risk: str):
+            cells = list(original_cells(odds, conf, edge, ev, units, risk))
+            risk_text = _clean(risk).lower()
+            if any(token in risk_text for token in ("fallback", "verify", "watch", "volume")):
+                cells[-1] = (cells[-1][0], cells[-1][1], GOLD, cells[-1][3], cells[-1][4])
+            return cells
+
+        metric_cells._ABA_RISK_COLOR_GUARD = True
+        module.magazine_metric_cells = metric_cells
+
+
 def _install_item_overrides(module: Any) -> None:
     def matchup_items(row: Any) -> list[str]:
         data = _prepared_row(row)
-        context = _short_context(data, 2)
+        context = _short_context(data, 3)
+        if context:
+            return _dedupe(context)[:3]
         if _needs_verification(data):
-            return _dedupe(["Watchlist only until provider context matches.", *context])[:2]
-        return _dedupe(context or ["Context is limited; recheck price and news before publishing."])[:2]
+            return ["Watchlist until live odds/context match.", "Re-run live APIs before official use."]
+        return ["Context is limited; recheck price and news before publishing."]
 
     def team_items(row: Any, side: str = "") -> list[str]:
         data = _prepared_row(row)
         items: list[str] = []
-        for key in (f"{side}_team_form", f"{side}_team_record", f"{side}_recent_results", "team_stats_summary", "api_football_team_summary", "perplexity_summary", "perplexity_context"):
+        for key in (
+            f"{side}_team_form",
+            f"{side}_team_record",
+            f"{side}_recent_results",
+            "team_stats_summary",
+            "api_football_team_summary",
+            "api_football_summary",
+            "sports_context_summary",
+            "news_summary",
+            "newsapi_summary",
+            "perplexity_summary",
+            "perplexity_context",
+        ):
             for item in _split(data.get(key)):
                 if not _generic(item):
-                    items.append(item[:70].rstrip() + ("…" if len(item) > 70 else ""))
-        return _dedupe(items)[:2] or ["Provider team feed not matched to this row.", "Use as watchlist until confirmed."]
+                    items.append(_trim(item, 78))
+        if items:
+            return _dedupe(items)[:3]
+        return ["Provider team feed not matched to this row.", "Use as watchlist until confirmed."]
 
     def injury_items(row: Any, prefix: str = "") -> list[str]:
         data = _prepared_row(row)
         items: list[str] = []
-        for key in (f"{prefix}_injuries", f"{prefix}_injury_report", f"{prefix}_lineup_status", f"{prefix}_player_notes", "injury_report", "lineup_status", "api_football_lineup_summary", "news_injury_summary"):
+        for key in (
+            f"{prefix}_injuries",
+            f"{prefix}_injury_report",
+            f"{prefix}_lineup_status",
+            f"{prefix}_player_notes",
+            "injury_report",
+            "lineup_status",
+            "api_football_lineup_summary",
+            "news_injury_summary",
+            "news_summary",
+            "newsapi_summary",
+            "perplexity_summary",
+            "perplexity_context",
+            "sports_context_summary",
+        ):
             for item in _split(data.get(key)):
                 if not _generic(item):
-                    items.append(item[:72].rstrip() + ("…" if len(item) > 72 else ""))
-        return _dedupe(items)[:2] or ["Lineup feed not verified for this row.", "Check team news before use."]
+                    items.append(_trim(item, 82))
+        if items:
+            return _dedupe(items)[:2]
+        return ["Lineup feed not verified for this row.", "Check team news before use."]
 
     def risk_items(row: Any) -> list[str]:
         if _needs_verification(row):
-            return ["Watchlist until provider match is verified.", "Confirm current price before use.", "Do not publish as official yet."]
+            return ["Fallback data used.", "Verify live odds before entry.", "Do not use until price is confirmed."]
         return ["Recheck price before use.", "Avoid if key news changes."]
 
     def chain_items(row: Any) -> list[str]:
@@ -142,8 +236,10 @@ def _install_item_overrides(module: Any) -> None:
         for key in ("chain_notes", "main_read", "add_on_legs", "parlay_notes", "live_betting_notes", "flash_market_notes", "prop_market_notes"):
             explicit.extend(_split(data.get(key)))
         if explicit and not _needs_verification(data):
-            return _dedupe(explicit)[:3]
-        return ["Straight watchlist only.", "Do not combine unverified rows.", "Wait for verified context."]
+            return _dedupe([_trim(item, 80) for item in explicit])[:3]
+        if _needs_verification(data):
+            return ["No parlay recommended.", "Not enough compatible selections.", "Verified odds are missing."]
+        return ["Straight only unless compatible +EV legs exist.", "Do not combine without official verification."]
 
     module._matchup_items = matchup_items
     module.matchup_items = matchup_items
@@ -191,6 +287,7 @@ def install(module: Any | None = None) -> Any:
             return None
     if getattr(module, "_ABA_DISPLAY_GUARD", "") == PATCH_VERSION:
         return module
+    _install_metric_overrides(module)
     _install_item_overrides(module)
     original_page = getattr(module, "render_full_pick_magazine_page", None)
     if callable(original_page):
