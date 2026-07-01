@@ -4,6 +4,7 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 
 from autonomous_betting_agent.profitability_metrics import (
+    RESULT_PENDING,
     as_frame,
     bankroll_summary,
     bookmaker_key,
@@ -19,6 +20,7 @@ from autonomous_betting_agent.profitability_metrics import (
     odds_verified,
     pick_key,
     profitability_summary,
+    result_status,
     stake_units,
     text,
     top_positive_ev_picks,
@@ -55,6 +57,17 @@ def percent_display(value: float | None, signed: bool = False) -> str:
     return f"{value * 100:.1f}%"
 
 
+def _row_dicts(frame: pd.DataFrame) -> list[dict[str, Any]]:
+    return [series.to_dict() for _, series in frame.iterrows()]
+
+
+def _active_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame.copy(deep=True)
+    mask = frame.apply(lambda row: result_status(row.to_dict()) == RESULT_PENDING, axis=1)
+    return frame[mask].copy(deep=True)
+
+
 def api_usage_summary(api_usage: Mapping[str, Any] | None = None) -> dict[str, Any]:
     data = dict(api_usage or {})
     used = data.get("used_calls", data.get("used", data.get("calls_used", 0)))
@@ -89,9 +102,12 @@ def model_status_summary(rows: Sequence[Mapping[str, Any]], explicit_status: str
         return explicit_status
     if not rows:
         return "Needs Data"
-    blocked = sum(lane(row) == "avoid" for row in rows)
-    playable = sum(is_positive_ev_playable(row) for row in rows)
-    if blocked == len(rows):
+    active_rows = [row for row in rows if result_status(row) == RESULT_PENDING]
+    if not active_rows:
+        return "Historical Proof"
+    blocked = sum(lane(row) == "avoid" for row in active_rows)
+    playable = sum(is_positive_ev_playable(row) for row in active_rows)
+    if blocked == len(active_rows):
         return "Blocked"
     if playable:
         return "Stable"
@@ -221,7 +237,7 @@ def recent_activity(rows: Sequence[Mapping[str, Any]], metrics: Mapping[str, Any
     activity = [
         {
             "type": "picks",
-            "title": f"Tracking {tracking} rows; {lane_counts.get('playable', 0)} official playable picks",
+            "title": f"Tracking {tracking} active rows; {lane_counts.get('playable', 0)} official playable picks",
             "detail": f"{metrics.get('unique_event_count', 0)} unique events scanned",
             "timestamp": timestamp,
         },
@@ -254,7 +270,8 @@ def upcoming_events(rows: Sequence[Mapping[str, Any]], explicit_events: Sequence
         return [dict(item) for item in list(explicit_events)[:limit]]
     events: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for row in rows:
+    active_rows = [row for row in rows if result_status(row) == RESULT_PENDING] or list(rows)
+    for row in active_rows:
         event = event_key(row)
         if not event or event in seen:
             continue
@@ -277,6 +294,9 @@ def upcoming_events(rows: Sequence[Mapping[str, Any]], explicit_events: Sequence
 
 
 def dashboard_pick_counts(rows: Sequence[Mapping[str, Any]], top_picks: Sequence[Mapping[str, Any]], metrics: Mapping[str, Any]) -> dict[str, int]:
+    active_rows = [row for row in rows if result_status(row) == RESULT_PENDING]
+    if not active_rows:
+        return {"positive_ev_picks": 0, "watchlist_picks": 0, "avoid_picks": 0}
     lane_counts = metrics.get("lane_counts", {})
     watchlist = int(lane_counts.get("watchlist", 0) or 0)
     prediction_only = int(lane_counts.get("prediction_only", 0) or 0)
@@ -303,13 +323,16 @@ def build_dashboard_data(
     generated_at: str | None = None,
 ) -> dict[str, Any]:
     frame = as_frame(rows)
-    row_dicts = [series.to_dict() for _, series in frame.iterrows()]
+    row_dicts = _row_dicts(frame)
+    active = _active_frame(frame)
+    active_rows = _row_dicts(active)
     learning_frame = as_frame(learning_rows)
     learning_count = int(len(learning_frame))
     metrics = profitability_summary(frame)
-    top_picks = top_positive_ev_picks(frame, limit=10)
-    bank = bankroll_summary(frame, bankroll=bankroll, unit_size=unit_size, max_daily_fraction=max_daily_fraction)
-    counts = dashboard_pick_counts(row_dicts, top_picks, metrics)
+    active_metrics = profitability_summary(active)
+    top_picks = top_positive_ev_picks(active, limit=10)
+    bank = bankroll_summary(active, bankroll=bankroll, unit_size=unit_size, max_daily_fraction=max_daily_fraction)
+    counts = dashboard_pick_counts(active_rows, top_picks, active_metrics)
     api = api_usage_summary(api_usage)
     dashboard = {
         "events_scanned": metrics.get("unique_event_count", 0),
@@ -325,11 +348,13 @@ def build_dashboard_data(
         "top_positive_ev_picks": top_picks,
         "odds_lock_summary": odds_lock_summary(top_picks),
         "bankroll_summary": bank,
-        "recent_activity": recent_activity(row_dicts, metrics, learning_count, generated_at=generated_at),
+        "recent_activity": recent_activity(active_rows, active_metrics, learning_count, generated_at=generated_at),
         "upcoming_events": upcoming_events(row_dicts, explicit_events=explicit_upcoming_events),
         "proof_summary": proof_summary(row_dicts, metrics),
         "clv_summary": clv_summary_for_dashboard(row_dicts, metrics),
         "roi_summary": roi_summary_for_dashboard(metrics),
+        "active_rows_scanned": len(active),
+        "historical_rows_scanned": max(0, len(frame) - len(active)),
     }
     for field in DASHBOARD_FIELDS:
         dashboard.setdefault(field, None)
