@@ -1,6 +1,13 @@
 from __future__ import annotations
 
+from io import BytesIO
+
+from PIL import Image
+
+from autonomous_betting_agent import magazine_book_export
 from autonomous_betting_agent.magazine_sale_ready_patch import (
+    _force_truthful_gate,
+    apply_magazine_sale_ready_patch,
     sale_ready_chain_items,
     sale_ready_injury_items,
     sale_ready_matchup_items,
@@ -127,3 +134,51 @@ def test_positive_edge_risk_and_chain_notes_are_operational():
     assert "Risk status: VOLUME OK." in text
     assert "Straight only: research." in text
     assert all(term not in text for term in _provider_terms())
+
+
+def test_uploaded_positive_ev_row_is_forced_to_watchlist_not_play():
+    row = _row(
+        event_name="Bosnia & Herzegovina vs USA",
+        away_team="Bosnia & Herzegovina",
+        home_team="USA",
+        final_decision="PLAY",
+        recommendation="PLAY",
+        consumer_action="PLAY",
+        recommended_action="PLAY",
+        risk="FALLBACK MODE",
+        risk_level="FALLBACK MODE",
+        odds_source="uploaded row",
+        odds_status="UPLOADED_ROW",
+        model_market_edge="0.013",
+        expected_value_per_unit="0.018",
+        units="0.2",
+    )
+
+    gated = _force_truthful_gate(row)
+
+    assert gated["final_decision"] == "WATCHLIST"
+    assert gated["recommendation"] == "WATCHLIST"
+    assert gated["consumer_action"] == "WATCHLIST"
+    assert gated["risk"] == "VERIFY PRICE"
+    assert gated["units"] == "0.0"
+    assert "No parlay recommended" in gated["chain_notes"]
+    assert "NO LIVE ODDS MATCH" in gated["report_truth_severity"]
+
+
+def test_magazine_preview_and_book_are_two_pages_per_pick():
+    renderer = apply_magazine_sale_ready_patch(magazine_book_export)
+    row = _row(
+        final_decision="PLAY",
+        risk="FALLBACK MODE",
+        odds_source="uploaded row",
+        odds_status="UPLOADED_ROW",
+        model_market_edge="0.013",
+        expected_value_per_unit="0.018",
+    )
+
+    pages = renderer.render_full_magazine_book_pages([row], report_name="ABA Signal Pro", language="en")
+    assert len(pages) == 2
+
+    png = renderer.render_full_pick_magazine_page_png(row, report_name="ABA Signal Pro", page_number=1, total_pages=1, language="en")
+    image = Image.open(BytesIO(png))
+    assert image.height >= magazine_book_export.PAGE_HEIGHT * 2
