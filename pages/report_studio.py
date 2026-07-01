@@ -407,7 +407,19 @@ def main() -> None:
     rows = frame.head(max_rows).to_dict("records")
     enriched_rows = enrich_cached(rows, LANG, ACTIVE_EXPORT_VERSION)
 
-    magazine_tab, data_tab, exports_tab = st.tabs([t("magazine"), t("data"), t("exports")])
+    cards_tab, magazine_tab, copy_tab, proof_tab, exports_tab, images_tab, feed_tab, diagnostics_tab = st.tabs([
+        t("cards"),
+        t("magazine"),
+        t("copy"),
+        t("proof"),
+        t("exports"),
+        t("images"),
+        t("feed_json"),
+        t("diagnostics"),
+    ])
+
+    with cards_tab:
+        st.dataframe(localized_dataframe(pd.DataFrame(enriched_rows), LANG), use_container_width=True)
 
     with magazine_tab:
         labels = [row_label(row, i) for i, row in enumerate(enriched_rows)]
@@ -416,61 +428,54 @@ def main() -> None:
         selected_row = enriched_rows[selected_index]
         png = render_page_png(selected_row, selected_index + 1, len(enriched_rows))
         st.image(png, caption=t("generated_preview"), use_container_width=True)
-        st.download_button(
-            t("download_page_png"),
-            data=png,
-            file_name=safe_filename(f"magazine_page_{selected_index + 1}_{fingerprint([selected_row], LANG)}", "png"),
-            mime="image/png",
-        )
-        st.download_button(
-            t("download_page"),
-            data=png,
-            file_name=safe_filename(f"full_magazine_page_{selected_index + 1}_{fingerprint([selected_row], LANG)}", "png"),
-            mime="image/png",
-            key=f"report_studio_image_full_page_{selected_index}_{ACTIVE_EXPORT_VERSION}",
-        )
-        page_pdf = render_book_pdf([selected_row])
-        st.download_button(
-            t("download_page_pdf"),
-            data=page_pdf,
-            file_name=safe_filename(f"magazine_page_{selected_index + 1}_{fingerprint([selected_row], LANG)}", "pdf"),
-            mime="application/pdf",
-        )
+        st.download_button(t("download_page_png"), data=png, file_name=safe_filename(f"magazine_page_{selected_index + 1}_{fingerprint([selected_row], LANG)}", "png"), mime="image/png")
+        st.download_button(t("download_page_pdf"), data=render_book_pdf([selected_row]), file_name=safe_filename(f"magazine_page_{selected_index + 1}_{fingerprint([selected_row], LANG)}", "pdf"), mime="application/pdf")
 
-        if st.button(t("build_book")):
-            with st.spinner(t("building_book")):
-                book_png = render_book_png(enriched_rows)
-                book_pdf = render_book_pdf(enriched_rows)
-                book_zip = render_book_zip(enriched_rows)
-            st.download_button(
-                t("download_book_png"),
-                data=book_png,
-                file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "png"),
-                mime="image/png",
-                key=f"report_studio_full_book_png_{ACTIVE_EXPORT_VERSION}",
-            )
-            st.download_button(
-                t("download_book_pdf"),
-                data=book_pdf,
-                file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "pdf"),
-                mime="application/pdf",
-                key=f"report_studio_full_book_pdf_{ACTIVE_EXPORT_VERSION}",
-            )
-            st.download_button(
-                t("download_zip"),
-                data=book_zip,
-                file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "zip"),
-                mime="application/zip",
-                key=f"report_studio_full_book_zip_{ACTIVE_EXPORT_VERSION}",
-            )
+    with copy_tab:
+        if enriched_rows:
+            first = enriched_rows[0]
+            st.text_area("Short copy", value=f"{row_label(first, 0)}\nFinal: {safe_text(first.get('final_decision') or first.get('recommended_action') or 'WATCHLIST')}", height=180)
 
-    with data_tab:
-        st.dataframe(localized_dataframe(pd.DataFrame(enriched_rows), LANG), use_container_width=True)
+    with proof_tab:
+        proof_cols = [col for col in ("event", "sport", "prediction", "model_probability", "market_probability", "model_market_edge", "expected_value_per_unit", "odds_source", "bookmaker", "final_decision") if col in pd.DataFrame(enriched_rows).columns]
+        st.dataframe(localized_dataframe(pd.DataFrame(enriched_rows)[proof_cols] if proof_cols else pd.DataFrame(enriched_rows), LANG), use_container_width=True)
 
     with exports_tab:
         out_frame = pd.DataFrame(enriched_rows)
         st.download_button(t("download_csv"), data=out_frame.to_csv(index=False).encode("utf-8"), file_name=safe_filename(f"report_rows_{fingerprint(enriched_rows, LANG)}", "csv"), mime="text/csv")
         st.download_button(t("download_json"), data=json.dumps(enriched_rows, ensure_ascii=False, indent=2).encode("utf-8"), file_name=safe_filename(f"report_rows_{fingerprint(enriched_rows, LANG)}", "json"), mime="application/json")
+
+    with images_tab:
+        if st.button(t("build_book")):
+            with st.spinner(t("building_book")):
+                book_png = render_book_png(enriched_rows)
+                book_pdf = render_book_pdf(enriched_rows)
+                book_zip = render_book_zip(enriched_rows)
+            st.download_button(t("download_book_png"), data=book_png, file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "png"), mime="image/png", key=f"report_studio_full_book_png_{ACTIVE_EXPORT_VERSION}")
+            st.download_button(t("download_book_pdf"), data=book_pdf, file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "pdf"), mime="application/pdf", key=f"report_studio_full_book_pdf_{ACTIVE_EXPORT_VERSION}")
+            st.download_button(t("download_zip"), data=book_zip, file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "zip"), mime="application/zip", key=f"report_studio_full_book_zip_{ACTIVE_EXPORT_VERSION}")
+        if enriched_rows:
+            selected_png = render_page_png(enriched_rows[0], 1, len(enriched_rows))
+            st.download_button(t("download_page"), data=selected_png, file_name=safe_filename(f"full_magazine_page_1_{fingerprint([enriched_rows[0]], LANG)}", "png"), mime="image/png", key=f"report_studio_image_full_page_0_{ACTIVE_EXPORT_VERSION}")
+
+    with feed_tab:
+        st.json({"rows": enriched_rows[:20], "row_count": len(enriched_rows)})
+
+    with diagnostics_tab:
+        first = dict(enriched_rows[0]) if enriched_rows else {}
+        api_diagnostics = {
+            "api_enrichment_version": ENRICHMENT_VERSION,
+            "first_row_api_enrichment_fields": first.get("api_enrichment_fields", ""),
+            "first_row_has_weather_summary": bool(safe_text(first.get("weather_summary"))),
+            "first_row_has_newsapi_summary": bool(safe_text(first.get("newsapi_summary"))),
+            "first_row_has_api_football_summary": bool(safe_text(first.get("api_football_summary"))),
+            "first_row_has_sportsdataio_context": bool(safe_text(first.get("sportsdataio_context"))),
+            "first_row_weather_summary": safe_text(first.get("weather_summary")),
+            "first_row_newsapi_summary": safe_text(first.get("newsapi_summary")),
+            "first_row_api_football_summary": safe_text(first.get("api_football_summary")),
+            "first_row_sportsdataio_context": safe_text(first.get("sportsdataio_context")),
+        }
+        st.json({"source": source, "row_count": len(enriched_rows), "api_enrichment": api_diagnostics})
 
 
 main()
