@@ -409,16 +409,49 @@ def _paint_report_name(module: Any, img: Any, report_name: str | None) -> None:
     draw.text((43, 29), text, font=module._fit(text, 250, 38, 18, True), fill="white")
 
 
+def _set_if_missing_or_bad(row: dict[str, Any], key: str, value: str) -> None:
+    if _bad(row.get(key)) or _bad_context(row.get(key), row):
+        row[key] = value
+
+
+def _install_final_renderer_guards(patched: Any) -> None:
+    try:
+        from .magazine_second_page_patch import install as install_second_page
+        install_second_page(patched)
+    except Exception:
+        return
+    try:
+        from autonomous_betting_agent import magazine_report_polish_patch as polish
+    except Exception:
+        return
+    original = getattr(polish, "install_sale_ready_polish", None)
+    if not callable(original) or getattr(original, "_ABA_FINAL_RENDERER_GUARD", False):
+        return
+
+    def guarded_install_sale_ready_polish(*args: Any, **kwargs: Any) -> Any:
+        result = original(*args, **kwargs)
+        try:
+            from .magazine_second_page_patch import install as install_second_page_after_polish
+            install_second_page_after_polish(patched)
+        except Exception:
+            pass
+        return result
+
+    guarded_install_sale_ready_polish._ABA_FINAL_RENDERER_GUARD = True  # type: ignore[attr-defined]
+    polish.install_sale_ready_polish = guarded_install_sale_ready_polish  # type: ignore[assignment]
+
+
 def _sanitize_pick(data: Any) -> Any:
     row = dict(_row(data))
     if _explicit_fallback_odds(row):
+        fallback_context = "Fallback report: verify current odds and news before entry."
         row["risk"] = "FALLBACK MODE"
         row["risk_level"] = "FALLBACK MODE"
         row["risk_label"] = "FALLBACK MODE"
         row["final_decision"] = "WATCHLIST"
-        row["sports_context_summary"] = "Fallback report: verify current odds and news before entry."
-        row["preview_summary"] = "Fallback report: verify current odds and news before entry."
-        row["short_reason"] = "Fallback report: verify current odds and news before entry."
+        # Preserve useful weather/news/matchup context. Only write the generic fallback line when the row truly lacks context.
+        for key in ("sports_context_summary", "preview_summary", "short_reason"):
+            _set_if_missing_or_bad(row, key, fallback_context)
         row["why_lose"] = "\n".join(["Fallback data used.", "Verify live odds before entry.", "Do not use until the price is confirmed."])
         row["chain_notes"] = "\n".join(["No parlay recommended", "Not enough compatible selections.", "Verified odds are missing."])
     for key in ("perplexity_context", "perplexity_summary", "newsapi_summary", "news_summary", "game_summary", "matchup_note", "matchup_notes", "team_snapshot_home", "team_snapshot_away", "sportsdataio_context", "sportsdataio_team_summary", "api_football_summary"):
@@ -463,5 +496,6 @@ def apply_magazine_sale_ready_patch(module):
     except Exception:
         pass
     base = re.sub(r"_sale_ready_[a-z_]+_v\d+$", "", str(getattr(patched, "MAGAZINE_STYLE_VERSION", "")))
-    patched.MAGAZINE_STYLE_VERSION = f"{base}_sale_ready_risk_chain_v4"
+    patched.MAGAZINE_STYLE_VERSION = f"{base}_sale_ready_risk_chain_v5_context_safe"
+    _install_final_renderer_guards(patched)
     return patched
