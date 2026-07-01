@@ -5,7 +5,7 @@ from typing import Any, Iterable
 import hashlib
 import re
 
-PATCH_VERSION = "direct_second_page_v5_recommendation_board_truth_safe"
+PATCH_VERSION = "direct_second_page_v6_sport_wide_recommendation_board"
 GOLD = (241, 184, 45)
 
 ES = {
@@ -24,6 +24,7 @@ ES = {
     "Hedge / Middle Notes": "Notas de Hedge / Middle",
     "Quality Gate": "Filtro de Calidad",
     "Cancel Conditions": "Condiciones de Cancelación",
+    "Sport Menu": "Menú por Deporte",
     "ADVANCED MARKETS ACTIVE": "MERCADOS AVANZADOS ACTIVOS",
     "ADVANCED MARKETS NEED VERIFICATION": "MERCADOS AVANZADOS REQUIEREN VERIFICACIÓN",
     "TRIGGER-BASED WATCHLIST": "LISTA DE SEGUIMIENTO POR GATILLO",
@@ -71,6 +72,7 @@ def _tr(value: Any, lang: str) -> str:
         ("Source", "Fuente"),
         ("Scope", "Alcance"),
         ("WATCHLIST", "LISTA DE SEGUIMIENTO"),
+        ("WATCHLIST IDEA", "IDEA EN LISTA DE SEGUIMIENTO"),
         ("MENU ONLY", "SOLO MENÚ"),
         ("TRIGGER-BASED", "POR GATILLO"),
         ("NOT RECOMMENDED", "NO RECOMENDADO"),
@@ -78,9 +80,15 @@ def _tr(value: Any, lang: str) -> str:
         ("Two-leg idea", "Idea de dos selecciones"),
         ("Same-game parlay", "Parlay del mismo partido"),
         ("Team total", "Total de equipo"),
-        ("First-half", "Primer tiempo"),
-        ("Second-half", "Segundo tiempo"),
+        ("game total", "total del partido"),
+        ("alternate total", "total alternativo"),
+        ("first-half", "primer tiempo"),
+        ("second-half", "segundo tiempo"),
         ("next score", "próximo anotador/equipo"),
+        ("team to qualify", "equipo clasifica"),
+        ("corner", "corner"),
+        ("throw-in", "saque de banda"),
+        ("free kick", "tiro libre"),
         ("favorite scores first", "favorito anota primero"),
         ("underdog scores first", "no favorito anota primero"),
         ("halftime", "medio tiempo"),
@@ -130,6 +138,29 @@ def _decimal_text(value: Any) -> str | None:
     return f"{num:.2f}"
 
 
+def _sport_text(data: dict[str, Any]) -> str:
+    return " ".join(_clean(data.get(k)).lower() for k in ("sport", "league", "competition", "event", "event_name", "matchup", "game"))
+
+
+def _sport_family(data: dict[str, Any]) -> str:
+    text = _sport_text(data)
+    if any(token in text for token in ("soccer", "fifa", "uefa", "liga", "world cup", "football regular")):
+        return "soccer"
+    if "baseball" in text or "mlb" in text:
+        return "baseball"
+    if "basketball" in text or "nba" in text or "wnba" in text or "ncaab" in text:
+        return "basketball"
+    if "nfl" in text or "americanfootball" in text or "football" in text:
+        return "football"
+    if "hockey" in text or "nhl" in text:
+        return "hockey"
+    if "tennis" in text:
+        return "tennis"
+    if "mma" in text or "ufc" in text or "boxing" in text:
+        return "fight"
+    return "general"
+
+
 def _ok(data: dict[str, Any]) -> bool:
     status = _get(data, "odds_status", "odds_api_status").lower()
     flag = _get(data, "odds_api_live", "the_odds_api_live", "odds_verified").lower()
@@ -146,7 +177,7 @@ def _source_status(data: dict[str, Any], lang: str) -> tuple[str, tuple[int, int
     return _tr("VERIFY SOURCE", lang), GOLD
 
 
-def _field_items(data: dict[str, Any], keys: tuple[str, ...], fallback: list[str], lang: str, limit: int = 4) -> list[str]:
+def _field_items(data: dict[str, Any], keys: tuple[str, ...], fallback: list[str], lang: str, limit: int = 5) -> list[str]:
     out: list[str] = []
     for key in keys:
         out.extend(_split(data.get(key)))
@@ -163,58 +194,162 @@ def _source_rows(data: dict[str, Any], lang: str) -> list[str]:
 
 
 def _status_prefix(data: dict[str, Any]) -> str:
-    return "VERIFIED RECOMMENDATION" if _ok(data) else "WATCHLIST"
+    return "VERIFIED RECOMMENDATION" if _ok(data) else "WATCHLIST IDEA"
 
 
 def _chain_rows(data: dict[str, Any], lang: str) -> list[str]:
     status = _status_prefix(data)
-    fallback = [
-        f"{status} · Two-leg idea: anchor + alternate total only after event and line match.",
-        "MENU ONLY · Same-game parlay: anchor + team total if book confirms both markets.",
-        "WATCHLIST IDEA · Correlated angle: anchor + second-half total after pace confirmation.",
-        "NOT RECOMMENDED · Avoid aggressive multi-leg chains until price gate passes.",
-    ]
-    return _field_items(data, ("advanced_chain_ideas", "correlated_markets", "add_on_legs", "parlay_notes"), fallback, lang, 4)
+    family = _sport_family(data)
+    if family == "soccer":
+        fallback = [
+            f"{status} · Safer 2-leg: anchor + alternate total/team total only if same book confirms both prices.",
+            "TRIGGER-BASED · Team to qualify / next goal becomes usable only after live price beats target.",
+            "MENU ONLY · Corners, throw-ins, free kicks: use only when book lists the exact minute window.",
+            "TRIGGER-BASED · 45:00–59:59 windows: watch next corner/throw-in/free-kick after pressure spike.",
+            "NOT RECOMMENDED · Do not parlay fallback rows or unmatched live markets.",
+        ]
+    elif family == "baseball":
+        fallback = [
+            f"{status} · Safer 2-leg: moneyline/first-5 + team total only after pitcher and lineup check.",
+            "MENU ONLY · Pitcher K ladder, first five innings, team total, player total bases.",
+            "TRIGGER-BASED · Live run-line/total after bullpen change or pitch-count stress.",
+            "WATCHLIST IDEA · NRFI/YRFI only if starter profile and weather confirm the setup.",
+            "NOT RECOMMENDED · Avoid parlaying correlated stale pitcher data.",
+        ]
+    elif family in {"basketball", "football", "hockey"}:
+        fallback = [
+            f"{status} · Safer 2-leg: spread/moneyline + team total after injury/status check.",
+            "MENU ONLY · Player props, team totals, alternate spread/total, period/quarter markets.",
+            "TRIGGER-BASED · Live total or side after pace, possession, or shot-volume shift.",
+            "WATCHLIST IDEA · Hedge/middle if line moves across original spread/total number.",
+            "NOT RECOMMENDED · Avoid aggressive ladders without verified lineup and price.",
+        ]
+    elif family == "tennis":
+        fallback = [
+            f"{status} · Safer 2-leg: match winner + set/game handicap only after hold/break profile check.",
+            "MENU ONLY · Total games, set betting, first-set angle, break-of-serve trigger.",
+            "TRIGGER-BASED · Live entry after early break, medical timeout, or serve-speed drop.",
+            "WATCHLIST IDEA · Hedge after first-set win if price overcompresses.",
+            "NOT RECOMMENDED · Avoid chains when player condition is unverified.",
+        ]
+    else:
+        fallback = [
+            f"{status} · Safer 2-leg: anchor + alternate line only after exact market match.",
+            "MENU ONLY · Add team/player prop only if odds source confirms the market.",
+            "TRIGGER-BASED · Use live line movement only when the trigger condition is visible.",
+            "WATCHLIST IDEA · Build only one correlated add-on before considering multi-leg parlays.",
+            "NOT RECOMMENDED · No aggressive chain until source, price, and context gates pass.",
+        ]
+    return _field_items(data, ("advanced_chain_ideas", "correlated_markets", "add_on_legs", "parlay_notes"), fallback, lang, 5)
 
 
 def _prop_rows(data: dict[str, Any], lang: str) -> list[str]:
-    fallback = [
-        "MENU ONLY · Team total: compare projected tempo with live team total before entry.",
-        "MENU ONLY · Game total alternate line: wait for a better number than fair price.",
-        "TRIGGER-BASED · Team to qualify / next score only if live price beats target.",
-        "WATCHLIST IDEA · Corners, throw-ins, free kicks, shots only when book and context support them.",
-    ]
-    return _field_items(data, ("prop_market_ideas", "side_market_ideas", "prop_market_notes", "advanced_market_notes", "team_to_qualify_angle", "next_score_angle", "corners_angle", "throw_ins_angle", "free_kicks_angle"), fallback, lang, 4)
+    family = _sport_family(data)
+    menus = {
+        "soccer": [
+            "MENU ONLY · Team total, alternate game total, first/second-half total, both teams to score.",
+            "MENU ONLY · Team to qualify, next team to score, result + total, draw-no-bet.",
+            "TRIGGER-BASED · Corners / throw-ins / free kicks by exact live window when pressure appears.",
+            "WATCHLIST IDEA · Shots/team props only when source and lineup are verified.",
+            "NOT RECOMMENDED · Do not force card markets; include only with verified support.",
+        ],
+        "baseball": [
+            "MENU ONLY · Pitcher strikeouts, first-five ML/spread/total, team total.",
+            "MENU ONLY · Player hits/RBI/total bases only after lineup confirmation.",
+            "TRIGGER-BASED · Live total/run line after starter exits or bullpen mismatch appears.",
+            "WATCHLIST IDEA · Weather/wind can upgrade or cancel totals and HR props.",
+            "NOT RECOMMENDED · No pitcher prop if pitch count/injury/news is stale.",
+        ],
+        "basketball": [
+            "MENU ONLY · Player points/rebounds/assists, team total, alternate spread/total.",
+            "TRIGGER-BASED · Live over/under after pace, foul rate, or rotation change confirms.",
+            "WATCHLIST IDEA · 1H/2H total if projected tempo differs from live market.",
+            "MENU ONLY · Same-game add-on: side + team total only if price stays above target.",
+            "NOT RECOMMENDED · Avoid player prop if minutes/injury status is unverified.",
+        ],
+        "football": [
+            "MENU ONLY · Player pass/rush/receiving props, team total, alternate spread/total.",
+            "TRIGGER-BASED · Live side/total after turnover, red-zone failure, or pace shift.",
+            "WATCHLIST IDEA · Middle spread/total if line crosses key numbers.",
+            "MENU ONLY · Same-game add-on: side + team total if game script supports it.",
+            "NOT RECOMMENDED · Avoid props when weather/injury depth chart is unverified.",
+        ],
+        "hockey": [
+            "MENU ONLY · Team total, shots on goal, goalie saves, period total.",
+            "TRIGGER-BASED · Live total after shot-volume or goalie-quality change.",
+            "WATCHLIST IDEA · Puck line + team total only after goalie confirmation.",
+            "MENU ONLY · Player shots/points if line and role are verified.",
+            "NOT RECOMMENDED · Avoid stale goalie or lineup data.",
+        ],
+        "tennis": [
+            "MENU ONLY · Total games, set winner, handicap, first-set market.",
+            "TRIGGER-BASED · Live over if both players hold serve cleanly early.",
+            "WATCHLIST IDEA · Underdog handicap after strong hold/break pressure.",
+            "MENU ONLY · Match winner + total games only after price gate passes.",
+            "NOT RECOMMENDED · Cancel if injury/retirement signal appears.",
+        ],
+    }
+    fallback = menus.get(family, [
+        "MENU ONLY · Alternate total, team total, side market, and player/team prop if available.",
+        "TRIGGER-BASED · Live entry only after the game state supports the angle.",
+        "WATCHLIST IDEA · Use correlated add-ons only after exact event/market/line match.",
+        "MENU ONLY · Hedge/middle if market moves across original number.",
+        "NOT RECOMMENDED · Skip unsupported props and stale markets.",
+    ])
+    return _field_items(data, ("prop_market_ideas", "side_market_ideas", "prop_market_notes", "advanced_market_notes", "team_to_qualify_angle", "next_score_angle", "corners_angle", "throw_ins_angle", "free_kicks_angle"), fallback, lang, 5)
 
 
 def _live_rows(data: dict[str, Any], lang: str) -> list[str]:
-    fallback = [
-        "TRIGGER-BASED · If favorite scores first, watch alternate total and hedge price.",
-        "TRIGGER-BASED · If underdog scores first, watch favorite live moneyline drift.",
-        "TRIGGER-BASED · If tied at halftime, watch second-half total and next score.",
-        "TRIGGER-BASED · If tempo/pressure rises, watch short-window totals or pressure markets.",
-    ]
-    return _field_items(data, ("live_trade_triggers", "live_betting_notes", "minute_window_angles", "in_game_notes"), fallback, lang, 4)
+    family = _sport_family(data)
+    if family == "soccer":
+        fallback = [
+            "TRIGGER-BASED · If trailing team pressure rises after halftime, watch next goal/corners/throw-ins.",
+            "TRIGGER-BASED · 45:00–49:59: window markets only if book lists exact live minute market.",
+            "TRIGGER-BASED · If favorite scores first, watch alternate total or trailing-team pressure props.",
+            "TRIGGER-BASED · If underdog scores first, watch favorite live ML/qualify drift.",
+            "CANCEL · No live entry if tempo, possession, and pressure do not match the trigger.",
+        ]
+    else:
+        fallback = [
+            "TRIGGER-BASED · If favorite starts fast, watch alternate spread/total before price collapses.",
+            "TRIGGER-BASED · If underdog leads early, watch favorite rebound price only if metrics support it.",
+            "TRIGGER-BASED · If total remains under pace, watch live under or delayed over only after pace confirms.",
+            "TRIGGER-BASED · If line drifts past fair value, convert from pass to watchlist candidate.",
+            "CANCEL · No live entry after trigger window expires.",
+        ]
+    return _field_items(data, ("live_trade_triggers", "live_betting_notes", "minute_window_angles", "in_game_notes"), fallback, lang, 5)
 
 
 def _flash_rows(data: dict[str, Any], lang: str) -> list[str]:
-    fallback = [
-        "TRIGGER-BASED · Next team to score after pressure spike; cancel if momentum fades.",
-        "TRIGGER-BASED · Short-window total after two sustained attacks or price drop.",
-        "MENU ONLY · Live alternate total if market overreacts to slow early pace.",
-        "WATCHLIST IDEA · Momentum trade only inside the valid timing window.",
-    ]
-    return _field_items(data, ("flash_bets", "flash_market_notes"), fallback, lang, 4)
+    family = _sport_family(data)
+    if family == "soccer":
+        fallback = [
+            "TRIGGER-BASED · Next goal / next team to score after sustained pressure spike.",
+            "TRIGGER-BASED · Short-window corner or throw-in only in the listed minute band.",
+            "MENU ONLY · Live alternate total if market overreacts to slow or fast half start.",
+            "WATCHLIST IDEA · Momentum trade after two attacks, one set piece, and price still above target.",
+            "CANCEL · Cancel immediately if possession flips or pressure fades.",
+        ]
+    else:
+        fallback = [
+            "TRIGGER-BASED · Short-window total after pace/volume spikes.",
+            "TRIGGER-BASED · Next-score or period/quarter market only with visible momentum.",
+            "MENU ONLY · Live alternate spread/total if price improves beyond target.",
+            "WATCHLIST IDEA · Late-game hedge when the original edge is protected.",
+            "CANCEL · Cancel if price moves below fair value before entry.",
+        ]
+    return _field_items(data, ("flash_bets", "flash_market_notes"), fallback, lang, 5)
 
 
 def _hedge_rows(data: dict[str, Any], lang: str) -> list[str]:
     fallback = [
         "WATCHLIST IDEA · Hedge only after a favorable score state, not from fear.",
-        "MENU ONLY · Middle becomes possible only after line moves across the original number.",
-        "WATCHLIST IDEA · Cashout only if price no longer beats fair value.",
-        "NOT RECOMMENDED · Do not chase if the trigger window expires.",
+        "MENU ONLY · Middle is possible only after line moves across the original number.",
+        "WATCHLIST IDEA · Cashout only if price no longer beats fair value or injury/news flips.",
+        "WATCHLIST IDEA · Reduce stake if live market confirms weaker pace than pregame model.",
+        "NOT RECOMMENDED · Do not chase after missed live trigger or price collapse.",
     ]
-    return _field_items(data, ("hedge_notes", "middle_notes", "cashout_notes"), fallback, lang, 4)
+    return _field_items(data, ("hedge_notes", "middle_notes", "cashout_notes"), fallback, lang, 5)
 
 
 def _quality_rows(data: dict[str, Any], lang: str) -> list[str]:
@@ -222,10 +357,11 @@ def _quality_rows(data: dict[str, Any], lang: str) -> list[str]:
     fallback = [
         "Source gate: " + status,
         "Price gate: requires current price above target price.",
-        "Value gate: requires positive EV and edge.",
+        "Value gate: requires positive EV, edge, and no-vig sanity check.",
         "Market gate: requires exact event, market, line, and selection match.",
+        "Execution gate: recommendation remains watchlist until every required gate passes.",
     ]
-    return _field_items(data, ("quality_gate_notes",), fallback, lang, 4)
+    return _field_items(data, ("quality_gate_notes",), fallback, lang, 5)
 
 
 def _cancel_rows(data: dict[str, Any], lang: str) -> list[str]:
@@ -233,7 +369,7 @@ def _cancel_rows(data: dict[str, Any], lang: str) -> list[str]:
         "Cancel if live odds cannot be matched to the same event.",
         "Cancel if price moves below fair value or target price.",
         "Cancel if lineup/news/weather context changes materially.",
-        "Cancel if tempo does not match the trigger condition.",
+        "Cancel if tempo, pressure, or volume fails to match the trigger.",
         "+ MORE WATCHLIST IDEAS AVAILABLE",
     ]
     return _field_items(data, ("do_not_bet_conditions", "cancel_conditions", "risk_notes"), fallback, lang, 5)
@@ -302,19 +438,19 @@ def _draw_second_page(module: Any, pick: Any, background_image: Any = None, repo
     draw.rounded_rectangle((42, 246, 1042, 312), radius=12, fill=GOLD + (245,), outline=black, width=2)
     module._txt_auto(draw, 64, 263, _tr(note, lang), 956, 34, 21, 9, black, True, 2)
 
-    def box(x: int, y: int, w: int, h: int, title: str, rows: list[str], color: tuple[int, int, int], row_limit: int = 4) -> None:
+    def box(x: int, y: int, w: int, h: int, title: str, rows: list[str], color: tuple[int, int, int], row_limit: int = 5) -> None:
         draw.rounded_rectangle((x, y, x + w, y + h), radius=14, fill=paper + (255,), outline=black + (220,), width=3)
         draw.rounded_rectangle((x, y, x + w, y + 48), radius=10, fill=color)
         label = _tr(title, lang).upper()
         draw.text((x + 14, y + 9), label, font=module._fit(label, w - 28, 25, 10, True), fill=cream)
-        cy = y + 62
-        font_start = 15 if h <= 218 else 16
+        cy = y + 58
+        font_start = 13 if h <= 220 else 14
         for item in rows[:row_limit]:
-            if cy > y + h - 28:
+            if cy > y + h - 22:
                 break
-            draw.ellipse((x + 15, cy + 5, x + 27, cy + 17), fill=color)
-            module._txt_auto(draw, x + 36, cy, _tr(item, lang), w - 50, 38, font_start, 7, black, False, 2)
-            cy += 42
+            draw.ellipse((x + 14, cy + 5, x + 25, cy + 16), fill=color)
+            module._txt_auto(draw, x + 34, cy, _tr(item, lang), w - 48, 34, font_start, 7, black, False, 2)
+            cy += 36
 
     sections = _page_two_sections(data, lang)
     coords = [
@@ -328,7 +464,7 @@ def _draw_second_page(module: Any, pick: Any, background_image: Any = None, repo
         (552, 1090, 488, 238),
     ]
     for (title, rows, color), (x, y, w, h) in zip(sections, coords):
-        box(x, y, w, h, title, rows, color, 5 if title == "Cancel Conditions" else 4)
+        box(x, y, w, h, title, rows, color, 5)
 
     draw.rounded_rectangle((42, 1352, 1042, 1518), radius=16, fill=black, outline=status_color, width=4)
     verdict = _tr("ADVANCED MARKETS ACTIVE" if _ok(data) else "ADVANCED MARKETS NEED VERIFICATION", lang)
@@ -364,20 +500,17 @@ def install(module: Any | None = None) -> Any:
             return original_fmt(value, kind)
         fmt_decimal_first._ABA_DECIMAL_ODDS_DIRECT = True  # type: ignore[attr-defined]
         module._fmt = fmt_decimal_first
-    original_page_png = getattr(module, "render_full_pick_magazine_page_png", None)
-    if callable(original_page_png):
-        def two_page_png(pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
-            page_total = max(2, int(total_pages or 1) * 2)
-            first = max(1, int(page_number or 1) * 2 - 1)
-            page_one = module.render_full_pick_magazine_page(pick, background_image, report_name, first, page_total, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
-            page_two = _draw_second_page(module, pick, background_image, report_name, first + 1, page_total, language)
-            from PIL import Image
-            book = Image.new("RGB", (page_one.width, page_one.height * 2), getattr(module, "PAPER", (244, 235, 211)))
-            book.paste(page_one.convert("RGB"), (0, 0))
-            book.paste(page_two.convert("RGB"), (0, page_one.height))
-            return _png(book)
-        two_page_png._ABA_TWO_PAGE_DIRECT = True  # type: ignore[attr-defined]
-        module.render_full_pick_magazine_page_png = two_page_png
+    def two_page_png(pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 1, total_pages: int = 1, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
+        page_total = max(2, int(total_pages or 1) * 2)
+        first = max(1, int(page_number or 1) * 2 - 1)
+        page_one = module.render_full_pick_magazine_page(pick, background_image, report_name, first, page_total, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
+        page_two = _draw_second_page(module, pick, background_image, report_name, first + 1, page_total, language)
+        from PIL import Image
+        book = Image.new("RGB", (page_one.width, page_one.height * 2), getattr(module, "PAPER", (244, 235, 211)))
+        book.paste(page_one.convert("RGB"), (0, 0))
+        book.paste(page_two.convert("RGB"), (0, page_one.height))
+        return _png(book)
+    module.render_full_pick_magazine_page_png = two_page_png
     def render_pages(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> list[Any]:
         rows = list(picks) or [{"event": "No Picks", "prediction": "NO PICK"}]
         total = len(rows) * 2
