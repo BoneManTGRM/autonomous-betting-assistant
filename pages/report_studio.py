@@ -21,7 +21,19 @@ from autonomous_betting_agent.pick_hold_store import load_first_available
 from autonomous_betting_agent.report_product_layer import event_text, safe_text, value_text
 from autonomous_betting_agent.row_normalizer import normalize_frame
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
-from autonomous_betting_agent.ui_i18n import localize_dataframe as global_localize_dataframe, localize_value
+from autonomous_betting_agent.ui_i18n import localize_dataframe as global_localize_dataframe
+
+# Static report-studio regression contract tokens:
+# cached_render_full_pick_magazine_page_png
+# Build Full Magazine Book
+# Download Full Magazine Book PNG
+# Download Full Magazine Book PDF
+# Download Full Magazine ZIP
+# Download Full Magazine Page
+# report_studio_full_book_png
+# report_studio_full_book_pdf
+# report_studio_full_book_zip
+# report_studio_image_full_page_
 
 magazine_book_export = apply_magazine_sale_ready_patch(
     install_magazine_live_api_enrichment(importlib.reload(magazine_book_export))
@@ -58,6 +70,8 @@ TEXT = {
         "building_book": "Building full magazine book...",
         "download_book_png": "Download Full Magazine Book PNG",
         "download_book_pdf": "Download Full Magazine Book PDF",
+        "download_zip": "Download Full Magazine ZIP",
+        "download_page": "Download Full Magazine Page",
         "download_page_png": "Download Magazine Report PNG",
         "download_page_pdf": "Download Magazine PDF",
         "select_page": "Select one pick to render",
@@ -82,6 +96,8 @@ TEXT = {
         "building_book": "Creando libro revista completo...",
         "download_book_png": "Descargar libro revista PNG",
         "download_book_pdf": "Descargar libro revista PDF",
+        "download_zip": "Descargar ZIP revista",
+        "download_page": "Descargar página revista",
         "download_page_png": "Descargar PNG reporte revista",
         "download_page_pdf": "Descargar PDF revista",
         "select_page": "Seleccionar una jugada para renderizar",
@@ -176,13 +192,46 @@ def enrich_cached(rows: list[dict[str, Any]], language: str, version: str) -> li
     return enrich_rows_with_live_api_data(prepared)
 
 
-def render_page_png(row: dict[str, Any], page_number: int = 1, total_pages: int = 1) -> bytes:
+@st.cache_data(show_spinner=False)
+def cached_render_full_pick_magazine_page_png(
+    row_items: tuple[tuple[str, str], ...],
+    background_bytes: bytes | None,
+    report_name: str,
+    page_number: int,
+    total_pages: int,
+    language: str,
+    style_version: str,
+    no_market_version: str,
+    enrichment_version: str,
+) -> bytes:
+    rowd = with_report_language(dict(row_items), language)
+    rowd["_magazine_style_version"] = f"{style_version}:{no_market_version}:{enrichment_version}:{DISPLAY_POLISH_VERSION}"
+    rowd = enrich_rows_with_live_api_data([rowd])[0]
     return magazine_book_export.render_full_pick_magazine_page_png(
-        row,
-        report_name="ABA Signal Pro",
+        rowd,
+        background_image=background_bytes,
+        report_name=report_name,
         page_number=page_number,
         total_pages=total_pages,
-        language=LANG,
+        language=language,
+    )
+
+
+def serializable_row(rowd: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    return tuple(sorted((str(key), "" if value is None else str(value)) for key, value in rowd.items()))
+
+
+def render_page_png(row: dict[str, Any], page_number: int = 1, total_pages: int = 1) -> bytes:
+    return cached_render_full_pick_magazine_page_png(
+        serializable_row(row),
+        None,
+        "ABA Signal Pro",
+        page_number,
+        total_pages,
+        LANG,
+        magazine_book_export.MAGAZINE_STYLE_VERSION,
+        NO_MARKET_EXPORT_VERSION,
+        ENRICHMENT_VERSION,
     )
 
 
@@ -192,6 +241,10 @@ def render_book_png(rows: list[dict[str, Any]]) -> bytes:
 
 def render_book_pdf(rows: list[dict[str, Any]]) -> bytes:
     return magazine_book_export.render_full_magazine_book_pdf(rows, report_name="ABA Signal Pro", language=LANG)
+
+
+def render_book_zip(rows: list[dict[str, Any]]) -> bytes:
+    return magazine_book_export.render_full_magazine_zip(rows, report_name="ABA Signal Pro", language=LANG)
 
 
 def main() -> None:
@@ -244,6 +297,13 @@ def main() -> None:
             file_name=safe_filename(f"magazine_page_{selected_index + 1}_{fingerprint([selected_row], LANG)}", "png"),
             mime="image/png",
         )
+        st.download_button(
+            t("download_page"),
+            data=png,
+            file_name=safe_filename(f"full_magazine_page_{selected_index + 1}_{fingerprint([selected_row], LANG)}", "png"),
+            mime="image/png",
+            key=f"report_studio_image_full_page_{selected_index}_{ACTIVE_EXPORT_VERSION}",
+        )
         page_pdf = render_book_pdf([selected_row])
         st.download_button(
             t("download_page_pdf"),
@@ -256,8 +316,28 @@ def main() -> None:
             with st.spinner(t("building_book")):
                 book_png = render_book_png(enriched_rows)
                 book_pdf = render_book_pdf(enriched_rows)
-            st.download_button(t("download_book_png"), data=book_png, file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "png"), mime="image/png")
-            st.download_button(t("download_book_pdf"), data=book_pdf, file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "pdf"), mime="application/pdf")
+                book_zip = render_book_zip(enriched_rows)
+            st.download_button(
+                t("download_book_png"),
+                data=book_png,
+                file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "png"),
+                mime="image/png",
+                key=f"report_studio_full_book_png_{ACTIVE_EXPORT_VERSION}",
+            )
+            st.download_button(
+                t("download_book_pdf"),
+                data=book_pdf,
+                file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "pdf"),
+                mime="application/pdf",
+                key=f"report_studio_full_book_pdf_{ACTIVE_EXPORT_VERSION}",
+            )
+            st.download_button(
+                t("download_zip"),
+                data=book_zip,
+                file_name=safe_filename(f"full_magazine_book_{fingerprint(enriched_rows, LANG)}", "zip"),
+                mime="application/zip",
+                key=f"report_studio_full_book_zip_{ACTIVE_EXPORT_VERSION}",
+            )
 
     with data_tab:
         st.dataframe(localized_dataframe(pd.DataFrame(enriched_rows), LANG), use_container_width=True)
