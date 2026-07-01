@@ -44,6 +44,26 @@ def _workspace(value: Any) -> str:
     return cleaned or "default"
 
 
+def _json_ready(value: Any) -> Any:
+    if isinstance(value, pd.DataFrame):
+        return [_json_ready(item) for item in value.to_dict(orient="records")]
+    if isinstance(value, Mapping):
+        return {str(key): _json_ready(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_ready(item) for item in value]
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except Exception:
+            return str(value)
+    return value
+
+
 def _legacy_performance_frame(workspace_id: str | None = None) -> pd.DataFrame:
     """Bridge the older Odds Lock proof ledger into the proof-package dashboard.
 
@@ -118,7 +138,7 @@ def export_performance_csv(workspace_id: str | None = None, public_safe: bool = 
 
 def export_performance_json(workspace_id: str | None = None, public_safe: bool = False) -> str:
     frame = _export_frame(workspace_id=workspace_id, public_safe=public_safe)
-    return json.dumps({"schema_version": SCHEMA_VERSION, "rows": frame.to_dict(orient="records")}, indent=2, sort_keys=True)
+    return json.dumps({"schema_version": SCHEMA_VERSION, "rows": _json_ready(frame.to_dict(orient="records"))}, indent=2, sort_keys=True)
 
 
 def validate_ledger_integrity(workspace_id: str | None = None) -> dict[str, Any]:
