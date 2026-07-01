@@ -7,16 +7,25 @@ def _skip_runtime_patches() -> bool:
     return os.getenv("GITHUB_ACTIONS", "").lower() in {"1", "true", "yes"}
 
 
-if not _skip_runtime_patches():
+def _run_magazine_bridge() -> None:
     try:
         import sitecustomize as _aba_sitecustomize
-        # Streamlit Cloud can expose CI=true. That must not disable runtime magazine rendering repairs.
         if hasattr(_aba_sitecustomize, "_ci_enabled"):
             _aba_sitecustomize._ci_enabled = lambda: False  # type: ignore[attr-defined]
-        if hasattr(_aba_sitecustomize, "_apply_magazine_display_bridge"):
-            _aba_sitecustomize._apply_magazine_display_bridge()  # type: ignore[attr-defined]
+        for name in (
+            "_install_magazine_reload_bridge",
+            "_install_magazine_polish_bridge",
+            "_apply_magazine_display_bridge",
+        ):
+            func = getattr(_aba_sitecustomize, name, None)
+            if callable(func):
+                func()
     except Exception:
         pass
+
+
+if not _skip_runtime_patches():
+    _run_magazine_bridge()
 
     try:
         from autonomous_betting_agent.proof_persistence_patch import install_proof_persistence_patch
@@ -42,12 +51,7 @@ if not _skip_runtime_patches():
     except Exception:
         pass
 
-    try:
-        import sitecustomize as _aba_sitecustomize
-        if hasattr(_aba_sitecustomize, "_apply_magazine_display_bridge"):
-            _aba_sitecustomize._apply_magazine_display_bridge()  # type: ignore[attr-defined]
-    except Exception:
-        pass
+    _run_magazine_bridge()
 
     try:
         from autonomous_betting_agent.sidebar_tools import install_sidebar_tools
