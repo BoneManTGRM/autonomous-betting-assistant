@@ -119,6 +119,7 @@ TEXT_ES = {
     "Verify live odds before entry.": "Verificar cuotas en vivo antes de entrar.",
     "Do not use until the price is confirmed.": "No usar hasta confirmar la cuota.",
     "Negative edge at current price.": "Ventaja negativa con la cuota actual.",
+    "Use as straight-bet research only.": "Usar solo como análisis de apuesta directa.",
     DN + "play unless price improves.": "No jugar salvo que la cuota mejore.",
     "Do not play unless price improves.": "No jugar salvo que la cuota mejore.",
     "Recheck odds and key news.": "Revisar cuotas y noticias clave.",
@@ -424,112 +425,7 @@ def sale_ready_chain_items(row: Any) -> list[str]:
         return _wrap(["No parlay recommended", "Not enough compatible selections.", "Verified odds are missing."], lang)
     _edge, _ev, negative, missing = _edge_state(row)
     if negative:
-        return _wrap([DN + "chain " + NEG_EV + " picks.", "Avoid " + P + "s unless edge turns positive.", "Recheck price before including."], lang)
+        return _wrap(["No parlay recommended", "Negative edge at current price.", "Use as straight-bet research only."], lang)
     if missing:
         return _wrap(["Research only: edge incomplete.", DN + "combine unverified picks.", "Wait for verified odds."], lang)
-    return _wrap(["Straight only: research.", "Avoid " + P + "s unless all legs are +EV.", "Recheck price before including."], lang)
-
-
-def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limit: int, lang: str = "en") -> list[str]:
-    data = dict(_row(row))
-    key_tuple = tuple(keys)
-    explicit = _source_items(data, key_tuple, limit, 86)
-    if explicit:
-        return _wrap(explicit, lang)
-    if any(k in key_tuple for k in ("risk", "risk_level", "risk_label", "risk_note", "risk_notes", "why_lose", "hidden_risk")):
-        items = sale_ready_risk_items(data)
-    elif any(k in key_tuple for k in ("chain_note", "chain_notes", P + "_note", P + "_notes", "combo_note", "combo_magazine_items", P + "_magazine_items", "main_read", "add_on_legs")):
-        items = sale_ready_chain_items(data)
-    elif "matchup_note" in key_tuple or "sports_context_summary" in key_tuple or "weather_summary" in key_tuple:
-        items = sale_ready_matchup_items(data)
-    elif "injury_report" in key_tuple or "lineup_status" in key_tuple or "key_players" in key_tuple:
-        items = sale_ready_injury_items(data, "away")
-    else:
-        items = sale_ready_team_items(data)
-    return _wrap(items[:limit], lang)
-
-
-def _paint_report_name(module: Any, img: Any, report_name: str | None) -> None:
-    if not report_name:
-        return
-    text = str(report_name or "").strip().upper()
-    if not text:
-        return
-    draw = module.ImageDraw.Draw(img, "RGBA")
-    draw.rectangle((28, 24, 308, 74), fill=module.RED)
-    draw.text((43, 29), text, font=module._fit(text, 250, 38, 18, True), fill="white")
-
-
-def _set_if_missing_or_bad(row: dict[str, Any], key: str, value: str) -> None:
-    if _bad(row.get(key)) or _bad_context(row.get(key), row):
-        row[key] = value
-
-
-def _sanitize_pick(data: Any) -> dict[str, Any]:
-    row = dict(_row(data))
-    if _explicit_fallback_odds(row):
-        fallback_context = "Fallback report: verify current odds and news before entry."
-        row["risk"] = "FALLBACK MODE"
-        row["risk_level"] = "FALLBACK MODE"
-        row["risk_label"] = "FALLBACK MODE"
-        row["final_decision"] = "WATCHLIST"
-        for key in ("sports_context_summary", "preview_summary", "short_reason"):
-            _set_if_missing_or_bad(row, key, fallback_context)
-        row["why_lose"] = "\n".join(["Fallback/watchlist only.", "Confirm current price before entry.", "Watchlist only: current price and live context need verification."])
-        row["chain_notes"] = "\n".join(["No parlay recommended", "Not enough compatible selections.", "Verified odds are missing."])
-    for key in ("perplexity_context", "perplexity_summary", "newsapi_summary", "news_summary", "game_summary", "matchup_note", "matchup_notes", "team_snapshot_home", "team_snapshot_away", "sportsdataio_context", "sportsdataio_team_summary", "api_football_summary"):
-        if _bad_context(row.get(key), row):
-            row[key] = ""
-    row["matchup_notes"] = "\n".join(sale_ready_matchup_items(row))
-    return row
-
-
-def _set_style_version(module: Any) -> None:
-    current = str(getattr(module, "MAGAZINE_STYLE_VERSION", ""))
-    base = re.sub(r"(?:_direct_two_page)?_sale_ready_[a-z_]+_v\d+(?:_[a-z_]+)*", "", current)
-    base = re.sub(r"_sale_ready_direct_multileg_v\d+", "", base)
-    module.MAGAZINE_STYLE_VERSION = f"{base or 'magazine'}_sale_ready_risk_chain_v4"
-
-
-def apply_magazine_sale_ready_patch(module):
-    patched = _impl.apply_magazine_sale_ready_patch(module)
-    patched.team_items = sale_ready_team_items
-    patched.injury_items = sale_ready_injury_items
-    patched.matchup_items = sale_ready_matchup_items
-    patched.risk_items = sale_ready_risk_items
-    patched.chain_items = sale_ready_chain_items
-    patched._team_items = sale_ready_team_items
-    patched._injury_items = sale_ready_injury_items
-    patched._matchup_items = sale_ready_matchup_items
-    patched._risk_items = sale_ready_risk_items
-    patched._chain_items = sale_ready_chain_items
-    patched._items = _items_from_context
-    patched.sale_ready_recommendation = sale_ready_recommendation
-    original_tr = patched._tr
-    original_render = patched.render_full_pick_magazine_page
-
-    def patched_tr(value, lang):
-        text = original_tr(value, lang)
-        return _es(text, lang) if lang == "es" else _clean_text(text)
-
-    def patched_render(pick, *args, **kwargs):
-        report_name = kwargs.get("report_name") if "report_name" in kwargs else (args[1] if len(args) > 1 else None)
-        img = original_render(_sanitize_pick(pick), *args, **kwargs)
-        _paint_report_name(patched, img, report_name)
-        return img
-
-    patched._tr = patched_tr
-    patched.render_full_pick_magazine_page = patched_render
-    try:
-        from .magazine_pipeline_runtime import install as install_final_enriched_pipeline
-        install_final_enriched_pipeline()
-    except Exception:
-        pass
-    try:
-        from .magazine_second_page_patch import install as install_second_page
-        install_second_page(patched)
-    except Exception:
-        pass
-    _set_style_version(patched)
-    setattr(patched, "_ABA_SALE_READY_DIRECT_MULTI_LEG_APPLIED", True)
-    return patched
+    return _wrap(["Straight only: research.", "Avoid " + P + "s unless all legs are +EV.", "Recheck price before entry."], lang)
