@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from typing import Any, Iterable
+import re
 
 # Regression markers kept for overlay plumbing tests:
 # repaint_vs_badge repaint_evidence_body repaint_masthead report_brand_name
@@ -26,12 +27,20 @@ translate_team_label = _contract.translate_team_label
 
 
 def _clean(value: Any) -> str:
-    return str(value or "").strip()
+    return re.sub(r"\s+", " ", str(value or "").strip())
 
 
 def _valid_text(value: Any) -> bool:
     text = _clean(value).lower()
     return bool(text and text not in {"nan", "none", "null", "n/a", "na", "--", "data unavailable"})
+
+
+def _short(value: Any, limit: int = 118) -> str:
+    text = _clean(value)
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(" .,;:")
+    return f"{cut}."
 
 
 def _decimal_text(value: Any) -> str | None:
@@ -180,26 +189,60 @@ def _png(image: Any) -> bytes:
     return out.getvalue()
 
 
-def _expanded_context_rows(data: dict[str, Any]) -> list[str]:
+def _compact_context_rows(data: dict[str, Any]) -> list[str]:
     rows: list[str] = []
-    weather = _first(data, "weather_summary_short", "weather_summary", "venue_weather", default="")
-    matchup = _first(data, "expanded_matchup_context", "sports_context_summary", "preview_summary", "game_summary", default="")
+    weather = _first(data, "weather_summary_short", "weather_summary", "venue_weather", "weather_risk", default="")
+    matchup = _first(data, "expanded_matchup_context", "sports_context_summary", "preview_summary", "game_summary", "matchup_note", "matchup_notes", default="")
+    news = _first(data, "news_summary", "newsapi_summary", "perplexity_summary", "perplexity_context", "sportsdataio_context", "api_football_summary", default="")
     line = _first(data, "line_movement_summary", "line_movement", "price_movement", default="Line movement: verify current market before entry.")
-    source = _first(data, "source_freshness", default="Source freshness: verify before entry.")
     status = _first(data, "verification_status", "report_truth_severity", default="VERIFY SOURCE")
     target = _stake_text(_first(data, "target_stake_units", default="0.0"))
     live = _stake_text(_first(data, "live_verified_stake_units", default="0.0"))
     if weather:
-        rows.append(weather)
+        rows.append("Weather: " + _short(weather, 98))
     if matchup:
-        rows.append(matchup)
-    rows.extend([
-        f"Verification: {status}.",
-        f"Target stake: {target}u · Live stake: {live}u.",
-        line,
-        source,
-    ])
-    return rows[:6]
+        rows.append("Context: " + _short(matchup, 108))
+    elif news:
+        rows.append("News: " + _short(news, 108))
+    rows.append(_short(line, 104))
+    rows.append(f"Verify: {status} · Target {target}u · Live {live}u.")
+    return rows[:4]
+
+
+def _expanded_context_rows(data: dict[str, Any]) -> list[str]:
+    return _compact_context_rows(data)
+
+
+def _draw_readable_bullets(patched: Any, draw: Any, x: int, y: int, rows: list[str], width: int, height: int, color: tuple[int, int, int], lang: str) -> None:
+    tr = getattr(patched, "_tr", lambda value, _lang="en": str(value))
+    font_fn = getattr(patched, "_font", None)
+    wrap_fn = getattr(patched, "_wrap_text_to_box", None)
+    line_height_fn = getattr(patched, "_line_height", None)
+    ellipsize_fn = getattr(patched, "_ellipsize_to_width", None)
+    if not callable(font_fn):
+        return
+    font = font_fn(18)
+    small = font_fn(16)
+    line_height = line_height_fn(font) if callable(line_height_fn) else 22
+    bottom = y + height
+    current_y = y
+    for row in rows[:4]:
+        if current_y + line_height > bottom:
+            break
+        text = tr(row, lang)
+        draw.ellipse((x, current_y + 7, x + 12, current_y + 19), fill=color)
+        if callable(wrap_fn):
+            lines = wrap_fn(draw, text, font, width - 34, 2)
+        else:
+            lines = [text]
+        for line in lines[:2]:
+            if current_y + line_height > bottom:
+                break
+            if callable(ellipsize_fn):
+                line = ellipsize_fn(draw, line, font if current_y == y else small, width - 34)
+            draw.text((x + 25, current_y), line, font=font if len(line) < 110 else small, fill=(14, 17, 21))
+            current_y += line_height
+        current_y += 6
 
 
 def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], language: str | None = None) -> Any:
@@ -216,6 +259,7 @@ def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], lan
     blue = getattr(patched, "BLUE", (19, 66, 108))
     black = getattr(patched, "BLACK", (13, 14, 16))
     cream = getattr(patched, "CREAM", (255, 248, 230))
+    # Repaint only the matchup notes region. Keep the original layout but use fewer rows and larger text.
     draw.rounded_rectangle((350, 1174, 1064, 1358), radius=16, fill=paper + (255,), outline=paper + (255,), width=4)
     if callable(getattr(patched, "_section", None)):
         patched._section(draw, 354, 1178, 706, 175, "MATCHUP NOTES", blue, lang)
@@ -224,12 +268,7 @@ def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], lan
         draw.rounded_rectangle((354, 1178, 1060, 1234), radius=10, fill=blue)
         draw.text((372, 1189), tr("MATCHUP NOTES", lang).upper(), fill=cream)
     rows = _expanded_context_rows(row)
-    if callable(getattr(patched, "_bullets_auto", None)):
-        patched._bullets_auto(draw, 378, 1246, rows, 650, 90, blue, 15, 8, 5, lang)
-    elif callable(getattr(patched, "_txt_auto", None)):
-        y = 1246
-        for item in rows[:4]:
-            y = patched._txt_auto(draw, 378, y, tr(item, lang), 650, 22, 13, 8, black, False, 1) + 2
+    _draw_readable_bullets(patched, draw, 378, 1246, rows, 650, 94, blue, lang)
     return img.convert("RGB")
 
 
@@ -314,6 +353,8 @@ def apply_magazine_sale_ready_patch(module):
         patched.MAGAZINE_STYLE_VERSION = current[: -len("_sale_ready_risk_chain_truth_v5")] + "_sale_ready_risk_chain_v4"
     elif "sale_ready_risk_chain_v4" not in current:
         patched.MAGAZINE_STYLE_VERSION = f"{current}_sale_ready_risk_chain_v4" if current else "sale_ready_risk_chain_v4"
+    if "matchup_readable_v2" not in patched.MAGAZINE_STYLE_VERSION:
+        patched.MAGAZINE_STYLE_VERSION = f"{patched.MAGAZINE_STYLE_VERSION}_matchup_readable_v2"
     _install_display_patches(patched)
     original_render = patched.render_full_pick_magazine_page
 
@@ -328,5 +369,5 @@ def apply_magazine_sale_ready_patch(module):
     patched.render_full_pick_magazine_page = truthful_render
     patched._pairs = _truth_pairs
     _install_forced_two_page_renderer(patched)
-    patched._ABA_SALE_READY_TRUTH_CONTRACT_VERSION = "truth_contract_v10"
+    patched._ABA_SALE_READY_TRUTH_CONTRACT_VERSION = "truth_contract_v10_matchup_readable_v2"
     return patched
