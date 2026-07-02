@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 MODEL_PROBABILITY_FIELDS = (
     "learned_model_probability",
@@ -37,6 +37,15 @@ MARKET_BASELINE_TOKENS = (
     "market_baseline_only",
 )
 FRESH_ODDS_KEYS = {"fresh_odds_slate_builder_rows"}
+REPORT_HANDOFF_KEYS = (
+    "odds_lock_pro_locked_rows",
+    "public_proof_dashboard_refresh_rows",
+    "pro_predictor_high_confidence_rows",
+    "pro_predictor_latest_rows",
+    "what_are_the_odds_latest_rows",
+    "ara_latest_predictions",
+    "fresh_odds_slate_builder_rows",
+)
 
 
 def _text(value: Any) -> str:
@@ -66,6 +75,21 @@ def _probability(value: Any) -> float | None:
     if 1.0 < parsed <= 100.0:
         parsed /= 100.0
     return parsed if 0.0 < parsed < 1.0 else None
+
+
+def _rows_from_any(value: Any) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [dict(row) for row in value if isinstance(row, Mapping)]
+    try:
+        import pandas as pd
+
+        if isinstance(value, pd.DataFrame):
+            return [] if value.empty else [dict(row) for row in value.to_dict(orient="records")]
+    except Exception:
+        pass
+    return []
 
 
 def _row_has_independent_probability(row: Mapping[str, Any]) -> bool:
@@ -128,6 +152,19 @@ def source_quality_score(key: str, rows: Sequence[Mapping[str, Any]], original_i
     )
 
 
+def best_source_key(candidates: Sequence[tuple[str, Any]]) -> str:
+    scored: list[tuple[tuple[int, int, int, int, int, int], int, str]] = []
+    for index, (key, value) in enumerate(candidates):
+        rows = _rows_from_any(value)
+        if not rows:
+            continue
+        scored.append((source_quality_score(key, rows, index), -index, key))
+    if not scored:
+        return ""
+    best = max(scored, key=lambda item: item[:2])
+    return best[2] if best[0][0] > 0 else ""
+
+
 def _patch_held_key_sets(store: Any) -> None:
     try:
         store.HELD_KEYS = set(getattr(store, "HELD_KEYS", set())) | FRESH_ODDS_KEYS
@@ -136,14 +173,9 @@ def _patch_held_key_sets(store: Any) -> None:
         return
 
 
-def install() -> None:
-    try:
-        from autonomous_betting_agent import pick_hold_store as store
-    except Exception:
+def _patch_load_first_available(store: Any) -> None:
+    if getattr(store, "_aba_report_source_quality_store_patch_v2", False):
         return
-    if getattr(store, "_aba_report_source_quality_guard_v1", False):
-        return
-    _patch_held_key_sets(store)
     original_load_first_available = store.load_first_available
 
     def quality_first_available(keys: list[str] | tuple[str, ...], workspace_id: Any = "test_01") -> tuple[str, list[dict[str, Any]]]:
@@ -161,4 +193,44 @@ def install() -> None:
         return original_load_first_available(keys, workspace_id)
 
     store.load_first_available = quality_first_available
-    store._aba_report_source_quality_guard_v1 = True
+    store._aba_report_source_quality_store_patch_v2 = True
+
+
+def _patch_streamlit_session_get() -> None:
+    """Make Report Studio's current-session loader skip stale early keys when a better session key exists."""
+    try:
+        import streamlit.runtime.state.session_state_proxy as proxy
+    except Exception:
+        return
+    session_cls = getattr(proxy, "SessionStateProxy", None)
+    original_get = getattr(session_cls, "get", None)
+    if session_cls is None or not callable(original_get):
+        return
+    if getattr(original_get, "_aba_report_source_quality_session_patch_v2", False):
+        return
+
+    def quality_guarded_get(self: Any, key: Any, default: Any = None) -> Any:
+        if key not in REPORT_HANDOFF_KEYS:
+            return original_get(self, key, default)
+        try:
+            candidates = [(handoff_key, original_get(self, handoff_key, [])) for handoff_key in REPORT_HANDOFF_KEYS]
+            winner = best_source_key(candidates)
+            if winner and key != winner:
+                return default
+        except Exception:
+            return original_get(self, key, default)
+        return original_get(self, key, default)
+
+    quality_guarded_get._aba_report_source_quality_session_patch_v2 = True  # type: ignore[attr-defined]
+    session_cls.get = quality_guarded_get
+
+
+def install() -> None:
+    try:
+        from autonomous_betting_agent import pick_hold_store as store
+    except Exception:
+        return
+    _patch_held_key_sets(store)
+    _patch_load_first_available(store)
+    _patch_streamlit_session_get()
+    store._aba_report_source_quality_guard_v2 = True
