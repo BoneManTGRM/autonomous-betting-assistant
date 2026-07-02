@@ -4,6 +4,6 @@
   "workspace_id": "test_01",
   "key": "odds_lock_pro_locked_rows",
   "parts": 8,
-  "rows_count": 351,
+  "rows_count": 379,
   "chunk_size": 50
 }
