@@ -61,3 +61,22 @@ def test_report_gate_rejects_negative_value():
     out = gate.classify_report_row(row)
     assert out["report_verification_class"] == gate.NO_PRICE_REJECTED
     assert out["risk"] == "PRICE REJECTED"
+
+
+def test_report_gate_requires_exact_market_line():
+    gate = importlib.import_module("autonomous_betting_agent.report_verification_gate")
+    row = {
+        "event": "A vs C",
+        "provider_event_id": "evt1",
+        "market_type": "spread",
+        "selection": "A",
+        "prediction": "Spread: A",
+        "decimal_price": 2.0,
+        "model_probability": 0.56,
+        "model_market_edge": 0.06,
+        "expected_value_per_unit": 0.12,
+        "provider_verified": "true",
+        "timestamp": "now",
+        "book": "Book A",
+    }
+    assert gate.classify_report_row(row)["report_verification_class"] == gate.RESEARCH_ONLY
