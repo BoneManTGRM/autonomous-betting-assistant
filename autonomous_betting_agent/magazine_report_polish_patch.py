@@ -4,7 +4,7 @@ import re
 from typing import Any, Iterable
 from urllib.parse import quote_plus, urlencode
 
-_PATCH_VERSION = "magazine_report_display_polish_v3_live_odds_match"
+_PATCH_VERSION = "magazine_report_display_polish_v4_readable_matchup"
 
 SOURCE_LABELS = {
     "Odds API": "Odds",
@@ -361,6 +361,41 @@ def _restore_sale_ready_version_suffix(renderer: Any) -> None:
     renderer.MAGAZINE_STYLE_VERSION = f"{base or 'magazine'}_sale_ready_risk_chain_v4"
 
 
+def _shorten(value: Any, limit: int = 118) -> str:
+    text = _clean(value)
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0].rstrip(" .,;:") + "."
+
+
+def _first_context(data: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        text = _clean(data.get(key))
+        if text and text.lower() not in {"nan", "none", "null", "n/a", "na", "--", "data unavailable"}:
+            return text
+    return ""
+
+
+def _readable_matchup_rows(data: dict[str, Any]) -> list[str]:
+    rows: list[str] = []
+    weather = _first_context(data, "weather_summary_short", "weather_summary", "venue_weather", "weather_risk")
+    context = _first_context(data, "expanded_matchup_context", "sports_context_summary", "preview_summary", "game_summary", "matchup_note", "matchup_notes")
+    news = _first_context(data, "news_summary", "newsapi_summary", "perplexity_summary", "perplexity_context", "api_football_summary", "sportsdataio_context")
+    line = _first_context(data, "line_movement_summary", "line_movement", "price_movement") or "Line: verify current market before entry"
+    status = _first_context(data, "verification_status", "report_truth_severity") or "VERIFY SOURCE"
+    target = _first_context(data, "target_stake_units", "recommended_stake_units", "units") or "0.0"
+    live = _first_context(data, "live_verified_stake_units") or "0.0"
+    if weather:
+        rows.append("Weather: " + _shorten(weather, 112))
+    if context:
+        rows.append("Context: " + _shorten(context, 122))
+    if news and news != context:
+        rows.append("News: " + _shorten(news, 108))
+    rows.append(f"Verify: {status} · target {target}u · live {live}u.")
+    rows.append(_shorten(line, 112))
+    return rows[:5]
+
+
 def install_sale_ready_polish() -> None:
     try:
         import autonomous_betting_agent.magazine_book_export as renderer
@@ -370,6 +405,7 @@ def install_sale_ready_polish() -> None:
         pass
     try:
         from autonomous_betting_agent import magazine_sale_ready_patch as sale
+        sale._expanded_context_rows = _readable_matchup_rows
         sale._ABA_DISPLAY_POLISH_VERSION = _PATCH_VERSION
     except Exception:
         pass
