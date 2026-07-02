@@ -6,7 +6,7 @@ import os
 
 # This file intentionally does not monkey-patch Streamlit widgets.
 # Keep Streamlit widget behavior native. Runtime helpers are limited to
-# secret lookup and magazine renderer repair after module reloads.
+# secret lookup and magazine/report runtime repair after module reloads.
 
 
 def get_secret(*names: str) -> str:
@@ -49,6 +49,16 @@ def _apply_magazine_display_bridge(module: object | None = None) -> None:
         pass
 
 
+def _install_report_source_quality_guard() -> None:
+    if _runtime_disabled():
+        return
+    try:
+        from autonomous_betting_agent.report_source_quality_guard import install
+        install()
+    except Exception:
+        pass
+
+
 def _install_magazine_reload_bridge() -> None:
     if _runtime_disabled() or getattr(importlib.reload, "_ABA_MAGAZINE_DIRECT_BRIDGE", False):
         return
@@ -85,6 +95,7 @@ def _install_magazine_polish_bridge() -> None:
     polish.install = install_and_guard  # type: ignore[assignment]
 
 
+_install_report_source_quality_guard()
 _install_magazine_reload_bridge()
 _install_magazine_polish_bridge()
 _apply_magazine_display_bridge()
