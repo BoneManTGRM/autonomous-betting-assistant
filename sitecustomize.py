@@ -47,6 +47,11 @@ def _apply_magazine_display_bridge(module: object | None = None) -> None:
         install(module)
     except Exception:
         pass
+    try:
+        from autonomous_betting_agent.magazine_regression_guard import install as install_regression_guard
+        install_regression_guard(module)
+    except Exception:
+        pass
 
 
 def _install_report_source_quality_guard() -> None:
