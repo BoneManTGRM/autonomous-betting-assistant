@@ -13,9 +13,10 @@ from autonomous_betting_agent.report_public_quality import (
     trim_complete_sentence,
 )
 
-VERSION = "active_magazine_export_guard_v2"
+VERSION = "active_magazine_export_guard_v3"
 NO_PLAY = "NO " + "BET / PRICE REJECTED"
-_DANGLING = ("where", "with", "with the", "who are", "because", "and", "or", "the", "in", "at", "for", "meaning")
+WATCH_VERIFY = "WATCHLIST / VERIFY PRICE"
+_DANGLING = ("where", "with", "with the", "who are", "because", "and", "or", "the", "in", "at", "for", "meaning", "against", "their", "of")
 _NOTE_KEYS = ("weather_summary", "venue_weather", "weather_risk", "weather_location", "expanded_matchup_context", "sports_context_summary", "preview_summary", "game_summary", "matchup_note", "matchup_notes", "news_summary", "newsapi_summary", "perplexity_summary", "perplexity_context", "sportsdataio_context", "api_football_summary", "line_movement_summary", "line_movement", "price_movement")
 
 
@@ -141,16 +142,20 @@ def normalize_row(value: Any) -> dict[str, Any]:
     for key in ("aba_display_pick", "display_pick", "prediction", "pick", "exact_bet", "final_recommendation_label", "public_market_label", "verified_market_label", "full_market_label", "market_label", "trend_label"):
         data[key] = label
     negative = _negative_value(data)
-    action = NO_PLAY if negative else public_action_label(data)
-    if is_saved_source(data) and action == "VERIFIED CANDIDATE":
-        action = "WATCHLIST / VERIFY PRICE"
+    saved = is_saved_source(data)
+    if negative:
+        action = NO_PLAY
+    elif saved:
+        action = WATCH_VERIFY
+    else:
+        action = public_action_label(data)
     for key in ("final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action"):
         data[key] = action
-    data["risk"] = "PRICE REJECTED" if negative else "VERIFY PRICE"
+    data["risk"] = "PRICE REJECTED" if negative else ("VERIFY PRICE" if saved else "VERIFIED PRICE")
     data["risk_level"] = data["risk_label"] = data["profit_guard_status"] = data["risk"]
-    data["final_explanation"] = "Negative edge or EV at current price." if negative else public_recommendation_status(data)
+    data["final_explanation"] = "Negative edge or EV at current price." if negative else ("Saved-source row. Verify current provider price before publishing." if saved else public_recommendation_status(data))
     data["action_reason"] = data["recommendation_reason"] = data["final_explanation"]
-    if is_saved_source(data):
+    if saved:
         data["report_source"] = "uploaded_saved_row"
         data["report_source_label"] = "Uploaded / saved row"
         data["report_data_scope"] = "Saved-source verification report"
@@ -164,6 +169,14 @@ def normalize_row(value: Any) -> dict[str, Any]:
         data["the_odds_api_live"] = "false"
         data["report_truth_warning"] = public_source_warning(data)
     return data
+
+
+def public_truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
+    data = normalize_row(row)
+    odds_status = _clean(data.get("odds_status") or data.get("odds_source") or "VERIFY").upper()
+    if is_saved_source(data):
+        return [("REPORT SOURCE", "Uploaded / saved row"), ("DATA SCOPE", "Saved-source verification report"), ("TRUTH", "VERIFY PRICE"), ("ODDS STATUS", odds_status), ("MATCHED", "Saved source only")]
+    return [("REPORT SOURCE", "Current provider row"), ("DATA SCOPE", "Current provider matched"), ("TRUTH", "VERIFIED PRICE"), ("ODDS STATUS", odds_status), ("MATCHED", "Provider matched")]
 
 
 def _draw_overlay(module: Any, image: Any, row: dict[str, Any], language: str | None = None) -> Any:
@@ -182,8 +195,8 @@ def _draw_overlay(module: Any, image: Any, row: dict[str, Any], language: str | 
         gold = (241, 184, 45)
         paper = getattr(module, "PAPER", (244, 235, 211))
         lang = module._lang(row, language) if callable(getattr(module, "_lang", None)) else "en"
-        action = _clean(row.get("final_decision") or "WATCHLIST / VERIFY PRICE").upper()
-        pick = _clean(row.get("prediction") or row.get("pick") or "") .upper()
+        action = _clean(row.get("final_decision") or WATCH_VERIFY).upper()
+        pick = _clean(row.get("prediction") or row.get("pick") or "").upper()
         draw.rectangle((24, 462, 344, 558), fill=black + (255,))
         draw.text((50, 472), module._tr("TREND", lang), font=module._fit(module._tr("TREND", lang), 190, 25, 14, True), fill=red)
         module._txt_auto(draw, 50, 508, module._tr(pick, lang), 210, 38, 26, 8, cream, True, 1)
@@ -209,7 +222,8 @@ def _draw_overlay(module: Any, image: Any, row: dict[str, Any], language: str | 
 
 
 def install(module: Any) -> Any:
-    if getattr(module, "_ABA_ACTIVE_EXPORT_GUARD", "") == VERSION:
+    current_page = getattr(module, "render_full_pick_magazine_page", None)
+    if getattr(current_page, "_ABA_ACTIVE_EXPORT_GUARD_WRAPPER", "") == VERSION:
         return module
     original_page = module.render_full_pick_magazine_page
     original_pages = module.render_full_magazine_book_pages
@@ -224,6 +238,7 @@ def install(module: Any) -> Any:
         if len(args) >= 11 and language is None:
             language = args[10]
         return _draw_overlay(module, image, row, language)
+    guarded_page._ABA_ACTIVE_EXPORT_GUARD_WRAPPER = VERSION  # type: ignore[attr-defined]
 
     def guarded_pages(picks: Iterable[Any], *args: Any, **kwargs: Any):
         return original_pages([normalize_row(row) for row in list(picks)], *args, **kwargs)
@@ -241,7 +256,7 @@ def install(module: Any) -> Any:
     def guarded_pairs(row: Any, lang: str):
         data = normalize_row(row)
         if is_saved_source(data):
-            return [("REPORT SOURCE", "Uploaded / saved row"), ("DATA SCOPE", "Saved-source verification report"), ("TRUTH", "VERIFY PRICE"), ("ODDS STATUS", str(data.get("odds_status") or "VERIFY")), ("MATCHED", "Saved source only")]
+            return public_truth_pairs(data, lang)
         pairs = [] if not callable(original_pairs) else list(original_pairs(data, lang))
         return [("CONFIGURED APIS" if str(label).upper() == "ACTIVE APIS" else label, value) for label, value in pairs][:5]
 
@@ -260,7 +275,7 @@ def install(module: Any) -> Any:
         from autonomous_betting_agent import magazine_second_page_patch as page2
         original_draw = page2._draw_second_page
         original_discover = getattr(page2, "discover_markets", None)
-        if callable(original_discover):
+        if callable(original_discover) and not getattr(original_discover, "_ABA_ACTIVE_EXPORT_DISCOVER", False):
             def guarded_discover(pick: Any):
                 row = normalize_row(pick)
                 markets, diag = original_discover(row)
@@ -268,10 +283,13 @@ def install(module: Any) -> Any:
                     if getattr(market, "edge", None) is not None and getattr(market, "ev", None) is not None and (market.edge <= 0 or market.ev <= 0):
                         market.badge = NO_PLAY
                         market.rejection_reason = "Requires positive edge and EV"
+                    elif str(getattr(market, "badge", "")).upper() == "WATCHLIST":
+                        market.badge = WATCH_VERIFY
                 if is_saved_source(row):
                     diag["provider_state"] = "Source saved"
                     diag["provider_called"] = "saved-source"
                 return markets, diag
+            guarded_discover._ABA_ACTIVE_EXPORT_DISCOVER = True  # type: ignore[attr-defined]
             page2.discover_markets = guarded_discover
         def guarded_second_page(patched: Any, pick: Any, *args: Any, **kwargs: Any):
             return original_draw(patched, normalize_row(pick), *args, **kwargs)
