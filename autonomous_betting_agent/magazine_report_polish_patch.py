@@ -4,7 +4,7 @@ import re
 from typing import Any, Iterable
 from urllib.parse import quote_plus, urlencode
 
-_PATCH_VERSION = "magazine_report_display_polish_v4_readable_matchup"
+_PATCH_VERSION = "magazine_report_display_polish_v6_truth_guard_labels"
 
 SOURCE_LABELS = {
     "Odds API": "Odds",
@@ -15,6 +15,20 @@ SOURCE_LABELS = {
     "Perplexity": "PPLX",
     "NewsAPI": "News",
 }
+
+UNVERIFIED_SOURCE_TOKENS = (
+    "uploaded",
+    "uploaded_row",
+    "saved-handoff",
+    "saved handoff",
+    "handoff",
+    "fallback",
+    "cached",
+    "ledger-history",
+    "ledger history",
+    "history only",
+    "missing",
+)
 
 # Presentation-safe fallback copy required by the magazine contract:
 # Watchlist only: current price and live context need verification.
@@ -47,19 +61,50 @@ def _split(value: Any) -> list[str]:
     return [_clean(part).strip(" -•") for part in text.splitlines() if _clean(part).strip(" -•")]
 
 
+def _unverified_source_marker(row: Any) -> bool:
+    data = _row(row)
+    blob = " ".join(
+        _clean(data.get(key)).lower().replace("_", "-")
+        for key in (
+            "report_source_mode",
+            "source_mode",
+            "report_source",
+            "report_source_note",
+            "report_source_label",
+            "report_data_scope",
+            "odds_status",
+            "odds_api_status",
+            "odds_source",
+            "data_source",
+            "verification_status",
+            "report_truth_severity",
+            "risk",
+            "risk_level",
+            "risk_label",
+        )
+    )
+    return any(token in blob for token in UNVERIFIED_SOURCE_TOKENS)
+
+
 def _live_odds_marker(row: Any) -> bool:
+    if _unverified_source_marker(row):
+        return False
     data = _row(row)
     status = _clean(data.get("odds_status") or data.get("odds_api_status")).lower()
     source = _clean(data.get("odds_source") or data.get("data_source")).lower()
-    return status in {"live", "live_api", "live_match", "odds_api_live_match"} or source in {"live", "live_api", "the odds api", "odds api"}
+    flags = {_clean(data.get(key)).lower() for key in ("odds_api_live", "the_odds_api_live", "odds_verified")}
+    live_status = status in {"live", "live_api", "live_match", "odds_api_live_match"}
+    live_source = source in {"live", "live_api", "the odds api", "odds api"}
+    live_flag = bool(flags & {"1", "true", "yes", "verified", "live"})
+    return live_status or live_source or live_flag
 
 
 def _fallback_row(row: Any) -> bool:
-    if _live_odds_marker(row):
-        return False
+    if _unverified_source_marker(row):
+        return True
     data = _row(row)
     source = _clean(data.get("odds_source") or data.get("data_source")).lower()
-    status = _clean(data.get("odds_status")).lower()
+    status = _clean(data.get("odds_status") or data.get("odds_api_status")).lower()
     mode = _clean(data.get("risk") or data.get("risk_level") or data.get("risk_label")).lower()
     return any(token in source or token in status or token in mode for token in ("uploaded", "fallback", "cached", "missing"))
 
@@ -139,8 +184,8 @@ def _sport_candidates(data: dict[str, Any], live: Any, key: str) -> list[str]:
         explicit.extend(["soccer_fifa_world_cup", "soccer_concacaf_gold_cup", "soccer_uefa_champs_league", "soccer_epl"])
     if "baseball" in text or "mlb" in text:
         explicit.append("baseball_mlb")
-    if "basketball" in text or "nba" in text:
-        explicit.append("basketball_nba")
+    if "basketball" in text or "nba" in text or "wnba" in text:
+        explicit.extend(["basketball_nba", "basketball_wnba"])
     if "nfl" in text:
         explicit.append("americanfootball_nfl")
     try:
@@ -188,7 +233,7 @@ def _target_market(data: dict[str, Any]) -> str:
     text = " ".join([_selection_text(data), _clean(data.get("market_type") or data.get("market"))]).lower()
     if "total" in text or "over" in text or "under" in text:
         return "totals"
-    if "spread" in text or "handicap" in text:
+    if "spread" in text or "handicap" in text or "run line" in text:
         return "spreads"
     return "h2h"
 
@@ -233,6 +278,10 @@ def _apply_live_odds_match(data: dict[str, Any], event: dict[str, Any], bookmake
     data["odds_api_status"] = "LIVE_MATCH"
     data["odds_api_live"] = "true"
     data["the_odds_api_live"] = "true"
+    data["odds_verified"] = "true"
+    data["report_source_mode"] = "current-run"
+    data["report_truth_severity"] = "LIVE VERIFIED"
+    data["verification_status"] = "LIVE VERIFIED"
     data["odds_api_event_id"] = _clean(event.get("id"))
     data["matched_event_id"] = _clean(event.get("id"))
     data["odds_api_sport_key"] = _clean(event.get("sport_key"))
@@ -313,8 +362,8 @@ def _install_renderer_source_labels(module: Any) -> None:
         inactive = [_source_label(name) for name in prov.get("inactive_sources", [])]
         if _fallback_row(row):
             if checked:
-                return ["Sources checked: " + " · ".join(checked[:6]) + "; no verified live match."]
-            return ["Sources checked: no verified live match."]
+                return ["Enabled APIs: " + " · ".join(checked[:6]) + "; no verified live match for this row."]
+            return ["Enabled APIs: checked; no verified live match for this row."]
         lines: list[str] = []
         if active:
             lines.append("Live sources: " + " · ".join(active))
@@ -334,6 +383,173 @@ def _install_renderer_source_labels(module: Any) -> None:
     module._ABA_SOURCE_LABEL_POLISH_VERSION = _PATCH_VERSION
 
 
+def _strict_live_verified(data: dict[str, Any]) -> bool:
+    return _live_odds_marker(data)
+
+
+def _strict_fallback_odds(data: dict[str, Any]) -> bool:
+    return _fallback_row(data)
+
+
+def _guarded_risk_items(row: Any) -> list[str]:
+    if _fallback_row(row):
+        return [
+            "Saved row / price verification required.",
+            "Confirm current sportsbook price before entry.",
+            "Watchlist only until a live source match is confirmed.",
+        ]
+    return ["Recheck current price before entry.", "Cancel if line or news changes."]
+
+
+def _guarded_team_items(row: Any, side: str = "") -> list[str]:
+    if _fallback_row(row):
+        return ["No live team snapshot returned.", "Team feed not matched to this row.", "Verify team/news context before entry."]
+    return ["Live team snapshot requires source match.", "Verify current team/news context before entry."]
+
+
+def _guarded_injury_items(row: Any, prefix: str = "") -> list[str]:
+    if _fallback_row(row):
+        return ["No verified lineup/injury update returned.", "Lineup/injury feed not verified for this row."]
+    return ["Verify lineup/injury news before entry."]
+
+
+def _guarded_truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
+    data = _row(row)
+    source_mode = _clean(data.get("report_source_mode") or data.get("source_mode") or data.get("report_source")).lower()
+    odds_status = _clean(data.get("odds_status") or data.get("odds_source") or data.get("data_source") or "MISSING").upper()
+    context_status = _clean(data.get("context_status") or data.get("context_source") or data.get("report_live_context_detected") or "VERIFY")
+    if _fallback_row(data):
+        if "uploaded" in odds_status.lower() or "uploaded" in source_mode:
+            source_label = "Uploaded / saved row"
+        elif "ledger" in source_mode or "history" in source_mode:
+            source_label = "Proof ledger history"
+        else:
+            source_label = "Saved handoff rows"
+        pairs = [
+            ("REPORT SOURCE", source_label),
+            ("DATA SCOPE", "Price verification required"),
+            ("TRUTH", "VERIFY PRICE"),
+            ("ODDS STATUS", odds_status),
+            ("CONTEXT STATUS", context_status),
+        ]
+    elif _live_odds_marker(data):
+        pairs = [
+            ("REPORT SOURCE", "Live API refreshed report"),
+            ("DATA SCOPE", "Current API-refreshed slate"),
+            ("TRUTH", "LIVE VERIFIED"),
+            ("ODDS STATUS", odds_status or "LIVE"),
+            ("CONTEXT STATUS", context_status),
+        ]
+    else:
+        pairs = [
+            ("REPORT SOURCE", _clean(data.get("report_source_label") or data.get("report_source_mode") or "Report source unknown")),
+            ("DATA SCOPE", _clean(data.get("report_data_scope") or "Current/fallback status unknown")),
+            ("TRUTH", "VERIFY"),
+            ("ODDS STATUS", odds_status),
+            ("CONTEXT STATUS", context_status),
+        ]
+    try:
+        from autonomous_betting_agent import magazine_sale_ready_patch_contract as contract
+        return [(contract._es(label, lang), contract._es(value, lang)) for label, value in pairs]
+    except Exception:
+        return pairs
+
+
+def _guard_row_truth(data: dict[str, Any]) -> dict[str, Any]:
+    if not _fallback_row(data):
+        return data
+    data["verification_status"] = "VERIFY PRICE"
+    data["report_truth_severity"] = "VERIFY PRICE"
+    data["report_truth_warning"] = "Saved/uploaded row requires live price verification."
+    data["final_decision"] = "WATCHLIST"
+    data["agent_decision"] = "WATCHLIST"
+    data["recommendation"] = "WATCHLIST"
+    data["risk"] = "VERIFY PRICE"
+    data["risk_level"] = "VERIFY PRICE"
+    data["risk_label"] = "VERIFY PRICE"
+    data["live_verified_stake_units"] = "0.0"
+    data["why_lose"] = "\n".join(_guarded_risk_items(data))
+    data["chain_notes"] = "\n".join([
+        "No verified parlay: source is saved/uploaded.",
+        "Need exact event, market, line, selection, price, and timestamp.",
+        "Add a second verified positive-EV leg before building a chain.",
+    ])
+    return data
+
+
+def _install_sale_truth_guard() -> None:
+    try:
+        from autonomous_betting_agent import magazine_sale_ready_patch as sale
+    except Exception:
+        return
+    sale._live_verified = _strict_live_verified
+    sale._fallback_odds = _strict_fallback_odds
+    sale._truth_pairs = _guarded_truth_pairs
+    original_force = getattr(sale, "_force_truthful_gate", None)
+    if callable(original_force) and not getattr(original_force, "_ABA_STRICT_TRUTH_GUARD", False):
+        def force_with_truth_guard(row: Any):
+            data = original_force(row)
+            return _guard_row_truth(data)
+        force_with_truth_guard._ABA_STRICT_TRUTH_GUARD = True  # type: ignore[attr-defined]
+        sale._force_truthful_gate = force_with_truth_guard
+    sale.sale_ready_risk_items = _guarded_risk_items
+
+
+def _install_renderer_truth_guard(renderer: Any) -> None:
+    renderer._pairs = _guarded_truth_pairs
+    renderer._risk_items = _guarded_risk_items
+    renderer.risk_items = _guarded_risk_items
+    renderer._team_items = _guarded_team_items
+    renderer.team_items = _guarded_team_items
+    renderer._injury_items = _guarded_injury_items
+    renderer.injury_items = _guarded_injury_items
+    renderer._ABA_TRUTH_GUARD_VERSION = _PATCH_VERSION
+
+
+def _install_second_page_guard() -> None:
+    try:
+        from autonomous_betting_agent import magazine_second_page_patch as second
+    except Exception:
+        return
+    original_sections = getattr(second, "_page_two_sections", None)
+    if not callable(original_sections) or getattr(original_sections, "_ABA_PAGE_TWO_REASON_GUARD", False):
+        return
+
+    def guarded_page_two_sections(data: dict[str, Any], lang: str):
+        sections = list(original_sections(data, lang))
+        if not _fallback_row(data):
+            return sections
+        try:
+            _markets, diag = second.discover_markets(data)
+        except Exception:
+            diag = {"markets_discovered": 0, "markets_rejected": 0, "timestamp": "missing", "provider_called": "unknown", "cached_handoff_live_status": "saved-handoff"}
+        reasons = [
+            "BLOCKED · no verified parlay: source is saved/uploaded, not live matched.",
+            f"Reason · markets discovered {diag.get('markets_discovered', 0)}; rejected {diag.get('markets_rejected', 0)}.",
+            f"Reason · provider {diag.get('provider_called', 'unknown')} · timestamp {diag.get('timestamp', 'missing')}.",
+            "Need exact event, market, line, selection, sportsbook, price, and timestamp.",
+            "Wait for a second verified positive-EV leg before making a parlay.",
+        ]
+        quality = [
+            f"Gate failed · source mode {diag.get('cached_handoff_live_status', 'saved-handoff')}.",
+            "Gate failed · saved/uploaded rows cannot become VERIFIED.",
+            "Gate required · live provider match + positive EV + fresh timestamp.",
+            "Gate required · Reparodynamics must not block the market.",
+        ]
+        rewritten = []
+        for title, items, color in sections:
+            if title == "Parlay Builder":
+                rewritten.append((title, [second._tr(x, lang) for x in reasons], color))
+            elif title == "Quality Gate":
+                rewritten.append((title, [second._tr(x, lang) for x in quality], color))
+            else:
+                rewritten.append((title, items, color))
+        return rewritten
+
+    guarded_page_two_sections._ABA_PAGE_TWO_REASON_GUARD = True  # type: ignore[attr-defined]
+    second._page_two_sections = guarded_page_two_sections
+
+
 def install_live_odds_api_match() -> None:
     try:
         from autonomous_betting_agent import magazine_live_api_enrichment as live
@@ -350,6 +566,7 @@ def install_live_odds_api_match() -> None:
             row.setdefault("odds_api_status", "LIVE_MATCH_ERROR")
             row.setdefault("odds_failure_reason", exc.__class__.__name__)
         original(row, refresh_time)
+        _guard_row_truth(row)
 
     apply_odds_truth_with_live_api_match._ABA_ODDS_API_MATCH_PATCH = True
     live._apply_odds_truth = apply_odds_truth_with_live_api_match
@@ -400,9 +617,12 @@ def install_sale_ready_polish() -> None:
     try:
         import autonomous_betting_agent.magazine_book_export as renderer
         _install_renderer_source_labels(renderer)
+        _install_renderer_truth_guard(renderer)
         _restore_sale_ready_version_suffix(renderer)
     except Exception:
         pass
+    _install_sale_truth_guard()
+    _install_second_page_guard()
     try:
         from autonomous_betting_agent import magazine_sale_ready_patch as sale
         sale._expanded_context_rows = _readable_matchup_rows
