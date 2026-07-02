@@ -56,7 +56,7 @@ def render_status_dashboard(cards: pd.DataFrame, *, language: str = 'en') -> str
         ('Investigación' if es else 'Research / Learning', research, 'Listas para reporte' if es else 'Report-ready'),
         ('Ganadoras grad.' if es else 'Graded Winners', graded_winners, 'Resultados finales' if es else 'Final results'),
         ('Problemas de datos' if es else 'Data Issues', data_issues, 'Filas bloqueadas' if es else 'Blocked rows'),
-        ('Publicables oficiales' if es else 'Official Publish-Ready', official, 'Prueba pagada' if es else 'Paid proof'),
+        ('Publicables oficiales' if es else 'Official Publish-Ready', official, 'Prueba publicable' if es else 'Publish-ready'),
         ('Listas aprendizaje' if es else 'Learning Ready', learning_ready, 'Filas de calibración' if es else 'Calibration rows'),
         ('Prob. media' if es else 'Avg Model', average_model_label(cards), 'Promedio del modelo' if es else 'Model average'),
     ]
