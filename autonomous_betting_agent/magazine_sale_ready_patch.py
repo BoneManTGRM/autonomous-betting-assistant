@@ -32,7 +32,7 @@ def _clean(value: Any) -> str:
 
 def _valid_text(value: Any) -> bool:
     text = _clean(value).lower()
-    return bool(text and text not in {"nan", "none", "null", "n/a", "na", "--", "data unavailable"})
+    return bool(text and text not in {"nan", "none", "null", "n/a", "na", "--", "data unavailable", "not provided"})
 
 
 def _short(value: Any, limit: int = 118) -> str:
@@ -77,6 +77,66 @@ def _stake_text(value: Any, default: str = "0.0") -> str:
         return raw or default
 
 
+def _norm_market_text(data: dict[str, Any]) -> str:
+    return _clean(_first(data, "market_type", "market", "market_name", "market_key", "bet_type", default="")).lower().replace("_", " ")
+
+
+def _line_text(data: dict[str, Any]) -> str:
+    raw = _first(data, "line", "point", "points", "handicap", "spread", "total", "threshold", "line_value", "over_under", default="")
+    if not raw:
+        return ""
+    try:
+        num = float(str(raw).replace("+", "").replace(",", ""))
+        if abs(num) < 100:
+            if num > 0:
+                return f"+{num:g}"
+            return f"{num:g}"
+    except Exception:
+        pass
+    return raw
+
+
+def _rich_pick_text(data: dict[str, Any]) -> str:
+    # Prefer complete bet labels before generic prediction/team labels. This prevents totals/spreads
+    # from collapsing to only a team name in the magazine.
+    selection = _first(
+        data,
+        "display_pick",
+        "aba_display_pick",
+        "exact_bet",
+        "bet_label",
+        "recommended_bet",
+        "pick_text",
+        "pick",
+        "selection",
+        "outcome",
+        "side",
+        "prediction",
+        default="",
+    )
+    market = _norm_market_text(data)
+    line = _line_text(data)
+    if not selection:
+        return "Not provided"
+    text = selection
+    low = text.lower()
+    if any(token in market for token in ("total", "over under", "over/under")):
+        total_side = _first(data, "total_side", "over_under_side", "side", "outcome", "selection", "prediction", default=text)
+        if any(token in total_side.lower() for token in ("over", "under")):
+            text = "Over" if "over" in total_side.lower() else "Under"
+        if line and line not in text:
+            text = f"{text} {line}"
+    elif any(token in market for token in ("spread", "handicap", "run line", "puck line")):
+        if line and line not in text and not re.search(r"[+-]\d", text):
+            text = f"{text} {line}"
+    return _clean(text)
+
+
+def _pick_for_display(row: Any) -> str:
+    data = dict(_contract._row(row))
+    return _first(data, "aba_display_pick", default="") or _rich_pick_text(data)
+
+
 def _live_verified(data: dict[str, Any]) -> bool:
     markers = {
         _clean(data.get(key)).lower()
@@ -111,6 +171,12 @@ def _normalize_display_fields(data: dict[str, Any]) -> dict[str, Any]:
     data["target_stake_units"] = _stake_text(target)
     data.setdefault("source_freshness", _first(data, "last_refreshed", "updated_at", "locked_at_utc", default="Verify before entry"))
     data.setdefault("verification_status", data.get("report_truth_severity") or ("LIVE VERIFIED" if _live_verified(data) else "VERIFY SOURCE"))
+    display_pick = _rich_pick_text(data)
+    if _valid_text(display_pick):
+        data["aba_display_pick"] = display_pick
+        data["display_pick"] = display_pick
+        data["prediction"] = display_pick
+        data["pick"] = display_pick
     return data
 
 
@@ -173,13 +239,7 @@ def _truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
         source_label = _clean(data.get("report_source_label") or data.get("report_source_mode") or "Report source unknown")
         scope = _clean(data.get("report_data_scope") or "Current/fallback status unknown")
         truth = _clean(data.get("report_truth_severity") or "VERIFY")
-    pairs = [
-        ("REPORT SOURCE", source_label),
-        ("DATA SCOPE", scope),
-        ("TRUTH", truth),
-        ("ODDS STATUS", odds_status),
-        ("CONTEXT STATUS", context_status),
-    ]
+    pairs = [("REPORT SOURCE", source_label), ("DATA SCOPE", scope), ("TRUTH", truth), ("ODDS STATUS", odds_status), ("CONTEXT STATUS", context_status)]
     return [(_contract._es(label, lang), _contract._es(value, lang)) for label, value in pairs]
 
 
@@ -213,6 +273,24 @@ def _expanded_context_rows(data: dict[str, Any]) -> list[str]:
     return _compact_context_rows(data)
 
 
+def _selected_badge(patched: Any, row: dict[str, Any], pick_text: str, lang: str) -> tuple[str, tuple[int, int, int]]:
+    blue = getattr(patched, "BLUE", (19, 66, 108))
+    red = getattr(patched, "RED", (190, 30, 28))
+    gold = (241, 184, 45)
+    low = pick_text.lower()
+    if any(token in low for token in ("over", "under", "más de", "menos de")):
+        return "O/U", blue
+    try:
+        away, home = patched._teams(row)
+    except Exception:
+        away, home = _first(row, "away_team", "team_a"), _first(row, "home_team", "team_b")
+    if away and away.lower() in low:
+        return away, red
+    if home and home.lower() in low:
+        return home, blue
+    return "PICK", gold
+
+
 def _draw_readable_bullets(patched: Any, draw: Any, x: int, y: int, rows: list[str], width: int, height: int, color: tuple[int, int, int], lang: str) -> None:
     tr = getattr(patched, "_tr", lambda value, _lang="en": str(value))
     font_fn = getattr(patched, "_font", None)
@@ -238,11 +316,36 @@ def _draw_readable_bullets(patched: Any, draw: Any, x: int, y: int, rows: list[s
         for line in lines[:2]:
             if current_y + line_height > bottom:
                 break
+            use_font = font if len(line) < 110 else small
             if callable(ellipsize_fn):
-                line = ellipsize_fn(draw, line, font if current_y == y else small, width - 34)
-            draw.text((x + 25, current_y), line, font=font if len(line) < 110 else small, fill=(14, 17, 21))
+                line = ellipsize_fn(draw, line, use_font, width - 34)
+            draw.text((x + 25, current_y), line, font=use_font, fill=(14, 17, 21))
             current_y += line_height
         current_y += 6
+
+
+def _overlay_pick_display(patched: Any, img: Any, draw: Any, row: dict[str, Any], lang: str) -> None:
+    black = getattr(patched, "BLACK", (13, 14, 16))
+    cream = getattr(patched, "CREAM", (255, 248, 230))
+    red = getattr(patched, "RED", (190, 30, 28))
+    green = getattr(patched, "GREEN", (61, 205, 84))
+    pick_text = _pick_for_display(row)
+    tr = getattr(patched, "_tr", lambda value, _lang="en": str(value))
+    txt_auto = getattr(patched, "_txt_auto", None)
+    badge = getattr(patched, "_badge", None)
+    # Repaint the trend label and selected-side badge. The base renderer used the home team badge unconditionally.
+    draw.rectangle((24, 462, 344, 558), fill=black + (255,))
+    draw.text((50, 472), tr("TREND", lang), font=patched._fit(tr("TREND", lang), 190, 25, 14, True), fill=red)
+    display = tr(_clean(pick_text,).upper(), lang).upper()
+    if callable(txt_auto):
+        txt_auto(draw, 50, 508, display, 210, 38, 30, 9, cream, True, 1)
+    label, color = _selected_badge(patched, row, pick_text, lang)
+    if callable(badge):
+        badge(img, draw, label, 268, 483, 58, 50, color)
+    # Repaint the final recommendation pick line so totals/spreads keep the line there too.
+    draw.rectangle((282, 1462, 654, 1518), fill=black + (255,))
+    if callable(txt_auto):
+        txt_auto(draw, 284, 1466, display, 360, 34, 42, 10, cream, True, 1)
 
 
 def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], language: str | None = None) -> Any:
@@ -259,7 +362,7 @@ def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], lan
     blue = getattr(patched, "BLUE", (19, 66, 108))
     black = getattr(patched, "BLACK", (13, 14, 16))
     cream = getattr(patched, "CREAM", (255, 248, 230))
-    # Repaint only the matchup notes region. Keep the original layout but use fewer rows and larger text.
+    _overlay_pick_display(patched, img, draw, row, lang)
     draw.rounded_rectangle((350, 1174, 1064, 1358), radius=16, fill=paper + (255,), outline=paper + (255,), width=4)
     if callable(getattr(patched, "_section", None)):
         patched._section(draw, 354, 1178, 706, 175, "MATCHUP NOTES", blue, lang)
@@ -287,6 +390,7 @@ def _install_display_patches(patched: Any) -> None:
         })
     except Exception:
         pass
+    patched._pick = _pick_for_display
     original_fmt = getattr(patched, "_fmt", None)
     if callable(original_fmt) and not getattr(original_fmt, "_ABA_DECIMAL_ODDS_TRUTH", False):
         def fmt_decimal_first(value: Any, kind: str = "") -> str:
@@ -343,7 +447,7 @@ def _install_forced_two_page_renderer(patched: Any) -> None:
 
     patched.render_full_pick_magazine_page_png = two_page_png
     patched.render_full_magazine_book_pages = book_pages
-    patched._ABA_FORCED_TWO_PAGE_TRUTH_RENDERER = "truth_contract_v10"
+    patched._ABA_FORCED_TWO_PAGE_TRUTH_RENDERER = "truth_contract_v11"
 
 
 def apply_magazine_sale_ready_patch(module):
@@ -353,8 +457,8 @@ def apply_magazine_sale_ready_patch(module):
         patched.MAGAZINE_STYLE_VERSION = current[: -len("_sale_ready_risk_chain_truth_v5")] + "_sale_ready_risk_chain_v4"
     elif "sale_ready_risk_chain_v4" not in current:
         patched.MAGAZINE_STYLE_VERSION = f"{current}_sale_ready_risk_chain_v4" if current else "sale_ready_risk_chain_v4"
-    if "matchup_readable_v2" not in patched.MAGAZINE_STYLE_VERSION:
-        patched.MAGAZINE_STYLE_VERSION = f"{patched.MAGAZINE_STYLE_VERSION}_matchup_readable_v2"
+    if "pick_line_labels_v1" not in patched.MAGAZINE_STYLE_VERSION:
+        patched.MAGAZINE_STYLE_VERSION = f"{patched.MAGAZINE_STYLE_VERSION}_matchup_readable_v2_pick_line_labels_v1"
     _install_display_patches(patched)
     original_render = patched.render_full_pick_magazine_page
 
@@ -369,5 +473,5 @@ def apply_magazine_sale_ready_patch(module):
     patched.render_full_pick_magazine_page = truthful_render
     patched._pairs = _truth_pairs
     _install_forced_two_page_renderer(patched)
-    patched._ABA_SALE_READY_TRUTH_CONTRACT_VERSION = "truth_contract_v10_matchup_readable_v2"
+    patched._ABA_SALE_READY_TRUTH_CONTRACT_VERSION = "truth_contract_v11_matchup_readable_pick_line_labels"
     return patched
