@@ -13,7 +13,7 @@ from autonomous_betting_agent.report_public_quality import (
     trim_complete_sentence,
 )
 
-VERSION = "active_magazine_export_guard_v3"
+VERSION = "active_magazine_export_guard_v4"
 NO_PLAY = "NO " + "BET / PRICE REJECTED"
 WATCH_VERIFY = "WATCHLIST / VERIFY PRICE"
 _DANGLING = ("where", "with", "with the", "who are", "because", "and", "or", "the", "in", "at", "for", "meaning", "against", "their", "of")
@@ -56,11 +56,20 @@ def _num(data: dict[str, Any], *keys: str) -> float | None:
     return None
 
 
+def _sport_text(data: dict[str, Any]) -> str:
+    return " ".join(_clean(data.get(k)).lower() for k in ("sport", "sport_key", "league", "competition", "event_type", "market", "market_type", "prediction", "pick", "selection"))
+
+
 def _family(data: dict[str, Any]) -> str:
     text = " ".join(_clean(data.get(k)).lower().replace("_", " ") for k in ("market_type", "market", "market_name", "wager_type", "prediction", "pick", "selection"))
+    sport = _sport_text(data)
+    line_text = " ".join(_clean(data.get(k)) for k in ("line", "point", "points", "spread_line", "run_line", "handicap", "line_point"))
+    baseball_line = bool(re.search(r"(?<![\d.])[+-]?1(?:\.0)?|[+-]?1\.5(?![\d.])", line_text + " " + text))
     if any(token in text for token in ("total", "over", "under")):
         return "total"
-    if "run line" in text or "puck line" in text:
+    if "run line" in text or (any(token in sport for token in ("mlb", "baseball")) and any(token in text for token in ("spread", "point spread", "handicap")) and baseball_line):
+        return "run_line"
+    if "puck line" in text:
         return "run_line"
     if any(token in text for token in ("spread", "handicap", "point spread")):
         return "spread"
@@ -127,6 +136,12 @@ def normalize_row(value: Any) -> dict[str, Any]:
                 data[key] = cleaned
     line = _line(data)
     fam = _family(data)
+    if fam == "total":
+        data["market_type"] = data["market"] = "game total"
+    elif fam == "run_line":
+        data["market_type"] = data["market"] = "run line"
+    elif fam == "spread":
+        data["market_type"] = data["market"] = "spread"
     if line:
         data["line"] = line
         data["point"] = line.lstrip("+")
@@ -139,6 +154,7 @@ def normalize_row(value: Any) -> dict[str, Any]:
     label = build_full_market_label(data)
     label = re.sub(r"\bSpread:\s*Point Spread:\s*", "Spread: ", label, flags=re.I)
     label = re.sub(r"\bRun Line:\s*Point Spread:\s*", "Run Line: ", label, flags=re.I)
+    label = re.sub(r"\bSpread:\s*Spread:\s*", "Spread: ", label, flags=re.I)
     for key in ("aba_display_pick", "display_pick", "prediction", "pick", "exact_bet", "final_recommendation_label", "public_market_label", "verified_market_label", "full_market_label", "market_label", "trend_label"):
         data[key] = label
     negative = _negative_value(data)
@@ -285,6 +301,8 @@ def install(module: Any) -> Any:
                         market.rejection_reason = "Requires positive edge and EV"
                     elif str(getattr(market, "badge", "")).upper() == "WATCHLIST":
                         market.badge = WATCH_VERIFY
+                    if is_saved_source(row) and str(getattr(market, "rejection_reason", "")).strip():
+                        market.rejection_reason = "Saved-source only - current provider match required"
                 if is_saved_source(row):
                     diag["provider_state"] = "Source saved"
                     diag["provider_called"] = "saved-source"
