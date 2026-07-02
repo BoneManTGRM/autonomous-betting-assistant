@@ -6,6 +6,7 @@ from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
+from .magazine_row_ordering import order_magazine_rows
 from .report_export_service import ReportExportBundle, build_report_export_bundle
 from .report_feed_service import build_report_feed
 from .report_learning_layer import calibration_audit
@@ -277,6 +278,13 @@ def _dedupe_cards(cards: pd.DataFrame) -> pd.DataFrame:
     return cards.loc[keep].reset_index(drop=True)
 
 
+def _order_cards(cards: pd.DataFrame) -> pd.DataFrame:
+    if cards.empty:
+        return cards
+    ordered = order_magazine_rows(cards.to_dict("records"))
+    return pd.DataFrame(ordered).reset_index(drop=True)
+
+
 def _bool_count(frame: pd.DataFrame, column: str) -> int:
     if frame.empty or column not in frame.columns:
         return 0
@@ -303,6 +311,7 @@ def build_report_studio_cards(raw_rows: pd.DataFrame | Sequence[Mapping[str, Any
     cards = apply_learning_layer_compat(enriched)
     cards = _apply_context_preview(cards, language=filters.language)
     cards = _dedupe_cards(cards)
+    cards = _order_cards(cards)
     return raw, normalized, filtered, cards
 
 
