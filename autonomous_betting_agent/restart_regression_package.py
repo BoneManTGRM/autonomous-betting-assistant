@@ -21,6 +21,15 @@ WARN = "WARN"
 FAIL = "FAIL"
 SHADOW_ONLY = "SHADOW ONLY"
 FORBIDDEN = "FORBIDDEN"
+VOLATILE_FINGERPRINT_KEYS = {
+    "generated_at_utc",
+    "dashboard_refresh_id",
+    "dashboard_refresh_hash",
+    "local_review_id",
+    "local_review_hash",
+    "restart_regression_id",
+    "restart_regression_hash",
+}
 
 
 def _now() -> str:
@@ -42,6 +51,16 @@ def _safe(value: Any) -> Any:
         except Exception:
             return str(value)
     return value
+
+
+def _stable_without_volatile(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(k): _stable_without_volatile(v) for k, v in sorted(value.items(), key=lambda item: str(item[0])) if str(k) not in VOLATILE_FINGERPRINT_KEYS}
+    if isinstance(value, (list, tuple)):
+        return [_stable_without_volatile(v) for v in value]
+    if isinstance(value, set):
+        return [_stable_without_volatile(v) for v in sorted(value, key=lambda item: str(item))]
+    return _safe(value)
 
 
 def _canonical(value: Any) -> str:
@@ -68,18 +87,7 @@ def export_restart_regression_json(report: Mapping[str, Any]) -> str:
 
 
 def package_fingerprint(value: Mapping[str, Any] | None) -> str:
-    source = dict(value or {})
-    volatile = {
-        "generated_at_utc",
-        "dashboard_refresh_id",
-        "dashboard_refresh_hash",
-        "local_review_id",
-        "local_review_hash",
-        "restart_regression_id",
-        "restart_regression_hash",
-    }
-    stable = {key: source.get(key) for key in sorted(source) if key not in volatile}
-    return stable_hash("fingerprint", stable, 32)
+    return stable_hash("fingerprint", _stable_without_volatile(dict(value or {})), 32)
 
 
 def check_row(check_id: str, title: str, status: str, details: str = "", expected: Any = "", actual: Any = "") -> dict[str, Any]:
