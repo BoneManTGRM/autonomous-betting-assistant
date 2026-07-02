@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Mapping
@@ -20,6 +21,15 @@ from .final_enriched_report_pipeline import (
     _txt,
     check_api_health,
 )
+
+LINE_FIELDS = (
+    'selected_line', 'locked_line', 'line', 'line_point', 'point', 'points', 'handicap',
+    'spread', 'total', 'threshold', 'market_line', 'bet_line', 'line_display', 'prop_line'
+)
+PROVIDER_LINE_FIELDS = ('provider_line', 'live_line', 'sportsbook_line', 'odds_api_line', 'current_line')
+TIMESTAMP_FIELDS = ('timestamp', 'price_timestamp', 'last_update', 'last_updated', 'updated_at', 'commence_time', 'locked_at_utc')
+SOURCE_FIELDS = ('provider', 'bookmaker', 'sportsbook', 'odds_source', 'data_source')
+ENDPOINT_FIELDS = ('provider_endpoint', 'endpoint_called', 'odds_endpoint')
 
 
 def _decimal_odds(row: Mapping[str, Any]) -> float | None:
@@ -56,6 +66,14 @@ def _clean(value: Any) -> str:
     return '' if _is_placeholder(text) else text
 
 
+def _num_from_fields(row: Mapping[str, Any], fields: tuple[str, ...]) -> float | None:
+    for field in fields:
+        value = _num(_first(row, field))
+        if value is not None:
+            return value
+    return None
+
+
 def _live_status(row: Mapping[str, Any], flags: tuple[str, ...], fields: tuple[str, ...]) -> tuple[str, str]:
     flagged = any(_txt(row.get(key)).lower() in {'true', '1', 'yes', 'live', 'active'} for key in flags)
     has_payload = any(_txt(row.get(key)) and not _is_placeholder(row.get(key)) for key in fields)
@@ -80,6 +98,190 @@ def _recommendation(probability: float | None, ev: float | None, edge: float | N
     if probability >= 0.60 and ev <= 0:
         return 'WATCHLIST'
     return 'PASS' if ev <= 0 else 'NO PLAY'
+
+
+def _market_text(row: Mapping[str, Any]) -> str:
+    return ' '.join(_txt(_first(row, 'selected_market', 'market_type', 'market', 'market_name', 'bet_type', 'wager_type', 'prediction', 'pick', 'selection')).lower().replace('_', ' ').split())
+
+
+def _pick_text(row: Mapping[str, Any]) -> str:
+    return _txt(_first(row, 'selected_pick', 'prediction', 'pick', 'selection', 'exact_bet', 'public_pick'))
+
+
+def _market_family(row: Mapping[str, Any]) -> str:
+    text = (_market_text(row) + ' ' + _pick_text(row).lower()).replace('_', ' ')
+    if any(token in text for token in ('total', 'over ', 'under ', 'over/', 'over under')):
+        return 'total'
+    if any(token in text for token in ('spread', 'handicap', 'run line', 'puck line', 'point spread')):
+        return 'spread'
+    if any(token in text for token in ('moneyline', 'h2h', 'winner', 'match winner', 'head to head')):
+        return 'moneyline'
+    return 'unknown'
+
+
+def _selected_line(row: Mapping[str, Any]) -> float | None:
+    direct = _num_from_fields(row, LINE_FIELDS)
+    if direct is not None:
+        return direct
+    text = _pick_text(row).lower()
+    match = re.search(r'(?<!\d)([+-]?\d+(?:\.\d+)?)(?!\d)', text)
+    if match:
+        return float(match.group(1))
+    return None
+
+
+def _provider_line(row: Mapping[str, Any]) -> float | None:
+    return _num_from_fields(row, PROVIDER_LINE_FIELDS)
+
+
+def _line_label(value: float | None) -> str:
+    if value is None:
+        return ''
+    return f'+{value:g}' if value > 0 else f'{value:g}'
+
+
+def _total_side(row: Mapping[str, Any]) -> str:
+    text = (_pick_text(row) + ' ' + _market_text(row)).lower()
+    if 'under' in text:
+        return 'Under'
+    if 'over' in text:
+        return 'Over'
+    return ''
+
+
+def _selection_name(row: Mapping[str, Any], home: str = '', away: str = '') -> str:
+    pick = _pick_text(row)
+    cleaned = re.sub(r'\b(moneyline|spread|point spread|run line|puck line|game total|total|over|under)\b', ' ', pick, flags=re.I)
+    cleaned = re.sub(r'[+-]?\d+(?:\.\d+)?', ' ', cleaned)
+    cleaned = re.sub(r'[:·\-]+', ' ', cleaned)
+    cleaned = ' '.join(cleaned.split())
+    if cleaned:
+        return cleaned
+    return home or away or pick or 'Selection'
+
+
+def _line_guard(row: Mapping[str, Any], context: str = '') -> dict[str, Any]:
+    family = _market_family(row)
+    selected = _selected_line(row)
+    provider = _provider_line(row)
+    issue = ''
+    risk = ''
+    action = ''
+    if family == 'total' and selected is None:
+        issue, risk, action = 'missing total line', 'TOTAL LINE MISSING', 'BLOCKED'
+    elif family == 'spread' and selected is None:
+        issue, risk, action = 'missing spread/run-line handicap', 'HANDICAP MISSING', 'BLOCKED'
+    elif selected is not None and provider is not None and abs(float(selected) - float(provider)) > 0.001:
+        issue, risk, action = f'line mismatch: selected {_line_label(selected)} vs provider {_line_label(provider)}', 'LINE MISMATCH', 'BLOCKED'
+    elif selected is not None and context:
+        # Loose narrative is not allowed to overwrite the pick; it can only warn.
+        narrative = [float(x) for x in re.findall(r'favou?red by\s*([+-]?\d+(?:\.\d+)?)|spread\s*([+-]?\d+(?:\.\d+)?)', context, flags=re.I) for x in x if x]
+        if narrative and all(abs(selected - value) > 0.001 for value in narrative[:2]):
+            risk, action = 'VERIFY LINE', 'WATCHLIST'
+    return {'market_family': family, 'selected_line': selected, 'provider_line': provider, 'data_issue_reason': issue, 'risk_override': risk, 'action_override': action}
+
+
+def beginner_explanation(row: Mapping[str, Any], home: str = '', away: str = '') -> str:
+    family = _market_family(row)
+    line = _selected_line(row)
+    pick = _pick_text(row)
+    selection = _selection_name(row, home, away)
+    sport = _txt(_first(row, 'sport', 'league')).lower()
+    if family == 'moneyline':
+        return f'Moneyline means {selection} must win the game. The final margin does not matter.'
+    if family == 'total':
+        side = _total_side(row)
+        if line is None:
+            return 'Game total is missing its number, so this is not bettable until the total line is known.'
+        needed = int(line) + 1 if side.lower() == 'over' and float(line).is_integer() is False else None
+        if side.lower() == 'over':
+            threshold = int(line + 0.5) if line % 1 == 0.5 else line
+            return f'Over {_line_label(line).lstrip("+")} means the two teams must combine for {threshold} or more points.'
+        if side.lower() == 'under':
+            threshold = int(line - 0.5) if line % 1 == 0.5 else line
+            return f'Under {_line_label(line).lstrip("+")} means the two teams must combine for {threshold} or fewer points.'
+        return f'Total {_line_label(line)} needs an Over or Under side before it is bettable.'
+    if family == 'spread':
+        if line is None:
+            return 'Spread handicap is missing, so this is not bettable until the handicap is known.'
+        margin = abs(float(line))
+        integer_margin = int(margin + 0.5) if margin % 1 == 0.5 else margin
+        score_unit = 'runs' if 'baseball' in sport or 'mlb' in sport else ('goals' if 'hockey' in sport or 'nhl' in sport else 'points')
+        if line < 0:
+            return f'{selection} {_line_label(line)} means {selection} must win by {integer_margin} or more {score_unit}.'
+        return f'{selection} +{margin:g} means {selection} can win outright or lose by {int(margin - 0.5) if margin % 1 == 0.5 else margin} or fewer {score_unit}.'
+    if 'parlay' in pick.lower():
+        return 'A parlay needs every leg to win. One losing leg loses the whole parlay.'
+    return 'Read the market type, line, price, source, edge, and EV before using this pick.'
+
+
+def _shadow_math(row: Mapping[str, Any], decimal_odds: float | None, model_probability: float | None, raw_implied: float | None, edge: float | None, ev: float | None, no_vig: float | None, odds_status: str, line_info: Mapping[str, Any]) -> dict[str, Any]:
+    current_price = _decimal_odds(row)
+    best_price = _decimal_odds({'decimal_odds': _first(row, 'best_sportsbook_price', 'best_price', 'best_decimal_odds')}) or current_price
+    opening_price = _decimal_odds({'decimal_odds': _first(row, 'opening_price', 'opening_decimal_odds')})
+    closing_price = _decimal_odds({'decimal_odds': _first(row, 'closing_price', 'closing_decimal_odds')})
+    no_vig_edge = round(model_probability - no_vig, 6) if model_probability is not None and no_vig is not None else None
+    best_ev = round(model_probability * best_price - 1, 6) if model_probability is not None and best_price else None
+    shadow_ev_delta = round(best_ev - ev, 6) if best_ev is not None and ev is not None else None
+    stale = odds_status != 'LIVE'
+    mismatch = bool(line_info.get('data_issue_reason') and 'line mismatch' in _txt(line_info.get('data_issue_reason')).lower())
+    if mismatch:
+        rec = 'BLOCK LINE MISMATCH'
+        reject = line_info.get('data_issue_reason')
+    elif stale:
+        rec = 'BLOCK STALE PRICE'
+        reject = 'odds source is not live verified'
+    elif best_price and decimal_odds and best_price > decimal_odds:
+        rec = 'BETTER PRICE AVAILABLE'
+        reject = ''
+    elif ev is not None and ev <= 0:
+        rec = 'WAIT FOR TARGET PRICE'
+        reject = 'current EV is not positive'
+    else:
+        rec = 'KEEP ORIGINAL'
+        reject = ''
+    return {
+        'shadow_mode': 'OBSERVING_ONLY',
+        'shadow_status_label': 'Shadow Mode: observing only',
+        'shadow_recommendation': rec,
+        'shadow_original_recommendation': _txt(_first(row, 'final_decision', 'recommendation', 'recommended_action', 'consumer_action')),
+        'shadow_disagrees_with_current_pick': str(rec not in {'KEEP ORIGINAL', ''}),
+        'shadow_raw_implied_probability': raw_implied,
+        'shadow_no_vig_implied_probability': no_vig,
+        'shadow_no_vig_edge_delta': no_vig_edge,
+        'shadow_ev_delta': shadow_ev_delta,
+        'shadow_edge_delta': edge,
+        'shadow_price_quality': 'STALE_OR_UNVERIFIED' if stale else ('BETTER_PRICE_AVAILABLE' if rec == 'BETTER PRICE AVAILABLE' else 'CURRENT_PRICE_OK'),
+        'shadow_clv_estimate': round((closing_price or 0) - (decimal_odds or 0), 6) if closing_price and decimal_odds else None,
+        'shadow_reject_reason': reject,
+        'shadow_promote_reason': '',
+        'shadow_confidence_adjustment': 'none_shadow_mode',
+        'shadow_market_quality_score': 0 if stale or mismatch else (1 if ev and ev > 0 else 0.5),
+        'shadow_line_quality_score': 0 if mismatch else (0.5 if line_info.get('risk_override') == 'VERIFY LINE' else 1),
+        'shadow_source_quality_score': 1 if odds_status == 'LIVE' else 0,
+        'shadow_stale_price_detected': str(stale),
+        'shadow_line_mismatch_detected': str(mismatch),
+        'shadow_current_decimal_odds': current_price,
+        'shadow_opening_price': opening_price,
+        'shadow_current_price': current_price,
+        'shadow_best_sportsbook_price': best_price,
+        'shadow_sportsbook_count': _txt(_first(row, 'sportsbook_count', 'book_count')) or '0',
+        'shadow_sportsbook_disagreement_range': _txt(_first(row, 'sportsbook_disagreement_range', 'book_price_range')),
+        'shadow_price_movement_direction': _txt(_first(row, 'price_movement_direction', 'line_movement_direction')),
+        'shadow_line_movement_flag': str(bool(_txt(_first(row, 'line_movement', 'price_movement')))),
+    }
+
+
+def _truth_timestamp(row: Mapping[str, Any]) -> str:
+    return _txt(_first(row, *TIMESTAMP_FIELDS))
+
+
+def _truth_provider(row: Mapping[str, Any]) -> str:
+    return _txt(_first(row, *SOURCE_FIELDS))
+
+
+def _truth_endpoint(row: Mapping[str, Any]) -> str:
+    return _txt(_first(row, *ENDPOINT_FIELDS))
 
 
 def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False) -> pd.DataFrame:
@@ -127,19 +329,30 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
         else:
             context, context_source, context_status, context_reason = '', 'EMPTY_WITH_REASON', 'FAILED', 'No real context source reached final_enriched_picks_df.'
 
-        sport_text = _txt(_first(row, 'sport', 'league')).lower()
-        soccer = any(token in sport_text for token in ('soccer', 'football', 'fifa', 'uefa', 'liga'))
-        sportsdataio_id = _txt(_first(row, 'sportsdataio_event_id', 'sportsdataio_game_id', 'sdio_event_id'))
-        api_football_id = _txt(_first(row, 'api_football_fixture_id', 'api_football_match_id', 'fixture_id'))
-        sportsdataio_status = 'MATCHED' if sportsdataio_id else ('SPORT_UNSUPPORTED' if soccer else ('API_KEY_MISSING' if not api_health['SportsDataIO']['key_loaded'] else 'NO_MATCH_TEAM_NAME'))
-        api_football_status = 'MATCHED' if api_football_id else ('API_KEY_MISSING' if not api_health['API-Football']['key_loaded'] else 'NO_MATCH_TEAM_NAME')
-
-        ev_status = 'LIVE_RECALCULATED' if odds_status == 'LIVE' and ev is not None else ('FALLBACK_CALCULATED' if decimal_odds and ev is not None else 'UNVERIFIED')
-        ev_source = 'calculated_from_live_odds_and_model_probability' if ev_status == 'LIVE_RECALCULATED' else ('fallback_calculated_from_uploaded_odds' if ev_status == 'FALLBACK_CALCULATED' else 'EMPTY_WITH_REASON')
+        line_info = _line_guard(row, context)
+        beginner = beginner_explanation(row, home_team, away_team)
+        line_blocked = bool(line_info.get('data_issue_reason'))
+        loose_verify_line = line_info.get('risk_override') == 'VERIFY LINE'
+        ev_status = 'LIVE_RECALCULATED' if odds_status == 'LIVE' and ev is not None else ('UNVERIFIED_MODEL_ONLY' if decimal_odds and ev is not None else 'UNVERIFIED')
+        ev_source = 'calculated_from_live_odds_and_model_probability' if ev_status == 'LIVE_RECALCULATED' else ('model_edge_pending_price_verification' if ev_status == 'UNVERIFIED_MODEL_ONLY' else 'EMPTY_WITH_REASON')
         fallback_used = odds_status != 'LIVE' or context_source != 'Perplexity' or news_status != 'LIVE' or perplexity_status != 'LIVE'
         fallback_reason = '; '.join(part for part in [odds_failure if odds_status != 'LIVE' else '', context_reason, news_failure if news_status != 'LIVE' else '', perplexity_failure if perplexity_status != 'LIVE' else ''] if part)
         recommendation = _recommendation(model_probability, ev, edge)
+        if line_blocked:
+            recommendation = 'BLOCKED'
+        elif fallback_used or loose_verify_line:
+            recommendation = 'WATCHLIST'
+        shadow = _shadow_math(row, decimal_odds, model_probability, raw_implied, edge, ev, no_vig, odds_status, line_info)
         provenance = {'decimal_odds': odds_source, 'EV': ev_source, 'context': context_source, 'news_summary': 'NewsAPI' if news_status == 'LIVE' and news_summary else 'EMPTY_WITH_REASON', 'perplexity_context': 'Perplexity' if perplexity_status == 'LIVE' and perplexity_context else 'EMPTY_WITH_REASON'}
+        risk_reasons = _txt(_first(row, 'risk_reasons', 'risk_reason', 'risk_notes'))
+        if line_blocked:
+            risk_reasons = f"{line_info.get('risk_override')}: {line_info.get('data_issue_reason')}"
+        elif loose_verify_line:
+            risk_reasons = 'Loose matchup/context text may reference a different line. Verify sportsbook line before using.'
+        elif fallback_used:
+            risk_reasons = 'Saved row / price verification required. Current sportsbook price not matched.'
+        selected_line = line_info.get('selected_line')
+        provider_line = line_info.get('provider_line')
 
         output = dict(row)
         output.update({
@@ -159,7 +372,13 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
             'normalized_away_team': _norm(away_team),
             'selected_market': _txt(_first(row, 'selected_market', 'market_type', 'market')),
             'selected_pick': _txt(_first(row, 'selected_pick', 'prediction', 'pick', 'selection')),
+            'selected_line': selected_line,
+            'provider_line': provider_line,
             'bookmaker': _txt(_first(row, 'bookmaker', 'sportsbook')),
+            'sportsbook': _txt(_first(row, 'sportsbook', 'bookmaker')),
+            'provider': _truth_provider(row) or odds_source,
+            'provider_endpoint': _truth_endpoint(row),
+            'price_timestamp': _truth_timestamp(row) if odds_status == 'LIVE' else '',
             'decimal_odds': decimal_odds,
             'decimal_price': decimal_odds,
             'american_odds': _num(_first(row, 'american_odds', 'moneyline')) or _american_from_decimal(decimal_odds),
@@ -182,20 +401,29 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
             'expected_value_per_unit': ev,
             'ev_source': ev_source,
             'ev_status': ev_status,
+            'ev_display_label': 'Verified EV' if ev_status == 'LIVE_RECALCULATED' else 'Unverified EV',
+            'edge_display_label': 'Verified edge' if ev_status == 'LIVE_RECALCULATED' else 'Model edge pending price verification',
             'fair_odds': round(1 / model_probability, 6) if model_probability else None,
             'target_odds': round((1 / model_probability) * 1.02, 6) if model_probability else None,
             'confidence_tier': _txt(_first(row, 'confidence_tier', 'confidence_bucket', 'public_confidence')),
             'recommendation_status': recommendation,
             'final_decision': recommendation,
-            'units': _txt(_first(row, 'units', 'recommended_stake_units', 'suggested_stake_units')) or ('0.5' if recommendation == 'BET CANDIDATE' else '0.0'),
-            'risk_label': _txt(_first(row, 'risk_label', 'risk', 'risk_level')) or ('FALLBACK MODE' if fallback_used else 'STANDARD'),
-            'risk_reasons': _txt(_first(row, 'risk_reasons', 'risk_reason', 'risk_notes')) or ('Fallback data used; verify before betting.' if fallback_used else ''),
-            'sportsdataio_event_id': sportsdataio_id,
-            'sportsdataio_match_status': sportsdataio_status,
-            'sportsdataio_failure_reason': '' if sportsdataio_id else ('SportsDataIO unsupported for this soccer/international row; use API-Football if matched.' if soccer else 'No SportsDataIO event id reached final_enriched_picks_df.'),
-            'api_football_fixture_id': api_football_id,
-            'api_football_match_status': api_football_status,
-            'api_football_failure_reason': '' if api_football_id else 'No API-Football fixture id reached final_enriched_picks_df.',
+            'consumer_action': recommendation,
+            'recommended_action': recommendation,
+            'units': _txt(_first(row, 'units', 'recommended_stake_units', 'suggested_stake_units')) or ('0.5' if recommendation == 'BET CANDIDATE' and ev_status == 'LIVE_RECALCULATED' else '0.0'),
+            'live_verified_stake_units': _txt(_first(row, 'live_verified_stake_units')) if odds_status == 'LIVE' and not line_blocked else '0.0',
+            'risk_label': line_info.get('risk_override') or ('VERIFY PRICE' if fallback_used else (_txt(_first(row, 'risk_label', 'risk', 'risk_level')) or 'STANDARD')),
+            'risk_reasons': risk_reasons,
+            'data_issue_reason': line_info.get('data_issue_reason') or _txt(_first(row, 'data_issue_reason')),
+            'beginner_explanation': beginner,
+            'what_this_means': beginner,
+            'glossary_note': 'Moneyline: team must win. Spread: cover the listed margin. Over/Under: combined score versus the total. Parlay: every leg must win.',
+            'sportsdataio_event_id': _txt(_first(row, 'sportsdataio_event_id', 'sportsdataio_game_id', 'sdio_event_id')),
+            'sportsdataio_match_status': 'MATCHED' if _txt(_first(row, 'sportsdataio_event_id', 'sportsdataio_game_id', 'sdio_event_id')) else 'NO_MATCH_TEAM_NAME',
+            'sportsdataio_failure_reason': '' if _txt(_first(row, 'sportsdataio_event_id', 'sportsdataio_game_id', 'sdio_event_id')) else 'No SportsDataIO event id reached final_enriched_picks_df.',
+            'api_football_fixture_id': _txt(_first(row, 'api_football_fixture_id', 'api_football_match_id', 'fixture_id')),
+            'api_football_match_status': 'MATCHED' if _txt(_first(row, 'api_football_fixture_id', 'api_football_match_id', 'fixture_id')) else 'NO_MATCH_TEAM_NAME',
+            'api_football_failure_reason': '' if _txt(_first(row, 'api_football_fixture_id', 'api_football_match_id', 'fixture_id')) else 'No API-Football fixture id reached final_enriched_picks_df.',
             'weather_status': weather_status,
             'weather_summary': _clean(_first(row, 'weather_summary', 'venue_weather', 'weather_risk')),
             'weather_failure_reason': weather_failure if weather_status != 'LIVE' else '',
@@ -218,16 +446,30 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
             'last_api_refresh_time': now,
             'report_run_id': report_run_id,
             'report_source': 'final_enriched_picks_df',
+            'report_source_mode': 'current-run' if odds_status == 'LIVE' else 'saved-handoff',
+            'report_source_label': 'Official +EV locked rows are being used.' if odds_status == 'LIVE' else 'Saved handoff rows are being used. Confirm this is the newest run before publishing.',
+            'report_data_scope': 'Current API-refreshed slate' if odds_status == 'LIVE' else 'Price verification required',
+            'report_truth_severity': 'LIVE VERIFIED' if odds_status == 'LIVE' and not line_blocked else 'VERIFY PRICE',
+            'verification_status': 'LIVE VERIFIED' if odds_status == 'LIVE' and not line_blocked else 'VERIFY PRICE',
             'field_provenance_json': json.dumps(provenance, sort_keys=True),
             'source_trace_json': json.dumps({'raw_row_index': index, 'event_key': event_key}, sort_keys=True),
             'api_health_json': json.dumps(api_health, sort_keys=True),
+            **shadow,
         })
-        for key, value in {
-            'injury_notes': '', 'team_snapshot_home': '', 'team_snapshot_away': '', 'matchup_notes': '',
-            'pro_bettor_evidence': '', 'reparodynamics_status': 'OBSERVATION_ONLY',
-            'reparodynamics_notes': 'No Reparodynamics annotation reached this row.', 'repair_flags': '',
-        }.items():
-            output.setdefault(key, value)
+        output.setdefault('injury_notes', '')
+        output.setdefault('team_snapshot_home', '')
+        output.setdefault('team_snapshot_away', '')
+        output['matchup_notes'] = '\n'.join([f'What This Means: {beginner}', context or '', risk_reasons or ''])
+        output['why_lose'] = '\n'.join([risk_reasons or 'Recheck price before entry.', 'Unverified model edge — price must be rechecked.' if odds_status != 'LIVE' else 'Live price matched.'])
+        output['chain_notes'] = '\n'.join([
+            'Parlay recommendations require at least two verified legs.',
+            'Because this row is not live-source verified, ABA can only show watchlist ideas, not a bettable parlay.' if odds_status != 'LIVE' else 'Only use verified source-returned markets.',
+            output.get('shadow_status_label', 'Shadow Mode: observing only'),
+        ])
+        output.setdefault('pro_bettor_evidence', '')
+        output.setdefault('reparodynamics_status', 'OBSERVATION_ONLY')
+        output.setdefault('reparodynamics_notes', 'No Reparodynamics annotation reached this row.')
+        output.setdefault('repair_flags', '')
         output['enrichment_input_hash'] = _hash({key: output.get(key) for key in REQUIRED_REPORT_COLUMNS if key not in {'enrichment_input_hash', 'report_run_id', 'last_api_refresh_time'}})
         rows.append(output)
 
@@ -255,6 +497,8 @@ def validate_report_pipeline(df: Any) -> list[str]:
         bad = frame['no_vig_status'].astype(str).eq('CALCULATED') & ~frame['odds_market_sides_available'].astype(str).eq('FULL')
         if bool(bad.any()):
             errors.append('no-vig calculated with incomplete market sides')
+    if 'shadow_mode' in frame and not frame['shadow_mode'].astype(str).eq('OBSERVING_ONLY').all():
+        errors.append('Shadow Math must remain observing-only in this runtime.')
     return errors
 
 
@@ -301,14 +545,22 @@ def install() -> None:
         data = row if isinstance(row, Mapping) else getattr(row, 'to_dict', lambda: {})()
         context = _txt(data.get('context') or data.get('sports_context_summary'))
         reason = _txt(data.get('context_failure_reason'))
-        return [context] if context and not _is_placeholder(context) else ['Context unavailable because: ' + (reason or 'no context reached final_enriched_picks_df')]
+        beginner = _txt(data.get('beginner_explanation') or data.get('what_this_means'))
+        lines = []
+        if beginner:
+            lines.append('What This Means: ' + beginner)
+        if context and not _is_placeholder(context):
+            lines.append(context)
+        if not lines:
+            lines.append('Context unavailable because: ' + (reason or 'no context reached final_enriched_picks_df'))
+        return lines[:3]
 
     def guarded_pairs(row, lang):
         data = row if isinstance(row, Mapping) else getattr(row, 'to_dict', lambda: {})()
         diagnostics = [
             ('SOURCE', _txt(data.get('report_source')) or 'final_enriched_picks_df'),
             ('RUN', _txt(data.get('report_run_id'))[:18]),
-            ('CACHE', _txt(data.get('cache_status'))),
+            ('SHADOW', _txt(data.get('shadow_status_label')) or 'Shadow Mode: observing only'),
         ]
         return (diagnostics + original_pairs(row, lang))[:5]
 
