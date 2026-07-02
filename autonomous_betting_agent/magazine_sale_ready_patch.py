@@ -35,12 +35,19 @@ def _valid_text(value: Any) -> bool:
     return bool(text and text not in {"nan", "none", "null", "n/a", "na", "--", "data unavailable", "not provided"})
 
 
+def _first(data: dict[str, Any], *keys: str, default: str = "") -> str:
+    for key in keys:
+        value = data.get(key)
+        if _valid_text(value):
+            return _clean(value)
+    return default
+
+
 def _short(value: Any, limit: int = 118) -> str:
     text = _clean(value)
     if len(text) <= limit:
         return text
-    cut = text[:limit].rsplit(" ", 1)[0].rstrip(" .,;:")
-    return f"{cut}."
+    return text[:limit].rsplit(" ", 1)[0].rstrip(" .,;:") + "."
 
 
 def _decimal_text(value: Any) -> str | None:
@@ -60,14 +67,6 @@ def _decimal_text(value: Any) -> str | None:
     return f"{num:.2f}"
 
 
-def _first(data: dict[str, Any], *keys: str, default: str = "") -> str:
-    for key in keys:
-        value = data.get(key)
-        if _valid_text(value):
-            return _clean(value)
-    return default
-
-
 def _stake_text(value: Any, default: str = "0.0") -> str:
     raw = _clean(value)
     try:
@@ -78,63 +77,125 @@ def _stake_text(value: Any, default: str = "0.0") -> str:
 
 
 def _norm_market_text(data: dict[str, Any]) -> str:
-    return _clean(_first(data, "market_type", "market", "market_name", "market_key", "bet_type", default="")).lower().replace("_", " ")
+    return _clean(_first(
+        data,
+        "market_type",
+        "market",
+        "market_name",
+        "market_key",
+        "bet_type",
+        "wager_type",
+        default="",
+    )).lower().replace("_", " ").replace("-", " ")
 
 
 def _line_text(data: dict[str, Any]) -> str:
-    raw = _first(data, "line", "point", "points", "handicap", "spread", "total", "threshold", "line_value", "over_under", default="")
+    raw = _first(
+        data,
+        "line",
+        "point",
+        "points",
+        "handicap",
+        "spread",
+        "total",
+        "threshold",
+        "line_value",
+        "over_under",
+        "market_line",
+        "bet_line",
+        "line_display",
+        "prop_line",
+        default="",
+    )
     if not raw:
         return ""
     try:
         num = float(str(raw).replace("+", "").replace(",", ""))
         if abs(num) < 100:
-            if num > 0:
-                return f"+{num:g}"
-            return f"{num:g}"
+            return f"+{num:g}" if num > 0 else f"{num:g}"
     except Exception:
         pass
     return raw
 
 
-def _rich_pick_text(data: dict[str, Any]) -> str:
-    # Prefer complete bet labels before generic prediction/team labels. This prevents totals/spreads
-    # from collapsing to only a team name in the magazine.
-    selection = _first(
+def _market_family(data: dict[str, Any]) -> str:
+    market = _norm_market_text(data)
+    if any(token in market for token in ("total", "over under", "over/under", "totals")):
+        return "total"
+    if any(token in market for token in ("spread", "handicap", "run line", "puck line", "point spread")):
+        return "spread"
+    if any(token in market for token in ("moneyline", "winner", "h2h", "match winner", "home away", "head to head")):
+        return "moneyline"
+    return market or "pick"
+
+
+def _market_label(data: dict[str, Any]) -> str:
+    family = _market_family(data)
+    sport = _clean(_first(data, "sport", "league", default="")).lower()
+    if family == "total":
+        return "Game Total"
+    if family == "spread":
+        return "Run Line" if "baseball" in sport or "mlb" in sport else "Spread"
+    if family == "moneyline":
+        return "Moneyline"
+    return family.title()
+
+
+def _base_selection(data: dict[str, Any]) -> str:
+    return _first(
         data,
-        "display_pick",
-        "aba_display_pick",
-        "exact_bet",
-        "bet_label",
-        "recommended_bet",
-        "pick_text",
-        "pick",
         "selection",
         "outcome",
         "side",
+        "pick_side",
+        "team_selection",
         "prediction",
+        "pick",
         default="",
     )
-    market = _norm_market_text(data)
+
+
+def _rich_pick_text(data: dict[str, Any]) -> str:
+    full = _first(data, "display_pick", "aba_display_pick", "exact_bet", "bet_label", "recommended_bet", "pick_text", default="")
+    if full and any(token in full.lower() for token in ("over", "under", "+", "-", "moneyline", "spread", "run line", "total")):
+        return _clean(full)
+
+    family = _market_family(data)
+    label = _market_label(data)
     line = _line_text(data)
-    if not selection:
-        return "Not provided"
-    text = selection
-    low = text.lower()
-    if any(token in market for token in ("total", "over under", "over/under")):
-        total_side = _first(data, "total_side", "over_under_side", "side", "outcome", "selection", "prediction", default=text)
-        if any(token in total_side.lower() for token in ("over", "under")):
-            text = "Over" if "over" in total_side.lower() else "Under"
-        if line and line not in text:
-            text = f"{text} {line}"
-    elif any(token in market for token in ("spread", "handicap", "run line", "puck line")):
-        if line and line not in text and not re.search(r"[+-]\d", text):
-            text = f"{text} {line}"
-    return _clean(text)
+    selection = _base_selection(data) or full or _first(data, "prediction", "pick", default="Not provided")
+    selection_low = selection.lower()
+
+    if family == "total":
+        side = _first(data, "total_side", "over_under_side", "side", "outcome", "selection", "prediction", default=selection)
+        side_low = side.lower()
+        if "over" in side_low:
+            selection = "Over"
+        elif "under" in side_low:
+            selection = "Under"
+        if line and line not in selection:
+            selection = f"{selection} {line}"
+        return _clean(f"{label}: {selection}")
+
+    if family == "spread":
+        if line and line not in selection and not re.search(r"[+-]\d", selection):
+            selection = f"{selection} {line}"
+        return _clean(f"{label}: {selection}")
+
+    if family == "moneyline":
+        return _clean(f"{label}: {selection}")
+
+    return _clean(f"{label}: {selection}") if label and label.lower() != "pick" else _clean(selection)
 
 
 def _pick_for_display(row: Any) -> str:
     data = dict(_contract._row(row))
-    return _first(data, "aba_display_pick", default="") or _rich_pick_text(data)
+    return _rich_pick_text(data)
+
+
+def _pick_subject(row: dict[str, Any]) -> str:
+    text = _pick_for_display(row)
+    return text.split(":", 1)[1].strip() if ":" in text else text
 
 
 def _live_verified(data: dict[str, Any]) -> bool:
@@ -172,11 +233,10 @@ def _normalize_display_fields(data: dict[str, Any]) -> dict[str, Any]:
     data.setdefault("source_freshness", _first(data, "last_refreshed", "updated_at", "locked_at_utc", default="Verify before entry"))
     data.setdefault("verification_status", data.get("report_truth_severity") or ("LIVE VERIFIED" if _live_verified(data) else "VERIFY SOURCE"))
     display_pick = _rich_pick_text(data)
-    if _valid_text(display_pick):
-        data["aba_display_pick"] = display_pick
-        data["display_pick"] = display_pick
-        data["prediction"] = display_pick
-        data["pick"] = display_pick
+    data["aba_display_pick"] = display_pick
+    data["display_pick"] = display_pick
+    data["prediction"] = display_pick
+    data["pick"] = display_pick
     return data
 
 
@@ -186,34 +246,28 @@ def _force_truthful_gate(row: Any) -> dict[str, Any]:
         data.setdefault("live_verified_stake_units", data.get("target_stake_units", "0.0") if _live_verified(data) else "0.0")
         return data
     target_stake = _stake_text(_first(data, "target_stake_units", "recommended_stake_units", "suggested_stake_units", "units", default="0.0"))
-    data["final_decision"] = "WATCHLIST"
-    data["agent_decision"] = "WATCHLIST"
-    data["recommendation"] = "WATCHLIST"
-    data["consumer_action"] = "WATCHLIST"
-    data["recommended_action"] = "WATCHLIST"
-    data["risk"] = "VERIFY PRICE"
-    data["risk_level"] = "VERIFY PRICE"
-    data["risk_label"] = "VERIFY PRICE"
-    data["target_stake_units"] = target_stake
-    data["live_verified_stake_units"] = "0.0"
-    data["recommended_stake_units"] = target_stake
-    data["suggested_stake_units"] = target_stake
-    data["units"] = target_stake
-    data["final_explanation"] = "Not live-odds verified. Use as watchlist until the price and market are matched."
+    data.update({
+        "final_decision": "WATCHLIST",
+        "agent_decision": "WATCHLIST",
+        "recommendation": "WATCHLIST",
+        "consumer_action": "WATCHLIST",
+        "recommended_action": "WATCHLIST",
+        "risk": "VERIFY PRICE",
+        "risk_level": "VERIFY PRICE",
+        "risk_label": "VERIFY PRICE",
+        "target_stake_units": target_stake,
+        "live_verified_stake_units": "0.0",
+        "recommended_stake_units": target_stake,
+        "suggested_stake_units": target_stake,
+        "units": target_stake,
+        "final_explanation": "Not live-odds verified. Use as watchlist until the price and market are matched.",
+        "report_truth_severity": data.get("report_truth_severity") or "NO LIVE ODDS MATCH",
+        "report_truth_warning": data.get("report_truth_warning") or "No live odds match. This report is verification-only.",
+        "verification_status": "NO LIVE ODDS MATCH",
+    })
     data["action_reason"] = data["final_explanation"]
-    data["why_lose"] = "\n".join([
-        "Not live-odds verified.",
-        "Current price must be matched before entry.",
-        "Do not publish as PLAY while odds row is fallback/uploaded.",
-    ])
-    data["chain_notes"] = "\n".join([
-        "Watchlist only: chain ideas move to Page 2.",
-        "Not enough compatible live-verified selections.",
-        "Verified odds are missing.",
-    ])
-    data["report_truth_severity"] = data.get("report_truth_severity") or "NO LIVE ODDS MATCH"
-    data["report_truth_warning"] = data.get("report_truth_warning") or "No live odds match. This report is verification-only."
-    data["verification_status"] = "NO LIVE ODDS MATCH"
+    data["why_lose"] = "\n".join(["Not live-odds verified.", "Current price must be matched before entry.", "Do not publish as PLAY while odds row is fallback/uploaded."])
+    data["chain_notes"] = "\n".join(["Watchlist only: chain ideas move to Page 2.", "Not enough compatible live-verified selections.", "Verified odds are missing."])
     return data
 
 
@@ -224,17 +278,11 @@ def _truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
     odds_status = _clean(data.get("odds_status") or data.get("odds_source") or "MISSING").upper()
     context_status = _clean(data.get("context_status") or data.get("context_source") or data.get("report_live_context_detected") or "VERIFY")
     if report_source == "final_enriched_picks_df" and _live_verified(data):
-        source_label = "Live API refreshed report"
-        scope = "Current API-refreshed slate"
-        truth = "LIVE VERIFIED"
+        source_label, scope, truth = "Live API refreshed report", "Current API-refreshed slate", "LIVE VERIFIED"
     elif report_source == "final_enriched_picks_df" or _fallback_odds(data):
-        source_label = "API refreshed / no live odds match"
-        scope = "Verification-only report"
-        truth = "NO LIVE ODDS MATCH"
+        source_label, scope, truth = "API refreshed / no live odds match", "Verification-only report", "NO LIVE ODDS MATCH"
     elif source_mode == "ledger-history":
-        source_label = "Proof ledger history"
-        scope = "Historical proof ledger"
-        truth = "HISTORY ONLY"
+        source_label, scope, truth = "Proof ledger history", "Historical proof ledger", "HISTORY ONLY"
     else:
         source_label = _clean(data.get("report_source_label") or data.get("report_source_mode") or "Report source unknown")
         scope = _clean(data.get("report_data_scope") or "Current/fallback status unknown")
@@ -277,16 +325,16 @@ def _selected_badge(patched: Any, row: dict[str, Any], pick_text: str, lang: str
     blue = getattr(patched, "BLUE", (19, 66, 108))
     red = getattr(patched, "RED", (190, 30, 28))
     gold = (241, 184, 45)
-    low = pick_text.lower()
-    if any(token in low for token in ("over", "under", "más de", "menos de")):
+    subject = _pick_subject(row).lower()
+    if any(token in subject for token in ("over", "under", "más de", "menos de")):
         return "O/U", blue
     try:
         away, home = patched._teams(row)
     except Exception:
         away, home = _first(row, "away_team", "team_a"), _first(row, "home_team", "team_b")
-    if away and away.lower() in low:
+    if away and away.lower() in subject:
         return away, red
-    if home and home.lower() in low:
+    if home and home.lower() in subject:
         return home, blue
     return "PICK", gold
 
@@ -309,10 +357,7 @@ def _draw_readable_bullets(patched: Any, draw: Any, x: int, y: int, rows: list[s
             break
         text = tr(row, lang)
         draw.ellipse((x, current_y + 7, x + 12, current_y + 19), fill=color)
-        if callable(wrap_fn):
-            lines = wrap_fn(draw, text, font, width - 34, 2)
-        else:
-            lines = [text]
+        lines = wrap_fn(draw, text, font, width - 34, 2) if callable(wrap_fn) else [text]
         for line in lines[:2]:
             if current_y + line_height > bottom:
                 break
@@ -328,24 +373,25 @@ def _overlay_pick_display(patched: Any, img: Any, draw: Any, row: dict[str, Any]
     black = getattr(patched, "BLACK", (13, 14, 16))
     cream = getattr(patched, "CREAM", (255, 248, 230))
     red = getattr(patched, "RED", (190, 30, 28))
-    green = getattr(patched, "GREEN", (61, 205, 84))
     pick_text = _pick_for_display(row)
     tr = getattr(patched, "_tr", lambda value, _lang="en": str(value))
     txt_auto = getattr(patched, "_txt_auto", None)
     badge = getattr(patched, "_badge", None)
-    # Repaint the trend label and selected-side badge. The base renderer used the home team badge unconditionally.
+    display = tr(_clean(pick_text).upper(), lang).upper()
+
+    # Repaint the trend block completely so stale team-only text cannot leak through.
     draw.rectangle((24, 462, 344, 558), fill=black + (255,))
     draw.text((50, 472), tr("TREND", lang), font=patched._fit(tr("TREND", lang), 190, 25, 14, True), fill=red)
-    display = tr(_clean(pick_text,).upper(), lang).upper()
     if callable(txt_auto):
-        txt_auto(draw, 50, 508, display, 210, 38, 30, 9, cream, True, 1)
+        txt_auto(draw, 50, 508, display, 210, 38, 26, 8, cream, True, 1)
     label, color = _selected_badge(patched, row, pick_text, lang)
     if callable(badge):
         badge(img, draw, label, 268, 483, 58, 50, color)
-    # Repaint the final recommendation pick line so totals/spreads keep the line there too.
-    draw.rectangle((282, 1462, 654, 1518), fill=black + (255,))
+
+    # Repaint the full final black recommendation strip, not only part of it.
+    draw.rectangle((270, 1454, 1064, 1524), fill=black + (255,))
     if callable(txt_auto):
-        txt_auto(draw, 284, 1466, display, 360, 34, 42, 10, cream, True, 1)
+        txt_auto(draw, 286, 1462, display, 750, 44, 38, 10, cream, True, 1)
 
 
 def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], language: str | None = None) -> Any:
@@ -384,9 +430,10 @@ def _install_display_patches(patched: Any) -> None:
             "TARGET": "OBJETIVO",
             "TARGET STAKE": "STAKE OBJETIVO",
             "LIVE STAKE": "STAKE EN VIVO",
-            "Verification": "Verificación",
-            "Target stake": "Stake objetivo",
-            "Live stake": "Stake en vivo",
+            "Moneyline": "Moneyline",
+            "Game Total": "Total del Juego",
+            "Run Line": "Run Line",
+            "Spread": "Spread",
         })
     except Exception:
         pass
@@ -447,7 +494,7 @@ def _install_forced_two_page_renderer(patched: Any) -> None:
 
     patched.render_full_pick_magazine_page_png = two_page_png
     patched.render_full_magazine_book_pages = book_pages
-    patched._ABA_FORCED_TWO_PAGE_TRUTH_RENDERER = "truth_contract_v11"
+    patched._ABA_FORCED_TWO_PAGE_TRUTH_RENDERER = "truth_contract_v12"
 
 
 def apply_magazine_sale_ready_patch(module):
@@ -457,8 +504,8 @@ def apply_magazine_sale_ready_patch(module):
         patched.MAGAZINE_STYLE_VERSION = current[: -len("_sale_ready_risk_chain_truth_v5")] + "_sale_ready_risk_chain_v4"
     elif "sale_ready_risk_chain_v4" not in current:
         patched.MAGAZINE_STYLE_VERSION = f"{current}_sale_ready_risk_chain_v4" if current else "sale_ready_risk_chain_v4"
-    if "pick_line_labels_v1" not in patched.MAGAZINE_STYLE_VERSION:
-        patched.MAGAZINE_STYLE_VERSION = f"{patched.MAGAZINE_STYLE_VERSION}_matchup_readable_v2_pick_line_labels_v1"
+    if "pick_market_labels_v2" not in patched.MAGAZINE_STYLE_VERSION:
+        patched.MAGAZINE_STYLE_VERSION = f"{patched.MAGAZINE_STYLE_VERSION}_matchup_readable_v2_pick_market_labels_v2"
     _install_display_patches(patched)
     original_render = patched.render_full_pick_magazine_page
 
@@ -473,5 +520,5 @@ def apply_magazine_sale_ready_patch(module):
     patched.render_full_pick_magazine_page = truthful_render
     patched._pairs = _truth_pairs
     _install_forced_two_page_renderer(patched)
-    patched._ABA_SALE_READY_TRUTH_CONTRACT_VERSION = "truth_contract_v11_matchup_readable_pick_line_labels"
+    patched._ABA_SALE_READY_TRUTH_CONTRACT_VERSION = "truth_contract_v12_matchup_readable_pick_market_labels"
     return patched
