@@ -14,13 +14,13 @@ LANGUAGE_KEYS = [
 CORE_TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Dashboard', 'Dashboard', 'pages/dashboard.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
+    ('Fresh Odds Slate Builder', 'Constructor de Slate de Odds Frescas', 'pages/fresh_odds_slate_builder.py'),
     ('Odds Lock Pro', 'Odds Lock Pro', 'pages/odds_lock_pro.py'),
     ('Report Studio', 'Report Studio', 'pages/report_studio.py'),
     ('Proof Center', 'Centro de Prueba', 'pages/proof_center.py'),
 )
 ADVANCED_TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
-    ('Fresh Odds Slate Builder', 'Constructor de Slate de Odds Frescas', 'pages/fresh_odds_slate_builder.py'),
     ('Market Optimizer', 'Market Optimizer', 'pages/market_optimizer.py'),
     ('Pro Recommendation Cards', 'Pro Recommendation Cards', 'pages/pro_recommendation_cards.py'),
     ('Subscriber Intelligence', 'Subscriber Intelligence', 'pages/subscriber_intelligence.py'),
