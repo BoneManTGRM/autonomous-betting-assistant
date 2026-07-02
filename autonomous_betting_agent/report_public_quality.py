@@ -173,7 +173,7 @@ def public_recommendation_status(row: Mapping[str, Any]) -> str:
     if ev is None or edge is None:
         return "Research only — missing edge or EV"
     if ev <= 0 or edge <= 0:
-        return "No play / Research only / Price rejected"
+        return "No bet / Research only / Price rejected"
     if is_saved_source(row) or provider_state(row) != "Provider matched":
         return "Watchlist / Verify price"
     return "Verified candidate / Playable value"
