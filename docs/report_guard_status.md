@@ -1,0 +1,1 @@
+Report guard status.
