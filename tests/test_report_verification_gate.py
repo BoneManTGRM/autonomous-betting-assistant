@@ -100,3 +100,23 @@ def test_report_gate_top_hundred_limit():
             "book": "Book A",
         })
     assert len(gate.build_report_rows(rows)) == 100
+
+
+def test_report_gate_page_two_requires_verified_advanced_market():
+    gate = importlib.import_module("autonomous_betting_agent.report_verification_gate")
+    row = {
+        "event": "A vs C",
+        "provider_event_id": "evt1",
+        "market_type": "moneyline",
+        "selection": "A",
+        "decimal_price": 2.0,
+        "model_probability": 0.56,
+        "model_market_edge": 0.06,
+        "expected_value_per_unit": 0.12,
+        "provider_verified": "true",
+        "timestamp": "now",
+        "book": "Book A",
+    }
+    assert not gate.should_render_page_two(row)
+    row["verified_advanced_market"] = "true"
+    assert gate.should_render_page_two(row)
