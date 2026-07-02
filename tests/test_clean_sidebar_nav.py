@@ -12,6 +12,7 @@ def test_clean_sidebar_keeps_production_pages_visible():
     required_core = {
         "pages/dashboard.py",
         "pages/pro_predictor_volume.py",
+        "pages/fresh_odds_slate_builder.py",
         "pages/odds_lock_pro.py",
         "pages/report_studio.py",
         "pages/proof_center.py",
@@ -25,7 +26,6 @@ def test_clean_sidebar_moves_extra_user_pages_to_advanced_group():
     advanced_paths = {item[2] for item in sidebar_nav.ADVANCED_TOOLS}
     extra_user_pages = {
         "pages/signal_board.py",
-        "pages/fresh_odds_slate_builder.py",
         "pages/market_optimizer.py",
         "pages/pro_recommendation_cards.py",
         "pages/subscriber_intelligence.py",
