@@ -39,3 +39,23 @@ def test_report_gate_requires_provider_match_for_default_report():
     }
     status = gate.classify_report_row(row)["report_verification_class"]
     assert status == gate.WATCHLIST_VERIFY_PRICE
+
+
+def test_report_gate_rejects_negative_value():
+    gate = importlib.import_module("autonomous_betting_agent.report_verification_gate")
+    row = {
+        "event": "A vs C",
+        "provider_event_id": "evt1",
+        "market_type": "moneyline",
+        "selection": "A",
+        "decimal_price": 2.0,
+        "model_probability": 0.48,
+        "model_market_edge": -0.02,
+        "expected_value_per_unit": -0.04,
+        "provider_verified": "true",
+        "timestamp": "now",
+        "book": "Book A",
+    }
+    out = gate.classify_report_row(row)
+    assert out["report_verification_class"] == gate.NO_PRICE_REJECTED
+    assert out["risk"] == "PRICE REJECTED"
