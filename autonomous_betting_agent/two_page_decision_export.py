@@ -5,9 +5,16 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from .report_public_quality import (
+    LIVE_TRIGGER_UNAVAILABLE,
+    MISSING_EXACT_MARKET_LINE,
+    NO_VERIFIED_PARLAY,
+    build_full_market_label,
+    public_diagnostic_banned_terms,
+    sanitize_public_text,
+)
 from .two_page_decision_engine import (
     DATA_UNAVAILABLE,
-    FLASH_UNAVAILABLE,
     NO_BET,
     SAFETY_LANGUAGE,
     TwoPageDecisionBundle,
@@ -54,12 +61,22 @@ def _csv(frame: pd.DataFrame | None) -> str:
     return frame.to_csv(index=False)
 
 
+def _public_line(value: Any) -> str:
+    cleaned = sanitize_public_text(value)
+    return cleaned or DATA_UNAVAILABLE
+
+
 def _parlay_lines(title: str, parlay: Mapping[str, Any]) -> list[str]:
     if not parlay:
-        return [f"### {title}", f"- Status: {DATA_UNAVAILABLE}"]
+        return [f"### {title}", f"- Status: {NO_VERIFIED_PARLAY}"]
     lines = [f"### {title}"]
-    lines.append(f"- Status: {_text(parlay.get('status')) or DATA_UNAVAILABLE}")
-    lines.append(f"- Correlation: {_text(parlay.get('correlation_rating')) or DATA_UNAVAILABLE}")
+    status = _text(parlay.get("status")) or DATA_UNAVAILABLE
+    rejection = _text(parlay.get("rejection_reason"))
+    if status == DATA_UNAVAILABLE or "fewer than two" in rejection.lower():
+        lines.append(f"- Status: {NO_VERIFIED_PARLAY}")
+    else:
+        lines.append(f"- Status: {_public_line(status)}")
+    lines.append(f"- Correlation: {_public_line(parlay.get('correlation_rating'))}")
     if parlay.get("combined_parlay_odds") is not None:
         lines.append(f"- Parlay odds: {_fmt_number(parlay.get('combined_parlay_odds'))}")
     if parlay.get("parlay_implied_probability") is not None:
@@ -70,35 +87,46 @@ def _parlay_lines(title: str, parlay: Mapping[str, Any]) -> list[str]:
         lines.append(f"- Parlay EV: {_fmt_number(parlay.get('parlay_EV'))}")
     if parlay.get("estimated_parlay_price") is not None:
         lines.append(f"- Price source: {'estimated from legs' if parlay.get('estimated_parlay_price') else 'sportsbook provided'}")
-    rejection = _text(parlay.get("rejection_reason"))
-    if rejection:
-        lines.append(f"- Rejection reason: {rejection}")
+    if rejection and "fewer than two" not in rejection.lower():
+        lines.append(f"- Rejection reason: {_public_line(rejection)}")
     return lines
+
+
+def _best_row_for_page1(bundle: TwoPageDecisionBundle) -> Mapping[str, Any]:
+    key = _text((bundle.page1 or {}).get("unique_pick_key"))
+    for row in bundle.diagnostics or []:
+        if _text(row.get("unique_pick_key")) == key:
+            return row
+    return bundle.page1 or {}
 
 
 def render_two_page_decision_markdown(bundle: TwoPageDecisionBundle) -> str:
     page1 = bundle.page1 or {}
     page2 = bundle.page2 or {}
+    page1_row = _best_row_for_page1(bundle)
+    market_label = build_full_market_label(page1_row)
+    if market_label == "Missing market selection" and page1.get("market_category"):
+        market_label = _text(page1.get("market_category")) or MISSING_EXACT_MARKET_LINE
     conservative = page2.get("best_conservative_parlay") or {}
     aggressive = page2.get("best_aggressive_parlay") or {}
-
     lines = [
         "## Two-Page Betting Decision Engine",
         "",
-        "### Page 1 — Straight Bet Decision",
-        f"- Status: {_text(page1.get('bet_status')) or NO_BET}",
-        f"- Event key: {_text(page1.get('unique_event_key')) or DATA_UNAVAILABLE}",
-        f"- Pick key: {_text(page1.get('unique_pick_key')) or DATA_UNAVAILABLE}",
-        f"- Market: {_text(page1.get('market_category')) or DATA_UNAVAILABLE}",
-        f"- Sportsbook / source: {_text(page1.get('sportsbook')) or DATA_UNAVAILABLE}",
+        "### Page 1 — Straight Pick Decision",
+        f"- Status: {_public_line(page1.get('bet_status') or NO_BET)}",
+        f"- Market: {_public_line(market_label)}",
+        f"- Event key: {_public_line(page1.get('unique_event_key'))}",
+        f"- Pick key: {_public_line(page1.get('unique_pick_key'))}",
+        f"- Market category: {_public_line(page1.get('market_category'))}",
+        f"- Sportsbook / source: {_public_line(page1.get('sportsbook'))}",
         f"- Odds: {_fmt_number(page1.get('decimal_odds'))}",
         f"- Model probability: {_fmt_percent(page1.get('model_probability'))}",
         f"- Implied probability: {_fmt_percent(page1.get('implied_probability'))}",
         f"- Edge: {_fmt_percent(page1.get('edge'))}",
         f"- EV: {_fmt_number(page1.get('EV'))}",
-        f"- Line-shopping status: {_text(page1.get('line_shopping_status')) or DATA_UNAVAILABLE}",
-        f"- Dynamic learning: {_text(page1.get('dynamic_learning_status')) or DATA_UNAVAILABLE}",
-        f"- Why selected: {_text(page1.get('why_selected') or page1.get('summary')) or DATA_UNAVAILABLE}",
+        f"- Line-shopping status: {_public_line(page1.get('line_shopping_status'))}",
+        f"- Dynamic learning: {_public_line(page1.get('dynamic_learning_status'))}",
+        f"- Why selected: {_public_line(page1.get('why_selected') or page1.get('summary'))}",
         "",
     ]
     lines.extend(_parlay_lines("Page 2 — Conservative Parlay", conservative))
@@ -106,27 +134,30 @@ def render_two_page_decision_markdown(bundle: TwoPageDecisionBundle) -> str:
     lines.extend(_parlay_lines("Page 2 — Aggressive Parlay", aggressive))
     lines += [
         "",
-        "### Page 2 — Prop / Qualification / Flash Status",
-        f"- Prop opportunity: {_text(page2.get('best_prop_opportunity')) or DATA_UNAVAILABLE}",
-        f"- Team qualification / advancement: {_text(page2.get('team_qualification_advancement')) or DATA_UNAVAILABLE}",
-        f"- Live flash-bet trigger: {_text(page2.get('best_live_flash_bet_trigger')) or FLASH_UNAVAILABLE}",
+        "### Page 2 — Prop / Qualification / Live Status",
+        f"- Prop opportunity: {_public_line(page2.get('best_prop_opportunity'))}",
+        f"- Team qualification / advancement: {_public_line(page2.get('team_qualification_advancement'))}",
+        f"- Live trigger: {_public_line(page2.get('best_live_flash_bet_trigger') or LIVE_TRIGGER_UNAVAILABLE)}",
         "",
         "### Provider Capability Audit",
     ]
     for cap in bundle.provider_capabilities or []:
         lines.append(
             "- "
-            + f"{_text(cap.get('sport')) or 'unknown'}: "
+            + f"{_public_line(cap.get('sport') or 'unknown')}: "
             + f"pregame_odds={bool(cap.get('pregame_odds_available'))}, "
             + f"live_odds={bool(cap.get('live_odds_available'))}, "
             + f"book_level={bool(cap.get('sportsbook_level_odds_available'))}, "
             + f"player_props={bool(cap.get('player_props_available'))}, "
             + f"team_props={bool(cap.get('team_props_available'))}, "
             + f"qualification={bool(cap.get('qualification_markets_available'))}, "
-            + f"freshness={_text(cap.get('latency_freshness_limitations')) or DATA_UNAVAILABLE}"
+            + f"freshness={_public_line(cap.get('latency_freshness_limitations'))}"
         )
     lines += ["", f"Safety: {SAFETY_LANGUAGE}"]
-    return "\n".join(lines).strip()
+    rendered = "\n".join(lines).strip()
+    for banned in public_diagnostic_banned_terms():
+        rendered = rendered.replace(banned, "")
+    return rendered
 
 
 def build_two_page_decision_export(cards: pd.DataFrame) -> TwoPageDecisionExport:
