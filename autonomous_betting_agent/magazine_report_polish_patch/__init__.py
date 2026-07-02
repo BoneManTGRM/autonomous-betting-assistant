@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 
-_PATCH_VERSION = 'magazine_report_polish_package_active_guard_v1'
+_PATCH_VERSION = 'magazine_report_polish_package_active_guard_v2'
 
 
 def install() -> None:
