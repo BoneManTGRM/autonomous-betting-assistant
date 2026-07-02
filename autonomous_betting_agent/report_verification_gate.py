@@ -206,6 +206,10 @@ def _line(data: Mapping[str, Any], kind: str) -> str:
     return _first(data, *keys)
 
 
+def _has_provider_line(data: Mapping[str, Any], kind: str) -> bool:
+    return bool(_line(data, kind)) if kind in {"total", "team_total", "run_line", "spread", "player_prop"} else has_exact_market_line(data)
+
+
 def verify_current_provider_match(row: Any, now: datetime | None = None) -> dict[str, Any]:
     data = _row(row)
     source_ok, source_reason = _source_current(data)
@@ -216,11 +220,12 @@ def verify_current_provider_match(row: Any, now: datetime | None = None) -> dict
     prob = _prob(data)
     edge = _edge(data)
     ev = _ev(data)
+    line_ok = _has_provider_line(data, kind)
     checks = {
         "event_id": bool(_first(data, *EVENT_ID_KEYS)),
         "selection": bool(_first(data, *SELECTION_KEYS)),
         "market_type": bool(kind and kind != "unknown"),
-        "exact_line": has_exact_market_line(data),
+        "exact_line": line_ok,
         "price": price is not None,
         "timestamp": fresh,
         "model_probability": prob is not None,
