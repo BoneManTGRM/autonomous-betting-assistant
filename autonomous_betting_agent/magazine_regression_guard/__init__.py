@@ -1,10 +1,38 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Iterable
 
-from autonomous_betting_agent.active_magazine_export_guard import install as _active_install, normalize_row, NO_PLAY
+from autonomous_betting_agent.active_magazine_export_guard import install as _active_install, normalize_row, NO_PLAY, _note
 
-PATCH_VERSION = "magazine_regression_guard_package_active_v1"
+PATCH_VERSION = "magazine_regression_guard_package_active_v2"
+
+
+def _row(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    if hasattr(value, "to_dict"):
+        try:
+            data = value.to_dict()
+            return dict(data) if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+    return dict(getattr(value, "__dict__", {}) or {})
+
+
+def _clean_public_note(value: Any) -> str:
+    return _note(value)
+
+
+def _clean_public_rows(rows: Iterable[Any], fallback: list[str] | None = None) -> list[str]:
+    out: list[str] = []
+    for row in rows:
+        text = _note(row)
+        low = text.lower()
+        if not text or "markets discovered" in low or "provider consensus_average" in low or "endpoint unknown" in low or "status code unknown" in low or "rows returned" in low:
+            continue
+        if text not in out:
+            out.append(text)
+    return out or list(fallback or [])
 
 
 def _enrich_pick(pick: Any) -> Any:
