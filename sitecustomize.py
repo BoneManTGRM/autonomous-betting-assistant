@@ -70,9 +70,9 @@ def _install_source_hook() -> None:
         result = old_subheader(body, *args, **kwargs)
         if str(body or '').strip().lower() in {'api sources', 'fuentes api'} and not st.session_state.get('_aba_bdl_ui'):
             st.session_state['_aba_bdl_ui'] = True
-            key = get_secret('BALLDONTLIE_API_KEY', 'BDL_API_KEY', 'BALLDONTLIE_KEY')
+            from autonomous_betting_agent.bdl_status import label as bdl_label
             col, _, _ = st.columns(3)
-            col.metric("Ball Don't Lie", 'Enabled' if key else 'Missing')
+            col.metric("Ball Don't Lie", bdl_label())
         return result
 
     st.caption = caption
