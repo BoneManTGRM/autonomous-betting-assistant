@@ -6,42 +6,14 @@ from io import BytesIO
 import json
 from typing import Any, Iterable, Mapping
 
-STALE_SAVED_SOURCE_TOKENS = (
-    "uploaded / saved",
-    "uploaded/saved",
-    "uploaded row",
-    "uploaded_row",
-    "saved-source",
-    "saved source",
-    "saved row",
-    "saved-row",
-    "saved handoff rows are being used",
-    "source saved",
-    "source_saved",
-)
-STALE_VERIFY_TOKENS = (
-    "verify price",
-    "verify_price",
-    "price verification required",
-    "verification pending",
-    "source saved",
-    "source_saved",
-    "uploaded_row",
-    "uploaded row",
-)
-PROOF_ID_FIELDS = ("proof_id", "proof_hash")
-PROOF_TIME_FIELDS = ("locked_at_utc", "locked_at", "proof_locked_at_utc")
-CURRENT_SOURCE_TOKENS = (
-    "live_api",
-    "live api",
-    "current run",
-    "current-run",
-    "live verified",
-    "diagnostic",
-    "pro_predictor_filter_diagnostic",
-    "odds_lock",
-    "locked",
-    "proof",
+FALLBACK_TOKENS = (
+    "no verified picks",
+    "no verified buyer picks",
+    "current provider check",
+    "current provider gate",
+    "provider not matched",
+    "no current provider row passed",
+    "research only: no verified buyer picks",
 )
 
 
@@ -72,86 +44,18 @@ def _bad_text(value: Any) -> bool:
     return text in {"", "nan", "none", "null", "n/a", "na", "--", "data unavailable", "not provided"}
 
 
-def _row_text(row: Mapping[str, Any], keys: Iterable[str]) -> str:
-    return " | ".join(_safe(row.get(key)).lower() for key in keys if not _bad_text(row.get(key)))
-
-
-def _has_proof_identity(row: Mapping[str, Any]) -> bool:
-    return any(not _bad_text(row.get(field)) for field in PROOF_ID_FIELDS) and any(not _bad_text(row.get(field)) for field in PROOF_TIME_FIELDS)
-
-
-def _is_current_or_locked(row: Mapping[str, Any]) -> bool:
-    if _has_proof_identity(row):
-        return True
-    text = _row_text(
-        row,
-        (
-            "report_source",
-            "data_scope",
-            "source_mode",
-            "source_type",
-            "proof_source_type",
-            "odds_source",
-            "verification_status",
-            "odds_status",
-            "decision_signals",
-            "recommendation_tier",
-        ),
-    )
-    return any(token in text for token in CURRENT_SOURCE_TOKENS)
-
-
 def _is_stale_saved_export_row(row: Mapping[str, Any]) -> bool:
-    """Detect old saved/uploaded watchlist rows that must not be exported as the current magazine.
+    """Compatibility hook for older tests and runtime patches.
 
-    These rows may have odds, confidence, edge, and EV, so the normal market-value
-    checks consider them valid. They are stale for export when the source is saved
-    or uploaded and the row is still VERIFY PRICE / UPLOADED_ROW, unless the row has
-    a real locked proof identity or an explicit current/live marker.
+    A saved/uploaded VERIFY PRICE row is still a real magazine row when it has a
+    matchup and pick. It must stay labeled WATCHLIST / VERIFY PRICE, but it should
+    export as part of the full visible magazine. Only true fallback/no-pick rows are
+    excluded by _is_fallback_row.
     """
-    if not isinstance(row, Mapping):
-        return True
-    if _is_current_or_locked(row):
-        return False
-    source_text = _row_text(
-        row,
-        (
-            "report_source",
-            "data_scope",
-            "source_mode",
-            "source_type",
-            "source_file",
-            "odds_source",
-            "truth",
-            "report_truth_severity",
-            "preview_summary",
-            "game_summary",
-            "sports_context_summary",
-            "short_reason",
-            "decision_reasons",
-        ),
-    )
-    status_text = _row_text(
-        row,
-        (
-            "odds_status",
-            "verification_status",
-            "recommendation_tier",
-            "blocker_reason",
-            "truth",
-            "report_truth_severity",
-            "risk_label",
-            "risk",
-        ),
-    )
-    saved_source = any(token in source_text for token in STALE_SAVED_SOURCE_TOKENS)
-    verify_only = any(token in status_text for token in STALE_VERIFY_TOKENS)
-    return saved_source and verify_only
+    return False
 
 
 def _is_fallback_row(row: Mapping[str, Any]) -> bool:
-    if _is_stale_saved_export_row(row):
-        return True
     text = " ".join(
         _safe(row.get(key)).lower()
         for key in (
@@ -167,20 +71,12 @@ def _is_fallback_row(row: Mapping[str, Any]) -> bool:
             "report_truth_warning",
             "report_truth_severity",
             "data_issue_reason",
+            "truth",
+            "odds_status",
+            "verification_status",
         )
     )
-    return any(
-        token in text
-        for token in (
-            "no verified picks",
-            "no verified buyer picks",
-            "current provider check",
-            "current provider gate",
-            "provider not matched",
-            "no current provider row passed",
-            "research only: no verified buyer picks",
-        )
-    )
+    return any(token in text for token in FALLBACK_TOKENS)
 
 
 def _has_pick_identity(row: Mapping[str, Any]) -> bool:
@@ -233,6 +129,7 @@ def _session_state() -> Any | None:
 
 _LAST_VALID_ROWS: list[dict[str, Any]] = []
 _LAST_SIGNATURE = ""
+_LAST_VALID_PAGES: list[Any] = []
 
 
 def _signature(rows: Iterable[Mapping[str, Any]], *, report_name: str | None = None, language: str | None = None) -> str:
@@ -297,6 +194,36 @@ def _remember(rows: list[dict[str, Any]], *, report_name: str | None, language: 
     return sig
 
 
+def _remember_pages(pages: list[Any], *, sig: str, row_count: int, source: str) -> None:
+    global _LAST_VALID_PAGES
+    _LAST_VALID_PAGES = list(pages or [])
+    state = _session_state()
+    if state is not None:
+        try:
+            state["magazine_report_rendered_pages"] = _LAST_VALID_PAGES
+            diagnostics = dict(state.get("magazine_report_export_diagnostics") or {})
+            diagnostics.update(
+                {
+                    "preview_source": source,
+                    "pdf_export_source": source,
+                    "png_export_source": source,
+                    "preview_page_count": len(_LAST_VALID_PAGES),
+                    "pdf_page_count": len(_LAST_VALID_PAGES),
+                    "png_page_count": len(_LAST_VALID_PAGES),
+                    "preview_row_count": row_count,
+                    "pdf_row_count": row_count,
+                    "png_row_count": row_count,
+                    "preview_source_signature": sig,
+                    "pdf_source_signature": sig,
+                    "png_source_signature": sig,
+                    "source_match": True,
+                }
+            )
+            state["magazine_report_export_diagnostics"] = diagnostics
+        except Exception:
+            pass
+
+
 def _stored_rows() -> list[dict[str, Any]]:
     state = _session_state()
     if state is not None:
@@ -309,6 +236,18 @@ def _stored_rows() -> list[dict[str, Any]]:
         except Exception:
             pass
     return list(_LAST_VALID_ROWS)
+
+
+def _stored_pages() -> list[Any]:
+    state = _session_state()
+    if state is not None:
+        try:
+            pages = list(state.get("magazine_report_rendered_pages") or [])
+            if pages:
+                return pages
+        except Exception:
+            pass
+    return list(_LAST_VALID_PAGES)
 
 
 def _select_rows(picks: Iterable[Any], *, report_name: str | None, language: str | None, source: str) -> tuple[list[dict[str, Any]], bool, str]:
@@ -344,7 +283,7 @@ def install(module: Any | None = None) -> Any | None:
             import autonomous_betting_agent.magazine_book_export as module
         except Exception:
             return None
-    if getattr(module, "_ABA_MAGAZINE_EXPORT_STATE_GUARD_V2", False):
+    if getattr(module, "_ABA_MAGAZINE_EXPORT_STATE_GUARD_V3", False):
         return module
 
     original_pages = getattr(module, "render_full_magazine_book_pages", None)
@@ -357,36 +296,20 @@ def install(module: Any | None = None) -> Any | None:
         if not rows:
             return []
         pages = original_pages(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
-        page_count = len(pages)
-        _remember(rows, report_name=report_name, language=language, page_count=page_count, source="recovered-preview-state" if recovered else "preview-pages")
-        state = _session_state()
-        if state is not None:
-            try:
-                state["magazine_report_export_diagnostics"] = {
-                    "preview_source": "rendered_report_state",
-                    "pdf_export_source": "rendered_report_state",
-                    "png_export_source": "rendered_report_state",
-                    "preview_page_count": page_count,
-                    "pdf_page_count": page_count,
-                    "png_page_count": page_count,
-                    "preview_row_count": len(rows),
-                    "pdf_row_count": len(rows),
-                    "png_row_count": len(rows),
-                    "preview_source_signature": sig,
-                    "pdf_source_signature": sig,
-                    "png_source_signature": sig,
-                    "source_match": True,
-                    "recovered_from_preview_state": recovered,
-                }
-            except Exception:
-                pass
+        _remember(rows, report_name=report_name, language=language, page_count=len(pages), source="recovered-preview-state" if recovered else "preview-pages")
+        _remember_pages(pages, sig=sig, row_count=len(rows), source="rendered_report_pages")
         return pages
 
     def guarded_pdf(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
         rows, _recovered, _sig = _select_rows(picks, report_name=report_name, language=language, source="pdf-export")
         if not rows:
-            raise ValueError("No valid current report preview available for export. Regenerate the preview from current/live or locked proof rows before downloading.")
+            pages = _stored_pages()
+            if pages:
+                return _pdf_from_pages(pages)
+            raise ValueError("No valid report preview available for export.")
         pages = module.render_full_magazine_book_pages(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
+        if not pages:
+            pages = _stored_pages()
         if not pages:
             raise ValueError("No valid report preview available for export.")
         return _pdf_from_pages(pages)
@@ -394,8 +317,9 @@ def install(module: Any | None = None) -> Any | None:
     def guarded_book_png(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
         rows, _recovered, _sig = _select_rows(picks, report_name=report_name, language=language, source="png-export")
         if not rows:
-            raise ValueError("No valid current report preview available for export. Regenerate the preview from current/live or locked proof rows before downloading.")
-        pages = module.render_full_magazine_book_pages(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
+            pages = _stored_pages()
+        else:
+            pages = module.render_full_magazine_book_pages(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
         if not pages:
             raise ValueError("No valid report preview available for export.")
         width = getattr(module, "PAGE_WIDTH", pages[0].width)
@@ -425,4 +349,5 @@ def install(module: Any | None = None) -> Any | None:
     module.render_full_pick_magazine_page_png = guarded_page_png
     module._ABA_MAGAZINE_EXPORT_STATE_GUARD_V1 = True
     module._ABA_MAGAZINE_EXPORT_STATE_GUARD_V2 = True
+    module._ABA_MAGAZINE_EXPORT_STATE_GUARD_V3 = True
     return module
