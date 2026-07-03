@@ -4,7 +4,7 @@ import builtins
 import importlib
 import os
 
-# This file intentionally does not monkey-patch Streamlit widgets.
+# Runtime bridges only. No secret values are printed or exposed.
 
 
 def get_secret(*names: str) -> str:
@@ -46,38 +46,6 @@ def _apply_balldontlie_bridge(module: object | None = None) -> None:
         install_registry()
     except Exception:
         pass
-
-
-def _install_source_hook() -> None:
-    if _runtime_disabled():
-        return
-    try:
-        import streamlit as st
-    except Exception:
-        return
-    if getattr(st, '_ABA_SOURCE_HOOK', False):
-        return
-    old_subheader = st.subheader
-    old_caption = st.caption
-
-    def caption(body, *args, **kwargs):
-        text = str(body or '')
-        if text.startswith('App version: pro-predictor-v23'):
-            body = 'App version: pro-predictor-v24-balldontlie-api-registry'
-        return old_caption(body, *args, **kwargs)
-
-    def subheader(body, *args, **kwargs):
-        result = old_subheader(body, *args, **kwargs)
-        if str(body or '').strip().lower() in {'api sources', 'fuentes api'} and not st.session_state.get('_aba_bdl_ui'):
-            st.session_state['_aba_bdl_ui'] = True
-            from autonomous_betting_agent.bdl_status import label as bdl_label
-            col, _, _ = st.columns(3)
-            col.metric("Ball Don't Lie", bdl_label())
-        return result
-
-    st.caption = caption
-    st.subheader = subheader
-    st._ABA_SOURCE_HOOK = True
 
 
 def _apply_parlay_intelligence_bridge(module: object | None = None) -> None:
@@ -156,5 +124,4 @@ def _install_magazine_polish_bridge() -> None:
 _install_report_source_quality_guard()
 _install_magazine_reload_bridge()
 _install_magazine_polish_bridge()
-_install_source_hook()
 _apply_magazine_display_bridge()
