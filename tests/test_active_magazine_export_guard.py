@@ -50,8 +50,8 @@ def test_installed_guard_cleans_saved_source_page_two_sections():
     })
     rendered = "\n".join(item for _title, rows, _color in page2._page_two_sections(row, "en") for item in rows)
     assert "Run Line: San Diego Padres +1.5" in rendered
-    assert "Saved-source only - current provider match required" in rendered
-    assert "Current provider match required" in rendered
+    assert "Source type: Saved-source report" in rendered
+    assert "Current provider match: Not verified" in rendered
     assert "Provider: saved-source" not in rendered
     assert "2026-07-02T02:26:25Z" not in rendered
     assert "Timestamp: Saved-row timestamp" in rendered
