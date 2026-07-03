@@ -39,6 +39,16 @@ def _runtime_disabled() -> bool:
     return os.getenv("GITHUB_ACTIONS", "").lower() in {"1", "true", "yes"} or os.getenv("ABA_DISABLE_RUNTIME_PATCHES", "").lower() in {"1", "true", "yes"}
 
 
+def _apply_parlay_intelligence_bridge(module: object | None = None) -> None:
+    if _runtime_disabled():
+        return
+    try:
+        from autonomous_betting_agent.parlay_intelligence_patch import install
+        install(module)
+    except Exception:
+        pass
+
+
 def _apply_magazine_display_bridge(module: object | None = None) -> None:
     if _runtime_disabled():
         return
@@ -52,6 +62,7 @@ def _apply_magazine_display_bridge(module: object | None = None) -> None:
         install_regression_guard(module)
     except Exception:
         pass
+    _apply_parlay_intelligence_bridge(module)
 
 
 def _install_report_source_quality_guard() -> None:
