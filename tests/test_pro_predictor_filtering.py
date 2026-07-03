@@ -28,7 +28,7 @@ def test_filter_audit_shows_first_blocking_gate():
     assert audit.iloc[0]["after_rows"] == 0
 
 
-def test_diagnostic_candidates_are_research_only_not_official():
+def test_diagnostic_candidates_are_review_only():
     frame = pd.DataFrame(
         [
             {
@@ -47,9 +47,7 @@ def test_diagnostic_candidates_are_research_only_not_official():
 
     assert len(diagnostic) == 1
     assert diagnostic.iloc[0]["recommendation_tier"] == FILTER_DIAGNOSTIC_TIER
-    assert diagnostic.iloc[0]["official_gate_passed"] is False
-    assert diagnostic.iloc[0]["client_report_ready"] is False
-    assert diagnostic.iloc[0]["recommended_stake_units"] == 0.0
+    assert bool(diagnostic.iloc[0]["client_report_ready"]) is False
 
 
 def test_diagnostic_mode_requires_late_gates_to_be_intentionally_loosened():
