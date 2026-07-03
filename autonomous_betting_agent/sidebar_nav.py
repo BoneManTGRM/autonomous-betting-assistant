@@ -6,40 +6,40 @@ import builtins
 from typing import Any
 
 APP_TAGLINE = 'Powered by Reparodynamics'
-APP_TAGLINE_ES = 'Impulsado por Reparodynamics'
+APP_TAGLINE_ES = 'Impulsado por Reparodinámica'
 GLOBAL_LANGUAGE_KEY = 'aba_global_language'
 ADVANCED_NAV_KEY = 'aba_show_advanced_tools'
 LANGUAGE_KEYS = [
     'global_language','dashboard_language','signal_board_language','pro_predictor_language','odds_lock_pro_language','fresh_odds_slate_builder_language','market_optimizer_language','market_dashboard_bridge_language','market_workflow_integration_language','pro_recommendation_cards_language','subscriber_intelligence_language','subscriber_ledger_language','subscriber_export_center_language','real_page_wiring_audit_language','proof_hardening_closeout_language','report_studio_language','proof_center_language','public_proof_share_language','client_proof_viewer_language','local_control_center_language','learning_memory_language','storage_diagnostics_language','reset_storage_language','reparodynamics_language','shadow_mode_results_language',
 ]
 CORE_TOOLS: tuple[tuple[str, str, str], ...] = (
-    ('Dashboard', 'Dashboard', 'pages/dashboard.py'),
+    ('Dashboard', 'Panel principal', 'pages/dashboard.py'),
     ('Pro Predictor', 'Predictor Pro', 'pages/pro_predictor_volume.py'),
-    ('Fresh Odds Slate Builder', 'Constructor de Slate de Odds Frescas', 'pages/fresh_odds_slate_builder.py'),
+    ('Fresh Odds Slate Builder', 'Constructor de cartelera con cuotas actualizadas', 'pages/fresh_odds_slate_builder.py'),
     ('Odds Lock Pro', 'Odds Lock Pro', 'pages/odds_lock_pro.py'),
-    ('Report Studio', 'Report Studio', 'pages/report_studio.py'),
-    ('Proof Center', 'Centro de Prueba', 'pages/proof_center.py'),
+    ('Report Studio', 'Estudio de reportes', 'pages/report_studio.py'),
+    ('Proof Center', 'Centro de pruebas', 'pages/proof_center.py'),
 )
 ADVANCED_TOOLS: tuple[tuple[str, str, str], ...] = (
-    ('Signal Board', 'Panel de Señales', 'pages/signal_board.py'),
-    ('Market Optimizer', 'Market Optimizer', 'pages/market_optimizer.py'),
-    ('Pro Recommendation Cards', 'Pro Recommendation Cards', 'pages/pro_recommendation_cards.py'),
-    ('Subscriber Intelligence', 'Subscriber Intelligence', 'pages/subscriber_intelligence.py'),
-    ('Subscriber Ledger', 'Subscriber Ledger', 'pages/subscriber_ledger.py'),
-    ('Subscriber Export Center', 'Subscriber Export Center', 'pages/subscriber_export_center.py'),
-    ('Market Dashboard Bridge', 'Market Dashboard Bridge', 'pages/market_dashboard_bridge.py'),
-    ('Market Workflow Integration', 'Market Workflow Integration', 'pages/market_workflow_integration.py'),
-    ('Real Page Wiring Audit', 'Real Page Wiring Audit', 'pages/real_page_wiring_audit.py'),
-    ('Proof Hardening Closeout', 'Proof Hardening Closeout', 'pages/proof_hardening_closeout.py'),
-    ('Public Proof Share', 'Compartir Prueba Pública', 'pages/public_proof_share.py'),
-    ('Client Proof Viewer', 'Visor de Prueba para Cliente', 'pages/client_proof_viewer.py'),
-    ('Local Control Center', 'Centro de Control Local', 'pages/local_control_center.py'),
-    ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory_safe.py'),
-    ('Storage Diagnostics', 'Diagnóstico de Almacenamiento', 'pages/storage_diagnostics.py'),
-    ('Reset Storage', 'Reiniciar almacenamiento', 'pages/reset_storage.py'),
+    ('Signal Board', 'Panel de señales', 'pages/signal_board.py'),
+    ('Market Optimizer', 'Optimizador de mercados', 'pages/market_optimizer.py'),
+    ('Pro Recommendation Cards', 'Tarjetas de recomendación Pro', 'pages/pro_recommendation_cards.py'),
+    ('Subscriber Intelligence', 'Inteligencia de suscriptores', 'pages/subscriber_intelligence.py'),
+    ('Subscriber Ledger', 'Registro de suscriptores', 'pages/subscriber_ledger.py'),
+    ('Subscriber Export Center', 'Centro de exportaciones para suscriptores', 'pages/subscriber_export_center.py'),
+    ('Market Dashboard Bridge', 'Puente del panel de mercados', 'pages/market_dashboard_bridge.py'),
+    ('Market Workflow Integration', 'Integración del flujo de mercados', 'pages/market_workflow_integration.py'),
+    ('Real Page Wiring Audit', 'Auditoría de conexión de páginas reales', 'pages/real_page_wiring_audit.py'),
+    ('Proof Hardening Closeout', 'Cierre de refuerzo de pruebas', 'pages/proof_hardening_closeout.py'),
+    ('Public Proof Share', 'Compartir prueba pública', 'pages/public_proof_share.py'),
+    ('Client Proof Viewer', 'Visor de pruebas para clientes', 'pages/client_proof_viewer.py'),
+    ('Local Control Center', 'Centro de control local', 'pages/local_control_center.py'),
+    ('Learning Memory', 'Memoria de aprendizaje', 'pages/learn_memory_safe.py'),
+    ('Storage Diagnostics', 'Diagnóstico de almacenamiento', 'pages/storage_diagnostics.py'),
+    ('Reset Storage', 'Restablecer almacenamiento', 'pages/reset_storage.py'),
 )
 TOOLS: tuple[tuple[str, str, str], ...] = CORE_TOOLS + ADVANCED_TOOLS
-REPARODYNAMICS_PAGE = ('Reparodynamics', 'Reparodynamics', 'pages/reparodynamics.py')
+REPARODYNAMICS_PAGE = ('Reparodynamics', 'Reparodinámica', 'pages/reparodynamics.py')
 PRO_PREDICTOR_LARGE_LIST_70_DEFAULTS = {'baseline_accuracy_min_books': 1,'baseline_accuracy_min_model_prob': 0.58,'baseline_accuracy_min_edge': -0.03,'baseline_accuracy_strong_edge': 0.04,'baseline_accuracy_min_strength': 38.0,'baseline_accuracy_use_high_conf': True,'baseline_accuracy_max_high_conf': 700,'baseline_accuracy_min_high_prob': 0.58,'baseline_accuracy_min_high_edge': -0.03,'baseline_accuracy_min_high_strength': 38.0,'baseline_accuracy_min_high_agent': 35.0}
 SIDEBAR_CSS = '''<style>
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"] { padding-top: 1.4rem; }
@@ -154,7 +154,8 @@ def render_app_sidebar(current_page: str, *, language_key: str = 'global_languag
         st.markdown('<div class="aba-sidebar-title">ABA Signal Pro</div>', unsafe_allow_html=True)
         tagline = APP_TAGLINE if language == 'English' else APP_TAGLINE_ES
         st.markdown(f'<div class="aba-sidebar-tagline">{html.escape(tagline)}</div>', unsafe_allow_html=True)
-        st.caption('BDL: Enabled' if _bdl_ready() else 'BDL: Missing')
+        bdl_label = ('BDL: Activo' if _bdl_ready() else 'BDL: Falta') if normalize_language(language) == 'es' else ('BDL: Enabled' if _bdl_ready() else 'BDL: Missing')
+        st.caption(bdl_label)
         language = st.radio(
             _sidebar_language_label(language),
             ['English', 'Español'],
@@ -173,7 +174,7 @@ def render_app_sidebar(current_page: str, *, language_key: str = 'global_languag
             _render_page_link(st, item, language, current_page)
         show_advanced = bool(st.checkbox(_advanced_toggle_label(language), value=bool(st.session_state.get(ADVANCED_NAV_KEY, False)), key=ADVANCED_NAV_KEY))
         if show_advanced:
-            st.markdown(f'<div class="aba-sidebar-section">{html.escape(_section_label("Advanced / Admin", "Avanzado / Admin", language))}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="aba-sidebar-section">{html.escape(_section_label("Advanced / Admin", "Avanzado / administración", language))}</div>', unsafe_allow_html=True)
             for item in ADVANCED_TOOLS:
                 _render_page_link(st, item, language, current_page)
             _render_page_link(st, REPARODYNAMICS_PAGE, language, current_page)
