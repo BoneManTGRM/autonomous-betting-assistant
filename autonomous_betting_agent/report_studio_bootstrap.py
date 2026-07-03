@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 
+VERSION = "report_studio_bootstrap_v2_full_export_state_guard"
+
+
 def install() -> None:
     try:
         from . import magazine_book_export as renderer
         from . import active_magazine_export_guard as guard
+        from . import magazine_export_state_guard as export_state_guard
         from . import report_verification_gate as gate
         guard.install(renderer)
         original_page = renderer.render_full_pick_magazine_page
@@ -16,7 +20,9 @@ def install() -> None:
             return [original_page(row, background_image, report_name, index + 1, total, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language) for index, row in enumerate(rows)]
 
         renderer.render_full_magazine_book_pages = gated_pages
+        export_state_guard.install(renderer)
         renderer._ABA_VERIFICATION_GATE = gate.VERSION
+        renderer._ABA_REPORT_STUDIO_BOOTSTRAP = VERSION
     except Exception:
         pass
     try:
