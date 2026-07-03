@@ -3,29 +3,46 @@ from __future__ import annotations
 from typing import Any, Iterable, Sequence
 
 SPORT_LEAGUE_ES = {
+    "AFL": "AFL",
+    "Allsvenskan - Sweden": "Allsvenskan - Suecia",
+    "Baseball": "Béisbol",
+    "Basketball": "Baloncesto",
     "Boxing": "Boxeo",
+    "Brazil Serie A": "Brasil Série A",
+    "Brazil Série A": "Brasil Série A",
+    "Brazil Serie B": "Brasil Série B",
+    "Brazil Série B": "Brasil Série B",
+    "Bundesliga": "Bundesliga",
+    "Chinese Super League": "Superliga - China",
+    "Eliteserien - Norway": "Eliteserien - Noruega",
+    "English Premier League": "Premier League inglesa",
+    "FIFA World Cup": "Copa Mundial FIFA",
+    "Football": "Fútbol americano",
+    "K League 1": "K League 1",
+    "KBO": "KBO",
+    "La Liga": "La Liga",
+    "League of Ireland": "Liga de Irlanda",
+    "Liga MX": "Liga MX",
     "MMA": "MMA",
     "MLB": "MLB",
+    "MLS": "MLS",
+    "MiLB": "MiLB",
+    "NBA": "NBA",
     "NCAAB": "NCAAB",
     "NCAAF": "NCAAF",
-    "NBA": "NBA",
+    "NCAA Baseball": "Béisbol NCAA",
     "NFL": "NFL",
     "NHL": "NHL",
-    "FIFA World Cup": "Copa Mundial FIFA",
-    "League of Ireland": "Liga de Irlanda",
-    "Brazil Série B": "Brasil Serie B",
-    "Brazil Serie B": "Brasil Serie B",
-    "Soccer": "Fútbol",
-    "Football": "Fútbol americano",
-    "Basketball": "Baloncesto",
-    "Baseball": "Béisbol",
-    "Tennis": "Tenis",
-    "English Premier League": "Premier League inglesa",
+    "NPB": "NPB",
+    "NRL": "NRL",
+    "PLL": "PLL",
     "Premier League": "Premier League",
-    "La Liga": "La Liga",
     "Serie A": "Serie A",
-    "Bundesliga": "Bundesliga",
-    "Liga MX": "Liga MX",
+    "Soccer": "Fútbol",
+    "Super League - China": "Superliga - China",
+    "Tennis": "Tenis",
+    "Veikkausliiga - Finland": "Veikkausliiga - Finlandia",
+    "WNBA": "WNBA",
 }
 
 
@@ -53,8 +70,8 @@ def render_sport_league_filter(st, *, label: str, options: Sequence[str], defaul
     if language != "es":
         return list(st.multiselect(label, raw_options, default=[option for option in raw_options if option in default_set], key=key))
 
-    st.caption("Elige opciones")
-    select_all = st.checkbox("Seleccionar todos", value=bool(raw_options) and len(default_set) == len(raw_options), key=f"{key}_select_all")
+    st.caption("Selecciona deportes o ligas")
+    select_all = st.checkbox("Seleccionar todo", value=bool(raw_options) and len(default_set) == len(raw_options), key=f"{key}_select_all")
     if select_all:
         return raw_options
 
