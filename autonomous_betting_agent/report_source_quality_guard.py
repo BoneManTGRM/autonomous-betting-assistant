@@ -46,6 +46,39 @@ REPORT_HANDOFF_KEYS = (
     "ara_latest_predictions",
     "fresh_odds_slate_builder_rows",
 )
+STALE_SAVED_TOKENS = (
+    "uploaded / saved",
+    "uploaded/saved",
+    "saved-source",
+    "saved source",
+    "saved row",
+    "saved-row",
+    "uploaded row",
+    "uploaded_row",
+    "source saved",
+    "source_saved",
+)
+VERIFY_ONLY_TOKENS = (
+    "verify price",
+    "verify_price",
+    "uploaded_row",
+    "uploaded row",
+    "source saved",
+    "source_saved",
+)
+PROOF_TIME_FIELDS = ("locked_at_utc", "locked_at", "proof_locked_at_utc")
+PROOF_ID_FIELDS = ("proof_id", "proof_hash")
+CURRENT_SOURCE_TOKENS = (
+    "live_api",
+    "live api",
+    "current run",
+    "current-run",
+    "diagnostic",
+    "pro_predictor_filter_diagnostic",
+    "odds_lock",
+    "locked",
+    "proof",
+)
 
 
 def _text(value: Any) -> str:
@@ -92,6 +125,76 @@ def _rows_from_any(value: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _combined_text(row: Mapping[str, Any], fields: Sequence[str]) -> str:
+    return " | ".join(_text(row.get(field)).lower() for field in fields if _text(row.get(field)))
+
+
+def _has_proof_identity(row: Mapping[str, Any]) -> bool:
+    has_id = any(bool(_text(row.get(field))) for field in PROOF_ID_FIELDS)
+    has_time = any(bool(_text(row.get(field))) for field in PROOF_TIME_FIELDS)
+    return has_id and has_time
+
+
+def _row_is_current_or_locked(row: Mapping[str, Any]) -> bool:
+    if _has_proof_identity(row):
+        return True
+    text = _combined_text(
+        row,
+        (
+            "report_source",
+            "source_mode",
+            "source_type",
+            "proof_source_type",
+            "odds_source",
+            "verification_status",
+            "odds_status",
+            "decision_signals",
+            "recommendation_tier",
+        ),
+    )
+    return any(token in text for token in CURRENT_SOURCE_TOKENS)
+
+
+def row_is_stale_saved_handoff(row: Mapping[str, Any]) -> bool:
+    """True for old saved/uploaded handoff rows that should not drive a fresh report.
+
+    These rows can contain odds, edge, and EV, so ordinary value-based scoring can
+    mistake them for usable current rows. They are not removed if they have a real
+    proof lock identity or an explicit current/live/diagnostic source marker.
+    """
+    if not isinstance(row, Mapping):
+        return True
+    if _row_is_current_or_locked(row):
+        return False
+    source_text = _combined_text(
+        row,
+        (
+            "report_source",
+            "data_scope",
+            "source_mode",
+            "source_type",
+            "source_file",
+            "odds_source",
+            "truth",
+            "report_truth_severity",
+        ),
+    )
+    status_text = _combined_text(
+        row,
+        (
+            "odds_status",
+            "verification_status",
+            "recommendation_tier",
+            "blocker_reason",
+            "truth",
+            "report_truth_severity",
+        ),
+    )
+    saved_source = any(token in source_text for token in STALE_SAVED_TOKENS)
+    verify_only = any(token in status_text for token in VERIFY_ONLY_TOKENS)
+    return saved_source and verify_only
+
+
 def _row_has_independent_probability(row: Mapping[str, Any]) -> bool:
     source = _text(row.get("model_probability_source")).lower()
     if any(token in source for token in MARKET_BASELINE_TOKENS):
@@ -101,7 +204,6 @@ def _row_has_independent_probability(row: Mapping[str, Any]) -> bool:
         prob = _probability(row.get(field))
         if prob is None:
             continue
-        # Treat exact market-probability copies as non-independent unless a learned source is explicit.
         if market_probability is not None and abs(prob - market_probability) < 0.000001 and field not in {"learned_model_probability", "final_adjusted_probability", "adjusted_model_probability"}:
             continue
         return True
@@ -134,8 +236,12 @@ def _source_priority(key: str, original_index: int) -> int:
     return max(0, 50 - original_index)
 
 
+def usable_report_rows(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return [row for row in rows if isinstance(row, Mapping) and not row_is_stale_saved_handoff(row)]
+
+
 def source_quality_score(key: str, rows: Sequence[Mapping[str, Any]], original_index: int = 0) -> tuple[int, int, int, int, int, int]:
-    clean_rows = [row for row in rows if isinstance(row, Mapping)]
+    clean_rows = usable_report_rows(rows)
     if not clean_rows:
         return (0, 0, 0, 0, 0, -original_index)
     independent = sum(1 for row in clean_rows if _row_has_independent_probability(row))
@@ -174,30 +280,30 @@ def _patch_held_key_sets(store: Any) -> None:
 
 
 def _patch_load_first_available(store: Any) -> None:
-    if getattr(store, "_aba_report_source_quality_store_patch_v2", False):
+    if getattr(store, "_aba_report_source_quality_store_patch_v3", False):
         return
-    original_load_first_available = store.load_first_available
 
     def quality_first_available(keys: list[str] | tuple[str, ...], workspace_id: Any = "test_01") -> tuple[str, list[dict[str, Any]]]:
         candidates: list[tuple[tuple[int, int, int, int, int, int], int, str, list[dict[str, Any]]]] = []
         for index, key in enumerate(keys):
             rows = store.load_held_rows(key, workspace_id)
             if rows:
-                score = source_quality_score(key, rows, index)
-                candidates.append((score, -index, key, rows))
+                usable_rows = [dict(row) for row in usable_report_rows(rows)]
+                score = source_quality_score(key, usable_rows, index)
+                candidates.append((score, -index, key, usable_rows))
         if not candidates:
             return "", []
         best = max(candidates, key=lambda item: item[:2])
         if best[0][0] > 0:
             return best[2], best[3]
-        return original_load_first_available(keys, workspace_id)
+        return "", []
 
     store.load_first_available = quality_first_available
-    store._aba_report_source_quality_store_patch_v2 = True
+    store._aba_report_source_quality_store_patch_v3 = True
 
 
 def _patch_streamlit_session_get() -> None:
-    """Make Report Studio's current-session loader skip stale early keys when a better session key exists."""
+    """Make Report Studio skip stale saved/uploaded session rows when selecting a source."""
     try:
         import streamlit.runtime.state.session_state_proxy as proxy
     except Exception:
@@ -206,7 +312,7 @@ def _patch_streamlit_session_get() -> None:
     original_get = getattr(session_cls, "get", None)
     if session_cls is None or not callable(original_get):
         return
-    if getattr(original_get, "_aba_report_source_quality_session_patch_v2", False):
+    if getattr(original_get, "_aba_report_source_quality_session_patch_v3", False):
         return
 
     def quality_guarded_get(self: Any, key: Any, default: Any = None) -> Any:
@@ -215,13 +321,18 @@ def _patch_streamlit_session_get() -> None:
         try:
             candidates = [(handoff_key, original_get(self, handoff_key, [])) for handoff_key in REPORT_HANDOFF_KEYS]
             winner = best_source_key(candidates)
-            if winner and key != winner:
+            if winner:
+                if key != winner:
+                    return default
+                rows = usable_report_rows(_rows_from_any(original_get(self, key, default)))
+                return rows if rows else default
+            if any(_rows_from_any(value) for _candidate_key, value in candidates):
                 return default
         except Exception:
             return original_get(self, key, default)
         return original_get(self, key, default)
 
-    quality_guarded_get._aba_report_source_quality_session_patch_v2 = True  # type: ignore[attr-defined]
+    quality_guarded_get._aba_report_source_quality_session_patch_v3 = True  # type: ignore[attr-defined]
     session_cls.get = quality_guarded_get
 
 
@@ -233,4 +344,4 @@ def install() -> None:
     _patch_held_key_sets(store)
     _patch_load_first_available(store)
     _patch_streamlit_session_get()
-    store._aba_report_source_quality_guard_v2 = True
+    store._aba_report_source_quality_guard_v3 = True
