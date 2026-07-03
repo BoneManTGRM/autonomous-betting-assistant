@@ -11,7 +11,7 @@ def install() -> None:
         from autonomous_betting_agent.row_normalizer import result_status, safe_text
     except Exception:
         return
-    if getattr(rss, '_ABA_REPORT_STUDIO_FRESH_LEDGER_GUARD_V1', False):
+    if getattr(rss, '_ABA_REPORT_STUDIO_FRESH_LEDGER_GUARD_V2', False):
         return
     original_build_state = rss.build_report_studio_state
 
@@ -42,9 +42,10 @@ def install() -> None:
     def _fresh_rows(rows: Any, source_note: str) -> tuple[Any, dict[str, Any]]:
         frame = _frame(rows)
         meta = {
-            'report_source_selection_policy': 'freshest_locked_batch_v1',
+            'report_source_selection_policy': 'freshest_locked_batch_v2',
             'stale_source_blocked': False,
             'source_selection_reason': 'not_ledger_source',
+            'selected_row_count': int(len(frame)),
             'newest_locked_at_utc': '',
             'newest_event_start_utc': '',
         }
@@ -69,20 +70,31 @@ def install() -> None:
         meta.update({
             'stale_source_blocked': bool(len(fresh) < len(frame)),
             'source_selection_reason': 'freshest_locked_batch_selected_stale_rows_blocked' if len(fresh) < len(frame) else 'freshest_locked_batch_selected',
+            'selected_row_count': int(len(fresh)),
             'newest_locked_at_utc': newest.isoformat() if pd.notna(newest) else '',
             'newest_event_start_utc': fresh_starts.max().isoformat() if not fresh_starts.empty and pd.notna(fresh_starts.max()) else '',
         })
+        for key, value in meta.items():
+            fresh[key] = value
         return fresh.reset_index(drop=True), meta
 
     def build_state_fresh_first(raw_rows: Any, brand: Any, *, filters: Any = None, source_note: str = ''):
         selected_rows, meta = _fresh_rows(raw_rows, source_note)
         state = original_build_state(selected_rows, brand, filters=filters, source_note=source_note)
         try:
-            if meta.get('stale_source_blocked'):
-                object.__setattr__(state, 'context_note', state.context_note + ' · Fresh locked ledger batch selected; older rows blocked.')
+            note = (
+                f" · Source diagnostic: selected_source={_mode(source_note)}; "
+                f"selected_row_count={meta.get('selected_row_count')}; "
+                f"newest_locked_at_utc={meta.get('newest_locked_at_utc') or 'none'}; "
+                f"newest_event_start_utc={meta.get('newest_event_start_utc') or 'none'}; "
+                f"stale_source_blocked={meta.get('stale_source_blocked')}; "
+                f"reason={meta.get('source_selection_reason')}."
+            )
+            object.__setattr__(state, 'context_note', state.context_note + note)
         except Exception:
             pass
         return state
 
     rss.build_report_studio_state = build_state_fresh_first
     rss._ABA_REPORT_STUDIO_FRESH_LEDGER_GUARD_V1 = True
+    rss._ABA_REPORT_STUDIO_FRESH_LEDGER_GUARD_V2 = True
