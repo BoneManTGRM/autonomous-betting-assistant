@@ -120,7 +120,8 @@ def test_report_gate_page_two_requires_verified_advanced_market():
     assert not gate.should_render_page_two(row)
     row["verified_advanced_market"] = "true"
     assert gate.should_render_page_two(row)
-    assert "Renderer: verification_gate_v1" in gate.build_report_rows([row])[0]["report_renderer_marker"]
+    marker = gate.build_report_rows([row])[0]["report_renderer_marker"]
+    assert f"Renderer: {gate.VERSION}" in marker
 
 
 def _page2_row(**extra):
