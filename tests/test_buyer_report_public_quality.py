@@ -1,8 +1,6 @@
 from autonomous_betting_agent.magazine_second_page_patch import _page_two_sections
 from autonomous_betting_agent.report_public_quality import (
-    LIVE_TRIGGER_UNAVAILABLE,
     MISSING_EXACT_MARKET_LINE,
-    NO_VERIFIED_PARLAY,
     build_full_market_label,
     public_diagnostic_banned_terms,
     public_recommendation_status,
@@ -66,8 +64,8 @@ def test_page_two_sections_are_buyer_facing_and_exact():
     }
     rendered = _flat(_page_two_sections(row, "en"))
     assert "Game Total: Over 171.5" in rendered
-    assert NO_VERIFIED_PARLAY in rendered
-    assert LIVE_TRIGGER_UNAVAILABLE in rendered
+    assert "STRAIGHT ANCHOR ONLY" in rendered
+    assert "No SGP/cross-game/prop/live parlay is playable" in rendered
     assert "Gate failed" not in rendered
     assert "endpoint" not in rendered.lower()
     assert "status code" not in rendered.lower()
