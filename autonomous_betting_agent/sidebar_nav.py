@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import html
+import builtins
 from typing import Any
 
 APP_TAGLINE = 'Powered by Reparodynamics'
@@ -130,6 +131,16 @@ def _section_label(text_en: str, text_es: str, language: str) -> str:
     return text_es if normalize_language(language) == 'es' else text_en
 
 
+def _bdl_ready() -> bool:
+    getter = getattr(builtins, 'get_secret', None)
+    if not callable(getter):
+        return False
+    try:
+        return bool(getter('BALLDONTLIE_API_KEY', 'BDL_API_KEY', 'BALLDONTLIE_KEY'))
+    except Exception:
+        return False
+
+
 def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'radio') -> str:
     import streamlit as st
     language = _language_label(_current_language(st))
@@ -143,6 +154,7 @@ def render_app_sidebar(current_page: str, *, language_key: str = 'global_languag
         st.markdown('<div class="aba-sidebar-title">ABA Signal Pro</div>', unsafe_allow_html=True)
         tagline = APP_TAGLINE if language == 'English' else APP_TAGLINE_ES
         st.markdown(f'<div class="aba-sidebar-tagline">{html.escape(tagline)}</div>', unsafe_allow_html=True)
+        st.caption('BDL: Enabled' if _bdl_ready() else 'BDL: Missing')
         language = st.radio(
             _sidebar_language_label(language),
             ['English', 'Español'],
