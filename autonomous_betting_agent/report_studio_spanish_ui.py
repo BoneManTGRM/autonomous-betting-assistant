@@ -13,6 +13,11 @@ SPORT_LEAGUE_ES = {
     "NHL": "NHL",
     "FIFA World Cup": "Copa Mundial FIFA",
     "League of Ireland": "Liga de Irlanda",
+    "Allsvenskan - Sweden": "Allsvenskan - Suecia",
+    "Eliteserien - Norway": "Eliteserien - Noruega",
+    "Veikkausliiga - Finland": "Veikkausliiga - Finlandia",
+    "NCAA Baseball": "Béisbol NCAA",
+    "Super League - China": "Superliga - China",
     "Brazil Série B": "Brasil Serie B",
     "Brazil Serie B": "Brasil Serie B",
     "Soccer": "Fútbol",
@@ -53,8 +58,8 @@ def render_sport_league_filter(st, *, label: str, options: Sequence[str], defaul
     if language != "es":
         return list(st.multiselect(label, raw_options, default=[option for option in raw_options if option in default_set], key=key))
 
-    st.caption("Elige opciones")
-    select_all = st.checkbox("Seleccionar todos", value=bool(raw_options) and len(default_set) == len(raw_options), key=f"{key}_select_all")
+    st.caption("Selecciona deportes o ligas")
+    select_all = st.checkbox("Seleccionar todo", value=bool(raw_options) and len(default_set) == len(raw_options), key=f"{key}_select_all")
     if select_all:
         return raw_options
 
