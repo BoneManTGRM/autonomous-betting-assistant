@@ -1,11 +1,12 @@
 from autonomous_betting_agent.magazine_export_state_guard import (
+    _is_fallback_row,
     _is_stale_saved_export_row,
     _select_rows,
     _valid_rows,
 )
 
 
-def test_saved_uploaded_verify_price_rows_are_invalid_for_magazine_export():
+def test_saved_uploaded_verify_price_rows_remain_valid_for_full_magazine_export():
     row = {
         "event": "Seattle Storm at Phoenix Mercury",
         "prediction": "Spread: Phoenix Mercury -1.5",
@@ -20,8 +21,9 @@ def test_saved_uploaded_verify_price_rows_are_invalid_for_magazine_export():
         "expected_value_per_unit": 0.017,
     }
 
-    assert _is_stale_saved_export_row(row)
-    assert _valid_rows([row]) == []
+    assert not _is_stale_saved_export_row(row)
+    assert not _is_fallback_row(row)
+    assert len(_valid_rows([row])) == 1
 
 
 def test_locked_saved_rows_are_allowed_for_magazine_export():
@@ -42,8 +44,8 @@ def test_locked_saved_rows_are_allowed_for_magazine_export():
     assert len(_valid_rows([row])) == 1
 
 
-def test_export_selection_returns_no_rows_when_only_stale_saved_rows_exist():
-    stale = {
+def test_export_selection_returns_preview_rows_when_saved_watchlist_rows_exist():
+    saved_watchlist = {
         "event": "San Diego Padres at Los Angeles Dodgers",
         "prediction": "Run Line: San Diego Padres +1.5",
         "report_source": "Uploaded / saved row",
@@ -56,7 +58,20 @@ def test_export_selection_returns_no_rows_when_only_stale_saved_rows_exist():
         "model_market_edge": 0.022,
     }
 
-    rows, recovered, _sig = _select_rows([stale], report_name="test", language="en", source="pdf-export")
+    rows, recovered, _sig = _select_rows([saved_watchlist], report_name="test", language="en", source="pdf-export")
 
-    assert rows == []
+    assert len(rows) == 1
+    assert rows[0]["event"] == "San Diego Padres at Los Angeles Dodgers"
     assert recovered is False
+
+
+def test_true_no_verified_fallback_row_is_not_valid_for_export():
+    fallback = {
+        "event": "NO VERIFIED PICKS vs CURRENT PROVIDER",
+        "prediction": "RESEARCH ONLY: NO VERIFIED BUYER PICKS",
+        "report_truth_severity": "RESEARCH ONLY: NO VERIFIED BUYER PICKS",
+        "data_issue_reason": "Provider not matched",
+    }
+
+    assert _is_fallback_row(fallback)
+    assert _valid_rows([fallback]) == []
