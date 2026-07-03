@@ -58,7 +58,7 @@ def _install_source_hook() -> None:
     def caption(body, *args, **kwargs):
         text = str(body or '')
         if text.startswith('App version: pro-predictor-v23'):
-            body = 'App version: pro-predictor-v24-bdl-runtime-context'
+            body = 'App version: pro-predictor-v24-balldontlie-api-registry'
         return old_caption(body, *args, **kwargs)
 
     def subheader(body, *args, **kwargs):
@@ -67,7 +67,7 @@ def _install_source_hook() -> None:
             st.session_state['_aba_bdl_ui'] = True
             key = get_secret('BALLDONTLIE_API_KEY', 'BDL_API_KEY', 'BALLDONTLIE_KEY')
             col, _, _ = st.columns(3)
-            col.metric('BDL', 'Enabled' if key else 'Missing')
+            col.metric("Ball Don't Lie", 'Enabled' if key else 'Missing')
         return result
 
     st.caption = caption
