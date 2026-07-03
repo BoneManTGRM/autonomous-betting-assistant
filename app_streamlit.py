@@ -19,11 +19,11 @@ TEXT = {
     },
     'es': {
         'title': 'ABA Signal Pro',
-        'caption': 'Powered by Reparodynamics',
-        'body': 'Usa el menú Tools para ejecutar Predictor Pro, bloquear pruebas, calificar resultados y revisar la memoria.',
-        'steps': 'Flujo: Predictor Pro → Odds Lock Pro → Centro de Control de Prueba → Dashboard Público → Learning Memory.',
-        'proof_control': 'Abrir Centro de Control de Prueba',
-        'reset_storage': 'Abrir Reiniciar almacenamiento',
+        'caption': 'Impulsado por Reparodinámica',
+        'body': 'Usa el menú de herramientas para ejecutar Predictor Pro, bloquear filas de prueba, calificar resultados y revisar la memoria de aprendizaje.',
+        'steps': 'Flujo: Predictor Pro → Odds Lock Pro → Centro de control de pruebas → Panel público de pruebas → Memoria de aprendizaje.',
+        'proof_control': 'Abrir Centro de control de pruebas',
+        'reset_storage': 'Abrir restablecimiento de almacenamiento',
         'predictor': 'Abrir Predictor Pro',
     },
 }
