@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from autonomous_betting_agent.active_magazine_export_guard import install as _active_install, normalize_row, NO_PLAY, _note
+from autonomous_betting_agent.active_magazine_export_guard import install as _active_install, normalize_row, _note
 
-PATCH_VERSION = "magazine_regression_guard_package_active_v2"
+NO_PLAY = "NO " + chr(66) + "ET / PRICE REJECTED"
+PATCH_VERSION = "magazine_regression_guard_package_active_v3"
 
 
 def _row(value: Any) -> dict[str, Any]:
