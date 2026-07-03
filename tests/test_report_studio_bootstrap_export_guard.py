@@ -42,7 +42,7 @@ def test_report_studio_full_book_pages_preserve_visible_watchlist_rows():
     report_studio_bootstrap.install()
     pages = renderer.render_full_magazine_book_pages(_watchlist_rows(), report_name="ABA Signal Pro")
 
-    assert len(pages) == 2
+    assert len(pages) == 4
 
 
 def test_report_studio_full_pdf_preserves_visible_watchlist_rows():
@@ -52,4 +52,4 @@ def test_report_studio_full_pdf_preserves_visible_watchlist_rows():
     pdf_bytes = renderer.render_full_magazine_book_pdf(_watchlist_rows(), report_name="ABA Signal Pro")
 
     assert pdf_bytes.startswith(b"%PDF")
-    assert pdf_bytes.count(b"/Type /Page") >= 2
+    assert pdf_bytes.count(b"/Type /Page") >= 4
