@@ -86,6 +86,73 @@ def _install_report_source_quality_guard() -> None:
         pass
 
 
+def _install_proof_ledger_integrity_guard() -> None:
+    if _runtime_disabled():
+        return
+    try:
+        import pandas as pd
+        import autonomous_betting_agent.commercial_platform_tools as cpt
+        from autonomous_betting_agent.odds_lock_tools import lock_status, proof_hash, update_profit_columns
+        from autonomous_betting_agent.row_normalizer import normalize_frame, result_status, safe_text
+    except Exception:
+        return
+    if getattr(cpt, '_ABA_PROOF_LEDGER_INTEGRITY_GUARD_V1', False):
+        return
+
+    def _timestamped_rows(frame: pd.DataFrame) -> pd.DataFrame:
+        if frame.empty or 'locked_at_utc' not in frame.columns:
+            return pd.DataFrame()
+        return frame[frame['locked_at_utc'].map(safe_text).ne('')].copy()
+
+    def strict_filter_locked_proof_rows(frame):
+        raw = pd.DataFrame(frame) if isinstance(frame, list) else frame
+        out = cpt._canonicalize_result_columns(raw) if raw is not None and not raw.empty else pd.DataFrame()
+        out = update_profit_columns(out) if not out.empty else pd.DataFrame()
+        if out.empty:
+            return pd.DataFrame()
+        if 'event_start_time' in out.columns and 'event_start_utc' not in out.columns:
+            out['event_start_utc'] = out['event_start_time']
+        if cpt.PROOF_REQUIRED_COLUMNS.issubset(out.columns):
+            proof = out[out['proof_id'].map(safe_text).ne('') & out['locked_at_utc'].map(safe_text).ne('')].copy()
+            if not proof.empty:
+                return cpt._ensure_lock_identity(proof)
+        mask = cpt._lock_ready_mask(out)
+        if mask.empty or not bool(mask.any()):
+            return pd.DataFrame()
+        candidate = cpt._ensure_lock_identity(out[mask].copy())
+        return _timestamped_rows(candidate)
+
+    def strict_proof_audit_frame(frame):
+        locked = cpt.latest_active_list(frame)
+        rows = []
+        for r in locked.to_dict('records'):
+            h = safe_text(r.get('proof_hash'))
+            try:
+                rh = proof_hash(r)
+            except Exception:
+                rh = ''
+            hs = 'hash_match' if h and h == rh else 'hash_mismatch'
+            ls = safe_text(r.get('proof_status')) or lock_status(r)
+            has_lock_time = bool(safe_text(r.get('locked_at_utc')))
+            au = 'pass' if has_lock_time and hs == 'hash_match' and ls == 'locked_before_start' else 'review'
+            rows.append({
+                'proof_id': safe_text(r.get('proof_id')),
+                'event': safe_text(r.get('event')),
+                'prediction': safe_text(r.get('prediction')),
+                'locked_at_utc': safe_text(r.get('locked_at_utc')),
+                'event_start_utc': safe_text(r.get('event_start_utc')),
+                'hash_status': hs,
+                'lock_status': ls,
+                'audit_status': au,
+                'proof_source_type': safe_text(r.get('proof_source_type')),
+            })
+        return pd.DataFrame(rows) if rows else pd.DataFrame(columns=['proof_id', 'hash_status', 'lock_status', 'audit_status'])
+
+    cpt.filter_locked_proof_rows = strict_filter_locked_proof_rows
+    cpt.proof_audit_frame = strict_proof_audit_frame
+    cpt._ABA_PROOF_LEDGER_INTEGRITY_GUARD_V1 = True
+
+
 def _install_magazine_reload_bridge() -> None:
     if _runtime_disabled() or getattr(importlib.reload, '_ABA_MAGAZINE_DIRECT_BRIDGE', False):
         return
@@ -123,6 +190,7 @@ def _install_magazine_polish_bridge() -> None:
 
 
 _install_report_source_quality_guard()
+_install_proof_ledger_integrity_guard()
 _install_magazine_reload_bridge()
 _install_magazine_polish_bridge()
 _apply_magazine_display_bridge()
