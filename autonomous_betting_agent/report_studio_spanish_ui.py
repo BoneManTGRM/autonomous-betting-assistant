@@ -42,7 +42,6 @@ def sport_league_display_text(value: Any, language: str = "en") -> str:
 
 
 def selected_raw_sport_values(display_values: Iterable[str], options: Sequence[str], language: str = "en") -> list[str]:
-    """Map displayed Spanish labels back to raw sport/league values."""
     wanted = {str(value or "").strip() for value in display_values}
     selected: list[str] = []
     for option in options:
@@ -54,20 +53,5 @@ def selected_raw_sport_values(display_values: Iterable[str], options: Sequence[s
 
 def render_sport_league_filter(st, *, label: str, options: Sequence[str], default: Iterable[str] | None = None, language: str = "en", key: str = "report_profile_sports") -> list[str]:
     raw_options = [str(option) for option in options if str(option or "").strip()]
-    default_set = {str(value) for value in (default or []) if str(value) in raw_options}
-    if language != "es":
-        return list(st.multiselect(label, raw_options, default=[option for option in raw_options if option in default_set], key=key))
-
-    st.caption("Selecciona deportes o ligas")
-    select_all = st.checkbox("Seleccionar todo", value=bool(raw_options) and len(default_set) == len(raw_options), key=f"{key}_select_all")
-    if select_all:
-        return raw_options
-
-    selected: list[str] = []
-    with st.container():
-        for option in raw_options:
-            option_key = "".join(ch if ch.isalnum() else "_" for ch in option.lower()).strip("_") or "option"
-            checked = st.checkbox(sport_league_display_text(option, "es"), value=option in default_set, key=f"{key}_{option_key}")
-            if checked:
-                selected.append(option)
-    return selected
+    default_values = [option for option in raw_options if option in {str(value) for value in (default or [])}]
+    return list(st.multiselect(label, raw_options, default=default_values, key=key, format_func=lambda option: sport_league_display_text(option, language)))
