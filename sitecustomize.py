@@ -5,6 +5,7 @@ import importlib
 import os
 
 # Runtime bridges only. No secret values are printed or exposed.
+# This file intentionally does not monkey-patch Streamlit widgets.
 
 
 def get_secret(*names: str) -> str:
