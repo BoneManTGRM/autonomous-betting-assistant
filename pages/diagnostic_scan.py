@@ -1,0 +1,3 @@
+from autonomous_betting_agent.pro_predictor_runtime_min import render_page
+
+render_page()
