@@ -41,6 +41,11 @@ def _apply_balldontlie_bridge(module: object | None = None) -> None:
         install(module)
     except Exception:
         pass
+    try:
+        from autonomous_betting_agent.api_registry_runtime_patch import install as install_registry
+        install_registry()
+    except Exception:
+        pass
 
 
 def _install_source_hook() -> None:
