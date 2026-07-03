@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-VERSION = "report_studio_bootstrap_v3_preserve_visible_rows"
+VERSION = "report_studio_bootstrap_v4_refresh_export_guard"
 
 
 def install() -> None:
@@ -20,6 +20,11 @@ def install() -> None:
             return [original_page(row, background_image, report_name, index + 1, total, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language) for index, row in enumerate(rows)]
 
         renderer.render_full_magazine_book_pages = visible_rows_pages
+        for marker in ("_ABA_MAGAZINE_EXPORT_STATE_GUARD_V1", "_ABA_MAGAZINE_EXPORT_STATE_GUARD_V2", "_ABA_MAGAZINE_EXPORT_STATE_GUARD_V3"):
+            try:
+                delattr(renderer, marker)
+            except Exception:
+                pass
         export_state_guard.install(renderer)
         renderer._ABA_REPORT_STUDIO_BOOTSTRAP = VERSION
     except Exception:
