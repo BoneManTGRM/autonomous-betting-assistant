@@ -59,6 +59,16 @@ def _apply_parlay_intelligence_bridge(module: object | None = None) -> None:
         pass
 
 
+def _apply_magazine_export_state_guard(module: object | None = None) -> None:
+    if _runtime_disabled():
+        return
+    try:
+        from autonomous_betting_agent.magazine_export_state_guard import install
+        install(module)
+    except Exception:
+        pass
+
+
 def _apply_magazine_display_bridge(module: object | None = None) -> None:
     if _runtime_disabled():
         return
@@ -74,6 +84,7 @@ def _apply_magazine_display_bridge(module: object | None = None) -> None:
         pass
     _apply_balldontlie_bridge(module)
     _apply_parlay_intelligence_bridge(module)
+    _apply_magazine_export_state_guard(module)
 
 
 def _install_report_source_quality_guard() -> None:
@@ -189,8 +200,29 @@ def _install_magazine_polish_bridge() -> None:
     polish.install = install_and_guard
 
 
+def _install_magazine_export_state_bridge() -> None:
+    if _runtime_disabled():
+        return
+    try:
+        import autonomous_betting_agent.magazine_sale_ready_patch as sale_ready
+    except Exception:
+        return
+    original_apply = getattr(sale_ready, 'apply_magazine_sale_ready_patch', None)
+    if not callable(original_apply) or getattr(original_apply, '_ABA_EXPORT_STATE_BRIDGE', False):
+        return
+
+    def apply_sale_ready_and_export_guard(module: object) -> object:
+        patched = original_apply(module)
+        _apply_magazine_export_state_guard(patched)
+        return patched
+
+    apply_sale_ready_and_export_guard._ABA_EXPORT_STATE_BRIDGE = True
+    sale_ready.apply_magazine_sale_ready_patch = apply_sale_ready_and_export_guard
+
+
 _install_report_source_quality_guard()
 _install_proof_ledger_integrity_guard()
 _install_magazine_reload_bridge()
 _install_magazine_polish_bridge()
+_install_magazine_export_state_bridge()
 _apply_magazine_display_bridge()
