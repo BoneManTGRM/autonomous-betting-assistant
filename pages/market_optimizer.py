@@ -32,14 +32,16 @@ TEXT = {
         "market_csv": "Manual market rows CSV", "history_csv": "Optional history rows CSV", "summary": "Optimizer summary", "hunter": "Playable / watch rows", "books": "Best-book comparison", "chains": "Chain preview", "avoid": "Avoid list", "marco": "Pro view JSON", "safety": "Safety details",
         "download_json": "Download optimizer JSON", "download_hunter": "Download playable rows CSV", "download_books": "Download book comparison CSV", "download_chains": "Download chain preview CSV", "download_avoid": "Download avoid list CSV", "download_marco": "Download pro view JSON", "download_manifest": "Download manifest JSON",
         "preview_only": "Preview only", "no_files": "No files written.", "no_live": "No live changes.", "no_report": "Run the optimizer preview to view outputs.", "no_source": "No current rows found yet.",
+        "market_rows_found": "Market rows found", "history_rows_found": "History rows found", "source": "Source", "markets": "Markets", "playable": "Playable", "watch": "Watch", "wait": "Wait", "no_play": "No play", "low_risk": "Low risk", "high_risk": "High risk", "hash": "Hash",
     },
     "es": {
-        "title": "Optimizador de Mercado", "caption": "Convierte filas recientes en listas y compara precios.",
-        "how": "Cómo usar esta página", "how_text": "Ejecuta Predictor Pro u Odds Lock Pro primero.",
-        "workspace_id": "ID de workspace", "bankroll": "Bankroll preview units", "auto_source": "Revisión automática", "run": "Ejecutar optimizer preview", "advanced": "Entrada manual avanzada",
-        "market_csv": "CSV manual de mercado", "history_csv": "CSV manual opcional", "summary": "Resumen optimizer", "hunter": "Filas jugar / observar", "books": "Comparación best-book", "chains": "Chain preview", "avoid": "Avoid list", "marco": "JSON pro view", "safety": "Detalles de seguridad",
-        "download_json": "Descargar JSON optimizer", "download_hunter": "Descargar CSV jugables", "download_books": "Descargar CSV libros", "download_chains": "Descargar CSV chain", "download_avoid": "Descargar CSV avoid", "download_marco": "Descargar JSON pro", "download_manifest": "Descargar JSON manifest",
-        "preview_only": "Solo preview", "no_files": "No escribe archivos.", "no_live": "No hace cambios live.", "no_report": "Ejecuta el preview para ver outputs.", "no_source": "No hay filas actuales.",
+        "title": "Optimizador de mercados", "caption": "Convierte filas recientes en listas de jugar, observar o evitar, y compara precios.",
+        "how": "Cómo usar esta página", "how_text": "Primero ejecuta Predictor Pro u Odds Lock Pro; después ejecuta esta vista previa.",
+        "workspace_id": "ID del espacio de trabajo", "bankroll": "Bankroll de vista previa en unidades", "auto_source": "Revisión automática de fuentes", "run": "Ejecutar vista previa del optimizador", "advanced": "Entrada manual avanzada",
+        "market_csv": "CSV manual de filas de mercado", "history_csv": "CSV opcional de historial", "summary": "Resumen del optimizador", "hunter": "Filas jugables / en observación", "books": "Comparación de mejores casas", "chains": "Vista previa de cadenas", "avoid": "Lista para evitar", "marco": "JSON de vista Pro", "safety": "Detalles de seguridad",
+        "download_json": "Descargar JSON del optimizador", "download_hunter": "Descargar CSV de filas jugables", "download_books": "Descargar CSV de comparación de casas", "download_chains": "Descargar CSV de vista previa de cadenas", "download_avoid": "Descargar CSV de lista para evitar", "download_marco": "Descargar JSON de vista Pro", "download_manifest": "Descargar JSON del manifiesto",
+        "preview_only": "Solo vista previa", "no_files": "No se escriben archivos.", "no_live": "No hay cambios en vivo.", "no_report": "Ejecuta la vista previa del optimizador para ver los resultados.", "no_source": "Aún no hay filas actuales.",
+        "market_rows_found": "Filas de mercado encontradas", "history_rows_found": "Filas de historial encontradas", "source": "Fuente", "markets": "Mercados", "playable": "Jugables", "watch": "Observación", "wait": "Esperar", "no_play": "No jugar", "low_risk": "Riesgo bajo", "high_risk": "Riesgo alto", "hash": "Hash",
     },
 }
 
@@ -64,7 +66,7 @@ workspace_id = normalize_workspace_id(st.text_input(t("workspace_id"), value=st.
 bankroll = st.number_input(t("bankroll"), min_value=1.0, value=1000.0, step=50.0, key="market_optimizer_bankroll")
 auto_market_csv, market_source, market_count = _session_rows_to_csv(ROW_SOURCE_KEYS)
 auto_history_csv, history_source, history_count = _session_rows_to_csv(HISTORY_SOURCE_KEYS)
-st.subheader(t("auto_source")); cols = st.columns(3); cols[0].metric("market rows found", market_count); cols[1].metric("history rows found", history_count); cols[2].metric("source", market_source or "none")
+st.subheader(t("auto_source")); cols = st.columns(3); cols[0].metric(t("market_rows_found"), market_count); cols[1].metric(t("history_rows_found"), history_count); cols[2].metric(t("source"), market_source or "none")
 if market_count <= 0: st.warning(t("no_source"))
 with st.expander(t("advanced"), expanded=False):
     market_csv = st.text_area(t("market_csv"), value=auto_market_csv, key="market_optimizer_market_csv", height=220)
@@ -74,7 +76,7 @@ if st.button(t("run"), key="market_optimizer_run", type="primary"):
 report = st.session_state.get(REPORT_KEY, {})
 if not report:
     st.info(t("no_report")); st.stop()
-metrics = st.columns(8); metrics[0].metric("markets", report.get("market_row_count", 0)); metrics[1].metric("playable", report.get("playable_count", 0)); metrics[2].metric("watch", report.get("watch_count", 0)); metrics[3].metric("wait", report.get("wait_count", 0)); metrics[4].metric("no play", report.get("no_play_count", 0)); metrics[5].metric("low risk", report.get("low_risk_count", 0)); metrics[6].metric("high risk", report.get("high_risk_count", 0)); metrics[7].metric("hash", _fragment(report.get("optimizer_hash")))
+metrics = st.columns(8); metrics[0].metric(t("markets"), report.get("market_row_count", 0)); metrics[1].metric(t("playable"), report.get("playable_count", 0)); metrics[2].metric(t("watch"), report.get("watch_count", 0)); metrics[3].metric(t("wait"), report.get("wait_count", 0)); metrics[4].metric(t("no_play"), report.get("no_play_count", 0)); metrics[5].metric(t("low_risk"), report.get("low_risk_count", 0)); metrics[6].metric(t("high_risk"), report.get("high_risk_count", 0)); metrics[7].metric(t("hash"), _fragment(report.get("optimizer_hash")))
 tabs = st.tabs([t("summary"), t("hunter"), t("books"), t("chains"), t("avoid"), t("marco")])
 with tabs[0]: st.json({field: report.get(field) for field in PAGE_CONTRACT_FIELDS})
 with tabs[1]: st.dataframe(pd.DataFrame(report.get("market_hunter_rows") or []), use_container_width=True, hide_index=True)
