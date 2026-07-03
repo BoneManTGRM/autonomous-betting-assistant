@@ -69,6 +69,16 @@ def _apply_magazine_export_state_guard(module: object | None = None) -> None:
         pass
 
 
+def _apply_report_studio_bootstrap_bridge() -> None:
+    if _runtime_disabled():
+        return
+    try:
+        from autonomous_betting_agent.report_studio_bootstrap import install
+        install()
+    except Exception:
+        pass
+
+
 def _apply_magazine_display_bridge(module: object | None = None) -> None:
     if _runtime_disabled():
         return
@@ -85,6 +95,7 @@ def _apply_magazine_display_bridge(module: object | None = None) -> None:
     _apply_balldontlie_bridge(module)
     _apply_parlay_intelligence_bridge(module)
     _apply_magazine_export_state_guard(module)
+    _apply_report_studio_bootstrap_bridge()
 
 
 def _install_report_source_quality_guard() -> None:
@@ -214,6 +225,7 @@ def _install_magazine_export_state_bridge() -> None:
     def apply_sale_ready_and_export_guard(module: object) -> object:
         patched = original_apply(module)
         _apply_magazine_export_state_guard(patched)
+        _apply_report_studio_bootstrap_bridge()
         return patched
 
     apply_sale_ready_and_export_guard._ABA_EXPORT_STATE_BRIDGE = True
