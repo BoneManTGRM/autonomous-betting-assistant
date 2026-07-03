@@ -4,6 +4,8 @@ import builtins
 import importlib
 import os
 
+# This file intentionally does not monkey-patch Streamlit widgets.
+
 
 def get_secret(*names: str) -> str:
     try:
