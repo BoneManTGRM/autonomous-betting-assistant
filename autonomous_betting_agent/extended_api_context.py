@@ -15,7 +15,7 @@ from .live_api_context import LiveAPIContextBuilder, _clean
 class ExtendedLiveAPIContextBuilder(LiveAPIContextBuilder):
     """Adds optional contextual APIs without changing core pick logic.
 
-    The extra sources are used only for event context/status fields. Failures are
+    Extra sources are used only for event context/status fields. Failures are
     contained so Pro Predictor can keep producing rows when optional APIs are
     missing, rate-limited, or unavailable.
     """
@@ -30,6 +30,7 @@ class ExtendedLiveAPIContextBuilder(LiveAPIContextBuilder):
     _api_football_cache: dict[str, dict[str, Any]] = field(default_factory=dict)
     _newsapi_cache: dict[str, dict[str, Any]] = field(default_factory=dict)
     _perplexity_cache: dict[str, dict[str, Any]] = field(default_factory=dict)
+    _balldontlie_cache: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def _get_json(self, url: str, *, headers: dict[str, str] | None = None) -> tuple[Any, str]:
         try:
@@ -164,7 +165,7 @@ class ExtendedLiveAPIContextBuilder(LiveAPIContextBuilder):
             return {**base, "perplexity_context_status": "no_query"}
         prompt = (
             "Provide a concise contextual research summary for this sports event. "
-            "Do not make a betting pick. Focus only on injuries, lineup/news risk, recent form, and market-moving context. "
+            "Do not make a selection. Focus only on injuries, lineup/news risk, recent form, and market-moving context. "
             f"Sport: {sport_title}. Event: {away_team} at {home_team}."
         )
         payload = {
@@ -195,9 +196,49 @@ class ExtendedLiveAPIContextBuilder(LiveAPIContextBuilder):
         self._perplexity_cache[key] = result
         return result
 
+    def _balldontlie_context(self, event: Any) -> dict[str, Any]:
+        key = self._event_key(event)
+        if key in self._balldontlie_cache:
+            return self._balldontlie_cache[key]
+        try:
+            from .balldontlie_integration import enrich_row_with_balldontlie
+            row = {
+                "sport": getattr(event, "sport_title", "") or getattr(event, "sport_key", ""),
+                "sport_key": getattr(event, "sport_key", ""),
+                "event": f"{getattr(event, 'away_team', '')} at {getattr(event, 'home_team', '')}".strip(),
+                "away_team": getattr(event, "away_team", ""),
+                "home_team": getattr(event, "home_team", ""),
+                "event_start_utc": getattr(event, "commence_time", ""),
+                "event_date": str(getattr(event, "commence_time", ""))[:10],
+            }
+            enriched = enrich_row_with_balldontlie(row)
+            status = str(enriched.get("balldontlie_status", "") or "")
+            result = {
+                "balldontlie_source_configured": "no" if status == "API_KEY_MISSING" else "yes",
+                "balldontlie_source_used": "yes" if status == "LIVE" else "no",
+                "balldontlie_status": status or "UNKNOWN",
+            }
+            for field in (
+                "balldontlie_sport", "balldontlie_team_summary", "balldontlie_game_summary",
+                "balldontlie_injury_summary", "balldontlie_odds_summary", "balldontlie_props_summary",
+                "team_stats_summary", "injury_report", "lineup_status", "matchup_notes",
+                "sports_context_summary", "player_prop_markets",
+            ):
+                if field in enriched:
+                    result[field] = enriched[field]
+        except Exception as exc:
+            result = {
+                "balldontlie_source_configured": "unknown",
+                "balldontlie_source_used": "no",
+                "balldontlie_status": f"error: {type(exc).__name__}",
+            }
+        self._balldontlie_cache[key] = result
+        return result
+
     def context_for_event(self, event: Any, *, pick_name: str) -> dict[str, Any]:
         context = super().context_for_event(event, pick_name=pick_name)
         context.update(self._api_football_context(event))
         context.update(self._newsapi_context(event))
         context.update(self._perplexity_context(event))
+        context.update(self._balldontlie_context(event))
         return context
