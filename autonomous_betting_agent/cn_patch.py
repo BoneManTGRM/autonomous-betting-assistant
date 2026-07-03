@@ -3,6 +3,11 @@ from __future__ import annotations
 
 def install() -> None:
     try:
+        from . import pro_predictor_source_panel_patch
+        pro_predictor_source_panel_patch.install()
+    except Exception:
+        pass
+    try:
         from . import chain_notes
         from . import magazine_book_export as m
     except Exception:
