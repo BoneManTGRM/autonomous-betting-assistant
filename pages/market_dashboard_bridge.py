@@ -50,34 +50,36 @@ TEXT = {
         "no_files": "NO FILES WRITTEN",
         "no_live": "NO LIVE CHANGES",
         "no_report": "Build the dashboard bridge to view outputs.",
+        "status": "Status", "markets": "Markets", "tracking_metric": "Tracking", "chains": "Chains", "avoid": "Avoid", "warn": "Warnings", "fail": "Failures", "hash": "Hash",
     },
     "es": {
-        "title": "Market Dashboard Bridge",
-        "caption": "Convierte output del Market Optimizer preview en dashboard, tracking schema y proof-handoff exports.",
-        "workspace_id": "ID de workspace",
-        "optimizer_json": "JSON optimizer report",
-        "market_csv": "CSV Market Hunter rows opcional",
-        "chain_csv": "CSV Chain Builder rows opcional",
-        "avoid_csv": "CSV Avoid List rows opcional",
-        "run": "Construir dashboard bridge",
-        "summary": "Resumen bridge",
-        "cards": "Dashboard cards",
-        "tracking": "Tracking schema rows",
-        "segments": "Segment summary",
-        "handoff": "Proof-flow handoff rows",
-        "checks": "Bridge checks",
-        "safety": "Safety gates",
-        "download_json": "Descargar JSON bridge",
-        "download_cards": "Descargar JSON dashboard cards",
-        "download_tracking": "Descargar CSV tracking schema",
-        "download_segments": "Descargar CSV segment summary",
-        "download_handoff": "Descargar CSV proof handoff",
-        "download_checks": "Descargar CSV bridge checks",
-        "download_manifest": "Descargar JSON manifest",
-        "preview_only": "PREVIEW ONLY",
-        "no_files": "NO FILES WRITTEN",
-        "no_live": "NO LIVE CHANGES",
-        "no_report": "Construye el dashboard bridge para ver outputs.",
+        "title": "Puente del panel de mercados",
+        "caption": "Convierte la vista previa del Optimizador de mercados en exportaciones para el panel, el esquema de seguimiento y el flujo de pruebas.",
+        "workspace_id": "ID del espacio de trabajo",
+        "optimizer_json": "JSON del reporte del optimizador",
+        "market_csv": "CSV opcional de filas de Market Hunter",
+        "chain_csv": "CSV opcional de filas de Chain Builder",
+        "avoid_csv": "CSV opcional de la lista para evitar",
+        "run": "Construir puente del panel",
+        "summary": "Resumen del puente",
+        "cards": "Tarjetas del panel",
+        "tracking": "Filas del esquema de seguimiento",
+        "segments": "Resumen de segmentos",
+        "handoff": "Filas de traspaso al flujo de pruebas",
+        "checks": "Revisiones del puente",
+        "safety": "Compuertas de seguridad",
+        "download_json": "Descargar JSON del puente",
+        "download_cards": "Descargar JSON de tarjetas del panel",
+        "download_tracking": "Descargar CSV del esquema de seguimiento",
+        "download_segments": "Descargar CSV de resumen de segmentos",
+        "download_handoff": "Descargar CSV de traspaso de pruebas",
+        "download_checks": "Descargar CSV de revisiones del puente",
+        "download_manifest": "Descargar JSON del manifiesto",
+        "preview_only": "SOLO VISTA PREVIA",
+        "no_files": "NO SE ESCRIBEN ARCHIVOS",
+        "no_live": "NO HAY CAMBIOS EN VIVO",
+        "no_report": "Construye el puente del panel para ver los resultados.",
+        "status": "Estado", "markets": "Mercados", "tracking_metric": "Seguimiento", "chains": "Cadenas", "avoid": "Evitar", "warn": "Avisos", "fail": "Fallos", "hash": "Hash",
     },
 }
 
@@ -108,14 +110,14 @@ if not report:
 
 st.write({t("preview_only"): bool(report.get("preview_only")), t("no_files"): int(report.get("files_written") or 0) == 0, t("no_live"): int(report.get("live_changes") or 0) == 0})
 metrics = st.columns(8)
-metrics[0].metric("status", report.get("bridge_status", ""))
-metrics[1].metric("markets", report.get("market_row_count", 0))
-metrics[2].metric("tracking", report.get("tracking_row_count", 0))
-metrics[3].metric("chains", report.get("chain_row_count", 0))
-metrics[4].metric("avoid", report.get("avoid_row_count", 0))
-metrics[5].metric("warn", report.get("warn_count", 0))
-metrics[6].metric("fail", report.get("fail_count", 0))
-metrics[7].metric("hash", _fragment(report.get("bridge_hash")))
+metrics[0].metric(t("status"), report.get("bridge_status", ""))
+metrics[1].metric(t("markets"), report.get("market_row_count", 0))
+metrics[2].metric(t("tracking_metric"), report.get("tracking_row_count", 0))
+metrics[3].metric(t("chains"), report.get("chain_row_count", 0))
+metrics[4].metric(t("avoid"), report.get("avoid_row_count", 0))
+metrics[5].metric(t("warn"), report.get("warn_count", 0))
+metrics[6].metric(t("fail"), report.get("fail_count", 0))
+metrics[7].metric(t("hash"), _fragment(report.get("bridge_hash")))
 
 st.markdown(f"### {t('summary')}")
 st.json({
