@@ -27,6 +27,14 @@ def _append_provider(module: Any) -> None:
         module.API_SUMMARY_KEY_FRAGMENTS = fragments + ("balldontlie",)
 
 
+def _install_report_studio_guard() -> None:
+    try:
+        from autonomous_betting_agent.report_studio_fresh_ledger_guard import install as install_guard
+        install_guard()
+    except Exception:
+        pass
+
+
 def install() -> None:
     for name in (
         "autonomous_betting_agent.magazine_api_sources",
@@ -37,3 +45,4 @@ def install() -> None:
             _append_provider(module)
         except Exception:
             pass
+    _install_report_studio_guard()
