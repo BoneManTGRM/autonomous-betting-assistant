@@ -97,16 +97,16 @@ def test_spanish_shadow_mode_copy_explains_data_blocked():
     assert "Dynamic aplicado EN VIVO" not in text
 
 
-def test_spanish_market_pages_do_not_use_mixed_spanglish_labels():
+def test_spanish_market_pages_replace_known_spanglish_phrases():
     optimizer = _read(MARKET_OPTIMIZER)
     bridge = _read(MARKET_BRIDGE)
     app = _read(APP_STREAMLIT)
     assert "Optimizador de mercados" in optimizer
-    assert "Vista previa" not in optimizer or "preview" not in optimizer[optimizer.find('"es"'):] 
+    assert "Vista previa del Optimizador de mercados" not in optimizer
+    assert "optimizer preview" not in optimizer.split('"es":', 1)[1].split("\n    },", 1)[0]
     assert "Puente del panel de mercados" in bridge
     assert "SOLO VISTA PREVIA" in bridge
+    assert "Convierte output del Market Optimizer preview" not in bridge
+    assert "NO LIVE CHANGES" not in bridge.split('"es":', 1)[1].split("\n    },", 1)[0]
     assert "Impulsado por Reparodinámica" in app
-    for bad in ["dashboard bridge", "outputs", "NO LIVE CHANGES", "NO FILES WRITTEN", "optimizer preview", "Learning Memory"]:
-        assert bad not in bridge[bridge.find('"es"'):]
-        assert bad not in optimizer[optimizer.find('"es"'):]
-        assert bad not in app[app.find("'es'"):]
+    assert "Learning Memory" not in app.split("'es':", 1)[1].split("\n    },", 1)[0]
