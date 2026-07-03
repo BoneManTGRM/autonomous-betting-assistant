@@ -6,7 +6,7 @@ import re
 
 from .report_public_quality import build_full_market_label, is_saved_source, market_type, provider_state, public_text, to_float
 
-VERSION = "verification_gate_v1"
+VERSION = "verification_gate_v2_no_verified_truth"
 VERIFIED_BUYER_PICK = "VERIFIED_BUYER_PICK"
 WATCHLIST_VERIFY_PRICE = "WATCHLIST_VERIFY_PRICE"
 NO_PRICE_REJECTED = "NO_B" + "ET_PRICE_REJECTED"
@@ -17,6 +17,7 @@ VERIFIED_REPORT = "Verified 100 Report"
 WATCHLIST_REPORT = "Verification Watchlist"
 AUDIT_REPORT = "Full Audit Book"
 NO_VERIFIED_MESSAGE = "No verified buyer picks available from current provider data yet."
+NO_VERIFIED_CLASS = "NO_VERIFIED_BUYER_PICKS"
 
 STATUS = {
     VERIFIED_BUYER_PICK: "VERIFIED CANDIDATE / PLAYABLE VALUE",
@@ -24,6 +25,7 @@ STATUS = {
     NO_PRICE_REJECTED: "NO B" + "ET / PRICE REJECTED",
     RESEARCH_ONLY: "RESEARCH ONLY",
     AUDIT_ONLY: "AUDIT ONLY",
+    NO_VERIFIED_CLASS: "NO VERIFIED BUYER PICKS",
 }
 RISK = {
     VERIFIED_BUYER_PICK: "VERIFIED PRICE",
@@ -31,6 +33,7 @@ RISK = {
     NO_PRICE_REJECTED: "PRICE REJECTED",
     RESEARCH_ONLY: "RESEARCH ONLY",
     AUDIT_ONLY: "AUDIT ONLY",
+    NO_VERIFIED_CLASS: "RESEARCH ONLY",
 }
 
 TIME_KEYS = ("provider_timestamp", "price_timestamp", "verified_timestamp", "timestamp", "last_update", "last_updated", "updated_at", "odds_timestamp")
@@ -44,7 +47,6 @@ PROVIDER_KEYS = ("provider", "odds_provider", "api_provider", "odds_source", "da
 BOOK_KEYS = ("sportsbook", "bookmaker", "book", "best_bookmaker")
 BAD_SOURCE = ("saved", "uploaded", "cached", "fallback", "handoff", "history", "ledger", "manual", "old")
 BAD_STATUS = ("cancel", "blocked", "do not publish", "post-start", "post start", "unsafe", "void", "final", "finished", "completed", "settled", "graded", "expired", "stale")
-LINE_REQUIRED = {"spread", "run_line", "total", "team_total", "player_prop"}
 LINE_KEYS = ("verified_line", "current_line", "provider_line", "spread_line", "run_line", "runline", "total_line", "game_total_line", "team_total_line", "handicap", "point", "points", "line")
 
 
@@ -416,9 +418,60 @@ def _stamp(rows: list[dict[str, Any]], mode: str, summary: Mapping[str, int]) ->
     return rows
 
 
-def _no_verified_row(summary: Mapping[str, int]) -> dict[str, Any]:
+def _no_verified_row(summary: Mapping[str, int]) -> list[dict[str, Any]]:
     reason = f"Verified buyer picks: 0 / 100. Watchlist rows: {summary.get('watchlist_verify_price_rows', 0)}. Price-rejected rows: {summary.get('price_rejected_rows', 0)}. Research-only rows: {summary.get('research_only_rows', 0)}. Audit-only rows: {summary.get('audit_only_rows', 0)}."
-    row = {"event": NO_VERIFIED_MESSAGE, "game": NO_VERIFIED_MESSAGE, "prediction": "No verified buyer picks", "pick": "No verified buyer picks", "market_type": "research only", "report_verification_class": RESEARCH_ONLY, "verification_status": RESEARCH_ONLY, "final_decision": "NO VERIFIED BUYER PICKS", "agent_decision": "NO VERIFIED BUYER PICKS", "recommendation": "NO VERIFIED BUYER PICKS", "consumer_action": "NO VERIFIED BUYER PICKS", "risk": "RESEARCH ONLY", "risk_level": "RESEARCH ONLY", "risk_label": "RESEARCH ONLY", "report_verification_reason": NO_VERIFIED_MESSAGE, "verification_reason": NO_VERIFIED_MESSAGE, "final_explanation": reason, "action_reason": reason, "recommendation_reason": reason}
+    row = {
+        "event": NO_VERIFIED_MESSAGE,
+        "game": NO_VERIFIED_MESSAGE,
+        "event_name": NO_VERIFIED_MESSAGE,
+        "matchup": NO_VERIFIED_MESSAGE,
+        "away_team": "No Verified Picks",
+        "home_team": "Current Provider Check",
+        "team_a": "No Verified Picks",
+        "team_b": "Current Provider Check",
+        "sport": "Report Verification",
+        "league": "ABA Signal Pro",
+        "season_label": "Current Provider Gate",
+        "sports_context_summary": NO_VERIFIED_MESSAGE,
+        "matchup_notes": NO_VERIFIED_MESSAGE,
+        "why_bullets": "No current provider row passed every buyer-pick gate. Do not publish as a verified pick.",
+        "prediction": "No verified buyer picks",
+        "pick": "No verified buyer picks",
+        "selection": "No verified buyer picks",
+        "market_type": "research only",
+        "market": "research only",
+        "report_verification_class": NO_VERIFIED_CLASS,
+        "report_classification": NO_VERIFIED_CLASS,
+        "verification_status": STATUS[NO_VERIFIED_CLASS],
+        "final_decision": STATUS[NO_VERIFIED_CLASS],
+        "agent_decision": STATUS[NO_VERIFIED_CLASS],
+        "recommendation": STATUS[NO_VERIFIED_CLASS],
+        "consumer_action": STATUS[NO_VERIFIED_CLASS],
+        "recommended_action": STATUS[NO_VERIFIED_CLASS],
+        "risk": RISK[NO_VERIFIED_CLASS],
+        "risk_level": RISK[NO_VERIFIED_CLASS],
+        "risk_label": RISK[NO_VERIFIED_CLASS],
+        "profit_guard_status": RISK[NO_VERIFIED_CLASS],
+        "report_verification_reason": NO_VERIFIED_MESSAGE,
+        "verification_reason": NO_VERIFIED_MESSAGE,
+        "verification_reasons": [NO_VERIFIED_MESSAGE],
+        "final_explanation": reason,
+        "action_reason": reason,
+        "recommendation_reason": reason,
+        "report_source": "no_verified_provider_gate",
+        "report_source_label": "No verified current-provider picks",
+        "report_data_scope": "No verified buyer picks",
+        "report_truth_severity": "RESEARCH ONLY",
+        "api_match_status": "Provider not matched",
+        "provider_match_status": "Provider not matched",
+        "odds_api_status": "NO_VERIFIED_BUYER_PICKS",
+        "odds_status": "NO_VERIFIED_BUYER_PICKS",
+        "odds_verified": "false",
+        "provider_verified": "false",
+        "current_provider_verified": "false",
+        "odds_api_live": "false",
+        "the_odds_api_live": "false",
+    }
     return _stamp([row], VERIFIED_REPORT, summary)
 
 
