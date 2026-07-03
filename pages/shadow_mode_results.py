@@ -13,7 +13,7 @@ from autonomous_betting_agent.reparodynamics_phase3e_audit import write_phase3e_
 from autonomous_betting_agent.reparodynamics_repair_memory import load_repair_memory, repair_memory_to_frames, save_repair_memory, stable_memory_run_id, update_repair_memory
 from autonomous_betting_agent.reparodynamics_shadow_backtest import build_phase3c_report
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
-from autonomous_betting_agent.ui_i18n import localize_dataframe
+from autonomous_betting_agent.ui_i18n import localize_dataframe, localize_value
 
 st.set_page_config(page_title="Shadow Mode Results", layout="wide")
 LANG = render_app_sidebar("shadow_mode_results", language_key="shadow_mode_results_language", selector="radio")
@@ -51,40 +51,77 @@ TEXT = {
         "lr_training": "LR training rows",
         "lr_eval": "LR evaluation rows",
         "dynamic_applied": "Dynamic Applied LIVE",
+        "data_blocked_help": "Data is blocked because the shadow layer could not build a safe train/evaluation split with enough completed rows, odds, and result fields. Live model mutation stays off until those requirements are met.",
     },
     "es": {
-        "title": "Resultados Shadow Mode",
-        "caption": "Dynamic Odds Predictor Shadow Fase 3E. El comportamiento en vivo no cambia.",
-        "warning": "Los resultados Shadow Mode son solo simulacion. Dynamic Odds Predictor no cambia picks en vivo, probabilidad del modelo, EV, stake, bankroll, ledgers de prueba ni datos crudos.",
+        "title": "Resultados del modo sombra",
+        "caption": "Simulación Fase 3E del Predictor Dinámico de Cuotas. El comportamiento en vivo no cambia.",
+        "warning": "Los resultados del modo sombra son solo una simulación. El Predictor Dinámico de Cuotas no cambia picks en vivo, probabilidad del modelo, EV, stake, bankroll, registros de prueba ni datos originales.",
         "workspace": "ID del espacio de trabajo",
         "include_system": "Incluir fuentes locales disponibles del sistema",
         "upload": "CSV calificado opcional",
         "uploaded": "Filas subidas cargadas",
-        "run": "Ejecutar comparacion Shadow de Dynamic Odds Fase 3E",
-        "save": "Guardar Fase 3E en Repair Memory",
-        "saved": "Guardado en Repair Memory. No se activaron reparaciones en vivo.",
-        "already_saved": "Ya guardado en Repair Memory.",
-        "open_reparodynamics": "Abrir pagina Reparodynamics",
-        "baseline": "Metricas baseline",
-        "dynamic": "Metricas dinamicas",
-        "comparison": "Comparacion dinamica vs baseline",
+        "run": "Ejecutar comparación sombra Fase 3E del Predictor Dinámico de Cuotas",
+        "save": "Guardar Fase 3E en la memoria de reparación",
+        "saved": "Guardado en la memoria de reparación. No se activaron reparaciones en vivo.",
+        "already_saved": "Ya está guardado en la memoria de reparación.",
+        "open_reparodynamics": "Abrir página de Reparodinámica",
+        "baseline": "Métricas base",
+        "dynamic": "Métricas dinámicas",
+        "comparison": "Comparación dinámica vs. base",
         "lr": "Desglose LR",
-        "dynamic_rows": "Filas dinamicas",
+        "dynamic_rows": "Filas dinámicas",
         "blockers": "Bloqueadores de datos",
-        "watchlists": "Listas de observacion",
-        "manual": "Cola de revision manual",
+        "watchlists": "Listas de observación",
+        "manual": "Cola de revisión manual",
         "safety": "Compuertas de seguridad",
-        "memory": "Vista previa de Repair Memory",
+        "memory": "Vista previa de la memoria de reparación",
         "phase3c": "Backtest Fase 3C",
-        "empty": "No hay filas en esta seccion.",
-        "no_data": "Ejecuta un escaneo Shadow Fase 3E para mostrar resultados.",
-        "audit_written": "Evento de auditoria Fase 3E escrito. La mutacion en vivo sigue prohibida.",
+        "empty": "No hay filas en esta sección.",
+        "no_data": "Ejecuta un escaneo sombra Fase 3E para mostrar resultados.",
+        "audit_written": "Evento de auditoría Fase 3E escrito. La mutación en vivo sigue prohibida.",
         "rows": "Filas",
         "completed": "Completadas",
-        "lr_training": "Filas entrenamiento LR",
-        "lr_eval": "Filas evaluacion LR",
-        "dynamic_applied": "Dynamic aplicado EN VIVO",
+        "lr_training": "Filas LR de entrenamiento",
+        "lr_eval": "Filas LR de evaluación",
+        "dynamic_applied": "Aplicaciones en vivo",
+        "data_blocked_help": "Datos bloqueados: la capa sombra no pudo crear una separación segura entre entrenamiento y evaluación con suficientes filas completadas, cuotas y resultados. La mutación del modelo en vivo permanece apagada hasta cumplir esos requisitos.",
     },
+}
+
+SPANISH_COLUMNS = {
+    "source": "Fuente",
+    "model_loaded": "Modelo cargado",
+    "model_source": "Fuente del modelo",
+    "workspace_id": "ID del espacio de trabajo",
+    "lr_training_rows": "Filas LR de entrenamiento",
+    "lr_evaluation_rows": "Filas LR de evaluación",
+    "training_rows": "Filas LR",
+    "feature_count": "Características",
+    "baseline_success_rate": "Base global",
+    "protected_base_success_rate": "Base protegida",
+    "quality": "Calidad",
+    "dynamic_odds_applied_live_count": "Aplicaciones en vivo",
+    "decision": "Decisión",
+    "decision_reason": "Razón de la decisión",
+    "evaluation_mode": "Modo de evaluación",
+    "leakage_guard_reason": "Razón del control antifuga",
+}
+SPANISH_VALUES = {
+    "data_blocked": "Datos bloqueados",
+    "DATA BLOCKED": "Datos bloqueados",
+    "no_model": "Sin modelo",
+    "no_safe_train_evaluation_split": "No existe una separación segura entre entrenamiento y evaluación",
+    "insufficient_heldout_sample": "Muestra de evaluación insuficiente",
+    "dynamic_shadow_inconclusive": "Sombra dinámica inconclusa",
+    "dynamic_shadow_worse": "La sombra dinámica empeoró los resultados",
+    "train_test_leakage_detected": "Fuga detectada entre entrenamiento y evaluación",
+    "FORBIDDEN": "Prohibido",
+    "OFF": "Apagado",
+    "SHADOW ONLY": "Solo sombra",
+    "no_completed_rows": "No hay filas completadas",
+    "stable_hash_holdout": "Evaluación estable por hash",
+    "chronological_holdout": "Evaluación cronológica",
 }
 
 
@@ -92,11 +129,34 @@ def t(key: str) -> str:
     return TEXT.get(LANG, TEXT["en"]).get(key, key)
 
 
+def _display_value(value: Any) -> Any:
+    if LANG != "es" or value is None:
+        return value
+    text = str(value).strip()
+    if text in SPANISH_VALUES:
+        return SPANISH_VALUES[text]
+    lower_key = text.lower().replace(" ", "_")
+    if lower_key in SPANISH_VALUES:
+        return SPANISH_VALUES[lower_key]
+    translated = localize_value(value, LANG)
+    return translated
+
+
+def display_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    if LANG != "es" or frame is None or frame.empty:
+        return frame
+    shown = localize_dataframe(frame, LANG)
+    shown = shown.rename(columns={column: SPANISH_COLUMNS.get(str(column), column) for column in shown.columns})
+    for column in shown.columns:
+        shown[column] = shown[column].map(_display_value)
+    return shown
+
+
 def show_frame(frame: pd.DataFrame | None) -> None:
     if frame is None or frame.empty:
         st.info(t("empty"))
     else:
-        st.dataframe(localize_dataframe(frame, LANG), use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(frame), use_container_width=True, hide_index=True)
 
 
 def show_rows(rows: Any) -> None:
@@ -172,6 +232,8 @@ else:
     c3.metric(t("lr_training"), report.get("lr_training_rows", 0))
     c4.metric(t("lr_eval"), report.get("lr_evaluation_rows", 0))
     c5.metric(t("dynamic_applied"), counts.get("dynamic_odds_applied_live_count", 0))
+    if str(report.get("decision") or "").lower() == "data_blocked":
+        st.warning(t("data_blocked_help"))
     tabs = st.tabs([t("baseline"), t("dynamic"), t("comparison"), t("lr"), t("dynamic_rows"), t("blockers"), t("watchlists"), t("manual"), t("safety"), t("phase3c"), t("memory")])
     with tabs[0]:
         show_frame(one_row(report.get("baseline_metrics", {}) or {}))
