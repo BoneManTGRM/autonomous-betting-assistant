@@ -21,6 +21,15 @@ def test_spanish_page_one_fallback_terms_are_available():
     assert REPORT_TEXT_ES["uploaded/cached row"] == "fila cargada/en caché"
 
 
+def test_spanish_visible_report_labels_are_available():
+    assert REPORT_TEXT_ES["PAGE 12 OF 72"] == "PÁGINA 12 DE 72"
+    assert REPORT_TEXT_ES["FINAL RECOMMENDATION"] == "RECOMENDACIÓN FINAL"
+    assert REPORT_TEXT_ES["TARGET"] == "OBJETIVO"
+    assert REPORT_TEXT_ES["VERIFY PRICE"] == "VERIFICAR CUOTA"
+    assert REPORT_TEXT_ES["REPORT SOURCE"] == "FUENTE DEL REPORTE"
+    assert REPORT_TEXT_ES["Saved-source verification report"] == "Reporte de verificación de fuente guardada"
+
+
 def test_spanish_sport_labels_still_work():
     assert sport_league_display_text("Allsvenskan - Sweden", "es") == "Allsvenskan - Suecia"
     assert sport_league_display_text("NCAA Baseball", "es") == "Béisbol NCAA"
