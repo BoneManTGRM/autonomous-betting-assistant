@@ -14,6 +14,13 @@ def test_spanish_body_report_terms_are_available():
     assert REPORT_TEXT_ES["No verified 2-leg parlay found. Reason: only one priced positive-EV leg available or correlation/pricing blocked."] == "No se encontró parlay verificado de 2 selecciones. Motivo: solo hay una selección con cuota y VE positivo, o la correlación/precio está bloqueado."
 
 
+def test_spanish_page_one_fallback_terms_are_available():
+    assert REPORT_TEXT_ES["Context unavailable."] == "Contexto no disponible."
+    assert REPORT_TEXT_ES["Team form data was not returned for this soccer event."] == "No se recibieron datos de forma para este evento de fútbol."
+    assert REPORT_TEXT_ES["Lineup and injury data were not returned for this baseball event."] == "No se recibieron datos de alineación o lesiones para este evento de béisbol."
+    assert REPORT_TEXT_ES["uploaded/cached row"] == "fila cargada/en caché"
+
+
 def test_spanish_sport_labels_still_work():
     assert sport_league_display_text("Allsvenskan - Sweden", "es") == "Allsvenskan - Suecia"
     assert sport_league_display_text("NCAA Baseball", "es") == "Béisbol NCAA"
