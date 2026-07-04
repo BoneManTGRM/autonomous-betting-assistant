@@ -18,6 +18,19 @@ REPORT_TEXT_ES = {
     "ADVANCED MARKET ANALYSIS": "ANÁLISIS AVANZADO DE MERCADO",
     "STRAIGHT ANCHOR ONLY": "SOLO ANCLA DIRECTA",
     "NO VERIFIED PARLAY AVAILABLE": "SIN PARLAY VERIFICADO DISPONIBLE",
+    "Ranked parlays use real priced legs only. SGPs need sportsbook pricing or modeled correlation. Props need prop-specific probability.": "Los parlays clasificados usan solo selecciones con cuotas reales. Los SGP requieren precio de la casa o correlación modelada. Los props requieren probabilidad específica.",
+    "Page 1 remains the straight-bet anchor; Page 2 only adds verified parlays.": "La página 1 sigue siendo el ancla de apuesta directa; la página 2 solo agrega parlays verificados.",
+    "No verified parlay available. Straight anchor only until another priced, positive-EV, source-traceable leg exists.": "Sin parlay verificado disponible. Solo ancla directa hasta que exista otra selección con cuota, VE positivo y fuente rastreable.",
+    "Parlay candidates were blocked by pricing, correlation, EV, stale data, or missing model probability.": "Los candidatos parlay fueron bloqueados por precio, correlación, VE, datos vencidos o probabilidad de modelo faltante.",
+    "No SGP/cross-game/prop/live parlay is playable until provider returns priced eligible legs and correlation is handled.": "No hay parlay SGP/cruzado/prop/en vivo jugable hasta que el proveedor devuelva selecciones elegibles con cuota y la correlación esté resuelta.",
+    "Avoid any market with stale odds, line movement against the anchor, missing prop model, unsupported SGP pricing, or expired live window.": "Evitar cualquier mercado con cuotas vencidas, movimiento de línea contra el ancla, modelo de prop faltante, SGP sin precio o ventana en vivo expirada.",
+    "Cancel if Page 1 line changes or sportsbook line differs from the report line.": "Cancelar si la línea de la página 1 cambia o si la casa muestra una línea distinta.",
+    "Cancel if any leg loses odds, timestamp, provider match, market status, or positive EV.": "Cancelar si alguna selección pierde cuota, marca de tiempo, coincidencia de proveedor, estado de mercado o VE positivo.",
+    "Cancel if SGP correlation cannot be priced by sportsbook or model.": "Cancelar si la correlación SGP no puede ser tasada por la casa o por el modelo.",
+    "Cancel if a live/flash window is started, suspended, or expired.": "Cancelar si una ventana en vivo/flash inició, fue suspendida o expiró.",
+    "No verified 2-leg parlay found. Reason: only one priced positive-EV leg available or correlation/pricing blocked.": "No se encontró parlay verificado de 2 selecciones. Motivo: solo hay una selección con cuota y VE positivo, o la correlación/precio está bloqueado.",
+    "No verified 3-leg parlay found. Three independently eligible legs were not available.": "No se encontró parlay verificado de 3 selecciones. No hubo tres selecciones independientes elegibles.",
+    "No verified 4-leg longshot. Four eligible priced legs were not available.": "No se encontró parlay largo verificado de 4 selecciones. No hubo cuatro selecciones elegibles con cuota.",
 }
 
 SPORT_LEAGUE_ES = {
