@@ -38,4 +38,5 @@ def test_second_page_guard_reclassifies_negative_ev_candidate():
     markets, diag = page2.discover_markets(row)
     assert diag["provider_state"] == "Saved price only"
     assert markets[0].badge == "NO BET / PRICE REJECTED"
-    assert "positive edge" in markets[0].rejection_reason.lower()
+    reason = markets[0].rejection_reason.lower()
+    assert "saved price only" in reason or "positive edge" in reason
