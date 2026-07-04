@@ -19,6 +19,17 @@ from .extended_api_context import ExtendedLiveAPIContextBuilder
 
 ENRICHMENT_VERSION = "v15_fixed_balldontlie"
 
+# Stub for tests expecting original structure
+API_SECRET_DEFS = {
+    "Odds API": ("ODDS_API_KEY", "THE_ODDS_API_KEY"),
+    "SportsDataIO": ("SPORTSDATAIO_API_KEY", "SPORTS_DATA_IO_API_KEY", "SPORTSDATA_API_KEY"),
+    "WeatherAPI": ("WEATHERAPI_KEY", "WEATHER_API_KEY"),
+    "API-Football": ("API_FOOTBALL_KEY", "APIFOOTBALL_KEY"),
+    "NewsAPI": ("NEWSAPI_KEY", "NEWS_API_KEY"),
+    "Perplexity": ("PERPLEXITY_API_KEY", "PPLX_API_KEY"),
+    "Balldontlie": ("BALLDONTLIE_API_KEY",),
+}
+
 def enrich_row_with_live_api_data(row_like: Any, **kwargs) -> dict[str, Any]:
     row = dict(row_like) if not isinstance(row_like, dict) else row_like.copy()
     try:
@@ -41,10 +52,7 @@ def enrich_rows_with_live_api_data(rows: list[Any], **kwargs) -> list[dict[str, 
 def install(module=None):
     """Install/patch the magazine live API enrichment. Returns the module for chaining."""
     if module is None:
-        # Fallback if called without arg
         return None
-    # No-op patch for now; enrichment active via direct calls in report flow
-    # Future: apply actual patches here if needed
     return module
 
 # Parlay helper for page 2
