@@ -31,6 +31,18 @@ REPORT_TEXT_ES = {
     "No verified 2-leg parlay found. Reason: only one priced positive-EV leg available or correlation/pricing blocked.": "No se encontró parlay verificado de 2 selecciones. Motivo: solo hay una selección con cuota y VE positivo, o la correlación/precio está bloqueado.",
     "No verified 3-leg parlay found. Three independently eligible legs were not available.": "No se encontró parlay verificado de 3 selecciones. No hubo tres selecciones independientes elegibles.",
     "No verified 4-leg longshot. Four eligible priced legs were not available.": "No se encontró parlay largo verificado de 4 selecciones. No hubo cuatro selecciones elegibles con cuota.",
+    "Context unavailable.": "Contexto no disponible.",
+    "Data unavailable": "Dato no disponible",
+    "Not provided": "No proporcionado",
+    "Sport N/A": "Deporte N/D",
+    "Team form data was not returned for this soccer event.": "No se recibieron datos de forma para este evento de fútbol.",
+    "Team form data was not returned for this baseball event.": "No se recibieron datos de forma para este evento de béisbol.",
+    "Lineup and injury data were not returned for this soccer event.": "No se recibieron datos de alineación o lesiones para este evento de fútbol.",
+    "Lineup and injury data were not returned for this baseball event.": "No se recibieron datos de alineación o lesiones para este evento de béisbol.",
+    "Context was not returned for this event.": "No se recibió contexto para este evento.",
+    "Check lineup and news updates before publishing.": "Revisar alineación y noticias antes de publicar.",
+    "Recheck price before publishing.": "Revisar la cuota antes de publicar.",
+    "uploaded/cached row": "fila cargada/en caché",
 }
 
 SPORT_LEAGUE_ES = {
