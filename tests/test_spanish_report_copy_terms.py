@@ -1,4 +1,4 @@
-from autonomous_betting_agent.report_studio_spanish_ui import REPORT_TEXT_ES, sport_league_display_text
+from autonomous_betting_agent.report_studio_spanish_ui import REPORT_TEXT_ES, spanish_report_text, sport_league_display_text
 
 
 def test_spanish_report_headings_are_available():
@@ -28,6 +28,14 @@ def test_spanish_visible_report_labels_are_available():
     assert REPORT_TEXT_ES["VERIFY PRICE"] == "VERIFICAR CUOTA"
     assert REPORT_TEXT_ES["REPORT SOURCE"] == "FUENTE DEL REPORTE"
     assert REPORT_TEXT_ES["Saved-source verification report"] == "Reporte de verificación de fuente guardada"
+
+
+def test_spanish_public_text_cleanup_handles_mixed_output():
+    assert spanish_report_text("DAILY SPORTS ANALYSIS", "es") == "ANÁLISIS DEPORTIVO DIARIO"
+    assert spanish_report_text("WHY WE PICKED IT", "es") == "POR QUÉ LO ELEGIMOS"
+    assert "Tipo de fuente" in spanish_report_text("Source type: Saved-source report", "es")
+    assert "SOLO ANCLA DIRECTA" in spanish_report_text("STRAIGHT ANCHOR ONLY: No verificado parlay candidate yet qualified from current proveedor mercados.", "es")
+    assert "No garantizamos resultados" in spanish_report_text("No guarantees. Bet responsibly. This analysis is for informational purposes only.", "es")
 
 
 def test_spanish_sport_labels_still_work():

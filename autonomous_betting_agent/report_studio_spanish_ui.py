@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable, Sequence
 
 REPORT_TEXT_ES = {
@@ -18,7 +19,12 @@ REPORT_TEXT_ES = {
     "ADVANCED MARKET ANALYSIS": "ANÁLISIS AVANZADO DE MERCADO",
     "STRAIGHT ANCHOR ONLY": "SOLO ANCLA DIRECTA",
     "NO VERIFIED PARLAY AVAILABLE": "SIN PARLAY VERIFICADO DISPONIBLE",
+    "WHY WE PICKED IT": "POR QUÉ LO ELEGIMOS",
+    "PRO BETTOR EVIDENCE": "EVIDENCIA DEL APOSTADOR PRO",
+    "PLAYER / INJURY NOTES": "JUGADORES / LESIONES",
+    "MATCHUP NOTES": "NOTAS DEL PARTIDO",
     "FINAL RECOMMENDATION": "RECOMENDACIÓN FINAL",
+    "FINAL": "FINAL",
     "RECOMMENDATION": "RECOMENDACIÓN",
     "TARGET": "OBJETIVO",
     "VERIFY PRICE": "VERIFICAR CUOTA",
@@ -27,6 +33,10 @@ REPORT_TEXT_ES = {
     "DATA SCOPE": "ALCANCE DE DATOS",
     "TRUTH": "VERDAD",
     "ODDS STATUS": "ESTADO DE CUOTAS",
+    "ODDS": "CUOTA",
+    "CONFIDENCE": "CONFIANZA",
+    "EDGE": "VENTAJA",
+    "RISK": "RIESGO",
     "Uploaded / saved row": "Fila cargada / guardada",
     "Saved-source verification report": "Reporte de verificación de fuente guardada",
     "UPLOADED_ROW": "FILA CARGADA",
@@ -55,9 +65,82 @@ REPORT_TEXT_ES = {
     "Check lineup and news updates before publishing.": "Revisar alineación y noticias antes de publicar.",
     "Recheck price before publishing.": "Revisar la cuota antes de publicar.",
     "uploaded/cached row": "fila cargada/en caché",
+    "No guarantees. Bet responsibly. This analysis is for informational purposes only.": "No garantizamos resultados. Apuesta responsablemente. Este análisis es solo informativo.",
+    "Fallback/watchlist only.": "Solo respaldo/lista de seguimiento.",
+    "Confirm current price before entry.": "Confirmar cuota actual antes de entrar.",
+    "Watchlist only: current price and live context need verification.": "Solo seguimiento: la cuota actual y el contexto en vivo requieren verificación.",
+    "Source type: Saved-source report": "Tipo de fuente: reporte de fuente guardada",
+    "Current proveedor match: Not verificado": "Coincidencia actual del proveedor: no verificada",
+    "marca de tiempo: Saved-row marca de tiempo": "Marca de tiempo: marca de fila guardada",
+    "Verification status: Source saved": "Estado de verificación: fuente guardada",
+    "STRAIGHT ANCHOR ONLY: No verificado parlay candidate yet qualified from current proveedor mercados.": "SOLO ANCLA DIRECTA: ningún candidato parlay verificado calificó con los mercados actuales del proveedor.",
+    "Eligible legs found: 0. Need at least two verificado quotad positive-EV legs.": "Selecciones elegibles encontradas: 0. Se necesitan al menos dos selecciones verificadas, con cuota y VE positivo.",
+    "No verificado parlay candidate yet available. Straight anchor only until another quotad, positive-EV, source-traceable leg exists.": "Sin parlay verificado disponible. Solo ancla directa hasta que exista otra selección con cuota, VE positivo y fuente rastreable.",
 }
 
 REPORT_TEXT_ES.update({f"PAGE {page} OF {total}": f"PÁGINA {page} DE {total}" for total in range(1, 201) for page in range(1, total + 1)})
+
+REPORT_PART_ES = (
+    ("DAILY SPORTS ANALYSIS", "ANÁLISIS DEPORTIVO DIARIO"),
+    ("WHY WE PICKED IT", "POR QUÉ LO ELEGIMOS"),
+    ("TEAM SNAPSHOTS", "RESUMEN DE EQUIPOS"),
+    ("PLAYER / INJURY NOTES", "JUGADORES / LESIONES"),
+    ("MATCHUP NOTES", "NOTAS DEL PARTIDO"),
+    ("PRO BETTOR EVIDENCE", "EVIDENCIA DEL APOSTADOR PRO"),
+    ("FINAL RECOMMENDATION", "RECOMENDACIÓN FINAL"),
+    ("REPORT SOURCE", "FUENTE DEL REPORTE"),
+    ("DATA SCOPE", "ALCANCE DE DATOS"),
+    ("ODDS STATUS", "ESTADO DE CUOTAS"),
+    ("Uploaded / saved row", "Fila cargada / guardada"),
+    ("Saved-source verification report", "Reporte de verificación de fuente guardada"),
+    ("UPLOADED_ROW", "FILA CARGADA"),
+    ("VERIFY PRICE", "VERIFICAR CUOTA"),
+    ("Source type", "Tipo de fuente"),
+    ("Saved-source report", "reporte de fuente guardada"),
+    ("Current proveedor match", "Coincidencia actual del proveedor"),
+    ("Not verificado", "no verificada"),
+    ("Verification status", "Estado de verificación"),
+    ("Source saved", "fuente guardada"),
+    ("Eligible legs found", "Selecciones elegibles encontradas"),
+    ("Need at least two", "Se necesitan al menos dos"),
+    ("verificado quotad", "verificadas con cuota"),
+    ("positive-EV", "VE positivo"),
+    ("STRAIGHT ANCHOR ONLY", "SOLO ANCLA DIRECTA"),
+    ("candidate yet qualified from current proveedor mercados", "candidato calificado con los mercados actuales del proveedor"),
+    ("candidate yet available", "candidato disponible"),
+    ("Straight anchor only until another quotad", "Solo ancla directa hasta que exista otra selección con cuota"),
+    ("source-traceable leg exists", "selección con fuente rastreable"),
+    ("The pick is", "La selección es"),
+    ("The pick for", "La selección para"),
+    ("The game total for", "El total del partido para"),
+    ("is supported by", "está respaldado por"),
+    ("are favored by", "son favoritas por"),
+    ("is favored by", "es favorito por"),
+    ("are listed as", "aparecen como"),
+    ("is listed as", "aparece como"),
+    ("is not the current market", "no es el mercado actual"),
+    ("home underdog", "local no favorito"),
+    ("run underdog", "no favorito en línea de carrera"),
+    ("run-line favorite", "favorito en línea de carrera"),
+    ("current market", "mercado actual"),
+    ("upcoming", "próximo"),
+    ("most recent", "más reciente"),
+    ("matched teams", "vinculó equipos"),
+    ("injuries checked", "lesiones revisadas"),
+    ("Weather: Weather:", "Clima:"),
+    ("Weather:", "Clima:"),
+    ("Location:", "Ubicación:"),
+    ("wind", "viento"),
+    ("Sunny", "Soleado"),
+    ("Partly cloudy", "Parcialmente nublado"),
+    ("Light rain", "Lluvia ligera"),
+    ("Clear", "Despejado"),
+    ("Overcast", "Nublado"),
+    ("Context:", "Contexto:"),
+    ("United States of America", "Estados Unidos"),
+    ("United States", "Estados Unidos"),
+    ("No guarantees. Bet responsibly. This analysis is for informational purposes only.", "No garantizamos resultados. Apuesta responsablemente. Este análisis es solo informativo."),
+)
 
 SPORT_LEAGUE_ES = {
     "Boxing": "Boxeo",
@@ -91,15 +174,43 @@ SPORT_LEAGUE_ES = {
 }
 
 
+def spanish_report_text(value: Any, language: str = "es") -> str:
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    if not text or language != "es":
+        return text
+    if text in REPORT_TEXT_ES:
+        return REPORT_TEXT_ES[text]
+    text = re.sub(r"\bPAGE\s+(\d+)\s+OF\s+(\d+)\b", r"PÁGINA \1 DE \2", text, flags=re.I)
+    for old, new in REPORT_PART_ES:
+        text = re.sub(re.escape(old), new, text, flags=re.I)
+    return text
+
+
+def _patch_translation_function(module: Any) -> None:
+    try:
+        module.ES.update(REPORT_TEXT_ES)
+    except Exception:
+        pass
+    original = getattr(module, "_tr", None)
+    if not callable(original) or getattr(original, "_ABA_SPANISH_VISIBLE_TEXT_PATCH", False):
+        return
+
+    def patched(value: Any, language: str) -> str:
+        return spanish_report_text(original(value, language), language)
+
+    patched._ABA_SPANISH_VISIBLE_TEXT_PATCH = True  # type: ignore[attr-defined]
+    module._tr = patched
+
+
 def _install_report_text_terms() -> None:
     try:
         from autonomous_betting_agent import magazine_book_export
-        magazine_book_export.ES.update(REPORT_TEXT_ES)
+        _patch_translation_function(magazine_book_export)
     except Exception:
         pass
     try:
         from autonomous_betting_agent import magazine_second_page_patch
-        magazine_second_page_patch.ES.update(REPORT_TEXT_ES)
+        _patch_translation_function(magazine_second_page_patch)
     except Exception:
         pass
 
