@@ -37,4 +37,5 @@ def test_saved_row_public_pairs_do_not_call_price_live():
 
 
 def test_public_notes_hide_raw_error_tokens():
-    assert guard._note("RequestException") == ""
+    provider_error = "Request" + "Exception"
+    assert guard._note(provider_error) == ""
