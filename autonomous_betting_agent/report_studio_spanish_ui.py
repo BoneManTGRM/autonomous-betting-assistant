@@ -18,6 +18,18 @@ REPORT_TEXT_ES = {
     "ADVANCED MARKET ANALYSIS": "ANÁLISIS AVANZADO DE MERCADO",
     "STRAIGHT ANCHOR ONLY": "SOLO ANCLA DIRECTA",
     "NO VERIFIED PARLAY AVAILABLE": "SIN PARLAY VERIFICADO DISPONIBLE",
+    "FINAL RECOMMENDATION": "RECOMENDACIÓN FINAL",
+    "RECOMMENDATION": "RECOMENDACIÓN",
+    "TARGET": "OBJETIVO",
+    "VERIFY PRICE": "VERIFICAR CUOTA",
+    "WATCHLIST": "LISTA DE SEGUIMIENTO",
+    "REPORT SOURCE": "FUENTE DEL REPORTE",
+    "DATA SCOPE": "ALCANCE DE DATOS",
+    "TRUTH": "VERDAD",
+    "ODDS STATUS": "ESTADO DE CUOTAS",
+    "Uploaded / saved row": "Fila cargada / guardada",
+    "Saved-source verification report": "Reporte de verificación de fuente guardada",
+    "UPLOADED_ROW": "FILA CARGADA",
     "Ranked parlays use real priced legs only. SGPs need sportsbook pricing or modeled correlation. Props need prop-specific probability.": "Los parlays clasificados usan solo selecciones con cuotas reales. Los SGP requieren precio de la casa o correlación modelada. Los props requieren probabilidad específica.",
     "Page 1 remains the straight-bet anchor; Page 2 only adds verified parlays.": "La página 1 sigue siendo el ancla de apuesta directa; la página 2 solo agrega parlays verificados.",
     "No verified parlay available. Straight anchor only until another priced, positive-EV, source-traceable leg exists.": "Sin parlay verificado disponible. Solo ancla directa hasta que exista otra selección con cuota, VE positivo y fuente rastreable.",
@@ -44,6 +56,8 @@ REPORT_TEXT_ES = {
     "Recheck price before publishing.": "Revisar la cuota antes de publicar.",
     "uploaded/cached row": "fila cargada/en caché",
 }
+
+REPORT_TEXT_ES.update({f"PAGE {page} OF {total}": f"PÁGINA {page} DE {total}" for total in range(1, 201) for page in range(1, total + 1)})
 
 SPORT_LEAGUE_ES = {
     "Boxing": "Boxeo",
