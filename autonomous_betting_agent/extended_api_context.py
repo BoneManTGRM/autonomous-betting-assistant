@@ -14,16 +14,20 @@ from .live_api_context import LiveAPIContextBuilder, _clean
 @dataclass
 class ExtendedLiveAPIContextBuilder(LiveAPIContextBuilder):
     """Adds optional contextual APIs.
-    Core: balldontlie (team/player/injury snapshots, matchup notes).
-    Perplexity restored (user context for injuries/lineups/form).
-    api_football and newsapi removed (situational/redundant for WNBA focus).
-    All failures contained; does not break core pick logic or reports.
+    Core kept: balldontlie (replaces football api for team/player/injury snapshots + matchup notes).
+    Restored: perplexity (user), newsapi (headlines for injuries/lineups).
+    api_football removed (redundant).
+    No sportsdataio present anywhere (already deleted).
+    Failures contained; reports stay clean.
     """
 
     perplexity_key: str = ""
+    newsapi_key: str = ""
     perplexity_base_url: str = "https://api.perplexity.ai"
+    newsapi_base_url: str = "https://newsapi.org/v2"
     optional_api_timeout_seconds: float = 4.0
     _perplexity_cache: dict[str, dict[str, Any]] = field(default_factory=dict)
+    _newsapi_cache: dict[str, dict[str, Any]] = field(default_factory=dict)
     _balldontlie_cache: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def _get_json(self, url: str, *, headers: dict[str, str] | None = None) -> tuple[Any, str]:
@@ -61,6 +65,40 @@ class ExtendedLiveAPIContextBuilder(LiveAPIContextBuilder):
                 getattr(event, "commence_time", ""),
             )
         )
+
+    def _newsapi_context(self, event: Any) -> dict[str, Any]:
+        configured = bool(self.newsapi_key)
+        base = {
+            "newsapi_source_configured": "yes" if configured else "no",
+            "newsapi_source_used": "no",
+            "newsapi_context_status": "not_configured" if not configured else "not_run",
+        }
+        if not configured:
+            return base
+        key = self._event_key(event)
+        if key in self._newsapi_cache:
+            return self._newsapi_cache[key]
+        home_team = str(getattr(event, "home_team", "") or "")
+        away_team = str(getattr(event, "away_team", "") or "")
+        query = " ".join(part for part in (home_team, away_team, "injury OR lineup OR news") if part).strip()
+        if not query:
+            return {**base, "newsapi_context_status": "no_query"}
+        params = {"q": query, "pageSize": 3, "sortBy": "publishedAt", "language": "en", "apiKey": self.newsapi_key}
+        url = f"{self.newsapi_base_url.rstrip('/')}/everything?{urlencode(params)}"
+        payload, status = self._get_json(url)
+        articles = payload.get("articles", []) if isinstance(payload, dict) else []
+        clean_articles = [article for article in articles if isinstance(article, dict)][:3]
+        headlines = [str(article.get("title", "")).strip() for article in clean_articles if article.get("title")]
+        result = {
+            **base,
+            "newsapi_source_used": "yes" if headlines and status == "used" else "no",
+            "newsapi_context_status": "used" if headlines and status == "used" else status,
+            "newsapi_headline_count": len(headlines),
+            "newsapi_context_summary": " | ".join(headlines)[:500],
+            "newsapi_context_note": "NewsAPI headlines are contextual only and do not create picks.",
+        }
+        self._newsapi_cache[key] = result
+        return result
 
     def _perplexity_context(self, event: Any) -> dict[str, Any]:
         configured = bool(self.perplexity_key)
@@ -153,6 +191,7 @@ class ExtendedLiveAPIContextBuilder(LiveAPIContextBuilder):
 
     def context_for_event(self, event: Any, *, pick_name: str) -> dict[str, Any]:
         context = super().context_for_event(event, pick_name=pick_name)
+        context.update(self._newsapi_context(event))
         context.update(self._perplexity_context(event))
         context.update(self._balldontlie_context(event))
         return context
