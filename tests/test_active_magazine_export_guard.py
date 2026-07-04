@@ -50,7 +50,7 @@ def test_installed_guard_cleans_saved_source_page_two_sections():
     })
     rendered = "\n".join(item for _title, rows, _color in page2._page_two_sections(row, "en") for item in rows)
     assert "Run Line: San Diego Padres +1.5" in rendered
-    assert "Source type: Saved-source report" in rendered
-    assert "Current provider match: Not verified" in rendered
+    assert "Source type: Saved row with provider/context fields" in rendered
+    assert "Current provider match: Recheck required" in rendered
+    assert "Stored price: 1.78 from consensus_average" in rendered
     assert "Provider: saved-source" not in rendered
-    assert "Timestamp: Saved-row timestamp" in rendered
