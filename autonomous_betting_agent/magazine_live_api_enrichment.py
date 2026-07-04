@@ -38,9 +38,14 @@ def enrich_row_with_live_api_data(row_like: Any, **kwargs) -> dict[str, Any]:
 def enrich_rows_with_live_api_data(rows: list[Any], **kwargs) -> list[dict[str, Any]]:
     return [enrich_row_with_live_api_data(r, **kwargs) for r in rows]
 
-def install():
-    """Install/patch the magazine live API enrichment."""
-    pass  # No-op for minimal safe version; enrichment active via direct calls
+def install(module=None):
+    """Install/patch the magazine live API enrichment. Returns the module for chaining."""
+    if module is None:
+        # Fallback if called without arg
+        return None
+    # No-op patch for now; enrichment active via direct calls in report flow
+    # Future: apply actual patches here if needed
+    return module
 
 # Parlay helper for page 2
 
