@@ -1,37 +1,38 @@
 area,area_type,group_value,records,avg_predicted,actual_hit_rate,actual_minus_predicted,smoothed_hit_rate,smoothed_edge,stake_units,profit_units,roi,avg_price,avg_clv_percent,beat_close_rate,reliability,brier,memory_type,importance,action
-MLB / 60-70%,sport_probability_bucket,MLB|60-70%,41,0.644683,0.780488,0.135805,0.758316,0.113633,20.53,9.079,0.442231,1.54828,,,0.856012,0.186926,sport_probability_bucket,0.596291,raise_trust
-Sport: MLB,sport,MLB,75,0.63828,0.746667,0.108387,0.73622,0.09794,38.44,15.0813,0.392334,1.596867,,,0.877383,0.196188,sport,0.59588,raise_trust
-Market: totals,market_type,totals,51,0.645255,0.745098,0.099843,0.73156,0.086305,11.96,4.841608,0.404817,1.562059,,,0.880324,0.191482,market_type,0.57261,raise_trust
-MLB / spreads,sport_market,MLB|spreads,62,0.632032,0.725806,0.093774,0.715089,0.083057,27.37,11.6791,0.426712,1.592439,,,0.872981,0.203231,sport_market,0.566114,raise_trust
-Probability bucket: 60-70%,probability_bucket,60-70%,93,0.642591,0.731183,0.088591,0.724166,0.081574,31.66,11.643108,0.367755,1.556403,,,0.873125,0.203,probability_bucket,0.563149,raise_trust
-Confidence/read: play_small,confidence,play_small,124,0.642274,0.717742,0.075468,0.713168,0.070894,52.9,18.601041,0.351626,1.567693,,,0.870056,0.20791,confidence,0.541788,raise_trust
+Market: totals,market_type,totals,54,0.641463,0.759259,0.117796,0.74406,0.102597,13.16,5.690208,0.432387,1.571567,,,0.880757,0.190789,market_type,0.605194,raise_trust
+MLB / 60-70%,sport_probability_bucket,MLB|60-70%,48,0.646396,0.75,0.103604,0.735199,0.088804,21.58,8.9385,0.414203,1.544933,,,0.871828,0.196121,sport_probability_bucket,0.57173,raise_trust
+Sport: MLB,sport,MLB,87,0.636264,0.724138,0.087874,0.716738,0.080474,40.06,14.9249,0.372564,1.598813,,,0.873033,0.203148,sport,0.560947,raise_trust
 API coverage: 66-99%,api_coverage_bucket,66-99%,99,0.644899,0.717172,0.072273,0.711768,0.066869,44.1,13.784341,0.31257,1.559665,,,0.870244,0.20761,api_coverage_bucket,0.533738,raise_trust
-Books: 11+,books_bucket,11+,174,0.638517,0.701149,0.062632,0.698396,0.059879,64.55,20.263541,0.31392,1.575521,,,0.867573,0.211883,books_bucket,0.519758,raise_trust
-Odds: 1.30-1.59,odds_bucket,1.30-1.59,91,0.67433,0.736264,0.061934,0.731259,0.056929,33.35,9.991949,0.299609,1.485116,,,0.874543,0.20073,odds_bucket,0.513859,raise_trust
-Probability source: final_probability,probability_source,final_probability,175,0.638423,0.697143,0.05872,0.694576,0.056153,64.65,20.163541,0.311888,1.575699,,,0.866948,0.212883,probability_source,0.512306,raise_trust
-Bookmaker: consensus_average,bookmaker,consensus_average,175,0.638423,0.697143,0.05872,0.694576,0.056153,64.65,20.163541,0.311888,1.575699,,,0.866948,0.212883,bookmaker,0.512306,raise_trust
+Probability bucket: 60-70%,probability_bucket,60-70%,112,0.642946,0.714286,0.071339,0.70953,0.066583,34.06,12.106308,0.355441,1.555297,,,0.869096,0.209446,probability_bucket,0.533167,raise_trust
+FIFA World Cup / 60-70%,sport_probability_bucket,FIFA World Cup|60-70%,43,0.64186,0.72093,0.07907,0.708527,0.066667,8.68,3.191975,0.367739,1.558563,,,0.848064,0.210055,sport_probability_bucket,0.513307,raise_trust
+MLB / spreads,sport_market,MLB|spreads,72,0.632333,0.694444,0.062111,0.688233,0.0559,28.79,11.3726,0.395019,1.591136,,,0.868125,0.211,sport_market,0.5118,raise_trust
+Confidence/read: play_small,confidence,play_small,147,0.642197,0.70068,0.058483,0.697662,0.055465,58.31,20.894641,0.358337,1.568633,,,0.867214,0.212458,confidence,0.510929,raise_trust
 Probability source: model_probability,probability_source,model_probability,95,0.7,0.757895,0.057895,0.753398,0.053398,95.0,34.25,0.360526,1.75,,,0.883224,0.186842,probability_source,0.506796,raise_trust
 Confidence/read: 0.70,confidence,0.70,95,0.7,0.757895,0.057895,0.753398,0.053398,95.0,34.25,0.360526,1.75,,,0.883224,0.186842,confidence,0.506796,raise_trust
-Odds: 1.60-1.89,odds_bucket,1.60-1.89,161,0.645584,0.695652,0.050068,0.693282,0.047698,108.3,34.091592,0.314788,1.717527,,,0.867796,0.211527,odds_bucket,0.495396,raise_trust
+Books: 11+,books_bucket,11+,212,0.638118,0.688679,0.050561,0.686841,0.048723,72.75,23.006641,0.316242,1.576642,,,0.865398,0.215364,books_bucket,0.497445,raise_trust
+Probability source: final_probability,probability_source,final_probability,213,0.638042,0.685446,0.047404,0.68373,0.045688,72.85,22.906641,0.314436,1.576783,,,0.864894,0.216169,probability_source,0.491376,raise_trust
+Bookmaker: consensus_average,bookmaker,consensus_average,213,0.638042,0.685446,0.047404,0.68373,0.045688,72.85,22.906641,0.314436,1.576783,,,0.864894,0.216169,bookmaker,0.491376,raise_trust
+Odds: 1.60-1.89,odds_bucket,1.60-1.89,179,0.639883,0.687151,0.047268,0.685129,0.045246,111.13,35.492892,0.319382,1.71565,,,0.866026,0.214358,odds_bucket,0.490492,raise_trust
+FIFA World Cup / spreads,sport_market,FIFA World Cup|spreads,42,0.625452,0.690476,0.065024,0.680072,0.05462,11.25,3.083933,0.274127,1.605769,,,0.838918,0.219543,sport_market,0.487141,raise_trust
+Sport: FIFA World Cup,sport,FIFA World Cup,110,0.6552,0.7,0.0448,0.696963,0.041763,53.1,14.354975,0.270339,1.62905,,,0.867533,0.211947,sport,0.483525,raise_trust
+Odds: 1.30-1.59,odds_bucket,1.30-1.59,110,0.673909,0.718182,0.044273,0.71518,0.041271,37.72,11.103749,0.294373,1.485849,,,0.870985,0.206424,odds_bucket,0.482542,raise_trust
 Market: estimated_score,market_type,estimated_score,74,0.7,0.743243,0.043243,0.739024,0.039024,74.0,23.75,0.320946,1.75,,,0.879561,0.192703,market_type,0.478049,raise_trust
-API coverage: 33-65%,api_coverage_bucket,33-65%,76,0.629987,0.671053,0.041066,0.667142,0.037155,20.55,6.3792,0.310423,1.596587,,,0.862655,0.219752,api_coverage_bucket,0.47431,raise_trust
-Market: spreads,market_type,spreads,120,0.635917,0.675,0.039083,0.672557,0.036641,48.69,14.830733,0.304595,1.583202,,,0.860752,0.222797,market_type,0.473281,raise_trust
-Probability bucket: 50-60%,probability_bucket,50-60%,56,0.584875,0.625,0.040125,0.619984,0.035109,20.5,7.1413,0.348356,1.709261,,,0.852452,0.236076,probability_bucket,0.470219,raise_trust
-FIFA World Cup / 60-70%,sport_probability_bucket,FIFA World Cup|60-70%,40,0.64165,0.7,0.05835,0.690275,0.048625,7.51,2.586075,0.344351,1.560942,,,0.834264,0.21633,sport_probability_bucket,0.469648,raise_trust
-Probability bucket: 70-80%,probability_bucket,70-80%,128,0.705383,0.742188,0.036805,0.740023,0.03464,114.49,38.299133,0.334519,1.662168,,,0.878549,0.194321,probability_bucket,0.469279,raise_trust
-Sport: FIFA World Cup,sport,FIFA World Cup,107,0.655495,0.691589,0.036093,0.689078,0.033583,51.93,13.749075,0.264762,1.63218,,,0.866034,0.214346,sport,0.467165,raise_trust
-FIFA World Cup / spreads,sport_market,FIFA World Cup|spreads,40,0.6241,0.675,0.0509,0.666517,0.042417,11.08,2.993533,0.270174,1.609433,,,0.829169,0.224481,sport_market,0.45792,raise_trust
+Probability bucket: 70-80%,probability_bucket,70-80%,132,0.706341,0.742424,0.036083,0.740362,0.034021,116.54,38.983933,0.334511,1.650779,,,0.878787,0.193941,probability_bucket,0.468043,raise_trust
+Probability bucket: 50-60%,probability_bucket,50-60%,70,0.5846,0.614286,0.029686,0.611241,0.026641,23.25,8.5064,0.365867,1.71026,,,0.851172,0.238124,probability_bucket,0.453282,raise_trust
+API coverage: 33-65%,api_coverage_bucket,33-65%,114,0.632088,0.657895,0.025807,0.656202,0.024115,28.75,9.1223,0.317297,1.591649,,,0.860249,0.223602,api_coverage_bucket,0.44823,raise_trust
 FIFA World Cup / totals,sport_market,FIFA World Cup|totals,31,0.644323,0.709677,0.065355,0.696271,0.051949,4.85,1.505542,0.310421,1.558913,,,0.807467,0.203735,sport_market,0.444164,raise_trust
+Market: spreads,market_type,spreads,154,0.637201,0.655844,0.018643,0.654924,0.017722,54.69,16.209733,0.296393,1.580368,,,0.858561,0.226302,market_type,0.435444,raise_trust
+MLB / 50-60%,sport_probability_bucket,MLB|50-60%,28,0.578429,0.642857,0.064429,0.62854,0.050111,10.0,3.3024,0.33024,1.727139,,,0.775247,0.233254,sport_probability_bucket,0.414121,raise_trust
 FIFA World Cup / 70-80%,sport_probability_bucket,FIFA World Cup|70-80%,43,0.704721,0.72093,0.016209,0.718388,0.013667,36.65,9.3555,0.255266,1.672206,,,0.854036,0.2005,sport_probability_bucket,0.411287,raise_trust
 FIFA World Cup / estimated_score,sport_market,FIFA World Cup|estimated_score,36,0.7,0.694444,-0.005556,0.695455,-0.004545,36.0,9.25,0.256944,1.75,,,0.822471,0.212222,sport_market,0.375702,raise_trust
-MLB / 50-60%,sport_probability_bucket,MLB|50-60%,23,0.578565,0.652174,0.073609,0.633178,0.054613,9.43,3.3183,0.351888,1.726326,,,0.749962,0.231355,sport_probability_bucket,0.363582,raise_trust
 FIFA World Cup / 50-60%,sport_probability_bucket,FIFA World Cup|50-60%,24,0.590375,0.625,0.034625,0.616344,0.025969,7.77,1.8075,0.232625,1.694204,,,0.752864,0.235849,sport_probability_bucket,0.33299,raise_trust
-Confidence/read: play_strong,confidence,play_strong,47,0.629277,0.638298,0.009021,0.636986,0.007709,7.75,1.0713,0.138232,1.601179,,,0.848961,0.228093,confidence,0.287382,raise_trust
 Sport: MMA,sport,MMA,18,0.668722,0.722222,0.0535,0.705761,0.037038,11.7,3.315,0.283333,1.652912,,,0.735275,0.202569,sport,0.284019,raise_trust
+Super League - China / spreads,sport_market,Super League - China|spreads,14,0.648786,0.571429,-0.077357,0.599558,-0.049227,3.35,0.6611,0.197343,1.555,,,0.675474,0.245343,sport_market,0.249078,lower_trust
+Sport: Super League - China,sport,Super League - China,17,0.650765,0.647059,-0.003706,0.648245,-0.00252,6.35,2.5563,0.402567,1.568541,,,0.715008,0.222895,sport,0.233241,raise_trust
+Confidence/read: play_strong,confidence,play_strong,61,0.628934,0.639344,0.01041,0.638137,0.009203,9.54,1.0053,0.105377,1.600854,,,0.832989,0.228225,confidence,0.229161,raise_trust
 Market: Winner,market_type,Winner,7,0.7,1.0,0.3,0.84,0.14,7.0,7.0,1.0,,,,0.684631,0.09,market_type,0.221775,raise_trust
-Sport: Brazil Série B,sport,Brazil Série B,6,0.723333,0.333333,-0.39,0.55619,-0.167143,6.0,-1.23,-0.205,1.436667,,,0.487529,0.375477,sport,0.218044,lower_trust
-Brazil Série B / 70-80%,sport_probability_bucket,Brazil Série B|70-80%,6,0.723333,0.333333,-0.39,0.55619,-0.167143,6.0,-1.23,-0.205,1.436667,,,0.487529,0.375477,sport_probability_bucket,0.218044,lower_trust
 Market: round/method,market_type,round/method,14,0.7,0.714286,0.014286,0.709091,0.009091,14.0,3.5,0.25,1.75,,,0.701135,0.204286,market_type,0.211217,raise_trust
+MLB / totals,sport_market,MLB|totals,6,0.636833,1.0,0.363167,0.792476,0.155643,2.27,1.0611,0.467445,1.614467,,,0.630682,0.146432,sport_market,0.211215,raise_trust
 MMA / totals,sport_market,MMA|totals,9,0.637444,0.777778,0.140333,0.711739,0.074294,2.7,1.315,0.487037,1.5774,,,0.658467,0.181804,sport_market,0.208824,raise_trust
 Boxing / 70-80%,sport_probability_bucket,Boxing|70-80%,8,0.708375,0.875,0.166625,0.791688,0.083313,7.1,3.530333,0.49723,1.694163,,,0.672647,0.135536,sport_probability_bucket,0.200543,raise_trust
 Sport: WNBA,sport,WNBA,9,0.665556,0.777778,0.112222,0.724967,0.059412,7.05,1.7841,0.253064,1.725556,,,0.658168,0.182284,sport,0.197494,raise_trust
@@ -41,37 +42,43 @@ Sport: League of Ireland,sport,League of Ireland,10,0.6555,0.7,0.0445,0.680222,0
 MLB / 70-80%,sport_probability_bucket,MLB|70-80%,9,0.712333,0.777778,0.065444,0.74698,0.034647,6.48,2.354,0.363272,1.583333,,,0.65496,0.187417,sport_probability_bucket,0.17864,raise_trust
 Boxing / round/method,sport_market,Boxing|round/method,7,0.7,0.857143,0.157143,0.773333,0.073333,7.0,3.5,0.5,1.75,,,0.648917,0.147143,sport_market,0.178289,raise_trust
 Probability source: fallback_high_confidence,probability_source,fallback_high_confidence,9,0.7,0.666667,-0.033333,0.682353,-0.017647,9.0,3.0,0.333333,,,,0.632512,0.223333,probability_source,0.165698,raise_trust
+Sport: NRL,sport,NRL,8,0.683875,0.75,0.066125,0.716938,0.033062,7.02,1.765,0.251425,1.75,,,0.63126,0.201755,sport,0.164974,raise_trust
+Sport: Veikkausliiga - Finland,sport,Veikkausliiga - Finland,7,0.656143,0.571429,-0.084714,0.61661,-0.039533,3.04,2.2033,0.72477,1.625243,,,0.573904,0.267163,sport,0.156242,lower_trust
+Veikkausliiga - Finland / spreads,sport_market,Veikkausliiga - Finland|spreads,5,0.6386,0.4,-0.2386,0.546831,-0.091769,1.04,0.7033,0.67625,1.57534,,,0.489371,0.338028,sport_market,0.155121,lower_trust
 WNBA / 70-80%,sport_probability_bucket,WNBA|70-80%,6,0.7,0.833333,0.133333,0.757143,0.057143,6.0,2.75,0.458333,1.75,,,0.624285,0.156667,sport_probability_bucket,0.152716,raise_trust
 WNBA / estimated_score,sport_market,WNBA|estimated_score,6,0.7,0.833333,0.133333,0.757143,0.057143,6.0,2.75,0.458333,1.75,,,0.624285,0.156667,sport_market,0.152716,raise_trust
-MLB / totals,sport_market,MLB|totals,4,0.66975,1.0,0.33025,0.779833,0.110083,2.07,0.911,0.440097,1.546425,,,0.595367,0.127628,sport_market,0.143852,raise_trust
+Super League - China / 50-60%,sport_probability_bucket,Super League - China|50-60%,6,0.5915,0.5,-0.0915,0.552286,-0.039214,1.15,0.6493,0.564609,1.691417,,,0.561823,0.256606,sport_probability_bucket,0.142068,lower_trust
+Market: h2h,market_type,h2h,5,0.627,0.8,0.173,0.693538,0.066538,5.0,1.0067,0.20134,1.52272,,,0.589276,0.17818,market_type,0.141707,raise_trust
+Confidence/read: research_watch,confidence,research_watch,5,0.627,0.8,0.173,0.693538,0.066538,5.0,1.0067,0.20134,1.52272,,,0.589276,0.17818,confidence,0.141707,raise_trust
 Sport: Cricket,sport,Cricket,4,0.7,1.0,0.3,0.8,0.1,4.0,4.0,1.0,,,,0.618885,0.09,sport,0.139174,raise_trust
 Cricket / 70-80%,sport_probability_bucket,Cricket|70-80%,4,0.7,1.0,0.3,0.8,0.1,4.0,4.0,1.0,,,,0.618885,0.09,sport_probability_bucket,0.139174,raise_trust
 Cricket / Winner,sport_market,Cricket|Winner,4,0.7,1.0,0.3,0.8,0.1,4.0,4.0,1.0,,,,0.618885,0.09,sport_market,0.139174,raise_trust
-Sport: NRL,sport,NRL,7,0.7,0.714286,0.014286,0.706667,0.006667,7.0,1.75,0.25,1.75,,,0.613202,0.204286,sport,0.134804,raise_trust
 NRL / 70-80%,sport_probability_bucket,NRL|70-80%,7,0.7,0.714286,0.014286,0.706667,0.006667,7.0,1.75,0.25,1.75,,,0.613202,0.204286,sport_probability_bucket,0.134804,raise_trust
 NRL / estimated_score,sport_market,NRL|estimated_score,7,0.7,0.714286,0.014286,0.706667,0.006667,7.0,1.75,0.25,1.75,,,0.613202,0.204286,sport_market,0.134804,raise_trust
 Sport: Soccer,sport,Soccer,7,0.7,0.571429,-0.128571,0.64,-0.06,7.0,1.0,0.142857,,,,0.577488,0.261429,sport,0.132319,lower_trust
 Soccer / 70-80%,sport_probability_bucket,Soccer|70-80%,7,0.7,0.571429,-0.128571,0.64,-0.06,7.0,1.0,0.142857,,,,0.577488,0.261429,sport_probability_bucket,0.132319,lower_trust
 Market: Moneyline,market_type,Moneyline,7,0.7,0.571429,-0.128571,0.64,-0.06,7.0,1.0,0.142857,,,,0.577488,0.261429,market_type,0.132319,lower_trust
 Soccer / Moneyline,sport_market,Soccer|Moneyline,7,0.7,0.571429,-0.128571,0.64,-0.06,7.0,1.0,0.142857,,,,0.577488,0.261429,sport_market,0.132319,lower_trust
-Sport: Super League - China,sport,Super League - China,6,0.7045,0.666667,-0.037833,0.688286,-0.016214,5.03,1.8767,0.373101,1.477783,,,0.591832,0.208591,sport,0.128409,raise_trust
+Sport: Brazil Série B,sport,Brazil Série B,8,0.729125,0.5,-0.229125,0.614562,-0.114563,8.0,-0.55,-0.06875,1.4125,,,0.485889,0.297681,sport,0.129758,lower_trust
+Brazil Série B / 70-80%,sport_probability_bucket,Brazil Série B|70-80%,8,0.729125,0.5,-0.229125,0.614562,-0.114563,8.0,-0.55,-0.06875,1.4125,,,0.485889,0.297681,sport_probability_bucket,0.129758,lower_trust
 AFL / 70-80%,sport_probability_bucket,AFL|70-80%,5,0.7,0.8,0.1,0.738462,0.038462,5.0,2.0,0.4,1.75,,,0.594389,0.17,sport_probability_bucket,0.12678,raise_trust
 AFL / estimated_score,sport_market,AFL|estimated_score,5,0.7,0.8,0.1,0.738462,0.038462,5.0,2.0,0.4,1.75,,,0.594389,0.17,sport_market,0.12678,raise_trust
 MLB / estimated_score,sport_market,MLB|estimated_score,5,0.7,0.8,0.1,0.738462,0.038462,5.0,2.0,0.4,1.75,,,0.594389,0.17,sport_market,0.12678,raise_trust
-Super League - China / spreads,sport_market,Super League - China|spreads,4,0.709,0.5,-0.209,0.639333,-0.069667,3.03,0.68,0.224422,1.4175,,,0.508562,0.266516,sport_market,0.125102,lower_trust
+Super League - China / 60-70%,sport_probability_bucket,Super League - China|60-70%,6,0.646167,0.666667,0.0205,0.654952,0.008786,1.16,0.4322,0.372586,1.552783,,,0.574676,0.236041,sport_probability_bucket,0.123997,raise_trust
 Sport: AFL,sport,AFL,6,0.6825,0.666667,-0.015833,0.675714,-0.006786,5.03,1.97,0.39165,1.738333,,,0.596783,0.200671,sport,0.122809,raise_trust
+Super League - China / 70-80%,sport_probability_bucket,Super League - China|70-80%,5,0.7274,0.8,0.0726,0.755323,0.027923,4.04,1.4748,0.36505,1.44,,,0.596473,0.166665,sport_probability_bucket,0.121177,raise_trust
 League of Ireland / 60-70%,sport_probability_bucket,League of Ireland|60-70%,3,0.646,1.0,0.354,0.742545,0.096545,0.16,0.081333,0.508331,1.5511,,,0.56504,0.126209,sport_probability_bucket,0.115013,raise_trust
 Sport: KBO,sport,KBO,3,0.661,1.0,0.339,0.753455,0.092455,3.0,2.2158,0.7386,1.7386,,,0.570194,0.117963,sport,0.113426,raise_trust
 MMA / 60-70%,sport_probability_bucket,MMA|60-70%,4,0.643,0.75,0.107,0.678667,0.035667,1.3,0.5605,0.431154,1.557075,,,0.552639,0.195994,sport_probability_bucket,0.109329,raise_trust
+Veikkausliiga - Finland / 60-70%,sport_probability_bucket,Veikkausliiga - Finland|60-70%,3,0.629667,0.333333,-0.296333,0.548848,-0.080818,0.03,-0.0134,-0.446667,1.59,,,0.438239,0.329091,sport_probability_bucket,0.108913,lower_trust
 League of Ireland / 50-60%,sport_probability_bucket,League of Ireland|50-60%,3,0.590667,0.333333,-0.257333,0.520485,-0.070182,1.05,0.6431,0.612476,1.694367,,,0.466623,0.283677,sport_probability_bucket,0.104788,lower_trust
 League of Ireland / 70-80%,sport_probability_bucket,League of Ireland|70-80%,4,0.71125,0.75,0.03875,0.724167,0.012917,2.06,1.4968,0.726602,1.5675,,,0.547526,0.204174,sport_probability_bucket,0.098775,raise_trust
-Super League - China / 70-80%,sport_probability_bucket,Super League - China|70-80%,4,0.72675,0.75,0.02325,0.7345,0.00775,4.0,1.46,0.365,1.4575,,,0.556318,0.190106,sport_probability_bucket,0.096378,raise_trust
-Brazil Série B / spreads,sport_market,Brazil Série B|spreads,5,0.728,0.4,-0.328,0.601846,-0.126154,5.0,-0.23,-0.046,1.374,,,0.356947,0.352573,sport_market,0.091527,lower_trust
+Brazil Série B / spreads,sport_market,Brazil Série B|spreads,7,0.733286,0.571429,-0.161857,0.657752,-0.075533,7.0,0.45,0.064286,1.364286,,,0.479144,0.270207,sport_market,0.091201,lower_trust
+Odds: <1.30,odds_bucket,<1.30,3,0.844667,1.0,0.155333,0.88703,0.042364,3.0,0.56,0.186667,1.186667,,,0.627843,0.025723,odds_bucket,0.088827,raise_trust
 MMA / 50-60%,sport_probability_bucket,MMA|50-60%,3,0.583,0.666667,0.083667,0.605818,0.022818,1.2,0.672,0.56,1.714433,,,0.501899,0.227235,sport_probability_bucket,0.086418,raise_trust
 League of Ireland / totals,sport_market,League of Ireland|totals,3,0.620333,0.666667,0.046333,0.63297,0.012636,1.12,0.718433,0.641458,1.622133,,,0.521093,0.196524,sport_market,0.082469,raise_trust
-Market: h2h,market_type,h2h,4,0.6265,0.75,0.1235,0.667667,0.041167,4.0,0.4912,0.1228,1.524525,,,0.557438,0.188314,market_type,0.076066,raise_trust
+Veikkausliiga - Finland / 70-80%,sport_probability_bucket,Veikkausliiga - Finland|70-80%,3,0.708333,0.666667,-0.041667,0.69697,-0.011364,2.01,1.49,0.741294,1.626667,,,0.496915,0.235208,sport_probability_bucket,0.081976,raise_trust
 MLB / h2h,sport_market,MLB|h2h,4,0.6265,0.75,0.1235,0.667667,0.041167,4.0,0.4912,0.1228,1.524525,,,0.557438,0.188314,sport_market,0.076066,raise_trust
-Confidence/read: research_watch,confidence,research_watch,4,0.6265,0.75,0.1235,0.667667,0.041167,4.0,0.4912,0.1228,1.524525,,,0.557438,0.188314,confidence,0.076066,raise_trust
 Sport: NCAA Baseball,sport,NCAA Baseball,3,0.7,0.666667,-0.033333,0.690909,-0.009091,3.0,0.5,0.166667,1.75,,,0.504337,0.223333,sport,0.068166,raise_trust
 NCAA Baseball / 70-80%,sport_probability_bucket,NCAA Baseball|70-80%,3,0.7,0.666667,-0.033333,0.690909,-0.009091,3.0,0.5,0.166667,1.75,,,0.504337,0.223333,sport_probability_bucket,0.068166,raise_trust
 NCAA Baseball / estimated_score,sport_market,NCAA Baseball|estimated_score,3,0.7,0.666667,-0.033333,0.690909,-0.009091,3.0,0.5,0.166667,1.75,,,0.504337,0.223333,sport_market,0.068166,raise_trust
