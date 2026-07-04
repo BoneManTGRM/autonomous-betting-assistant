@@ -13,8 +13,10 @@ from autonomous_betting_agent.report_public_quality import (
     trim_complete_sentence,
 )
 
-VERSION = "active_magazine_export_guard_v4_restored"
+VERSION = "active_magazine_export_guard_v5_saved_context_truth"
 WATCH_VERIFY = "WATCHLIST / VERIFY PRICE"
+RAW_ERROR_TOKENS = ("HTTPError", "Traceback", "RequestException", "ConnectionError", "ReadTimeout")
+SAVED_TEXT_TOKENS = ("uploaded", "cached", "saved", "handoff", "fallback", "manual")
 
 
 def _clean(value: Any) -> str:
@@ -95,12 +97,34 @@ def _negative_value(data: dict[str, Any]) -> bool:
     return edge is not None and ev is not None and (edge <= 0 or ev <= 0)
 
 
+def _savedish(text: str) -> bool:
+    low = _clean(text).lower()
+    return any(token in low for token in SAVED_TEXT_TOKENS)
+
+
+def _price_source(data: dict[str, Any]) -> str:
+    source = _first(data, "odds_source", "price_source", "data_source", "provider", "api_source", "bookmaker", "sportsbook", "book", default="")
+    return "" if _savedish(source) else source
+
+
+def _price(data: dict[str, Any]) -> str:
+    return _first(data, "current_verified_price", "decimal_price", "decimal_odds", "best_price", "odds_at_pick", "american_odds", "odds_american", "odds", default="")
+
+
+def _timestamp(data: dict[str, Any]) -> str:
+    return _first(data, "odds_timestamp", "price_timestamp", "odds_updated_at", "line_timestamp", "locked_at_utc", "commence_time", "event_start_utc", default="")
+
+
 def _note(value: Any) -> str:
     text = _clean(value)
     if not text:
         return ""
+    if any(token.lower() in text.lower() for token in RAW_ERROR_TOKENS):
+        return ""
     text = re.sub(r"\bWeather:\s*Weather:\s*", "Weather: ", text, flags=re.I)
     text = re.sub(r"\bContext:\s*Context:\s*", "Context: ", text, flags=re.I)
+    text = re.sub(r"\bBALLDONTLIE matched teams:[^.;]*[.;]?", "Provider team match found.", text, flags=re.I)
+    text = re.sub(r"\bBALLDONTLIE injuries checked\b", "Provider injury check completed", text, flags=re.I)
     text = sanitize_public_text(text)
     low = text.rstrip(" .,:;-").lower()
     if any(low.endswith(end) for end in ("where", "with", "with the", "who are", "because", "and", "or", "the", "in", "at", "for", "meaning", "against", "their", "of")):
@@ -186,24 +210,41 @@ def normalize_row(value: Any) -> dict[str, Any]:
     action = "NO " + "BET / PRICE REJECTED" if negative else (WATCH_VERIFY if saved else public_action_label(data))
     for key in ("final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action"):
         data[key] = action
-    data["risk"] = "PRICE REJECTED" if negative else ("VERIFY PRICE" if saved else "VERIFIED PRICE")
+    data["risk"] = "PRICE REJECTED" if negative else ("VERIFY CURRENT PRICE" if saved else "VERIFIED PRICE")
     data["risk_level"] = data["risk_label"] = data["profit_guard_status"] = data["risk"]
-    data["final_explanation"] = "Negative edge or EV at current price." if negative else ("Saved-source row. Verify current provider price before publishing." if saved else public_recommendation_status(data))
+    data["final_explanation"] = "Negative edge or EV at current price." if negative else ("Saved row uses stored price/context. Recheck current provider price before publishing." if saved else public_recommendation_status(data))
     data["action_reason"] = data["recommendation_reason"] = data["final_explanation"]
     if saved:
-        data["report_source"] = "uploaded_saved_row"
-        data["report_source_label"] = "Uploaded / saved row"
-        data["report_data_scope"] = "Saved-source verification report"
-        data["report_truth_severity"] = "VERIFY PRICE"
-        data["verification_status"] = "Source saved"
-        data["api_match_status"] = "Provider not matched"
-        data["provider_match_status"] = "Provider not matched"
-        data["odds_api_status"] = "SAVED_SOURCE"
+        source = _price_source(data)
+        price = _price(data)
+        timestamp = _timestamp(data)
+        if price:
+            data["saved_display_price"] = price
+        if source:
+            data["saved_price_source"] = source
+        if timestamp:
+            data["saved_price_timestamp"] = timestamp
+        data["report_source"] = "saved_context_row"
+        data["report_source_label"] = "Saved row + provider context"
+        data["report_data_scope"] = "Saved handoff with stored provider/context fields"
+        data["report_truth_severity"] = "VERIFY CURRENT PRICE"
+        data["verification_status"] = "Saved price only - current provider recheck required"
+        data["api_match_status"] = "Current provider recheck required"
+        data["provider_match_status"] = "Current provider recheck required"
+        data["odds_api_status"] = _first(data, "odds_status", default="SAVED_PRICE_VERIFY_CURRENT")
         data["odds_verified"] = "false"
         data["odds_api_live"] = "false"
         data["the_odds_api_live"] = "false"
         data["report_truth_warning"] = public_source_warning(data)
     return data
+
+
+def _price_line(data: dict[str, Any]) -> str:
+    price = data.get("saved_display_price") or _price(data)
+    source = data.get("saved_price_source") or _price_source(data)
+    if price and source:
+        return f"{price} from {source}"
+    return price or source or "Stored price not found"
 
 
 def public_truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
@@ -212,7 +253,12 @@ def public_truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
         return [("REPORT SOURCE", "No verified current-provider picks"), ("DATA SCOPE", "No verified buyer picks"), ("TRUTH", "RESEARCH ONLY"), ("ODDS STATUS", "NO VERIFIED BUYER PICKS"), ("MATCHED", "Provider not matched")]
     odds_status = _clean(data.get("odds_status") or data.get("odds_source") or "VERIFY").upper()
     if is_saved_source(data):
-        return [("REPORT SOURCE", "Uploaded / saved row"), ("DATA SCOPE", "Saved-source verification report"), ("TRUTH", "VERIFY PRICE"), ("ODDS STATUS", odds_status), ("MATCHED", "Saved source only")]
+        pairs = [("REPORT SOURCE", "Saved row + provider context"), ("PRICE STATUS", "Verify current price"), ("SAVED PRICE", _price_line(data))]
+        timestamp = data.get("saved_price_timestamp") or _timestamp(data)
+        if timestamp:
+            pairs.append(("TIMESTAMP", _clean(timestamp)))
+        pairs.append(("MATCHED", "Current provider recheck required"))
+        return pairs[:5]
     return [("REPORT SOURCE", "Current provider row"), ("DATA SCOPE", "Current provider matched"), ("TRUTH", "VERIFIED PRICE"), ("ODDS STATUS", odds_status), ("MATCHED", "Provider matched")]
 
 
@@ -222,13 +268,25 @@ def _draw_overlay(module: Any, image: Any, row: dict[str, Any], language: str | 
 
 def _clean_saved_page2_row(text: str) -> str:
     text = _clean(text)
-    text = text.replace("Provider match required before verified status", "Saved-source only - current provider match required")
-    text = text.replace("Provider match required", "Current provider match required")
+    text = text.replace("Provider match required before verified status", "Current provider recheck required before verified status")
+    text = text.replace("Provider match required", "Current provider recheck required")
     text = text.replace("Fresh timestamp required", "Fresh provider timestamp required")
     text = text.replace("Exact market line required", "Exact provider market line required")
-    text = re.sub(r"Provider:\s*saved-source", "Current provider match: Not verified", text, flags=re.I)
-    text = re.sub(r"Timestamp:\s*\d{4}-\d{2}-\d{2}T[^\s]+", "Timestamp: Saved-row timestamp", text)
+    text = re.sub(r"Provider:\s*saved-source", "Current provider match: Recheck required", text, flags=re.I)
+    text = re.sub(r"Timestamp:\s*\d{4}-\d{2}-\d{2}T([^\s]+)", r"Timestamp: saved row \1", text)
     return text
+
+
+def _source_diagnostics(data: dict[str, Any]) -> list[str]:
+    rows = ["Source type: Saved row with provider/context fields", "Current provider match: Recheck required"]
+    price = _price_line(data)
+    if price and price != "Stored price not found":
+        rows.append("Stored price: " + price)
+    timestamp = data.get("saved_price_timestamp") or _timestamp(data)
+    if timestamp:
+        rows.append("Timestamp: " + _clean(timestamp))
+    rows.append("Verification status: Saved price only")
+    return rows[:5]
 
 
 def install(module: Any) -> Any:
@@ -240,6 +298,8 @@ def install(module: Any) -> Any:
     original_pairs = getattr(module, "_pairs", None)
     original_api_lines = getattr(module, "api_provenance_lines", None)
     original_matchup_items = getattr(module, "_matchup_items", None)
+    original_team_items = getattr(module, "_team_items", None)
+    original_injury_items = getattr(module, "_injury_items", None)
 
     def guarded_page(pick: Any, *args: Any, **kwargs: Any):
         row = normalize_row(pick)
@@ -262,14 +322,18 @@ def install(module: Any) -> Any:
         if _no_verified_row(data):
             return ["Matched to this row: Provider not matched"]
         lines = ["Configured APIs: " + configured] if configured else []
-        lines.append("Matched to this row: " + ("Saved source only" if is_saved_source(data) else "Provider matched"))
+        if is_saved_source(data):
+            source = _price_source(data)
+            if source:
+                lines.append("Saved price source: " + source)
+            lines.append("Matched to this row: Current provider recheck required")
+        else:
+            lines.append("Matched to this row: Provider matched")
         return lines
 
     def guarded_pairs(row: Any, lang: str):
         data = normalize_row(row)
-        if _no_verified_row(data):
-            return public_truth_pairs(data, lang)
-        if is_saved_source(data):
+        if _no_verified_row(data) or is_saved_source(data):
             return public_truth_pairs(data, lang)
         pairs = [] if not callable(original_pairs) else list(original_pairs(data, lang))
         return [("CONFIGURED APIS" if str(label).upper() == "ACTIVE APIS" else label, value) for label, value in pairs][:5]
@@ -277,7 +341,17 @@ def install(module: Any) -> Any:
     def guarded_matchup(row: Any):
         data = normalize_row(row)
         rows = [] if not callable(original_matchup_items) else list(original_matchup_items(data))
-        return _clean_lines(rows, ["Context was not returned for this event."], 3)
+        return _clean_lines(rows, ["Context available only from saved row; recheck price before publishing."], 3)
+
+    def guarded_team(row: Any, side: str = ""):
+        data = normalize_row(row)
+        rows = [] if not callable(original_team_items) else list(original_team_items(data, side))
+        return _clean_lines(rows, ["Saved team/context note only.", "Recheck lineup/news before entry."], 3)
+
+    def guarded_injury(row: Any, prefix: str):
+        data = normalize_row(row)
+        rows = [] if not callable(original_injury_items) else list(original_injury_items(data, prefix))
+        return _clean_lines(rows, ["No clean injury feed linked to this row.", "Recheck lineup/news before entry."], 2)
 
     module.render_full_pick_magazine_page = guarded_page
     module.render_full_magazine_book_pages = guarded_pages
@@ -285,6 +359,8 @@ def install(module: Any) -> Any:
     module._active_note = lambda row: guarded_api_lines(row)[-1] + "."
     module._pairs = guarded_pairs
     module._matchup_items = guarded_matchup
+    module._team_items = guarded_team
+    module._injury_items = guarded_injury
     try:
         from autonomous_betting_agent import magazine_second_page_patch as page2
         original_discover = getattr(page2, "discover_markets", None)
@@ -299,10 +375,10 @@ def install(module: Any) -> Any:
                     elif str(getattr(market, "badge", "")).upper() == "WATCHLIST":
                         market.badge = WATCH_VERIFY
                     if is_saved_source(row) and str(getattr(market, "rejection_reason", "")).strip():
-                        market.rejection_reason = "Saved-source only - current provider match required"
+                        market.rejection_reason = "Saved price only - current provider recheck required"
                 if is_saved_source(row):
-                    diag["provider_state"] = "Source saved"
-                    diag["provider_called"] = "saved-source"
+                    diag["provider_state"] = "Saved price only"
+                    diag["provider_called"] = _price_source(row) or "saved-row"
                 return markets, diag
             guarded_discover._ABA_ACTIVE_EXPORT_DISCOVER = True  # type: ignore[attr-defined]
             page2.discover_markets = guarded_discover
@@ -316,7 +392,7 @@ def install(module: Any) -> Any:
                 cleaned = []
                 for title, rows, color in sections:
                     if title == "Source Diagnostics":
-                        rows = ["Source type: Saved-source report", "Current provider match: Not verified", "Timestamp: Saved-row timestamp", "Verification status: Source saved"]
+                        rows = _source_diagnostics(row)
                     else:
                         rows = [_clean_saved_page2_row(item) for item in rows]
                     cleaned.append((title, rows, color))
