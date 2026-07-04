@@ -2,6 +2,24 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Sequence
 
+REPORT_TEXT_ES = {
+    "DAILY SPORTS ANALYSIS": "ANÁLISIS DEPORTIVO DIARIO",
+    "TEAM SNAPSHOTS": "RESUMEN DE EQUIPOS",
+    "RISK DESK": "MESA DE RIESGO",
+    "PARLAY RECOMMENDATION BOARD": "TABLERO DE RECOMENDACIONES PARLAY",
+    "PRIMARY ANCHOR": "ANCLA PRINCIPAL",
+    "TOP PARLAY RECOMMENDATIONS": "MEJORES RECOMENDACIONES PARLAY",
+    "BEST 2-LEG PARLAYS": "MEJORES PARLAYS DE 2 SELECCIONES",
+    "BEST 3/4-LEG PARLAYS": "MEJORES PARLAYS DE 3/4 SELECCIONES",
+    "SGP / CROSS / PROP / LIVE": "SGP / CRUZADO / PROP / EN VIVO",
+    "PARLAY AVOID LIST": "PARLAYS A EVITAR",
+    "SOURCE DIAGNOSTICS": "DIAGNÓSTICO DE FUENTE",
+    "CANCEL CONDITIONS": "CONDICIONES DE CANCELACIÓN",
+    "ADVANCED MARKET ANALYSIS": "ANÁLISIS AVANZADO DE MERCADO",
+    "STRAIGHT ANCHOR ONLY": "SOLO ANCLA DIRECTA",
+    "NO VERIFIED PARLAY AVAILABLE": "SIN PARLAY VERIFICADO DISPONIBLE",
+}
+
 SPORT_LEAGUE_ES = {
     "Boxing": "Boxeo",
     "MMA": "MMA",
@@ -34,6 +52,19 @@ SPORT_LEAGUE_ES = {
 }
 
 
+def _install_report_text_terms() -> None:
+    try:
+        from autonomous_betting_agent import magazine_book_export
+        magazine_book_export.ES.update(REPORT_TEXT_ES)
+    except Exception:
+        pass
+    try:
+        from autonomous_betting_agent import magazine_second_page_patch
+        magazine_second_page_patch.ES.update(REPORT_TEXT_ES)
+    except Exception:
+        pass
+
+
 def sport_league_display_text(value: Any, language: str = "en") -> str:
     text = str(value or "").strip()
     if language == "es":
@@ -52,6 +83,10 @@ def selected_raw_sport_values(display_values: Iterable[str], options: Sequence[s
 
 
 def render_sport_league_filter(st, *, label: str, options: Sequence[str], default: Iterable[str] | None = None, language: str = "en", key: str = "report_profile_sports") -> list[str]:
+    _install_report_text_terms()
     raw_options = [str(option) for option in options if str(option or "").strip()]
     default_values = [option for option in raw_options if option in {str(value) for value in (default or [])}]
     return list(st.multiselect(label, raw_options, default=default_values, key=key, format_func=lambda option: sport_league_display_text(option, language)))
+
+
+_install_report_text_terms()
