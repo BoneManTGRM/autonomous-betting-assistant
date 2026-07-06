@@ -1,9 +1,9 @@
-# deploy trigger: force-streamlit-rebuild-report-studio-v14
-numpy
-pandas<3.0
-python-dateutil
-requests
-pyyaml
-streamlit>=1.37
-pytest
-pillow
+# deploy trigger: force-streamlit-rebuild-report-studio-v15
+numpy>=1.26
+pandas>=2.2,<3.0
+python-dateutil>=2.9
+requests>=2.32
+pyyaml>=6.0.2
+streamlit>=1.50
+pytest>=8.3
+pillow>=11.0
