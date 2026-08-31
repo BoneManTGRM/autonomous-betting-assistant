@@ -6,7 +6,7 @@ from typing import Any, Iterable, Mapping
 MISSING_EXACT_MARKET_LINE = "Missing exact market line"
 SAVED_SOURCE_PUBLIC_WARNING = "Saved-source report. Verify current provider price before publishing."
 LIVE_TRIGGER_UNAVAILABLE = "Live trigger unavailable - no matched live feed."
-NO_VERIFIED_PARLAY = "No verified parlay candidate yet - need at least 2 independent positive-EV legs from current provider data."
+NO_VERIFIED_PARLAY = "No verified parlay or chain bet qualifies."
 DANGLING_ENDINGS = ("where", "where the", "with", "with the", "who are", "because", "and", "but", "the", "of", "in", "against", "expected")
 SAVED_SOURCE_TOKENS = ("saved", "uploaded", "cached", "handoff", "fallback", "manual", "uploaded_row")
 PROVIDER_TOKENS = ("odds api", "the odds api", "sportsdataio", "sportradar", "api-football", "bookmaker", "draftkings", "fanduel", "betmgm", "caesars", "pinnacle", "consensus")
@@ -175,12 +175,34 @@ def has_exact_market_line(row: Mapping[str, Any]) -> bool:
     return bool(_line_value(row, kind if kind != "player_prop" else "prop")) if kind in {"total", "team_total", "run_line", "spread", "player_prop"} else True
 
 
+def is_manual_verified_input(row: Mapping[str, Any]) -> bool:
+    """Return True only for an explicitly attested manual price observation.
+
+    A generic upload is never enough. The operator must identify the book,
+    capture time, event, and verification method so reports can distinguish a
+    manually observed price from an automated live-provider response.
+    """
+    mode = first_value(row, "source_mode", "report_source_mode", "odds_status").lower().replace("-", "_").replace(" ", "_")
+    attestation = first_value(row, "manual_attestation", "operator_attestation", "price_attested").lower()
+    method = first_value(row, "verification_method", "price_verification_method").lower()
+    book = first_value(row, "sportsbook", "bookmaker", "book", "best_bookmaker")
+    captured = first_value(row, "price_timestamp", "odds_timestamp", "verified_timestamp", "captured_at_utc")
+    event_id = first_value(row, "provider_event_id", "manual_event_id", "event_id", "fixture_id", "game_id")
+    explicit_mode = mode in {"manual_verified", "manually_verified", "manual_verified_input"}
+    attested = attestation in {"1", "true", "yes", "attested", "confirmed"}
+    return bool(explicit_mode and attested and method in {"manual", "operator", "manual_entry", "manual_verified"} and book and captured and event_id)
+
+
 def is_saved_source(row: Mapping[str, Any]) -> bool:
+    if is_manual_verified_input(row):
+        return False
     text = " ".join(public_text(row.get(key)).lower() for key in ("source_mode", "selected_source_key", "odds_source", "data_source", "source", "source_file", "source_label", "odds_status", "report_source", "report_source_mode"))
     return any(token in text for token in SAVED_SOURCE_TOKENS)
 
 
 def provider_state(row: Mapping[str, Any]) -> str:
+    if is_manual_verified_input(row):
+        return "Manual input verified"
     if is_saved_source(row):
         return "Source saved"
     text = " ".join(public_text(row.get(key)).lower() for key in ("api_match_status", "provider_match_status", "odds_source", "data_source", "source", "provider"))
@@ -214,7 +236,7 @@ def public_recommendation_status(row: Mapping[str, Any]) -> str:
         return "Research only - missing exact market line"
     if ev is None or edge is None:
         return "Research only - missing edge or EV"
-    if is_saved_source(row) or provider_state(row) != "Provider matched":
+    if is_saved_source(row) or provider_state(row) not in {"Provider matched", "Manual input verified"}:
         return "Watchlist / Verify price"
     return "Verified candidate / Playable value"
 
@@ -249,7 +271,7 @@ def sanitize_public_text(value: Any) -> str:
     text = public_text(value)
     if not text:
         return ""
-    replacements = ((r"\bGate failed\b", "Verification pending"), (r"\bsource mode saved-handoff\b", "Saved-source verification pending"), (r"\bsaved/uploaded rows cannot become VERIFIED\b", "Provider match required before verified status"), (r"\bReparodynamics blocked\b", "Reparodynamics remains in protected observation mode"), (r"\bno verified parlay\b(?! candidate)", "No verified parlay candidate yet"), (r"\bData unavailable\b", "Verification pending"), (r"\bUPLOADED_ROW\b", "Saved-source verification pending"))
+    replacements = ((r"\bGate failed\b", "Verification pending"), (r"\bsource mode saved-handoff\b", "Saved-source verification pending"), (r"\bsaved/uploaded rows cannot become VERIFIED\b", "Provider match required before verified status"), (r"\bReparodynamics blocked\b", "Reparodynamics remains in protected observation mode"), (r"\bno verified parlay\b(?! or chain bet qualifies)", "No verified parlay or chain bet qualifies"), (r"\bData unavailable\b", "Verification pending"), (r"\bUPLOADED_ROW\b", "Saved-source verification pending"))
     for pattern, replacement in replacements:
         text = re.sub(pattern, replacement, text, flags=re.I)
     for pattern in RAW_PUBLIC_DIAGNOSTIC_PATTERNS:

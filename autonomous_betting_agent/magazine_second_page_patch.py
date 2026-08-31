@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from io import BytesIO
 from typing import Any, Iterable, Mapping
 import hashlib
@@ -12,6 +13,7 @@ from autonomous_betting_agent.report_public_quality import (
     NO_VERIFIED_PARLAY,
     build_full_market_label,
     has_exact_market_line,
+    is_manual_verified_input,
     provider_state,
     public_recommendation_status,
     public_source_warning,
@@ -19,7 +21,7 @@ from autonomous_betting_agent.report_public_quality import (
     sanitize_public_text,
 )
 
-PATCH_VERSION = "direct_second_page_v9_extensive_parlay_engine"
+PATCH_VERSION = "direct_second_page_v11_shared_snapshot_custom_brand"
 GOLD = (241, 184, 45)
 GREEN = (61, 205, 84)
 RED = (190, 30, 28)
@@ -79,8 +81,8 @@ MARKET_KEYS = (
 )
 SOURCE_KEYS = ("provider", "odds_provider", "api_provider", "odds_source", "sportsbook", "bookmaker", "source", "data_source")
 BOOK_KEYS = ("sportsbook", "bookmaker", "book", "best_bookmaker")
-EVENT_ID_KEYS = ("provider_event_id", "event_id", "game_id", "fixture_id", "sportsdataio_event_id", "sdio_event_id", "odds_api_event_id", "api_football_fixture_id")
-TIME_KEYS = ("timestamp", "provider_timestamp", "price_timestamp", "last_update", "last_updated", "updated_at", "commence_time", "locked_at_utc")
+EVENT_ID_KEYS = ("provider_event_id", "manual_event_id", "event_id", "game_id", "fixture_id", "sportsdataio_event_id", "sdio_event_id", "odds_api_event_id", "api_football_fixture_id")
+TIME_KEYS = ("price_timestamp", "odds_timestamp", "captured_at_utc", "provider_timestamp", "timestamp", "last_update", "last_updated", "updated_at", "locked_at_utc")
 BAD_SOURCE_TOKENS = ("saved", "handoff", "uploaded", "cached", "fallback", "ledger", "history", "missing")
 PROP_MODEL_KEYS = ("model_probability", "probability", "win_probability", "prop_model_probability", "player_prop_probability", "market_model_probability")
 
@@ -97,6 +99,9 @@ class MarketCandidate:
     sportsbook: str = ""
     timestamp: str = ""
     provider_event_id: str = ""
+    event_name: str = ""
+    event_start_time: str = ""
+    verification_method: str = "automated_provider"
     is_live: bool = False
     model_probability: float | None = None
     implied_probability: float | None = None
@@ -125,6 +130,13 @@ class ParlayCandidate:
     status: str
     reason: str
     cancel_trigger: str
+    fair_decimal_odds: float | None = None
+    minimum_acceptable_odds: float | None = None
+    suggested_stake_units: float = 0.0
+    profit_at_suggested_stake: float | None = None
+    quoted_book: str = ""
+    quoted_timestamp: str = ""
+    quote_verification_method: str = ""
 
 
 def _clean(value: Any) -> str:
@@ -165,6 +177,16 @@ def _tr(value: Any, lang: str) -> str:
 def _lang(data: dict[str, Any], language: str | None = None) -> str:
     text = _clean(language or data.get("report_language") or data.get("language") or data.get("lang")).lower()
     return "es" if text.startswith("es") or "español" in text or "espanol" in text else "en"
+
+
+def _demonstration_mode(data: Mapping[str, Any]) -> bool:
+    if data.get("demonstration_mode") is True:
+        return True
+    text = " ".join(
+        _clean(data.get(key)).lower()
+        for key in ("report_title", "report_data_scope", "report_truth_warning", "league")
+    )
+    return any(token in text for token in ("demonstration", "demo only", "validation fixture"))
 
 
 def _get(data: Mapping[str, Any], *keys: str, default: str = "") -> str:
@@ -323,6 +345,8 @@ def _repair_status(data: dict[str, Any]) -> str:
 
 
 def _source_ok(data: dict[str, Any]) -> bool:
+    if is_manual_verified_input(data):
+        return True
     mode = _get(data, "report_source_mode", "source_mode").lower()
     if public_source_warning(data).startswith("Saved-source"):
         return False
@@ -366,7 +390,8 @@ def _candidate(item: Mapping[str, Any], parent: dict[str, Any], sport: str) -> M
         ev_value = prob * dec - 1.0
     fair = 1.0 / prob if prob and prob > 0 else None
     target = fair + 0.02 if fair else None
-    provider = _provider(item) or _provider(parent)
+    manual_verified = is_manual_verified_input(merged)
+    provider = _provider(item) or _provider(parent) or ("Manual operator entry" if manual_verified else "")
     sportsbook = _book(item) or _book(parent)
     timestamp = _timestamp(item) or _timestamp(parent)
     event_id = _event_id(item) or _event_id(parent)
@@ -385,7 +410,7 @@ def _candidate(item: Mapping[str, Any], parent: dict[str, Any], sport: str) -> M
         missing.append("exact market line")
     if group in {"prop", "flash"} and prob is None:
         missing.append("prop-specific model probability")
-    source_ok = _source_ok(parent)
+    source_ok = _source_ok(merged)
     value_ok = edge is not None and ev_value is not None and edge > 0 and ev_value > 0
     full_label = build_full_market_label(merged)
     badge = WATCHLIST
@@ -402,7 +427,32 @@ def _candidate(item: Mapping[str, Any], parent: dict[str, Any], sport: str) -> M
         badge = VERIFIED
     if live and badge == WATCHLIST and group == "flash":
         badge, reason = LIVE_TRIGGER, reason or "Requires live trigger confirmation"
-    return MarketCandidate(raw, normal, selection, full_label, line, dec, provider, sportsbook, timestamp, event_id, live, prob, implied, edge, ev_value, fair, target, badge, reason, repair, "same-event/correlation check required")
+    return MarketCandidate(
+        raw_market=raw,
+        normalized_market=normal,
+        selection=selection,
+        full_label=full_label,
+        line=line,
+        decimal_odds=dec,
+        provider=provider,
+        sportsbook=sportsbook,
+        timestamp=timestamp,
+        provider_event_id=event_id,
+        event_name=_get(merged, "public_event", "event", "event_name", "matchup", "game", default=event_id),
+        event_start_time=_get(merged, "event_start_utc", "start_time", "commence_time", "scheduled_at"),
+        verification_method="manual_verified" if manual_verified else "automated_provider",
+        is_live=live,
+        model_probability=prob,
+        implied_probability=implied,
+        edge=edge,
+        ev=ev_value,
+        fair_odds=fair,
+        target_odds=target,
+        badge=badge,
+        rejection_reason=reason,
+        repair_status=repair,
+        correlation_warning="same-event/correlation check required",
+    )
 
 
 def discover_markets(pick: Any) -> tuple[list[MarketCandidate], dict[str, Any]]:
@@ -451,6 +501,60 @@ def _is_same_event(a: MarketCandidate, b: MarketCandidate) -> bool:
     return bool(a.provider_event_id and b.provider_event_id and a.provider_event_id == b.provider_event_id)
 
 
+def _quote_leg_ids(value: Any) -> list[str]:
+    if isinstance(value, (list, tuple, set)):
+        return sorted(_clean(item).lower() for item in value if _clean(item))
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("["):
+            try:
+                return _quote_leg_ids(json.loads(text))
+            except Exception:
+                pass
+        return sorted(part.strip().lower() for part in re.split(r"[|;,]", text) if part.strip())
+    return []
+
+
+def _quote_timestamp_is_fresh(value: Any) -> bool:
+    text = _clean(value)
+    if text.lower() in {"now", "current"}:
+        return True
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return False
+    parsed = parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+    age = (datetime.now(timezone.utc) - parsed).total_seconds()
+    return -300 <= age <= 900
+
+
+def _quote_is_verified(quote: Mapping[str, Any]) -> bool:
+    book = _book(quote)
+    timestamp = _timestamp(quote)
+    if not book or not timestamp or not _quote_timestamp_is_fresh(timestamp):
+        return False
+    mode = _get(quote, "source_mode", "report_source_mode").lower().replace("-", "_").replace(" ", "_")
+    method = _get(quote, "verification_method", "price_verification_method").lower()
+    attestation = _get(quote, "manual_attestation", "operator_attestation", "price_attested").lower()
+    manual = mode in {"manual_verified", "manually_verified", "manual_verified_input"} and method in {"manual", "operator", "manual_entry", "manual_verified"} and attestation in {"1", "true", "yes", "attested", "confirmed"}
+    provider = provider_state(quote) == "Provider matched" or _get(quote, "provider_verified", "odds_verified", "price_verified").lower() in {"1", "true", "yes", "verified", "current", "matched"}
+    return manual or provider
+
+
+def _matching_parlay_quote(legs: list[MarketCandidate], parent: Mapping[str, Any]) -> dict[str, Any] | None:
+    leg_ids = sorted(leg.provider_event_id.lower() for leg in legs if leg.provider_event_id)
+    leg_keys = sorted(f"{leg.provider_event_id}|{leg.full_label}".lower() for leg in legs)
+    raw_quotes = parent.get("parlay_price_quotes") or parent.get("combined_price_quotes") or []
+    quotes = _parse_markets(raw_quotes)
+    for quote in quotes:
+        quote_keys = _quote_leg_ids(quote.get("leg_keys"))
+        quote_ids = _quote_leg_ids(quote.get("leg_event_ids") or quote.get("event_ids"))
+        exact_match = bool(quote_keys and quote_keys == leg_keys) or bool(quote_ids and quote_ids == leg_ids)
+        if exact_match:
+            return quote
+    return None
+
+
 def _leg_is_eligible(market: MarketCandidate) -> tuple[bool, str]:
     missing = []
     if not market.provider_event_id:
@@ -480,50 +584,68 @@ def _leg_is_eligible(market: MarketCandidate) -> tuple[bool, str]:
     return True, "eligible"
 
 
-def _pricing_source_for(legs: list[MarketCandidate], parent: dict[str, Any]) -> tuple[str, float | None, str]:
-    returned = _decimal(_get(parent, "sportsbook_parlay_price", "sgp_decimal_odds", "same_game_parlay_price", "provider_parlay_price", "parlay_decimal_odds"))
+def _pricing_source_for(legs: list[MarketCandidate], parent: dict[str, Any]) -> tuple[str, float | None, str, str, str, str]:
     same_game = any(_is_same_event(a, b) for i, a in enumerate(legs) for b in legs[i + 1:])
-    if returned:
-        return SPORTSBOOK_RETURNED_PARLAY_PRICE, returned, "sportsbook-returned combined price"
+    quote = _matching_parlay_quote(legs, parent)
+    if quote is None and same_game:
+        returned = _decimal(_get(parent, "sportsbook_parlay_price", "sgp_decimal_odds", "same_game_parlay_price"))
+        if returned:
+            quote = {**parent, "decimal_odds": returned}
+    if quote is not None:
+        returned = _decimal(_get(quote, "decimal_odds", "decimal_price", "price", "provider_parlay_price", "parlay_decimal_odds"))
+        if returned and _quote_is_verified(quote):
+            method = "manual_verified" if _get(quote, "source_mode").lower().replace("-", "_") in {"manual_verified", "manually_verified", "manual_verified_input"} else "automated_provider"
+            return SPORTSBOOK_RETURNED_PARLAY_PRICE, returned, "exact leg-matched sportsbook parlay quote", _book(quote), _timestamp(quote), method
+        return UNPRICED_PARLAY, None, "Matched combined quote is missing a current verified book, price, or timestamp.", _book(quote), _timestamp(quote), ""
     if same_game:
-        return UNPRICED_PARLAY, None, "Same-game correlation cannot be priced from independent leg multiplication."
+        return UNPRICED_PARLAY, None, "Same-game correlation cannot be priced from independent leg multiplication.", "", "", ""
     if all(leg.decimal_odds for leg in legs):
         product = 1.0
         for leg in legs:
             product *= float(leg.decimal_odds or 1.0)
-        return SYNTHETIC_PRODUCT_PRICE, product, "independent cross-game synthetic price"
-    return UNPRICED_PARLAY, None, "combined price unavailable"
+        return SYNTHETIC_PRODUCT_PRICE, product, "independent cross-game price estimate; confirm an exact sportsbook parlay quote", "", "", ""
+    return UNPRICED_PARLAY, None, "combined price unavailable", "", "", ""
 
 
-def _correlation_for(legs: list[MarketCandidate], pricing_source: str) -> tuple[str, str]:
+def _joint_probability(parent: Mapping[str, Any]) -> float | None:
+    return _prob(_get(parent, "joint_model_probability", "parlay_model_probability", "sgp_model_probability"))
+
+
+def _correlation_method(parent: Mapping[str, Any]) -> str:
+    return _get(parent, "correlation_method", "joint_probability_method", "parlay_model_method")
+
+
+def _correlation_for(legs: list[MarketCandidate], pricing_source: str, parent: Mapping[str, Any]) -> tuple[str, str]:
     same_events = sum(1 for i, a in enumerate(legs) for b in legs[i + 1:] if _is_same_event(a, b))
     labels = [leg.full_label.lower() for leg in legs]
     if len(labels) != len(set(labels)):
         return "blocked", "Duplicate market exposure."
     if same_events and pricing_source != SPORTSBOOK_RETURNED_PARLAY_PRICE:
-        return "blocked", "Same-game correlation cannot be priced from independent leg multiplication."
+        return "blocked", "Same-game correlation cannot be priced from independent leg multiplication; a sportsbook price and validated joint-probability model are required."
+    if same_events and (_joint_probability(parent) is None or not _correlation_method(parent)):
+        return "blocked", "Sportsbook SGP price is available, but validated joint probability and correlation method are missing."
     if same_events:
-        return "sgp priced", "Sportsbook-returned SGP price used."
-    return "acceptable", "Independent cross-game exposure."
+        return "modeled same-game", f"Sportsbook-returned SGP price with {_correlation_method(parent)}."
+    return "independent product", "Independent cross-game probability product."
 
 
-def _combined_probability(legs: list[MarketCandidate], correlation_risk: str) -> float | None:
+def _combined_probability(legs: list[MarketCandidate], correlation_risk: str, parent: Mapping[str, Any]) -> float | None:
+    if correlation_risk == "modeled same-game":
+        return _joint_probability(parent)
     prob = 1.0
     for leg in legs:
         if leg.model_probability is None:
             return None
         prob *= float(leg.model_probability)
-    if correlation_risk in {"watchlist", "sgp priced"}:
-        prob *= 0.92
     if correlation_risk == "blocked":
         return None
     return prob
 
 
 def _build_parlay(parlay_type: str, legs: list[MarketCandidate], parent: dict[str, Any]) -> ParlayCandidate:
-    pricing_source, combined_odds, source_reason = _pricing_source_for(legs, parent)
-    corr, corr_reason = _correlation_for(legs, pricing_source)
-    combined_prob = _combined_probability(legs, corr)
+    pricing_source, combined_odds, source_reason, quoted_book, quoted_timestamp, quote_method = _pricing_source_for(legs, parent)
+    corr, corr_reason = _correlation_for(legs, pricing_source, parent)
+    combined_prob = _combined_probability(legs, corr, parent)
     implied = 1.0 / combined_odds if combined_odds else None
     combined_ev = combined_prob * combined_odds - 1.0 if combined_prob is not None and combined_odds else None
     eligibility = [_leg_is_eligible(leg) for leg in legs]
@@ -532,6 +654,8 @@ def _build_parlay(parlay_type: str, legs: list[MarketCandidate], parent: dict[st
         status = PARLAY_BLOCKED
     elif combined_ev is None or combined_ev <= 0:
         status = PARLAY_AVOID
+    elif pricing_source == SYNTHETIC_PRODUCT_PRICE:
+        status = PARLAY_WATCHLIST
     else:
         status = PARLAY_PLAYABLE
     reason = corr_reason if status == PARLAY_BLOCKED else source_reason
@@ -539,7 +663,40 @@ def _build_parlay(parlay_type: str, legs: list[MarketCandidate], parent: dict[st
         reason = bad_reasons[0]
     if status == PARLAY_AVOID:
         reason = "Combined EV is not positive."
-    return ParlayCandidate(0, parlay_type, legs, combined_odds, combined_prob, implied, combined_ev, pricing_source, corr, "fresh verified" if status == PARLAY_PLAYABLE else "requires review", status, reason, "Cancel if any leg loses provider match, price, line, timestamp, or positive EV.")
+    fair = (1.0 / combined_prob) if combined_prob and combined_prob > 0 else None
+    minimum = (1.02 / combined_prob) if combined_prob and combined_prob > 0 else None
+    fraction = 0.0
+    if status in {PARLAY_PLAYABLE, PARLAY_WATCHLIST} and combined_odds and combined_prob:
+        full_kelly = ((combined_odds * combined_prob) - 1.0) / (combined_odds - 1.0)
+        fraction = round(min(0.25, max(0.0, full_kelly * 0.25)), 3)
+    profit = round(fraction * (combined_odds - 1.0), 3) if combined_odds and fraction else None
+    quality = "manual verified inputs" if any(leg.verification_method == "manual_verified" for leg in legs) else "automated provider inputs"
+    if status == PARLAY_WATCHLIST:
+        quality += "; exact combined quote required"
+    elif status != PARLAY_PLAYABLE:
+        quality = "requires review"
+    return ParlayCandidate(
+        0,
+        parlay_type,
+        legs,
+        combined_odds,
+        combined_prob,
+        implied,
+        combined_ev,
+        pricing_source,
+        corr,
+        quality,
+        status,
+        reason,
+        "Cancel if any leg loses source verification, price, line, timestamp, positive EV, or the quoted minimum price.",
+        fair,
+        minimum,
+        fraction,
+        profit,
+        quoted_book,
+        quoted_timestamp,
+        quote_method,
+    )
 
 
 def generate_parlay_candidates(pick: Any) -> tuple[list[ParlayCandidate], dict[str, Any]]:
@@ -549,7 +706,7 @@ def generate_parlay_candidates(pick: Any) -> tuple[list[ParlayCandidate], dict[s
     all_markets = [anchor] + [m for m in markets if m.full_label.lower() != anchor.full_label.lower()]
     eligible = [m for m in all_markets if _leg_is_eligible(m)[0]]
     out: list[ParlayCandidate] = []
-    for size, label, limit in ((2, "2-leg", 80), (3, "3-leg", 80), (4, "4-leg longshot", 50)):
+    for size, label, limit in ((2, "2-leg", 80), (3, "3-leg", 80)):
         others = [m for m in eligible if m.full_label != anchor.full_label]
         combos: list[list[MarketCandidate]] = []
         if _leg_is_eligible(anchor)[0]:
@@ -572,8 +729,8 @@ def generate_parlay_candidates(pick: Any) -> tuple[list[ParlayCandidate], dict[s
             out.append(_build_parlay("prop parlay", p.legs, data))
         if any(_market_group(leg.normalized_market) == "flash" or leg.is_live for leg in p.legs):
             out.append(_build_parlay("live/flash parlay", p.legs, data))
-        if not same_game:
-            out.append(_build_parlay("cross-game parlay", p.legs, data))
+        # Cross-game combinations already exist as the canonical 2-leg/3-leg
+        # candidates above. Do not duplicate them under a second label.
     unique: dict[tuple[str, tuple[str, ...]], ParlayCandidate] = {}
     for p in out:
         key = (p.parlay_type, tuple(sorted(leg.full_label for leg in p.legs)))
@@ -591,21 +748,90 @@ def generate_parlay_candidates(pick: Any) -> tuple[list[ParlayCandidate], dict[s
 
 
 def _leg_text(leg: MarketCandidate) -> str:
-    return f"{leg.full_label or leg.selection} @ {_odds(leg.decimal_odds)}"
+    event = leg.event_name or leg.provider_event_id or "event missing"
+    source = "manual" if leg.verification_method == "manual_verified" else leg.provider
+    return f"{event} · {leg.full_label or leg.selection} @ {_odds(leg.decimal_odds)} · {leg.sportsbook or 'book missing'} · {source} · {leg.timestamp or 'time missing'}"
 
 
 def _parlay_line(p: ParlayCandidate, lang: str) -> str:
     legs = " + ".join(_leg_text(leg) for leg in p.legs)
-    text = f"#{p.rank} {p.status} · {p.parlay_type}: {legs} · odds {_odds(p.combined_decimal_odds)} · P {_pct(p.combined_probability)} · implied {_pct(p.parlay_implied_probability)} · EV {_ev(p.combined_ev)} · corr {p.correlation_risk} · {p.pricing_source}"
+    profit = f"{p.profit_at_suggested_stake * 100:.1f}% bankroll" if p.profit_at_suggested_stake is not None else "N/A"
+    text = f"#{p.rank} {p.status} · {p.parlay_type}: {legs} · combined {_odds(p.combined_decimal_odds)} · P {_pct(p.combined_probability)} · implied {_pct(p.parlay_implied_probability)} · EV {_ev(p.combined_ev)} · min {_odds(p.minimum_acceptable_odds)} · quarter-Kelly stake {p.suggested_stake_units * 100:.1f}% bankroll · model profit {profit} · corr {p.correlation_risk} · {p.pricing_source}"
     return _tr(text, lang)
+
+
+def _short_leg_text(leg: MarketCandidate) -> str:
+    event = leg.event_name or leg.provider_event_id or "event missing"
+    source = "manual" if leg.verification_method == "manual_verified" else leg.provider or "source missing"
+    captured = leg.timestamp or "time missing"
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", captured):
+        captured = captured[11:16] + "Z"
+    return (
+        f"{event}: {leg.full_label or leg.selection} @ {_odds(leg.decimal_odds)} · "
+        f"P {_pct(leg.model_probability)} · {leg.sportsbook or 'book missing'} · {source} {captured}"
+    )
+
+
+def _parlay_metrics(p: ParlayCandidate) -> str:
+    profit = f"{p.profit_at_suggested_stake * 100:.1f}%" if p.profit_at_suggested_stake is not None else "N/A"
+    return (
+        f"Combined {_odds(p.combined_decimal_odds)} · P {_pct(p.combined_probability)} · "
+        f"implied {_pct(p.parlay_implied_probability)} · EV {_ev(p.combined_ev)} · "
+        f"min {_odds(p.minimum_acceptable_odds)} · ¼ Kelly {p.suggested_stake_units * 100:.1f}% bankroll · profit {profit}"
+    )
+
+
+def _parlay_summary(p: ParlayCandidate, lang: str) -> str:
+    text = (
+        f"#{p.rank} {p.status} · {p.parlay_type} · {_odds(p.combined_decimal_odds)} odds · "
+        f"P {_pct(p.combined_probability)} · EV {_ev(p.combined_ev)} · ¼ Kelly {p.suggested_stake_units * 100:.1f}%"
+    )
+    return _tr(text, lang)
+
+
+def _parlay_card_rows(p: ParlayCandidate, lang: str) -> list[str]:
+    if p.pricing_source == SYNTHETIC_PRODUCT_PRICE:
+        pricing = "estimated independent price · exact quote required"
+    else:
+        quote_time = p.quoted_timestamp
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", quote_time):
+            quote_time = quote_time[11:16] + "Z"
+        pricing = f"quoted {p.quoted_book or 'book missing'} {quote_time or 'time missing'}"
+    rows = [f"#{p.rank} {p.status} · {p.parlay_type} · {pricing}"]
+    rows.extend(f"Leg {index}: {_short_leg_text(leg)}" for index, leg in enumerate(p.legs, 1))
+    rows.append(_parlay_metrics(p))
+    if len(rows) < 5:
+        rows.append(f"Correlation: {p.correlation_risk} · cancel below {_odds(p.minimum_acceptable_odds)}")
+    return sanitize_public_items([_tr(row, lang) for row in rows[:5]])
+
+
+def _unique_by_legs(parlays: Iterable[ParlayCandidate]) -> list[ParlayCandidate]:
+    unique: list[ParlayCandidate] = []
+    seen: set[tuple[str, ...]] = set()
+    for parlay in parlays:
+        signature = tuple(sorted(f"{leg.provider_event_id}|{leg.full_label}" for leg in parlay.legs))
+        if signature in seen:
+            continue
+        seen.add(signature)
+        unique.append(parlay)
+    return unique
 
 
 def _top_by_type(parlays: list[ParlayCandidate], kind: str, n: int) -> list[ParlayCandidate]:
     return [p for p in parlays if kind in p.parlay_type and p.status in {PARLAY_PLAYABLE, PARLAY_WATCHLIST}][:n]
 
 
-def _page_two_sections(data: dict[str, Any], lang: str) -> list[tuple[str, list[str], tuple[int, int, int]]]:
-    parlays, diag = generate_parlay_candidates(data)
+def _page_two_sections(
+    data: dict[str, Any],
+    lang: str,
+    *,
+    parlays: list[ParlayCandidate] | None = None,
+    diagnostics: Mapping[str, Any] | None = None,
+) -> list[tuple[str, list[str], tuple[int, int, int]]]:
+    if parlays is None or diagnostics is None:
+        parlays, generated_diagnostics = generate_parlay_candidates(data)
+        diagnostics = generated_diagnostics
+    diag = dict(diagnostics)
     playable = [p for p in parlays if p.status == PARLAY_PLAYABLE]
     watch = [p for p in parlays if p.status == PARLAY_WATCHLIST]
     blocked = [p for p in parlays if p.status in {PARLAY_BLOCKED, PARLAY_AVOID}]
@@ -616,18 +842,27 @@ def _page_two_sections(data: dict[str, Any], lang: str) -> list[tuple[str, list[
         f"Provider: {anchor.provider or 'missing'} · book {anchor.sportsbook or 'missing'} · timestamp {anchor.timestamp or 'missing'}.",
         "Page 1 remains the straight-bet anchor; Page 2 only adds verified parlays.",
     ]
-    if playable or watch:
-        top = [_parlay_line(p, lang) for p in (playable + watch)[:5]]
+    ranked_unique = _unique_by_legs(playable + watch)
+    if ranked_unique:
+        top = [_parlay_summary(p, lang) for p in ranked_unique[:4]]
     else:
-        top = [f"{STRAIGHT_ANCHOR_ONLY}: no verified parlay qualified from current provider markets.", f"Eligible legs found: {diag.get('eligible_legs', 0)}. Need at least two verified priced positive-EV legs."]
-    two = [_parlay_line(p, lang) for p in _top_by_type(parlays, "2-leg", 5)] or ["No verified 2-leg parlay found. Reason: only one priced positive-EV leg available or correlation/pricing blocked."]
-    three = [_parlay_line(p, lang) for p in _top_by_type(parlays, "3-leg", 5)] or ["No verified 3-leg parlay found. Three independently eligible legs were not available."]
-    four = [_parlay_line(p, lang) for p in _top_by_type(parlays, "4-leg", 3)] or ["No verified 4-leg longshot. Four eligible priced legs were not available."]
-    specialty: list[str] = []
-    for kind in ("same-game", "cross-game", "prop", "live/flash"):
-        specialty += [_parlay_line(p, lang) for p in _top_by_type(parlays, kind, 2)]
-    if not specialty:
-        specialty = ["No SGP/cross-game/prop/live parlay is playable until provider returns priced eligible legs and correlation is handled."]
+        top = ["No verified parlay or chain bet qualifies.", f"Eligible legs found: {diag.get('eligible_legs', 0)}. Need at least two source-traceable priced positive-EV legs."]
+    best_two = next(iter(_top_by_type(parlays, "2-leg", 1)), None)
+    best_three = next(iter(_top_by_type(parlays, "3-leg", 1)), None)
+    two = _parlay_card_rows(best_two, lang) if best_two else ["No verified 2-leg parlay found. Reason: only one priced positive-EV leg available or correlation/pricing blocked."]
+    three = _parlay_card_rows(best_three, lang) if best_three else ["No verified 3-leg parlay found. Three independently eligible legs were not available."]
+    if ranked_unique:
+        specialty = [
+            "Cross-game chains: independent probability and price products are labeled estimates.",
+            "Same-game parlays: require a sportsbook SGP quote plus a validated joint-probability method.",
+            "Props: each leg requires its own market-specific model probability and current price.",
+            "Live / flash: cancel when the market starts, suspends, expires, or changes price.",
+        ]
+    else:
+        specialty = [
+            "STRAIGHT ANCHOR ONLY",
+            "No SGP/cross-game/prop/live parlay is playable until provider returns priced eligible legs and correlation is handled.",
+        ]
     avoid = [f"Avoid: {p.parlay_type} · {p.reason}" for p in blocked[:5]] or ["Avoid any market with stale odds, line movement against the anchor, missing prop model, unsupported SGP pricing, or expired live window."]
     diag_rows = [
         f"Provider: {diag.get('provider_called', 'unknown')} · state {diag.get('provider_state', 'unknown')}.",
@@ -645,7 +880,7 @@ def _page_two_sections(data: dict[str, Any], lang: str) -> list[tuple[str, list[
         ("Primary Anchor", sanitize_public_items([_tr(x, lang) for x in anchor_rows]), RED),
         ("Top Parlay Recommendations", sanitize_public_items(top[:5]), BLUE),
         ("Best 2-Leg Parlays", sanitize_public_items([_tr(x, lang) for x in two[:5]]), BLUE),
-        ("Best 3/4-Leg Parlays", sanitize_public_items([_tr(x, lang) for x in (three[:3] + four[:2])]), GOLD),
+        ("Best 3-Leg Parlays", sanitize_public_items([_tr(x, lang) for x in three[:5]]), GOLD),
         ("SGP / Cross / Prop / Live", sanitize_public_items([_tr(x, lang) for x in specialty[:5]]), BLUE),
         ("Parlay Avoid List", sanitize_public_items([_tr(x, lang) for x in avoid[:5]]), RED),
         ("Source Diagnostics", sanitize_public_items([_tr(x, lang) for x in diag_rows]), BLUE),
@@ -653,14 +888,31 @@ def _page_two_sections(data: dict[str, Any], lang: str) -> list[tuple[str, list[
     ]
 
 
-def _final_status(data: dict[str, Any], lang: str) -> tuple[str, str, tuple[int, int, int]]:
-    parlays, diag = generate_parlay_candidates(data)
+def _final_detail(parlay: ParlayCandidate, lang: str) -> str:
+    legs = " + ".join(f"{leg.selection} @{_odds(leg.decimal_odds)}" for leg in parlay.legs)
+    detail = f"{parlay.parlay_type}: {legs} · {_parlay_metrics(parlay)} · corr {parlay.correlation_risk}"
+    return _tr(detail, lang)
+
+
+def _final_status(
+    data: dict[str, Any],
+    lang: str,
+    *,
+    parlays: list[ParlayCandidate] | None = None,
+    diagnostics: Mapping[str, Any] | None = None,
+) -> tuple[str, str, tuple[int, int, int]]:
+    if parlays is None or diagnostics is None:
+        parlays, generated_diagnostics = generate_parlay_candidates(data)
+        diagnostics = generated_diagnostics
+    diag = dict(diagnostics)
     playable = next((p for p in parlays if p.status == PARLAY_PLAYABLE), None)
     watch = next((p for p in parlays if p.status == PARLAY_WATCHLIST), None)
     if playable:
-        return _tr(BEST_PARLAY_FOUND, lang), _tr(_parlay_line(playable, lang), lang), GREEN
+        if _demonstration_mode(data):
+            return _tr("DEMONSTRATION PARLAY CALCULATION", lang), _final_detail(playable, lang), GOLD
+        return _tr(BEST_PARLAY_FOUND, lang), _final_detail(playable, lang), GREEN
     if watch:
-        return _tr("WATCHLIST PARLAY ONLY", lang), _tr(_parlay_line(watch, lang), lang), GOLD
+        return _tr("WATCHLIST PARLAY ONLY", lang), _final_detail(watch, lang), GOLD
     if diag.get("eligible_legs", 0) <= 1:
         return _tr(STRAIGHT_ANCHOR_ONLY, lang), _tr("No verified parlay available. Straight anchor only until another priced, positive-EV, source-traceable leg exists.", lang), GOLD
     return _tr(NO_VERIFIED_PARLAY_AVAILABLE, lang), _tr("Parlay candidates were blocked by pricing, correlation, EV, stale data, or missing model probability.", lang), GOLD
@@ -675,13 +927,75 @@ def advanced_market_diagnostics(pick: Any) -> dict[str, Any]:
     return diag
 
 
+def build_parlay_report_payload(pick: Any) -> dict[str, Any]:
+    """Return the language- and brand-neutral Page 2 facts used by every renderer."""
+    data = _row(pick)
+    parlays, diagnostics = generate_parlay_candidates(data)
+    return {
+        "schema_version": "aba_parlay_report_v1",
+        "anchor": asdict(_anchor_market(data)),
+        "recommendations": [asdict(parlay) for parlay in parlays[:30]],
+        "diagnostics": dict(diagnostics),
+    }
+
+
 def _png(image: Any) -> bytes:
     out = BytesIO()
     image.save(out, format="PNG", optimize=True)
     return out.getvalue()
 
 
-def _draw_second_page(module: Any, pick: Any, background_image: Any = None, report_name: str | None = None, page_number: int = 2, total_pages: int = 2, language: str | None = None):
+def _report_brand_name(data: Mapping[str, Any], report_name: str | None = None) -> str:
+    return _clean(report_name or _get(data, "report_brand_name", "brand_name", default="ABA SIGNAL PRO")) or "ABA SIGNAL PRO"
+
+
+def _paint_header_identity(
+    module: Any,
+    img: Any,
+    draw: Any,
+    data: Mapping[str, Any],
+    report_name: str | None,
+    logo_image: Any,
+    logo_mode: str,
+    logo_opacity: float,
+) -> None:
+    red = getattr(module, "RED", RED)
+    draw.rectangle((28, 24, 308, 74), fill=red)
+    logo = None
+    if logo_image is not None and str(logo_mode or "header").lower() not in {"none", "off", "disabled"}:
+        loader = getattr(module, "_load_image", None)
+        if callable(loader):
+            logo = loader(logo_image)
+    if logo is not None:
+        resample = getattr(module, "_resample", lambda: 1)()
+        logo.thumbnail((262, 44), resample)
+        alpha = logo.getchannel("A") if "A" in logo.getbands() else None
+        if alpha is not None:
+            alpha = alpha.point(lambda value: int(value * min(1.0, max(0.0, float(logo_opacity)))))
+            logo.putalpha(alpha)
+        x = 28 + (280 - logo.width) // 2
+        y = 24 + (50 - logo.height) // 2
+        logo = logo.convert("RGBA")
+        img.paste(logo, (x, y), logo)
+        return
+    brand = _report_brand_name(data, report_name).upper()
+    draw.text((43, 29), brand, font=module._fit(brand, 250, 38, 18, True), fill="white")
+
+
+def _draw_second_page(
+    module: Any,
+    pick: Any,
+    background_image: Any = None,
+    report_name: str | None = None,
+    page_number: int = 2,
+    total_pages: int = 2,
+    language: str | None = None,
+    logo_image: Any = None,
+    background_mode: str = "hero_right",
+    logo_mode: str = "header",
+    background_opacity: float = 0.9,
+    logo_opacity: float = 1.0,
+):
     from PIL import ImageDraw
     data = _row(pick)
     lang = _lang(data, language)
@@ -690,13 +1004,16 @@ def _draw_second_page(module: Any, pick: Any, background_image: Any = None, repo
     blue = getattr(module, "BLUE", BLUE)
     cream = getattr(module, "CREAM", CREAM)
     paper = getattr(module, "PAPER", PAPER)
-    seed = int(hashlib.sha256((_get(data, "event", "game", "matchup", "event_name", default="parlay") + "page2v9").encode()).hexdigest()[:8], 16)
+    seed = int(hashlib.sha256((_get(data, "event", "game", "matchup", "event_name", default="parlay") + "page2v11").encode()).hexdigest()[:8], 16)
     img = module._paper(seed).convert("RGBA")
+    if background_image is not None and str(background_mode or "").lower() == "full_page":
+        hero = getattr(module, "_hero", None)
+        if callable(hero):
+            hero(img, background_image, "full_page", background_opacity)
     draw = ImageDraw.Draw(img, "RGBA")
     draw.rectangle((18, 18, 1062, 82), fill=black)
-    draw.rectangle((28, 24, 308, 74), fill=red)
-    draw.text((43, 29), "ABA SIGNAL PRO", font=module._fit("ABA SIGNAL PRO", 250, 38, 25, True), fill="white")
-    title = _tr("PARLAY RECOMMENDATION BOARD", lang)
+    _paint_header_identity(module, img, draw, data, report_name, logo_image, logo_mode, logo_opacity)
+    title = _tr(_get(data, "page_two_title", "parlay_report_title", default="PARLAY RECOMMENDATION BOARD"), lang).upper()
     draw.text((330, 28), title, font=module._fit(title, 470, 38, 17, True), fill="white")
     page_text = _tr(f"PAGE {page_number} OF {total_pages}", lang)
     draw.rounded_rectangle((840, 24, 1050, 74), radius=5, fill=cream, outline=black)
@@ -704,13 +1021,23 @@ def _draw_second_page(module: Any, pick: Any, background_image: Any = None, repo
     away, home = module._teams(data)
     module._txt_auto(draw, 42, 104, f"{away} vs {home}".upper(), 660, 52, 46, 15, red, True, 2)
     module._txt_auto(draw, 42, 162, _tr(build_full_market_label(data).upper(), lang), 650, 42, 32, 12, blue, True, 2)
-    final_title, final_detail, final_color = _final_status(data, lang)
-    price = _decimal(_get(data, "display_decimal_odds", "verified_price", "decimal_price", "decimal_odds", "odds", "best_price", "odds_at_pick", "american_odds", "odds_american"))
-    price_text = f"{_tr('PRICE', lang)} {_odds(price)}"
+    page_parlays, page_diagnostics = generate_parlay_candidates(data)
+    final_title, final_detail, final_color = _final_status(
+        data,
+        lang,
+        parlays=page_parlays,
+        diagnostics=page_diagnostics,
+    )
+    best_parlay = next((candidate for candidate in page_parlays if candidate.status == PARLAY_PLAYABLE), None) or next((candidate for candidate in page_parlays if candidate.status == PARLAY_WATCHLIST), None)
+    price = best_parlay.combined_decimal_odds if best_parlay else _decimal(_get(data, "display_decimal_odds", "verified_price", "decimal_price", "decimal_odds", "odds", "best_price", "odds_at_pick", "american_odds", "odds_american"))
+    price_label = "DEMO PRICE" if _demonstration_mode(data) else ("EST. PRICE" if best_parlay and best_parlay.pricing_source == SYNTHETIC_PRODUCT_PRICE else "PRICE")
+    price_text = f"{_tr(price_label, lang)} {_odds(price)}"
     draw.rounded_rectangle((720, 104, 1042, 214), radius=14, fill=black, outline=final_color, width=3)
     draw.text((740, 122), final_title, font=module._fit(final_title, 282, 24, 10, True), fill=final_color)
     draw.text((740, 160), price_text, font=module._fit(price_text, 250, 28, 12, True), fill=cream)
-    note = "Ranked parlays use real priced legs only. SGPs need sportsbook pricing or modeled correlation. Props need prop-specific probability."
+    note = "Parlays use source-traceable priced legs only. SGPs require a book quote plus validated joint probability. Estimated cross-game prices are labeled estimates."
+    if _demonstration_mode(data):
+        note = "DEMONSTRATION ONLY - not current betting advice. " + note
     draw.rounded_rectangle((42, 232, 1042, 294), radius=12, fill=GOLD + (245,), outline=black, width=2)
     module._txt_auto(draw, 64, 248, _tr(note, lang), 956, 32, 20, 8, black, True, 2)
 
@@ -730,7 +1057,13 @@ def _draw_second_page(module: Any, pick: Any, background_image: Any = None, repo
             cy += 34
 
     coords = [(42, 318, 488, 210), (552, 318, 488, 210), (42, 548, 488, 224), (552, 548, 488, 224), (42, 792, 488, 224), (552, 792, 488, 224), (42, 1036, 488, 224), (552, 1036, 488, 224)]
-    for (title2, rows, color), coord in zip(_page_two_sections(data, lang), coords):
+    sections = _page_two_sections(
+        data,
+        lang,
+        parlays=page_parlays,
+        diagnostics=page_diagnostics,
+    )
+    for (title2, rows, color), coord in zip(sections, coords):
         box(*coord, title2, rows, color)
     draw.rounded_rectangle((42, 1288, 1042, 1518), radius=16, fill=black, outline=final_color, width=4)
     draw.text((68, 1310), final_title, font=module._fit(final_title, 914, 36, 14, True), fill=final_color)
@@ -757,7 +1090,20 @@ def install(module: Any | None = None) -> Any:
         page_total = max(2, int(total_pages or 1) * 2)
         first = max(1, int(page_number or 1) * 2 - 1)
         page_one = module.render_full_pick_magazine_page(pick, background_image, report_name, first, page_total, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
-        page_two = _draw_second_page(module, pick, background_image, report_name, first + 1, page_total, language)
+        page_two = _draw_second_page(
+            module,
+            pick,
+            background_image,
+            report_name,
+            first + 1,
+            page_total,
+            language,
+            logo_image,
+            background_mode,
+            logo_mode,
+            background_opacity,
+            logo_opacity,
+        )
         from PIL import Image
         book = Image.new("RGB", (page_one.width, page_one.height * 2), getattr(module, "PAPER", PAPER))
         book.paste(page_one.convert("RGB"), (0, 0))
@@ -770,7 +1116,20 @@ def install(module: Any | None = None) -> Any:
         pages: list[Any] = []
         for index, row in enumerate(rows):
             pages.append(module.render_full_pick_magazine_page(row, background_image, report_name, index * 2 + 1, total, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
-            pages.append(_draw_second_page(module, row, background_image, report_name, index * 2 + 2, total, language))
+            pages.append(_draw_second_page(
+                module,
+                row,
+                background_image,
+                report_name,
+                index * 2 + 2,
+                total,
+                language,
+                logo_image,
+                background_mode,
+                logo_mode,
+                background_opacity,
+                logo_opacity,
+            ))
         return pages
 
     module.render_full_pick_magazine_page_png = two_page_png

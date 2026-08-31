@@ -1,5 +1,7 @@
 from dataclasses import dataclass, fields
+import hashlib
 import html as html_lib
+import json
 from typing import Any, Mapping
 
 import pandas as pd
@@ -20,6 +22,7 @@ from autonomous_betting_agent.report_product_layer import (
 )
 from autonomous_betting_agent.report_summary import build_report_summary_bundle
 from autonomous_betting_agent.two_page_decision_export import build_two_page_decision_export
+from autonomous_betting_agent.report_verification_gate import VERSION as VERIFICATION_GATE_VERSION, classify_report_row
 
 
 @dataclass(frozen=True)
@@ -40,6 +43,7 @@ class ReportExportBundle:
     page1_decision: dict[str, Any] | None = None
     page2_decision: dict[str, Any] | None = None
     provider_capabilities: list[dict[str, Any]] | None = None
+    verification_manifest: dict[str, Any] | None = None
 
 
 def clean_legacy_report_labels(text: str) -> str:
@@ -73,6 +77,33 @@ def _render_summary_html(markdown: str) -> str:
             lines.append("<br>")
     lines.append("</section>")
     return "\n".join(lines)
+
+
+def _verified_cards(cards: pd.DataFrame) -> pd.DataFrame:
+    source = cards.copy(deep=True) if isinstance(cards, pd.DataFrame) else pd.DataFrame(cards)
+    return pd.DataFrame([classify_report_row(row) for row in source.to_dict("records")])
+
+
+def _records_sha256(cards: pd.DataFrame) -> str:
+    payload = json.dumps(cards.to_dict("records"), sort_keys=True, default=str, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _verification_manifest(cards: pd.DataFrame, *, input_sha256: str) -> dict[str, Any]:
+    records = cards.to_dict("records")
+    counts: dict[str, int] = {}
+    for row in records:
+        key = str(row.get("report_verification_class") or "UNCLASSIFIED")
+        counts[key] = counts.get(key, 0) + 1
+    return {
+        "schema_version": "aba_report_manifest_v1",
+        "verification_gate_version": VERIFICATION_GATE_VERSION,
+        "input_sha256": input_sha256,
+        "row_count": len(records),
+        "classification_counts": counts,
+        "live_api_claims": sum(bool(row.get("automated_live_provider_verified")) for row in records),
+        "manual_verified_inputs": sum(bool(row.get("manual_verified_input")) for row in records),
+    }
 
 
 def render_whatsapp_report(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *, max_items: int = 8) -> str:
@@ -114,6 +145,9 @@ def render_whatsapp_report(cards: pd.DataFrame, brand: MagazineBrand | Mapping[s
 
 def build_report_export_bundle(cards: pd.DataFrame, brand: MagazineBrand | Mapping[str, Any], *, mode: str = "consumer", public: bool = False) -> ReportExportBundle:
     cards = apply_learning_layer_compat(cards)
+    input_sha256 = _records_sha256(cards)
+    cards = _verified_cards(cards)
+    manifest = _verification_manifest(cards, input_sha256=input_sha256)
     decision = build_two_page_decision_export(cards)
     cards_with_decisions = decision.cards
     summary = build_report_summary_bundle(cards_with_decisions)
@@ -125,7 +159,8 @@ def build_report_export_bundle(cards: pd.DataFrame, brand: MagazineBrand | Mappi
     json_text = cards_to_json(cards_with_summary)
     csv_text = summary.csv_text
     pdf_bytes = render_report_pdf(cards, brand, mode=mode, summary_markdown=summary.markdown + "\n\n" + decision.markdown)
-    feed = build_report_feed(cards, brand, mode=mode, public=public)
+    feed = dict(build_report_feed(cards, brand, mode=mode, public=public))
+    feed["verification_manifest"] = manifest
     return ReportExportBundle(
         html=html,
         markdown=markdown,
@@ -143,4 +178,5 @@ def build_report_export_bundle(cards: pd.DataFrame, brand: MagazineBrand | Mappi
         page1_decision=decision.page1,
         page2_decision=decision.page2,
         provider_capabilities=decision.provider_capabilities,
+        verification_manifest=manifest,
     )

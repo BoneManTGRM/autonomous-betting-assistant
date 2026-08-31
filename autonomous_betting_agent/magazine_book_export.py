@@ -865,7 +865,7 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     draw.rectangle((18, 18, PAGE_WIDTH - 18, 82), fill=BLACK)
     draw.rectangle((28, 24, 308, 74), fill=RED)
     draw.text((43, 29), "ABA SIGNAL PRO", font=_fit("ABA SIGNAL PRO", 250, 38, 25, True), fill="white")
-    daily = _tr("DAILY SPORTS ANALYSIS", lang)
+    daily = _tr(_get(pick, "report_title", default="DAILY SPORTS ANALYSIS"), lang).upper()
     draw.text((330, 28), daily, font=_fit(daily, 470, 38, 20, True), fill="white")
     draw.rounded_rectangle((840, 24, 1050, 74), radius=5, fill=CREAM, outline=BLACK)
     page_text = _tr(f"PAGE {page_number} OF {total_pages}", lang)
@@ -885,7 +885,7 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     conf = _pct(_num(pick, "learned_model_probability", "model_probability_clean", "model_probability", "final_probability"))
     edge = _edge(_num(pick, "model_market_edge", "edge"))
     ev = _fmt(_get(pick, "expected_value_per_unit", "profit_expected_value", "expected_value", "ev"), "ev")
-    units = _fmt(_get(pick, "recommended_stake_units", "suggested_stake_units", "units", default="1.0"), "unit")
+    units = _fmt(_get(pick, "target_stake_units", "recommended_stake_units", "suggested_stake_units", "units", default="1.0"), "unit")
     risk = _tr(_clean(_get(pick, "risk", "risk_level", "risk_label", "profit_guard_status", default=NO_VERIFIED), True), lang)
     for label, value, color, x, width in magazine_metric_cells(odds, conf, edge, ev, units, risk):
         _metric(draw, x, sy + 6, width, label, value, color, lang)
@@ -979,7 +979,14 @@ def render_full_magazine_book_png(picks: Iterable[Any], background_image: Any = 
 
 
 def render_full_magazine_book_pdf(picks: Iterable[Any], background_image: Any = None, report_name: str | None = None, logo_image: Any = None, background_mode: str = "hero_right", logo_mode: str = "header", background_opacity: float = 0.9, logo_opacity: float = 1.0, use_team_logo: bool = True, language: str | None = None) -> bytes:
-    pages = [page.convert("RGB") for page in render_full_magazine_book_pages(picks, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)]
+    pages: list[Image.Image] = []
+    for page in render_full_magazine_book_pages(picks, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language):
+        snapshot = BytesIO()
+        page.convert("RGB").save(snapshot, format="PNG")
+        snapshot.seek(0)
+        stable_page = Image.open(snapshot).convert("RGB")
+        stable_page.load()
+        pages.append(stable_page)
     out = BytesIO()
     pages[0].save(out, format="PDF", save_all=True, append_images=pages[1:], resolution=100.0)
     return out.getvalue()

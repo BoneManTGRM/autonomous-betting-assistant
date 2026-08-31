@@ -151,9 +151,20 @@ def _patch_second_page() -> None:
         page2.discover_markets = discover_with_guard
     original_sections = getattr(page2, "_page_two_sections", None)
     if callable(original_sections):
-        def sections_with_guard(data: dict[str, Any], lang: str):
+        def sections_with_guard(
+            data: dict[str, Any],
+            lang: str,
+            *,
+            parlays=None,
+            diagnostics=None,
+        ):
             enriched = _enrich_pick(data)
-            sections = original_sections(enriched, lang)
+            sections = original_sections(
+                enriched,
+                lang,
+                parlays=parlays,
+                diagnostics=diagnostics,
+            )
             guarded = []
             source_saved = _source_saved(_row(enriched))
             for title, rows, color in sections:

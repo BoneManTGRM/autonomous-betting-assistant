@@ -11,6 +11,8 @@ import re
 # Page 1 endpoint pass removes visible CHAIN BETTING NOTES through overlay replacement.
 
 from autonomous_betting_agent import magazine_sale_ready_patch_contract as _contract
+from autonomous_betting_agent.report_public_quality import is_manual_verified_input
+from autonomous_betting_agent.report_verification_gate import VERIFIED_BUYER_PICK, classify_report_row
 
 _es = _contract._es
 _items_from_context = _contract._items_from_context
@@ -33,6 +35,16 @@ def _clean(value: Any) -> str:
 def _valid_text(value: Any) -> bool:
     text = _clean(value).lower()
     return bool(text and text not in {"nan", "none", "null", "n/a", "na", "--", "data unavailable", "not provided"})
+
+
+def _demonstration_mode(data: dict[str, Any]) -> bool:
+    if data.get("demonstration_mode") is True:
+        return True
+    text = " ".join(
+        _clean(data.get(key)).lower()
+        for key in ("report_title", "report_data_scope", "report_truth_warning", "league")
+    )
+    return any(token in text for token in ("demonstration", "demo only", "validation fixture"))
 
 
 def _first(data: dict[str, Any], *keys: str, default: str = "") -> str:
@@ -242,6 +254,42 @@ def _normalize_display_fields(data: dict[str, Any]) -> dict[str, Any]:
 
 def _force_truthful_gate(row: Any) -> dict[str, Any]:
     data = _normalize_display_fields(dict(_contract._row(row)))
+    if _demonstration_mode(data):
+        data.update({
+            "final_decision": "DEMONSTRATION ONLY",
+            "agent_decision": "DEMONSTRATION ONLY",
+            "recommendation": "DEMONSTRATION ONLY",
+            "consumer_action": "DEMONSTRATION ONLY",
+            "recommended_action": "DEMONSTRATION ONLY",
+            "risk": "DEMONSTRATION DATA",
+            "risk_level": "DEMONSTRATION DATA",
+            "risk_label": "DEMONSTRATION DATA",
+            "target_stake_units": "0.0",
+            "live_verified_stake_units": "0.0",
+            "report_truth_severity": "DEMONSTRATION ONLY",
+            "verification_status": "DEMONSTRATION ONLY",
+            "report_truth_warning": data.get("report_truth_warning") or "Demonstration only; not current betting advice.",
+        })
+        return data
+    if is_manual_verified_input(data):
+        classified = classify_report_row(data)
+        if classified.get("report_verification_class") == VERIFIED_BUYER_PICK:
+            data.update(classified)
+            data.update({
+                "final_decision": "MANUALLY VERIFIED INPUT",
+                "agent_decision": "MANUALLY VERIFIED INPUT",
+                "recommendation": "MANUALLY VERIFIED INPUT",
+                "consumer_action": "MANUALLY VERIFIED INPUT",
+                "recommended_action": "MANUALLY VERIFIED INPUT",
+                "risk": "MANUALLY VERIFIED PRICE",
+                "risk_level": "MANUALLY VERIFIED PRICE",
+                "risk_label": "MANUALLY VERIFIED PRICE",
+                "live_verified_stake_units": "0.0",
+                "report_truth_severity": "MANUALLY VERIFIED INPUT",
+                "report_truth_warning": "Operator-attested sportsbook observation; not an automated live API quote.",
+                "verification_status": "MANUALLY VERIFIED INPUT",
+            })
+            return data
     if not _fallback_odds(data):
         data.setdefault("live_verified_stake_units", data.get("target_stake_units", "0.0") if _live_verified(data) else "0.0")
         return data
@@ -277,7 +325,15 @@ def _truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
     source_mode = _clean(data.get("report_source_mode")).lower()
     odds_status = _clean(data.get("odds_status") or data.get("odds_source") or "MISSING").upper()
     context_status = _clean(data.get("context_status") or data.get("context_source") or data.get("report_live_context_detected") or "VERIFY")
-    if report_source == "final_enriched_picks_df" and _live_verified(data):
+    if _demonstration_mode(data):
+        source_label = _clean(data.get("report_source_label") or "Demonstration fixture")
+        scope = _clean(data.get("report_data_scope") or "Demonstration only - not current betting advice")
+        truth = "DEMONSTRATION ONLY"
+        odds_status = "DEMO PRICE - NOT LIVE API"
+    elif is_manual_verified_input(data):
+        source_label, scope, truth = "Operator-attested manual input", "Manual sportsbook observation", "MANUALLY VERIFIED INPUT"
+        odds_status = "MANUAL - NOT LIVE API"
+    elif report_source == "final_enriched_picks_df" and _live_verified(data):
         source_label, scope, truth = "Live API refreshed report", "Current API-refreshed slate", "LIVE VERIFIED"
     elif report_source == "final_enriched_picks_df" or _fallback_odds(data):
         source_label, scope, truth = "API refreshed / no live odds match", "Verification-only report", "NO LIVE ODDS MATCH"
@@ -418,6 +474,15 @@ def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], lan
         draw.text((372, 1189), tr("MATCHUP NOTES", lang).upper(), fill=cream)
     rows = _expanded_context_rows(row)
     _draw_readable_bullets(patched, draw, 378, 1246, rows, 650, 94, blue, lang)
+    if _demonstration_mode(row):
+        if callable(getattr(patched, "_section", None)):
+            patched._section(draw, 20, 1178, 320, 175, "RISK DESK", getattr(patched, "RED", (190, 30, 28)), lang)
+        demo_rows = (
+            ["Solo demostración", "No es consejo de apuesta actual", "Reemplazar cada cuota antes de publicar"]
+            if lang == "es"
+            else ["Demonstration only", "Not current betting advice", "Replace all prices first"]
+        )
+        _draw_readable_bullets(patched, draw, 44, 1248, demo_rows, 272, 92, getattr(patched, "RED", (190, 30, 28)), lang)
     return img.convert("RGB")
 
 
@@ -477,7 +542,20 @@ def _install_forced_two_page_renderer(patched: Any) -> None:
         page_total = max(2, int(total_pages or 1) * 2)
         first = max(1, int(page_number or 1) * 2 - 1)
         page_one = patched.render_full_pick_magazine_page(row, background_image, report_name, first, page_total, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language)
-        page_two = second_page._draw_second_page(patched, row, background_image, report_name, first + 1, page_total, language)
+        page_two = second_page._draw_second_page(
+            patched,
+            row,
+            background_image,
+            report_name,
+            first + 1,
+            page_total,
+            language,
+            logo_image,
+            background_mode,
+            logo_mode,
+            background_opacity,
+            logo_opacity,
+        )
         book = Image.new("RGB", (page_one.width, page_one.height * 2), getattr(patched, "PAPER", (244, 235, 211)))
         book.paste(page_one.convert("RGB"), (0, 0))
         book.paste(page_two.convert("RGB"), (0, page_one.height))
@@ -489,12 +567,25 @@ def _install_forced_two_page_renderer(patched: Any) -> None:
         pages: list[Any] = []
         for index, row in enumerate(rows):
             pages.append(patched.render_full_pick_magazine_page(row, background_image, report_name, index * 2 + 1, total, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
-            pages.append(second_page._draw_second_page(patched, row, background_image, report_name, index * 2 + 2, total, language))
+            pages.append(second_page._draw_second_page(
+                patched,
+                row,
+                background_image,
+                report_name,
+                index * 2 + 2,
+                total,
+                language,
+                logo_image,
+                background_mode,
+                logo_mode,
+                background_opacity,
+                logo_opacity,
+            ))
         return pages
 
     patched.render_full_pick_magazine_page_png = two_page_png
     patched.render_full_magazine_book_pages = book_pages
-    patched._ABA_FORCED_TWO_PAGE_TRUTH_RENDERER = "truth_contract_v12"
+    patched._ABA_FORCED_TWO_PAGE_TRUTH_RENDERER = "truth_contract_v13_shared_snapshot_custom_brand"
 
 
 def apply_magazine_sale_ready_patch(module):

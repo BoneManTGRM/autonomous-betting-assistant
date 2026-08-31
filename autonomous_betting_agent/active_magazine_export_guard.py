@@ -5,6 +5,7 @@ import re
 
 from autonomous_betting_agent.report_public_quality import (
     build_full_market_label,
+    is_manual_verified_input,
     is_saved_source,
     public_action_label,
     public_recommendation_status,
@@ -154,6 +155,16 @@ def _price_line(data: dict[str, Any]) -> str:
     return price or source or "Stored price not found"
 
 
+def _demonstration_mode(data: dict[str, Any]) -> bool:
+    if data.get("demonstration_mode") is True:
+        return True
+    text = " ".join(
+        _clean(data.get(key)).lower()
+        for key in ("report_title", "report_data_scope", "report_truth_warning", "league")
+    )
+    return any(token in text for token in ("demonstration", "demo only", "validation fixture"))
+
+
 def normalize_row(value: Any) -> dict[str, Any]:
     data = _row(value)
     for key in ("weather_summary", "venue_weather", "weather_risk", "weather_location", "expanded_matchup_context", "sports_context_summary", "preview_summary", "game_summary", "matchup_note", "matchup_notes", "news_summary", "newsapi_summary", "perplexity_summary", "perplexity_context", "sportsdataio_context", "api_football_summary", "line_movement_summary", "line_movement", "price_movement"):
@@ -211,15 +222,25 @@ def normalize_row(value: Any) -> dict[str, Any]:
     for key in ("aba_display_pick", "display_pick", "prediction", "pick", "exact_bet", "final_recommendation_label", "public_market_label", "verified_market_label", "full_market_label", "market_label", "trend_label"):
         data[key] = label
     negative = _negative_value(data)
+    manual_verified = is_manual_verified_input(data)
     saved = is_saved_source(data)
-    action = "NO " + "BET / PRICE REJECTED" if negative else (WATCH_VERIFY if saved else public_action_label(data))
+    demo = _demonstration_mode(data)
+    action = "DEMONSTRATION ONLY" if demo else ("NO " + "BET / PRICE REJECTED" if negative else (WATCH_VERIFY if saved else public_action_label(data)))
     for key in ("final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action"):
         data[key] = action
-    data["risk"] = "PRICE REJECTED" if negative else ("VERIFY CURRENT PRICE" if saved else "VERIFIED PRICE")
+    data["risk"] = "DEMONSTRATION DATA" if demo else ("PRICE REJECTED" if negative else ("VERIFY CURRENT PRICE" if saved else "MANUALLY VERIFIED PRICE" if manual_verified else "VERIFIED PRICE"))
     data["risk_level"] = data["risk_label"] = data["profit_guard_status"] = data["risk"]
-    data["final_explanation"] = "Negative edge or EV at current price." if negative else ("Saved row uses stored price/context. Recheck current provider price before publishing." if saved else public_recommendation_status(data))
+    data["final_explanation"] = "Demonstration only - not current betting advice." if demo else ("Negative edge or EV at current price." if negative else ("Saved row uses stored price/context. Recheck current provider price before publishing." if saved else public_recommendation_status(data)))
     data["action_reason"] = data["recommendation_reason"] = data["final_explanation"]
-    if saved:
+    if demo:
+        data["report_source"] = "demonstration_fixture"
+        data["report_source_label"] = _first(data, "report_source_label", default="Demonstration fixture")
+        data["report_data_scope"] = _first(data, "report_data_scope", default="Demonstration only - not current betting advice")
+        data["report_truth_severity"] = "DEMONSTRATION ONLY"
+        data["verification_status"] = "DEMONSTRATION ONLY"
+        data["odds_api_live"] = "false"
+        data["the_odds_api_live"] = "false"
+    elif saved:
         price = _price(data)
         source = _price_source(data)
         timestamp = _timestamp(data)
@@ -241,6 +262,17 @@ def normalize_row(value: Any) -> dict[str, Any]:
         data["odds_api_live"] = "false"
         data["the_odds_api_live"] = "false"
         data["report_truth_warning"] = public_source_warning(data)
+    elif manual_verified:
+        data["report_source"] = "manual_verified_input"
+        data["report_source_label"] = "Operator-attested manual price"
+        data["report_data_scope"] = "Manual sportsbook observation"
+        data["report_truth_severity"] = "MANUALLY VERIFIED INPUT"
+        data["verification_status"] = "Manual price observation - not an automated live API quote"
+        data["api_match_status"] = "Manual input verified"
+        data["provider_match_status"] = "Manual input verified"
+        data["odds_verified"] = "manual"
+        data["odds_api_live"] = "false"
+        data["the_odds_api_live"] = "false"
     return data
 
 
@@ -249,6 +281,14 @@ def public_truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
     if _no_verified_row(data):
         return [("REPORT SOURCE", "No verified current-provider picks"), ("DATA SCOPE", "No verified buyer picks"), ("TRUTH", "RESEARCH ONLY"), ("ODDS STATUS", "NO_VERIFIED_BUYER_PICKS"), ("MATCHED", "Provider not matched")]
     odds_status = _clean(data.get("odds_status") or data.get("odds_source") or "VERIFY").upper()
+    if _demonstration_mode(data):
+        return [
+            ("REPORT SOURCE", _first(data, "report_source_label", default="Demonstration fixture")),
+            ("DATA SCOPE", _first(data, "report_data_scope", default="Demonstration only - not current betting advice")),
+            ("TRUTH", "DEMONSTRATION ONLY"),
+            ("ODDS STATUS", "DEMO PRICE - NOT LIVE API"),
+            ("LIVE API", "Not used for this validation fixture"),
+        ]
     if is_saved_source(data):
         pairs = [("REPORT SOURCE", "Saved row + provider context"), ("PRICE STATUS", "Verify current price"), ("SAVED PRICE", _price_line(data))]
         timestamp = _first(data, "saved_price_timestamp", default="") or _timestamp(data)
@@ -256,6 +296,14 @@ def public_truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
             pairs.append(("TIMESTAMP", timestamp))
         pairs.append(("MATCHED", "Current provider recheck required"))
         return pairs[:5]
+    if is_manual_verified_input(data):
+        return [
+            ("REPORT SOURCE", "Operator-attested manual input"),
+            ("PRICE STATUS", "Manually verified"),
+            ("BOOK / PRICE", _price_line(data)),
+            ("TIMESTAMP", _timestamp(data) or "Missing"),
+            ("LIVE API", "Not used for this price"),
+        ]
     return [("REPORT SOURCE", "Current provider row"), ("DATA SCOPE", "Current provider matched"), ("TRUTH", "VERIFIED PRICE"), ("ODDS STATUS", odds_status), ("MATCHED", "Provider matched")]
 
 
@@ -317,12 +365,13 @@ def install(module: Any) -> Any:
         if _no_verified_row(data):
             return ["Matched to this row: Provider not matched"]
         lines = ["Configured APIs: " + configured] if configured else []
-        lines.append("Matched to this row: " + ("Current provider recheck required" if is_saved_source(data) else "Provider matched"))
+        matched = "Current provider recheck required" if is_saved_source(data) else "Manual input verified" if is_manual_verified_input(data) else "Provider matched"
+        lines.append("Matched to this row: " + matched)
         return lines
 
     def guarded_pairs(row: Any, lang: str):
         data = normalize_row(row)
-        if _no_verified_row(data) or is_saved_source(data):
+        if _no_verified_row(data) or is_saved_source(data) or is_manual_verified_input(data):
             return public_truth_pairs(data, lang)
         pairs = [] if not callable(original_pairs) else list(original_pairs(data, lang))
         return [("CONFIGURED APIS" if str(label).upper() == "ACTIVE APIS" else label, value) for label, value in pairs][:5]
@@ -361,9 +410,20 @@ def install(module: Any) -> Any:
             page2.discover_markets = guarded_discover
         original_sections = getattr(page2, "_page_two_sections", None)
         if callable(original_sections) and not getattr(original_sections, "_ABA_ACTIVE_EXPORT_SECTIONS", False):
-            def guarded_sections(data: dict[str, Any], lang: str):
+            def guarded_sections(
+                data: dict[str, Any],
+                lang: str,
+                *,
+                parlays=None,
+                diagnostics=None,
+            ):
                 row = normalize_row(data)
-                sections = original_sections(row, lang)
+                sections = original_sections(
+                    row,
+                    lang,
+                    parlays=parlays,
+                    diagnostics=diagnostics,
+                )
                 if not is_saved_source(row):
                     return sections
                 cleaned = []

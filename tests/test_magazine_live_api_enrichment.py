@@ -29,11 +29,14 @@ def test_weather_news_api_football_and_sportsdataio_checked_details(monkeypatch)
 
     def fake_request(url, *, headers=None, cache_key=None, timeout=3.0):
         if cache_key and cache_key[0] == "weather":
+            assert "weather-secret" in url
             return {
                 "location": {"name": "Philadelphia", "region": "Pennsylvania", "country": "USA"},
                 "current": {"temp_c": 22.0, "wind_kph": 8.0, "condition": {"text": "Clear"}},
             }
         if cache_key and cache_key[0] == "news":
+            assert headers == {"X-Api-Key": "news-secret"}
+            assert "Iraq" in url and "France" in url
             return {"articles": []}
         if cache_key and cache_key[0] == "api-football-team":
             return {"response": []}

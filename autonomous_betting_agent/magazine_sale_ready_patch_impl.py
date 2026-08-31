@@ -134,6 +134,12 @@ def _edge_state(row: Any) -> tuple[float | None, float | None, bool, bool]:
 
 
 def sale_ready_recommendation(row: Any) -> tuple[str, str, bool]:
+    demo_text = " ".join(
+        _get(row, key, default="").lower()
+        for key in ("report_title", "report_data_scope", "report_truth_warning", "league")
+    )
+    if bool(_row(row).get("demonstration_mode")) or any(token in demo_text for token in ("demonstration", "demo only", "validation fixture")):
+        return "DEMONSTRATION ONLY", "Not current betting advice.", False
     if _fallback_odds(row):
         return "WATCHLIST", "Fallback/watchlist only.", False
     _edge, _ev, negative, missing = _edge_state(row)

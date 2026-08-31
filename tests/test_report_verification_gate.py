@@ -176,10 +176,10 @@ def test_page2_generates_cross_game_two_leg_when_second_verified_leg_exists():
         "provider_verified": "true",
     }])
     parlays, diag = page2.generate_parlay_candidates(row)
-    playable = [p for p in parlays if p.status == page2.PARLAY_PLAYABLE]
+    conditional = [p for p in parlays if p.status == page2.PARLAY_WATCHLIST]
     assert diag["eligible_legs"] >= 2
-    assert playable
-    assert playable[0].pricing_source == page2.SYNTHETIC_PRODUCT_PRICE
+    assert conditional
+    assert conditional[0].pricing_source == page2.SYNTHETIC_PRODUCT_PRICE
 
 
 def test_same_game_without_sgp_price_is_blocked():

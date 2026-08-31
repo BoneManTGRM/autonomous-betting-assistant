@@ -343,6 +343,13 @@ def _edge_state(row: Any) -> tuple[float | None, float | None, bool, bool]:
 
 
 def sale_ready_recommendation(row: Any) -> tuple[str, str, bool]:
+    data = dict(_row(row))
+    demo_text = " ".join(
+        _clean_text(data.get(key)).lower()
+        for key in ("report_title", "report_data_scope", "report_truth_warning", "league")
+    )
+    if data.get("demonstration_mode") is True or any(token in demo_text for token in ("demonstration", "demo only", "validation fixture")):
+        return "DEMONSTRATION ONLY", "Not current betting advice.", False
     _edge, _ev, negative, missing = _edge_state(row)
     if _explicit_fallback_odds(row):
         return "WATCHLIST", "Fallback data used.", False
@@ -491,14 +498,34 @@ def _items_from_context(row: Any, keys: Iterable[str], fallback: list[str], limi
     return _wrap(items[:limit], lang)
 
 
-def _paint_report_name(module: Any, img: Any, report_name: str | None) -> None:
-    if not report_name:
-        return
-    text = str(report_name or "").strip().upper()
-    if not text:
-        return
+def _paint_report_name(
+    module: Any,
+    img: Any,
+    report_name: str | None,
+    logo_image: Any = None,
+    logo_mode: str = "header",
+    logo_opacity: float = 1.0,
+) -> None:
     draw = module.ImageDraw.Draw(img, "RGBA")
     draw.rectangle((28, 24, 308, 74), fill=module.RED)
+    logo = None
+    if logo_image is not None and str(logo_mode or "header").lower() not in {"none", "off", "disabled"}:
+        loader = getattr(module, "_load_image", None)
+        if callable(loader):
+            logo = loader(logo_image)
+    if logo is not None:
+        resample = getattr(module, "_resample", lambda: 1)()
+        logo.thumbnail((262, 44), resample)
+        alpha = logo.getchannel("A") if "A" in logo.getbands() else None
+        if alpha is not None:
+            alpha = alpha.point(lambda value: int(value * min(1.0, max(0.0, float(logo_opacity)))))
+            logo.putalpha(alpha)
+        x = 28 + (280 - logo.width) // 2
+        y = 24 + (50 - logo.height) // 2
+        logo = logo.convert("RGBA")
+        img.paste(logo, (x, y), logo)
+        return
+    text = str(report_name or "ABA Signal Pro").strip().upper()
     draw.text((43, 29), text, font=module._fit(text, 250, 38, 18, True), fill="white")
 
 
@@ -557,8 +584,13 @@ def apply_magazine_sale_ready_patch(module):
 
     def patched_render(pick, *args, **kwargs):
         report_name = kwargs.get("report_name") if "report_name" in kwargs else (args[1] if len(args) > 1 else None)
-        img = original_render(_sanitize_pick(pick), *args, **kwargs)
-        _paint_report_name(patched, img, report_name)
+        logo_image = kwargs.get("logo_image") if "logo_image" in kwargs else (args[4] if len(args) > 4 else None)
+        logo_mode = kwargs.get("logo_mode") if "logo_mode" in kwargs else (args[6] if len(args) > 6 else "header")
+        logo_opacity = kwargs.get("logo_opacity") if "logo_opacity" in kwargs else (args[8] if len(args) > 8 else 1.0)
+        row = _sanitize_pick(pick)
+        report_name = report_name or row.get("report_brand_name") or row.get("brand_name")
+        img = original_render(row, *args, **kwargs)
+        _paint_report_name(patched, img, report_name, logo_image, logo_mode, logo_opacity)
         return img
 
     patched._tr = patched_tr
