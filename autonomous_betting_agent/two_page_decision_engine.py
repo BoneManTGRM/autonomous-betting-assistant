@@ -297,6 +297,9 @@ def _explicit_blockers(row: Mapping[str, Any]) -> list[str]:
 
 def no_bet_reasons(row: Mapping[str, Any], *, ev: float | None, edge: float | None, implied: float | None) -> list[str]:
     reasons = _explicit_blockers(row)
+    verification_class = _text(row.get("report_verification_class"))
+    if verification_class and verification_class != "VERIFIED_BUYER_PICK":
+        reasons.append("source verification gate not passed")
     if _started(row):
         reasons.append("event already started")
     if _stale(row):

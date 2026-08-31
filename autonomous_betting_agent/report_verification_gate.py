@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 import re
 
-from .report_public_quality import build_full_market_label, is_saved_source, market_type, provider_state, public_text, to_float
+from .report_public_quality import build_full_market_label, is_manual_verified_input, is_saved_source, market_type, provider_state, public_text, to_float
 
 VERSION = "verification_gate_v2_no_verified_truth"
 VERIFIED_BUYER_PICK = "VERIFIED_BUYER_PICK"
@@ -36,12 +36,12 @@ RISK = {
     NO_VERIFIED_CLASS: "RESEARCH ONLY",
 }
 
-TIME_KEYS = ("provider_timestamp", "price_timestamp", "verified_timestamp", "timestamp", "last_update", "last_updated", "updated_at", "odds_timestamp")
+TIME_KEYS = ("provider_timestamp", "price_timestamp", "verified_timestamp", "captured_at_utc", "timestamp", "last_update", "last_updated", "updated_at", "odds_timestamp")
 PRICE_KEYS = ("decimal_price", "decimal_odds", "best_price", "odds_decimal", "odds_at_pick", "verified_price", "current_price", "price", "odds")
 PROB_KEYS = ("learned_model_probability", "final_adjusted_probability", "adjusted_model_probability", "model_probability_clean", "model_probability", "probability")
 EDGE_KEYS = ("model_market_edge", "edge", "raw_edge", "two_page_raw_edge")
 EV_KEYS = ("expected_value_per_unit", "profit_expected_value", "expected_value", "ev", "EV", "raw_EV", "two_page_raw_EV")
-EVENT_KEYS = ("provider_event_id", "odds_api_event_id", "sportsdataio_event_id", "sdio_event_id", "api_football_fixture_id", "fixture_id", "game_id", "event_id")
+EVENT_KEYS = ("provider_event_id", "manual_event_id", "odds_api_event_id", "sportsdataio_event_id", "sdio_event_id", "api_football_fixture_id", "fixture_id", "game_id", "event_id")
 SELECTION_KEYS = ("selection", "pick", "prediction", "side", "outcome", "team", "participant", "exact_" + "b" + "et")
 PROVIDER_KEYS = ("provider", "odds_provider", "api_provider", "odds_source", "data_source", "source")
 BOOK_KEYS = ("sportsbook", "bookmaker", "book", "best_bookmaker")
@@ -173,6 +173,8 @@ def _fresh(data: Mapping[str, Any], now: datetime | None = None) -> tuple[bool, 
 
 
 def _source_current(data: Mapping[str, Any]) -> tuple[bool, str]:
+    if is_manual_verified_input(data):
+        return True, "Operator-attested manual price observation confirmed."
     if is_saved_source(data):
         return False, "Saved-source row requires current provider verification."
     blob = _blob(data, ("source_mode", "selected_source_key", "odds_source", "data_source", "source", "source_label", "odds_status", "report_source", "report_source_mode"))
@@ -268,8 +270,9 @@ def verify_current_provider_match(row: Any, now: datetime | None = None) -> dict
         "verified_timestamp": _first(data, *TIME_KEYS),
         "timestamp_status": ts_status,
         "timestamp_age_seconds": age,
-        "provider_name": _first(data, *PROVIDER_KEYS),
+        "provider_name": _first(data, *PROVIDER_KEYS) or ("Manual operator entry" if is_manual_verified_input(data) else ""),
         "book": _first(data, *BOOK_KEYS),
+        "verification_method": "manual_verified" if is_manual_verified_input(data) else "automated_provider",
         "model_probability": prob,
         "edge": edge,
         "ev": ev,
@@ -303,21 +306,24 @@ def classify_report_row(row: Any, now: datetime | None = None) -> dict[str, Any]
         reasons.append(block_reason)
     if not reasons:
         reasons = ["Current provider verification confirmed."] if cls == VERIFIED_BUYER_PICK else ["Current provider verification unavailable."]
+    manual_verified = cls == VERIFIED_BUYER_PICK and is_manual_verified_input(data)
+    status = "MANUALLY VERIFIED INPUT / PLAYABLE VALUE" if manual_verified else STATUS[cls]
+    risk = "MANUALLY VERIFIED PRICE" if manual_verified else RISK[cls]
     out = dict(data)
     out.update({
         "report_verification_class": cls,
         "report_classification": cls,
         "verification_gate_version": VERSION,
-        "verification_status": STATUS[cls],
-        "final_decision": STATUS[cls],
-        "agent_decision": STATUS[cls],
-        "recommendation": STATUS[cls],
-        "consumer_action": STATUS[cls],
-        "recommended_action": STATUS[cls],
-        "risk": RISK[cls],
-        "risk_level": RISK[cls],
-        "risk_label": RISK[cls],
-        "profit_guard_status": RISK[cls],
+        "verification_status": status,
+        "final_decision": status,
+        "agent_decision": status,
+        "recommendation": status,
+        "consumer_action": status,
+        "recommended_action": status,
+        "risk": risk,
+        "risk_level": risk,
+        "risk_label": risk,
+        "profit_guard_status": risk,
         "report_verification_reason": reasons[0],
         "verification_reason": reasons[0],
         "verification_reasons": reasons,
@@ -335,6 +341,9 @@ def classify_report_row(row: Any, now: datetime | None = None) -> dict[str, Any]
         "timestamp_age_seconds": info["timestamp_age_seconds"],
         "provider_name": info["provider_name"],
         "book": info["book"],
+        "verification_method": info["verification_method"],
+        "manual_verified_input": manual_verified,
+        "automated_live_provider_verified": bool(cls == VERIFIED_BUYER_PICK and not manual_verified),
         "model_probability": info["model_probability"] if info["model_probability"] is not None else data.get("model_probability"),
         "model_market_edge": info["edge"] if info["edge"] is not None else data.get("model_market_edge"),
         "expected_value_per_unit": info["ev"] if info["ev"] is not None else data.get("expected_value_per_unit"),

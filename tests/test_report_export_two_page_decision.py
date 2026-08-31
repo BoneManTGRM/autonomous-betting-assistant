@@ -48,6 +48,11 @@ def test_report_export_bundle_includes_two_page_decision_columns_and_markdown():
     assert bundle.page1_decision is not None
     assert bundle.page2_decision is not None
     assert bundle.provider_capabilities
+    assert bundle.verification_manifest is not None
+    assert bundle.verification_manifest["row_count"] == 2
+    assert bundle.feed["verification_manifest"] == bundle.verification_manifest
+    repeated = build_report_export_bundle(rows, _brand())
+    assert repeated.verification_manifest["input_sha256"] == bundle.verification_manifest["input_sha256"]
 
 
 def test_report_export_bundle_keeps_unavailable_page2_markets_honest():

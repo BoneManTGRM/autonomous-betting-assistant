@@ -231,7 +231,19 @@ def install() -> None:
     def raw_risk(row: Any) -> str:
         return m._clean(m._get(row, "risk", "risk_level", "risk_label", "profit_guard_status", default="REVIEW"), True)
 
+    def demonstration_mode(row: Any) -> bool:
+        data = dict(m._row(row))
+        if data.get("demonstration_mode") is True:
+            return True
+        text = " ".join(
+            str(data.get(key) or "").lower()
+            for key in ("report_title", "report_data_scope", "report_truth_warning", "league")
+        )
+        return any(token in text for token in ("demonstration", "demo only", "validation fixture"))
+
     def normalize_public_risk_label(row: Any, language: str = "en") -> str:
+        if demonstration_mode(row):
+            return "DEMO"
         raw = raw_risk(row).upper().replace("_", " ")
         if "HIGH" in raw:
             label = "HIGH"
@@ -262,6 +274,10 @@ def install() -> None:
         return "Calidad de datos: parcial" if language == "es" else "Data quality: partial"
 
     def risk_desk_bullets(row: Any, language: str = "en") -> list[str]:
+        if demonstration_mode(row):
+            if language == "es":
+                return ["Solo demostración", "No es consejo de apuesta actual", "Reemplazar cada cuota antes de publicar"]
+            return ["Demonstration only", "Not current betting advice", "Replace all prices first"]
         raw = raw_risk(row).upper().replace("_", " ")
         if language == "es":
             if "RESEARCH" in raw:

@@ -28,7 +28,20 @@ def install() -> None:
             for index, row in enumerate(rows):
                 first_page = index * 2 + 1
                 pages.append(original_page(row, background_image, report_name, first_page, total, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
-                pages.append(second_page._draw_second_page(renderer, row, background_image, report_name, first_page + 1, total, language))
+                pages.append(second_page._draw_second_page(
+                    renderer,
+                    row,
+                    background_image,
+                    report_name,
+                    first_page + 1,
+                    total,
+                    language,
+                    logo_image,
+                    background_mode,
+                    logo_mode,
+                    background_opacity,
+                    logo_opacity,
+                ))
             return pages
 
         renderer.render_full_magazine_book_pages = visible_rows_pages

@@ -212,9 +212,17 @@ def _install_page2_patch() -> None:
     if not callable(original_sections):
         return
 
-    def enhanced_sections(data: dict[str, Any], lang: str):
+    def enhanced_sections(
+        data: dict[str, Any],
+        lang: str,
+        *,
+        parlays=None,
+        diagnostics=None,
+    ):
         scan = _market_scan(page2, data)
-        parlays, diag = page2.generate_parlay_candidates(data)
+        if parlays is None or diagnostics is None:
+            parlays, diagnostics = page2.generate_parlay_candidates(data)
+        diag = dict(diagnostics)
         playable = [p for p in parlays if p.status == page2.PARLAY_PLAYABLE]
         blocked_parlays = [p for p in parlays if p.status in {page2.PARLAY_BLOCKED, page2.PARLAY_AVOID}]
         reason_rows = [f"{name}: {count}" for name, count in scan["reason_counts"].most_common(5)] or ["No rejected market rows were returned by the scan."]
@@ -262,9 +270,20 @@ def _install_page2_patch() -> None:
             ("Cancel Conditions", sanitize_public_items([page2._tr(x, lang) for x in cancel_rows]), page2.RED),
         ]
 
-    def enhanced_final_status(data: dict[str, Any], lang: str):
+    def enhanced_final_status(
+        data: dict[str, Any],
+        lang: str,
+        *,
+        parlays=None,
+        diagnostics=None,
+    ):
         if callable(original_final_status):
-            title, detail, color = original_final_status(data, lang)
+            title, detail, color = original_final_status(
+                data,
+                lang,
+                parlays=parlays,
+                diagnostics=diagnostics,
+            )
         else:
             title, detail, color = page2.NO_VERIFIED_PARLAY_AVAILABLE, "No verified parlay available.", page2.GOLD
         scan = _market_scan(page2, data)
