@@ -113,6 +113,18 @@ def _install_report_studio_memory_guard() -> None:
     book._ABA_USERCUSTOMIZE_MEMORY_GUARD = True
 
 
+def _install_report_export_verification_gate() -> None:
+    try:
+        from autonomous_betting_agent import magazine_book_export as book
+        from autonomous_betting_agent.report_export_verification import patch_magazine_renderer
+    except Exception:
+        return
+    try:
+        patch_magazine_renderer(book)
+    except Exception:
+        pass
+
+
 def _install_verified_price_magazine_guard() -> None:
     try:
         from autonomous_betting_agent import magazine_book_export as book
@@ -144,7 +156,7 @@ def _install_verified_price_magazine_guard() -> None:
         book_name = _first(data, ("bookmaker", "sportsbook", "book", "odds_book"))
         source = _first(data, ("odds_source", "price_source", "data_source", "provider", "api_source"))
         timestamp = _first(data, ("odds_timestamp", "price_timestamp", "odds_updated_at", "line_timestamp", "locked_at_utc", "commence_time"))
-        status = _first(data, ("market_status", "line_status", "odds_status", "market_state", "live_status"))
+        status = _first(data, ("export_verification_status", "market_status", "line_status", "odds_status", "market_state", "live_status"))
         verified = _truth_label(_first(data, ("odds_verified", "price_verified", "verified_odds", "live_odds_verified", "current_price_verified", "source_verified")))
 
         verification_value = "Not verified"
@@ -245,6 +257,7 @@ if not _skip_runtime_patches():
     _run_magazine_bridge()
     _install_spanish_report_text_guard()
     _install_report_studio_memory_guard()
+    _install_report_export_verification_gate()
     _install_verified_price_magazine_guard()
     _install_dynamic_odds_baseline_guard()
 
