@@ -62,6 +62,7 @@ ES = {
     "Primary Anchor": "Ancla principal",
     "Top Parlay Recommendations": "Mejores recomendaciones parlay",
     "Best 2-Leg Parlays": "Mejores parlays de 2 selecciones",
+    "Best 3-Leg Parlays": "Mejores parlays de 3 selecciones",
     "Best 3/4-Leg Parlays": "Mejores parlays de 3/4 selecciones",
     "SGP / Cross / Prop / Live": "SGP / cruzado / prop / en vivo",
     "Parlay Avoid List": "Parlays a evitar",
@@ -71,6 +72,13 @@ ES = {
     "WATCHLIST": "SEGUIMIENTO",
     "AVOID": "EVITAR",
     "BLOCKED": "BLOQUEADO",
+    "DEMONSTRATION PARLAY CALCULATION": "CÁLCULO DE PARLAY DE DEMOSTRACIÓN",
+    "DEMONSTRATION CALCULATION": "CÁLCULO DE DEMOSTRACIÓN",
+    "DEMONSTRATION WATCHLIST": "SEGUIMIENTO DE DEMOSTRACIÓN",
+    "DEMO PRICE": "CUOTA DE DEMOSTRACIÓN",
+    "EST. PRICE": "CUOTA EST.",
+    "PRICE": "CUOTA",
+    "No guarantees. Bet responsibly. This analysis is for informational purposes only.": "No garantizamos resultados. Apuesta responsablemente. Este análisis es solo informativo.",
 }
 
 MARKET_KEYS = (
@@ -161,16 +169,87 @@ def _tr(value: Any, lang: str) -> str:
         return text
     if text in ES:
         return ES[text]
-    replacements = (
-        ("Primary anchor", "Ancla principal"), ("price", "cuota"), ("market", "mercado"),
-        ("selection", "selección"), ("line", "línea"), ("edge", "ventaja"),
-        ("timestamp", "marca de tiempo"), ("provider", "proveedor"), ("requires", "requiere"),
-        ("verified", "verificado"), ("rejected", "rechazado"), ("Game Total", "Total del partido"),
-        ("Run Line", "Línea de carrera"), ("Spread", "Hándicap"), ("Moneyline", "Ganador"),
-        ("Over", "Más de"), ("Under", "Menos de"),
+    phrases = (
+        ("DEMONSTRATION ONLY - not current betting advice.", "SOLO DEMOSTRACIÓN; no es consejo de apuesta actual."),
+        ("Synthetic fixture validation only", "Solo validación con fixture sintético"),
+        ("Synthetic fixture", "Fixture sintético"),
+        ("synthetic fixture", "fixture sintético"),
+        ("ABA test harness", "Banco de pruebas ABA"),
+        ("TEST FIXTURE", "FIXTURE DE PRUEBA"),
+        ("Provider not matched", "Proveedor no vinculado"),
+        ("Parlay calculations", "Cálculos de parlay"),
+        ("quoted demo calculations", "cálculos demo con cuota"),
+        ("estimated watchlist", "seguimiento estimado"),
+        ("Parlays use source-traceable priced legs only.", "Los parlays usan únicamente selecciones con cuota y fuente rastreable."),
+        ("SGPs require a book quote plus validated joint probability.", "Los SGP requieren una cuota de la casa y una probabilidad conjunta validada."),
+        ("Estimated cross-game prices are labeled estimates.", "Las cuotas estimadas entre partidos se identifican como estimaciones."),
+        ("Page 1 remains the straight-bet anchor; Page 2 only adds verified parlays.", "La página 1 conserva el ancla de apuesta directa; la página 2 solo agrega parlays verificados."),
+        ("Page 1 remains the straight-bet anchor; Page 2 shows demonstration calculations only.", "La página 1 conserva el ancla de apuesta directa; la página 2 muestra solo cálculos de demostración."),
+        ("DEMONSTRATION CALCULATION", "CÁLCULO DE DEMOSTRACIÓN"),
+        ("DEMONSTRATION WATCHLIST", "SEGUIMIENTO DE DEMOSTRACIÓN"),
+        ("Cross-game chains: independent probability and price products are labeled estimates.", "Cadenas entre partidos: los productos independientes de probabilidad y cuota se identifican como estimaciones."),
+        ("Same-game parlays: require a sportsbook SGP quote plus a validated joint-probability method.", "Parlays del mismo partido: requieren una cuota SGP de la casa y un método validado de probabilidad conjunta."),
+        ("Props: each leg requires its own market-specific model probability and current price.", "Props: cada selección requiere su propia probabilidad de modelo para ese mercado y una cuota actual."),
+        ("Live / flash: cancel when the market starts, suspends, expires, or changes price.", "En vivo / flash: cancelar cuando el mercado inicia, se suspende, vence o cambia de cuota."),
+        ("Avoid any market with stale odds, line movement against the anchor, missing prop model, unsupported SGP pricing, or expired live window.", "Evitar cualquier mercado con cuotas vencidas, movimiento de línea contra el ancla, modelo prop faltante, cuota SGP no compatible o ventana en vivo vencida."),
+        ("Cancel if Page 1 line changes or sportsbook line differs from the report line.", "Cancelar si cambia la línea de la página 1 o si la línea de la casa difiere de la línea del reporte."),
+        ("Cancel if any leg loses odds, timestamp, provider match, market status, or positive EV.", "Cancelar si alguna selección pierde la cuota, marca de tiempo, coincidencia de proveedor, estado de mercado o VE positivo."),
+        ("Cancel if SGP correlation cannot be priced by sportsbook or model.", "Cancelar si la correlación SGP no puede ser valuada por la casa o el modelo."),
+        ("Cancel if a live/flash window is started, suspended, or expired.", "Cancelar si una ventana en vivo/flash ya inició, está suspendida o venció."),
+        ("No verified parlay or chain bet qualifies.", "Ningún parlay o apuesta en cadena verificada califica."),
+        ("No verified 2-leg parlay found. Reason: only one priced positive-EV leg available or correlation/pricing blocked.", "No se encontró un parlay verificado de 2 selecciones. Motivo: solo hay una selección con cuota y VE positivo, o la correlación/cuota está bloqueada."),
+        ("No verified 3-leg parlay found. Three independently eligible legs were not available.", "No se encontró un parlay verificado de 3 selecciones. No había tres selecciones elegibles de forma independiente."),
+        ("No SGP/cross-game/prop/live parlay is playable until provider returns priced eligible legs and correlation is handled.", "Ningún parlay SGP/entre partidos/prop/en vivo es jugable hasta que el proveedor entregue selecciones elegibles con cuota y se resuelva la correlación."),
+        ("No verified parlay available. Straight anchor only until another priced, positive-EV, source-traceable leg exists.", "No hay un parlay verificado disponible. Solo se conserva el ancla directa hasta que exista otra selección con cuota, VE positivo y fuente rastreable."),
+        ("Parlay candidates were blocked by pricing, correlation, EV, stale data, or missing model probability.", "Los candidatos de parlay fueron bloqueados por cuota, correlación, VE, datos vencidos o probabilidad de modelo faltante."),
+        ("Manual input verified", "Entrada manual verificada"),
+        ("independent product", "producto independiente"),
+        ("estimated independent price", "cuota independiente estimada"),
+        ("synthetic test price", "cuota de prueba sintética"),
+        ("exact quote required", "se requiere cuota exacta"),
+        ("cancel below", "cancelar por debajo de"),
+        ("Primary anchor", "Ancla principal"),
+        ("Model P", "P del modelo"),
+        ("repair status stable", "estado de reparación estable"),
+        ("Markets discovered", "Mercados descubiertos"),
+        ("eligible legs", "selecciones elegibles"),
+        ("Parlay candidates", "Candidatos de parlay"),
+        ("market-specific", "específica del mercado"),
+        ("same-game", "del mismo partido"),
+        ("cross-game", "entre partidos"),
+        ("joint-probability", "probabilidad conjunta"),
+        ("source-traceable", "con fuente rastreable"),
+        ("quarter-Kelly stake", "apuesta Kelly de un cuarto"),
+        ("model profit", "ganancia del modelo"),
+        (" · playable ", " · jugables "),
+        (" · watchlist ", " · seguimiento "),
     )
-    for old, new in replacements:
+    for old, new in phrases:
         text = re.sub(re.escape(old), new, text, flags=re.I)
+    text = re.sub(r"(?<!\w)(\d+)-leg(?!\w)", r"\1 selecciones", text, flags=re.I)
+    words = (
+        ("Moneyline", "Ganador"), ("Game Total", "Total del partido"),
+        ("Run Line", "Línea de carrera"), ("Spread", "Hándicap"),
+        ("PLAYABLE", "JUGABLE"), ("WATCHLIST", "SEGUIMIENTO"),
+        ("BLOCKED", "BLOQUEADO"), ("AVOID", "EVITAR"),
+        ("Provider", "Proveedor"), ("book", "casa"), ("quoted", "cotizado"),
+        ("timestamp", "Marca de tiempo"), ("state", "estado"),
+        ("Markets", "Mercados"), ("market", "mercado"),
+        ("Legs", "Selecciones"), ("Leg", "Selección"),
+        ("Combined", "Combinada"), ("implied", "implícita"),
+        ("edge", "ventaja"), ("odds", "cuota"), ("price", "cuota"),
+        ("line", "línea"), ("selection", "selección"),
+        ("playable", "jugables"), ("watchlist", "seguimiento"),
+        ("profit", "ganancia"), ("bankroll", "banca"), ("corr", "correlación"),
+        ("Correlation", "Correlación"), ("requires", "requiere"),
+        ("verified", "verificado"), ("rejected", "rechazado"),
+        ("missing", "faltante"), ("stable", "estable"),
+        ("Over", "Más de"), ("Under", "Menos de"), ("EV", "VE"),
+    )
+    for old, new in words:
+        text = re.sub(rf"(?<!\w){re.escape(old)}(?!\w)", new, text, flags=re.I)
+    text = re.sub(r"(?<!\w)min(?=\s+\d)", "mín.", text, flags=re.I)
+    text = re.sub(r"\bat\s+(?=\d)", "a cuota ", text, flags=re.I)
     return text
 
 
@@ -187,6 +266,11 @@ def _demonstration_mode(data: Mapping[str, Any]) -> bool:
         for key in ("report_title", "report_data_scope", "report_truth_warning", "league")
     )
     return any(token in text for token in ("demonstration", "demo only", "validation fixture"))
+
+
+def _synthetic_demo_fixture(data: Mapping[str, Any]) -> bool:
+    mode = _get(data, "report_source_mode", "source_mode").lower().replace("-", "_").replace(" ", "_")
+    return _demonstration_mode(data) and mode in {"synthetic_fixture", "synthetic_test_fixture", "validation_fixture"}
 
 
 def _get(data: Mapping[str, Any], *keys: str, default: str = "") -> str:
@@ -345,6 +429,8 @@ def _repair_status(data: dict[str, Any]) -> str:
 
 
 def _source_ok(data: dict[str, Any]) -> bool:
+    if _synthetic_demo_fixture(data):
+        return True
     if is_manual_verified_input(data):
         return True
     mode = _get(data, "report_source_mode", "source_mode").lower()
@@ -391,6 +477,7 @@ def _candidate(item: Mapping[str, Any], parent: dict[str, Any], sport: str) -> M
     fair = 1.0 / prob if prob and prob > 0 else None
     target = fair + 0.02 if fair else None
     manual_verified = is_manual_verified_input(merged)
+    synthetic_fixture = _synthetic_demo_fixture(merged)
     provider = _provider(item) or _provider(parent) or ("Manual operator entry" if manual_verified else "")
     sportsbook = _book(item) or _book(parent)
     timestamp = _timestamp(item) or _timestamp(parent)
@@ -440,7 +527,7 @@ def _candidate(item: Mapping[str, Any], parent: dict[str, Any], sport: str) -> M
         provider_event_id=event_id,
         event_name=_get(merged, "public_event", "event", "event_name", "matchup", "game", default=event_id),
         event_start_time=_get(merged, "event_start_utc", "start_time", "commence_time", "scheduled_at"),
-        verification_method="manual_verified" if manual_verified else "automated_provider",
+        verification_method="manual_verified" if manual_verified else "synthetic_fixture" if synthetic_fixture else "automated_provider",
         is_live=live,
         model_probability=prob,
         implied_probability=implied,
@@ -538,7 +625,8 @@ def _quote_is_verified(quote: Mapping[str, Any]) -> bool:
     attestation = _get(quote, "manual_attestation", "operator_attestation", "price_attested").lower()
     manual = mode in {"manual_verified", "manually_verified", "manual_verified_input"} and method in {"manual", "operator", "manual_entry", "manual_verified"} and attestation in {"1", "true", "yes", "attested", "confirmed"}
     provider = provider_state(quote) == "Provider matched" or _get(quote, "provider_verified", "odds_verified", "price_verified").lower() in {"1", "true", "yes", "verified", "current", "matched"}
-    return manual or provider
+    synthetic_fixture = _synthetic_demo_fixture(quote) and method in {"synthetic", "test_fixture", "validation_fixture"}
+    return manual or provider or synthetic_fixture
 
 
 def _matching_parlay_quote(legs: list[MarketCandidate], parent: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -594,7 +682,8 @@ def _pricing_source_for(legs: list[MarketCandidate], parent: dict[str, Any]) -> 
     if quote is not None:
         returned = _decimal(_get(quote, "decimal_odds", "decimal_price", "price", "provider_parlay_price", "parlay_decimal_odds"))
         if returned and _quote_is_verified(quote):
-            method = "manual_verified" if _get(quote, "source_mode").lower().replace("-", "_") in {"manual_verified", "manually_verified", "manual_verified_input"} else "automated_provider"
+            mode = _get(quote, "source_mode").lower().replace("-", "_")
+            method = "manual_verified" if mode in {"manual_verified", "manually_verified", "manual_verified_input"} else "synthetic_fixture" if _synthetic_demo_fixture(quote) else "automated_provider"
             return SPORTSBOOK_RETURNED_PARLAY_PRICE, returned, "exact leg-matched sportsbook parlay quote", _book(quote), _timestamp(quote), method
         return UNPRICED_PARLAY, None, "Matched combined quote is missing a current verified book, price, or timestamp.", _book(quote), _timestamp(quote), ""
     if same_game:
@@ -670,7 +759,10 @@ def _build_parlay(parlay_type: str, legs: list[MarketCandidate], parent: dict[st
         full_kelly = ((combined_odds * combined_prob) - 1.0) / (combined_odds - 1.0)
         fraction = round(min(0.25, max(0.0, full_kelly * 0.25)), 3)
     profit = round(fraction * (combined_odds - 1.0), 3) if combined_odds and fraction else None
-    quality = "manual verified inputs" if any(leg.verification_method == "manual_verified" for leg in legs) else "automated provider inputs"
+    if any(leg.verification_method == "synthetic_fixture" for leg in legs):
+        quality = "synthetic demonstration inputs"
+    else:
+        quality = "manual verified inputs" if any(leg.verification_method == "manual_verified" for leg in legs) else "automated provider inputs"
     if status == PARLAY_WATCHLIST:
         quality += "; exact combined quote required"
     elif status != PARLAY_PLAYABLE:
@@ -749,7 +841,7 @@ def generate_parlay_candidates(pick: Any) -> tuple[list[ParlayCandidate], dict[s
 
 def _leg_text(leg: MarketCandidate) -> str:
     event = leg.event_name or leg.provider_event_id or "event missing"
-    source = "manual" if leg.verification_method == "manual_verified" else leg.provider
+    source = "manual" if leg.verification_method == "manual_verified" else "synthetic fixture" if leg.verification_method == "synthetic_fixture" else leg.provider
     return f"{event} · {leg.full_label or leg.selection} @ {_odds(leg.decimal_odds)} · {leg.sportsbook or 'book missing'} · {source} · {leg.timestamp or 'time missing'}"
 
 
@@ -762,7 +854,7 @@ def _parlay_line(p: ParlayCandidate, lang: str) -> str:
 
 def _short_leg_text(leg: MarketCandidate) -> str:
     event = leg.event_name or leg.provider_event_id or "event missing"
-    source = "manual" if leg.verification_method == "manual_verified" else leg.provider or "source missing"
+    source = "manual" if leg.verification_method == "manual_verified" else "synthetic fixture" if leg.verification_method == "synthetic_fixture" else leg.provider or "source missing"
     captured = leg.timestamp or "time missing"
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", captured):
         captured = captured[11:16] + "Z"
@@ -781,23 +873,27 @@ def _parlay_metrics(p: ParlayCandidate) -> str:
     )
 
 
-def _parlay_summary(p: ParlayCandidate, lang: str) -> str:
+def _parlay_summary(p: ParlayCandidate, lang: str, demonstration: bool = False) -> str:
+    status = "DEMONSTRATION CALCULATION" if demonstration and p.status == PARLAY_PLAYABLE else "DEMONSTRATION WATCHLIST" if demonstration and p.status == PARLAY_WATCHLIST else p.status
     text = (
-        f"#{p.rank} {p.status} · {p.parlay_type} · {_odds(p.combined_decimal_odds)} odds · "
+        f"#{p.rank} {status} · {p.parlay_type} · {_odds(p.combined_decimal_odds)} odds · "
         f"P {_pct(p.combined_probability)} · EV {_ev(p.combined_ev)} · ¼ Kelly {p.suggested_stake_units * 100:.1f}%"
     )
     return _tr(text, lang)
 
 
-def _parlay_card_rows(p: ParlayCandidate, lang: str) -> list[str]:
+def _parlay_card_rows(p: ParlayCandidate, lang: str, demonstration: bool = False) -> list[str]:
     if p.pricing_source == SYNTHETIC_PRODUCT_PRICE:
         pricing = "estimated independent price · exact quote required"
+    elif p.quote_verification_method == "synthetic_fixture":
+        pricing = f"synthetic test price · {p.quoted_timestamp or 'time missing'}"
     else:
         quote_time = p.quoted_timestamp
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", quote_time):
             quote_time = quote_time[11:16] + "Z"
         pricing = f"quoted {p.quoted_book or 'book missing'} {quote_time or 'time missing'}"
-    rows = [f"#{p.rank} {p.status} · {p.parlay_type} · {pricing}"]
+    status = "DEMONSTRATION CALCULATION" if demonstration and p.status == PARLAY_PLAYABLE else "DEMONSTRATION WATCHLIST" if demonstration and p.status == PARLAY_WATCHLIST else p.status
+    rows = [f"#{p.rank} {status} · {p.parlay_type} · {pricing}"]
     rows.extend(f"Leg {index}: {_short_leg_text(leg)}" for index, leg in enumerate(p.legs, 1))
     rows.append(_parlay_metrics(p))
     if len(rows) < 5:
@@ -840,17 +936,18 @@ def _page_two_sections(
         f"Primary anchor: {anchor.full_label} at {_odds(anchor.decimal_odds)}.",
         f"Model P {_pct(anchor.model_probability)} · implied {_pct(anchor.implied_probability)} · edge {_spct(anchor.edge)} · EV {_ev(anchor.ev)}.",
         f"Provider: {anchor.provider or 'missing'} · book {anchor.sportsbook or 'missing'} · timestamp {anchor.timestamp or 'missing'}.",
-        "Page 1 remains the straight-bet anchor; Page 2 only adds verified parlays.",
+        "Page 1 remains the straight-bet anchor; Page 2 shows demonstration calculations only." if _demonstration_mode(data) else "Page 1 remains the straight-bet anchor; Page 2 only adds verified parlays.",
     ]
     ranked_unique = _unique_by_legs(playable + watch)
+    demonstration = _demonstration_mode(data)
     if ranked_unique:
-        top = [_parlay_summary(p, lang) for p in ranked_unique[:4]]
+        top = [_parlay_summary(p, lang, demonstration) for p in ranked_unique[:4]]
     else:
         top = ["No verified parlay or chain bet qualifies.", f"Eligible legs found: {diag.get('eligible_legs', 0)}. Need at least two source-traceable priced positive-EV legs."]
     best_two = next(iter(_top_by_type(parlays, "2-leg", 1)), None)
     best_three = next(iter(_top_by_type(parlays, "3-leg", 1)), None)
-    two = _parlay_card_rows(best_two, lang) if best_two else ["No verified 2-leg parlay found. Reason: only one priced positive-EV leg available or correlation/pricing blocked."]
-    three = _parlay_card_rows(best_three, lang) if best_three else ["No verified 3-leg parlay found. Three independently eligible legs were not available."]
+    two = _parlay_card_rows(best_two, lang, demonstration) if best_two else ["No verified 2-leg parlay found. Reason: only one priced positive-EV leg available or correlation/pricing blocked."]
+    three = _parlay_card_rows(best_three, lang, demonstration) if best_three else ["No verified 3-leg parlay found. Three independently eligible legs were not available."]
     if ranked_unique:
         specialty = [
             "Cross-game chains: independent probability and price products are labeled estimates.",
@@ -864,12 +961,20 @@ def _page_two_sections(
             "No SGP/cross-game/prop/live parlay is playable until provider returns priced eligible legs and correlation is handled.",
         ]
     avoid = [f"Avoid: {p.parlay_type} · {p.reason}" for p in blocked[:5]] or ["Avoid any market with stale odds, line movement against the anchor, missing prop model, unsupported SGP pricing, or expired live window."]
-    diag_rows = [
-        f"Provider: {diag.get('provider_called', 'unknown')} · state {diag.get('provider_state', 'unknown')}.",
-        f"Markets discovered: {diag.get('markets_discovered', 0)} · eligible legs: {diag.get('eligible_legs', 0)}.",
-        f"Parlay candidates: {diag.get('parlay_candidates', 0)} · playable {diag.get('playable_parlays', 0)} · watchlist {diag.get('watchlist_parlays', 0)}.",
-        f"Timestamp: {diag.get('timestamp', 'missing')} · repair status {diag.get('repair_status', 'stable')}.",
-    ]
+    if demonstration:
+        diag_rows = [
+            f"Provider: {diag.get('provider_called', 'unknown')} · state Synthetic fixture validation only.",
+            f"Markets discovered: {diag.get('markets_discovered', 0)} · eligible legs: {diag.get('eligible_legs', 0)}.",
+            f"Parlay calculations: {diag.get('parlay_candidates', 0)} · quoted demo calculations {diag.get('playable_parlays', 0)} · estimated watchlist {diag.get('watchlist_parlays', 0)}.",
+            f"Timestamp: {diag.get('timestamp', 'missing')} · repair status {diag.get('repair_status', 'stable')}.",
+        ]
+    else:
+        diag_rows = [
+            f"Provider: {diag.get('provider_called', 'unknown')} · state {diag.get('provider_state', 'unknown')}.",
+            f"Markets discovered: {diag.get('markets_discovered', 0)} · eligible legs: {diag.get('eligible_legs', 0)}.",
+            f"Parlay candidates: {diag.get('parlay_candidates', 0)} · playable {diag.get('playable_parlays', 0)} · watchlist {diag.get('watchlist_parlays', 0)}.",
+            f"Timestamp: {diag.get('timestamp', 'missing')} · repair status {diag.get('repair_status', 'stable')}.",
+        ]
     cancel = [
         "Cancel if Page 1 line changes or sportsbook line differs from the report line.",
         "Cancel if any leg loses odds, timestamp, provider match, market status, or positive EV.",
@@ -1014,8 +1119,11 @@ def _draw_second_page(
     draw.rectangle((18, 18, 1062, 82), fill=black)
     _paint_header_identity(module, img, draw, data, report_name, logo_image, logo_mode, logo_opacity)
     title = _tr(_get(data, "page_two_title", "parlay_report_title", default="PARLAY RECOMMENDATION BOARD"), lang).upper()
-    draw.text((330, 28), title, font=module._fit(title, 470, 38, 17, True), fill="white")
-    page_text = _tr(f"PAGE {page_number} OF {total_pages}", lang)
+    title_font = module._fit(title, 470, 38, 10, True)
+    safe_title = module._ellipsize_to_width(draw, title, title_font, 470) if hasattr(module, "_ellipsize_to_width") else title
+    draw.text((330, 28), safe_title, font=title_font, fill="white")
+    page_label = getattr(module, "_page_label", None)
+    page_text = page_label(page_number, total_pages, lang) if callable(page_label) else (f"PÁGINA {page_number} DE {total_pages}" if lang == "es" else f"PAGE {page_number} OF {total_pages}")
     draw.rounded_rectangle((840, 24, 1050, 74), radius=5, fill=cream, outline=black)
     draw.text((862, 32), page_text, font=module._fit(page_text, 174, 28, 15, True), fill=black)
     away, home = module._teams(data)
@@ -1069,7 +1177,8 @@ def _draw_second_page(
     draw.text((68, 1310), final_title, font=module._fit(final_title, 914, 36, 14, True), fill=final_color)
     module._txt_auto(draw, 68, 1364, final_detail, 914, 104, 20, 8, cream, False, 3)
     draw.rectangle((20, 1542, 1060, 1581), fill=black)
-    module._txt_auto(draw, 42, 1550, getattr(module, "SAFETY_FOOTER", "Informational only."), 890, 20, 15, 8, cream, False, 1)
+    footer = _tr(getattr(module, "SAFETY_FOOTER", "Informational only."), lang)
+    module._txt_auto(draw, 42, 1550, footer, 890, 20, 15, 8, cream, False, 1)
     return img.convert("RGB")
 
 

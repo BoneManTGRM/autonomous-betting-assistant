@@ -450,6 +450,88 @@ def _overlay_pick_display(patched: Any, img: Any, draw: Any, row: dict[str, Any]
         txt_auto(draw, 286, 1462, display, 750, 44, 38, 10, cream, True, 1)
 
 
+def _overlay_metric_strip(patched: Any, draw: Any, row: dict[str, Any], lang: str) -> None:
+    black = getattr(patched, "BLACK", (13, 14, 16))
+    cream = getattr(patched, "CREAM", (255, 248, 230))
+    green = getattr(patched, "GREEN", (61, 205, 84))
+    metric = getattr(patched, "_metric", None)
+    cells = getattr(patched, "magazine_metric_cells", None)
+    if not callable(metric) or not callable(cells):
+        return
+    odds = patched._fmt(_first(row, "display_decimal_odds", "decimal_price", "decimal_odds", "odds", default=""), "odds")
+    probability = patched._num(row, "learned_model_probability", "model_probability_clean", "model_probability", "final_probability")
+    confidence = patched._pct(probability)
+    edge = patched._edge(patched._num(row, "model_market_edge", "edge"))
+    ev = patched._fmt(_first(row, "expected_value_per_unit", "profit_expected_value", "expected_value", "ev", default=""), "ev")
+    units = patched._fmt(_first(row, "target_stake_units", "recommended_stake_units", "suggested_stake_units", "units", default="0.0"), "unit")
+    if _demonstration_mode(row):
+        risk = "DEMO"
+    else:
+        normalizer = getattr(patched, "normalize_public_risk_label", None)
+        risk = normalizer(row, lang) if callable(normalizer) else _first(row, "risk", "risk_level", "risk_label", default="REVIEW")
+    draw.rectangle((344, 462, 1060, 556), fill=black)
+    for label, value, color, x, width in cells(odds, confidence, edge, ev, units, risk):
+        metric(draw, x, 462, width, label, value, color or green, lang)
+    draw.line((1060, 463, 1060, 555), fill=cream, width=1)
+
+
+def _overlay_evidence_panel(patched: Any, draw: Any, row: dict[str, Any], lang: str) -> None:
+    black = getattr(patched, "BLACK", (13, 14, 16))
+    cream = getattr(patched, "CREAM", (255, 248, 230))
+    blue = getattr(patched, "BLUE", (19, 66, 108))
+    tr = getattr(patched, "_tr", lambda value, _lang="en": str(value))
+    txt_auto = getattr(patched, "_txt_auto", None)
+    font = getattr(patched, "_font", None)
+    fit = getattr(patched, "_fit", None)
+    if not callable(txt_auto) or not callable(font) or not callable(fit):
+        return
+    draw.rectangle((23, 961, 337, 1127), fill=cream)
+    y = 976
+    for label, value in _truth_pairs(row, lang)[:4]:
+        label_text = f"{tr(label, lang)}:"
+        draw.text((44, y), label_text, font=fit(label_text, 92, 14, 6, True), fill=black)
+        txt_auto(draw, 142, y, tr(value, lang), 178, 22, 14, 6, black, True, 1)
+        y += 29
+    draw.rectangle((28, 1088, 332, 1120), fill=blue)
+    status = tr("NO LIVE FEEDS USED", lang)
+    draw.text((43, 1095), status, font=fit(status, 270, 15, 8, True), fill=cream)
+    draw.rectangle((337, 1084, 351, 1124), fill=getattr(patched, "PAPER", (244, 235, 211)))
+
+
+def _overlay_why_panel(patched: Any, draw: Any, row: dict[str, Any], lang: str) -> None:
+    if not _demonstration_mode(row):
+        return
+    cream = getattr(patched, "CREAM", (255, 248, 230))
+    red = getattr(patched, "RED", (190, 30, 28))
+    probability = patched._num(row, "learned_model_probability", "model_probability_clean", "model_probability", "final_probability")
+    implied = patched._num(row, "market_probability", "market_implied_probability")
+    if implied is None:
+        price = _decimal_text(_first(row, "display_decimal_odds", "decimal_price", "decimal_odds", "odds", default=""))
+        implied = 1.0 / float(price) if price else None
+    edge = patched._num(row, "model_market_edge", "edge")
+    ev = _first(row, "expected_value_per_unit", "profit_expected_value", "expected_value", "ev", default="")
+    probability_text = patched._pct(probability)
+    implied_text = patched._pct(implied)
+    edge_text = patched._edge(edge)
+    ev_text = patched._fmt(ev, "ev")
+    if lang == "es":
+        rows = [
+            f"Entrada sintética del modelo: {probability_text}.",
+            f"Momio de prueba: {_decimal_text(_first(row, 'decimal_price', 'decimal_odds', 'odds', default='')) or 'no disponible'}; implícita {implied_text}.",
+            f"Cálculo demo: ventaja {edge_text}; VE {ev_text}.",
+            "No es consejo de apuesta ni información en vivo.",
+        ]
+    else:
+        rows = [
+            f"Synthetic model input: {probability_text}.",
+            f"Synthetic test price: {_decimal_text(_first(row, 'decimal_price', 'decimal_odds', 'odds', default='')) or 'unavailable'}; implied {implied_text}.",
+            f"Demonstration math: edge {edge_text}; EV {ev_text}.",
+            "Not betting advice or live information.",
+        ]
+    draw.rectangle((23, 641, 337, 882), fill=cream)
+    _draw_readable_bullets(patched, draw, 44, 655, rows, 272, 210, red, lang)
+
+
 def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], language: str | None = None) -> Any:
     try:
         from PIL import ImageDraw
@@ -465,6 +547,9 @@ def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], lan
     black = getattr(patched, "BLACK", (13, 14, 16))
     cream = getattr(patched, "CREAM", (255, 248, 230))
     _overlay_pick_display(patched, img, draw, row, lang)
+    _overlay_metric_strip(patched, draw, row, lang)
+    _overlay_why_panel(patched, draw, row, lang)
+    _overlay_evidence_panel(patched, draw, row, lang)
     draw.rounded_rectangle((350, 1174, 1064, 1358), radius=16, fill=paper + (255,), outline=paper + (255,), width=4)
     if callable(getattr(patched, "_section", None)):
         patched._section(draw, 354, 1178, 706, 175, "MATCHUP NOTES", blue, lang)
@@ -478,7 +563,7 @@ def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], lan
         if callable(getattr(patched, "_section", None)):
             patched._section(draw, 20, 1178, 320, 175, "RISK DESK", getattr(patched, "RED", (190, 30, 28)), lang)
         demo_rows = (
-            ["Solo demostración", "No es consejo de apuesta actual", "Reemplazar cada cuota antes de publicar"]
+            ["Solo demostración", "No es consejo actual", "Cambiar momios primero"]
             if lang == "es"
             else ["Demonstration only", "Not current betting advice", "Replace all prices first"]
         )
