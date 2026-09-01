@@ -347,6 +347,105 @@ def _truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
     return [(_contract._es(label, lang), _contract._es(value, lang)) for label, value in pairs]
 
 
+def _page_one_trace_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
+    """Return the exact odds trace used by Page 1 when it is available."""
+    data = _force_truthful_gate(row)
+    labels = {
+        "en": ("ODDS SOURCE", "BOOK", "EVENT ID", "PRICE TIME"),
+        "es": ("FUENTE CUOTAS", "CASA", "ID EVENTO", "HORA CUOTA"),
+    }["es" if lang == "es" else "en"]
+    values = (
+        _first(data, "odds_source", "provider", "data_source", default=""),
+        _first(data, "bookmaker", "sportsbook", default=""),
+        _first(data, "provider_event_id", "odds_event_id", "event_id", default=""),
+        _first(data, "price_timestamp", "odds_timestamp", "captured_at_utc", "odds_last_refresh", default=""),
+    )
+    trace = [(label, value) for label, value in zip(labels, values) if value]
+    return trace if len(trace) >= 3 else _truth_pairs(data, lang)[:4]
+
+
+def _live_flag(data: dict[str, Any], *keys: str) -> bool:
+    for key in keys:
+        value = _clean(data.get(key)).lower()
+        if value in {"1", "true", "yes", "live", "used", "matched", "live_unverified_research"}:
+            return True
+    return False
+
+
+def _usable_provider_text(data: dict[str, Any], keys: tuple[str, ...]) -> str:
+    value = _first(data, *keys, default="")
+    low = value.lower()
+    blocked = (
+        "api key missing",
+        "provider response was unavailable",
+        "no recent matching articles",
+        "no injury/lineup headline",
+        "no live payload",
+    )
+    return "" if not value or any(token in low for token in blocked) else value
+
+
+def _provider_line(label: str, values: list[str], limit: int = 112) -> str:
+    clean_values: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = _clean(value)
+        text = re.sub(rf"^{re.escape(label)}\s*:?\s*", "", text, flags=re.I)
+        key = text.lower().rstrip(".")
+        if text and key not in seen:
+            clean_values.append(text.rstrip("."))
+            seen.add(key)
+    return _short(f"{label}: {'; '.join(clean_values)}", limit) if clean_values else ""
+
+
+def _page_one_provider_rows(row: Any, lang: str | None = None) -> list[str]:
+    """Compact, truthful provider facts for Page 1's wide matchup panel."""
+    data = dict(row) if isinstance(row, dict) else dict(getattr(row, "to_dict", lambda: {})())
+    effective_lang = lang or ("es" if str(data.get("report_language") or "").lower().startswith("es") else "en")
+    rows: list[str] = []
+
+    if _live_flag(data, "weatherapi_live", "weather_status"):
+        weather = _usable_provider_text(data, ("weather_summary_short", "weather_summary", "venue_weather", "weather_risk"))
+        if weather:
+            compact = _contract._compact_weather(weather, effective_lang)
+            rows.append(" ".join(compact) if compact else _provider_line("WeatherAPI", [weather]))
+
+    if _live_flag(data, "api_football_live", "api_football_status", "api_football_match_status"):
+        api_fb = _usable_provider_text(data, ("api_football_context", "api_football_summary", "api_football_team_summary"))
+        if api_fb:
+            rows.append(_provider_line("API-Football", [api_fb]))
+
+    if _live_flag(data, "newsapi_live", "newsapi_status", "news_status"):
+        news_count = _usable_provider_text(data, ("newsapi_summary", "news_summary"))
+        headline = _usable_provider_text(data, ("news_injury_summary", "breaking_news_summary"))
+        line = _provider_line("NewsAPI", [news_count, headline])
+        if line:
+            rows.append(line)
+
+    if _live_flag(data, "perplexity_live", "perplexity_status"):
+        research = _usable_provider_text(data, ("perplexity_summary", "perplexity_context", "perplexity_news_context"))
+        if research:
+            label = (
+                "Perplexity NO VERIFICADO (no verifica)"
+                if effective_lang == "es"
+                else "Perplexity UNVERIFIED (not a verification source)"
+            )
+            rows.append(_provider_line(label, [research]))
+
+    if _live_flag(data, "balldontlie_live", "balldontlie_status"):
+        game = _usable_provider_text(data, ("balldontlie_game_summary",))
+        odds = _usable_provider_text(data, ("balldontlie_odds_summary",))
+        props = _usable_provider_text(data, ("balldontlie_props_summary",))
+        line = _provider_line("BALLDONTLIE", [game, odds, props])
+        if line:
+            rows.append(line)
+
+    if rows:
+        return [_contract._es(item, effective_lang) for item in rows[:5]]
+    fallback = sale_ready_matchup_items(data)
+    return fallback[:4]
+
+
 def _png(image: Any) -> bytes:
     out = BytesIO()
     image.save(out, format="PNG", optimize=True)
@@ -354,23 +453,7 @@ def _png(image: Any) -> bytes:
 
 
 def _compact_context_rows(data: dict[str, Any]) -> list[str]:
-    rows: list[str] = []
-    weather = _first(data, "weather_summary_short", "weather_summary", "venue_weather", "weather_risk", default="")
-    matchup = _first(data, "expanded_matchup_context", "sports_context_summary", "preview_summary", "game_summary", "matchup_note", "matchup_notes", default="")
-    news = _first(data, "news_summary", "newsapi_summary", "perplexity_summary", "perplexity_context", "sportsdataio_context", "api_football_summary", default="")
-    line = _first(data, "line_movement_summary", "line_movement", "price_movement", default="Line movement: verify current market before entry.")
-    status = _first(data, "verification_status", "report_truth_severity", default="VERIFY SOURCE")
-    target = _stake_text(_first(data, "target_stake_units", default="0.0"))
-    live = _stake_text(_first(data, "live_verified_stake_units", default="0.0"))
-    if weather:
-        rows.append("Weather: " + _short(weather, 98))
-    if matchup:
-        rows.append("Context: " + _short(matchup, 108))
-    elif news:
-        rows.append("News: " + _short(news, 108))
-    rows.append(_short(line, 104))
-    rows.append(f"Verify: {status} · Target {target}u · Live {live}u.")
-    return rows[:4]
+    return _page_one_provider_rows(data)
 
 
 def _expanded_context_rows(data: dict[str, Any]) -> list[str]:
@@ -423,6 +506,25 @@ def _draw_readable_bullets(patched: Any, draw: Any, x: int, y: int, rows: list[s
             draw.text((x + 25, current_y), line, font=use_font, fill=(14, 17, 21))
             current_y += line_height
         current_y += 6
+
+
+def _draw_compact_provider_rows(patched: Any, draw: Any, x: int, y: int, rows: list[str], width: int, height: int, color: tuple[int, int, int], lang: str) -> None:
+    font_fn = getattr(patched, "_font", None)
+    ellipsize_fn = getattr(patched, "_ellipsize_to_width", None)
+    if not callable(font_fn):
+        return
+    font = font_fn(14)
+    step = max(17, height // max(1, min(5, len(rows))))
+    current_y = y
+    for row in rows[:5]:
+        if current_y + step > y + height + 2:
+            break
+        text = str(row)
+        if callable(ellipsize_fn):
+            text = ellipsize_fn(draw, text, font, width - 28)
+        draw.ellipse((x, current_y + 5, x + 10, current_y + 15), fill=color)
+        draw.text((x + 20, current_y), text, font=font, fill=(14, 17, 21))
+        current_y += step
 
 
 def _overlay_pick_display(patched: Any, img: Any, draw: Any, row: dict[str, Any], lang: str) -> None:
@@ -487,14 +589,19 @@ def _overlay_evidence_panel(patched: Any, draw: Any, row: dict[str, Any], lang: 
         return
     draw.rectangle((23, 961, 337, 1127), fill=cream)
     y = 976
-    for label, value in _truth_pairs(row, lang)[:4]:
-        label_text = f"{tr(label, lang)}:"
+    for label, value in _page_one_trace_pairs(row, lang)[:4]:
+        label_text = f"{label}:"
         draw.text((44, y), label_text, font=fit(label_text, 92, 14, 6, True), fill=black)
-        txt_auto(draw, 142, y, tr(value, lang), 178, 22, 14, 6, black, True, 1)
+        txt_auto(draw, 142, y, value, 178, 22, 14, 6, black, True, 1)
         y += 29
     draw.rectangle((28, 1088, 332, 1120), fill=blue)
-    status = tr("NO LIVE FEEDS USED", lang)
-    draw.text((43, 1095), status, font=fit(status, 270, 15, 8, True), fill=cream)
+    if _demonstration_mode(row):
+        status = "FIXTURE SINTÉTICO - SIN FUENTES EN VIVO" if lang == "es" else "SYNTHETIC FIXTURE - NO LIVE FEEDS"
+    else:
+        provenance = patched.api_provenance(row) if callable(getattr(patched, "api_provenance", None)) else {"active_sources": []}
+        active = provenance.get("active_sources") or []
+        status = ("ACTIVO: " if lang == "es" else "ACTIVE: ") + _contract.api_sources.short_api_list(active) if active else tr("NO LIVE FEEDS USED", lang)
+    txt_auto(draw, 43, 1093, status, 270, 26, 15, 7, cream, True, 1)
     draw.rectangle((337, 1084, 351, 1124), fill=getattr(patched, "PAPER", (244, 235, 211)))
 
 
@@ -558,7 +665,7 @@ def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], lan
         draw.rounded_rectangle((354, 1178, 1060, 1234), radius=10, fill=blue)
         draw.text((372, 1189), tr("MATCHUP NOTES", lang).upper(), fill=cream)
     rows = _expanded_context_rows(row)
-    _draw_readable_bullets(patched, draw, 378, 1246, rows, 650, 94, blue, lang)
+    _draw_compact_provider_rows(patched, draw, 378, 1243, rows, 650, 98, blue, lang)
     if _demonstration_mode(row):
         if callable(getattr(patched, "_section", None)):
             patched._section(draw, 20, 1178, 320, 175, "RISK DESK", getattr(patched, "RED", (190, 30, 28)), lang)
