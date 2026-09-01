@@ -81,7 +81,20 @@ def install() -> None:
         return country_es.get(text.lower(), text) if lang == "es" else text
 
     def patched_tr(v: Any, lang: str) -> str:
-        text = original_tr(v, lang)
+        protected = str(v or "")
+        provider_tokens = {
+            "API-Football": "__ABA_PROVIDER_API_FOOTBALL__",
+            "SportsDataIO": "__ABA_PROVIDER_SPORTSDATAIO__",
+            "WeatherAPI": "__ABA_PROVIDER_WEATHERAPI__",
+            "NewsAPI": "__ABA_PROVIDER_NEWSAPI__",
+            "Perplexity": "__ABA_PROVIDER_PERPLEXITY__",
+            "BALLDONTLIE": "__ABA_PROVIDER_BALLDONTLIE__",
+            "The Odds API": "__ABA_PROVIDER_THE_ODDS_API__",
+            "Odds API": "__ABA_PROVIDER_ODDS_API__",
+        }
+        for brand, token in provider_tokens.items():
+            protected = protected.replace(brand, token)
+        text = original_tr(protected, lang)
         if m._bad(text):
             return text
         raw = str(text)
@@ -116,6 +129,8 @@ def install() -> None:
                 raw = re.sub(rf"\b{re.escape(src)}\b", dst, raw, flags=re.I)
             for src, dst in country_es.items():
                 raw = re.sub(rf"\b{re.escape(src)}\b", dst, raw, flags=re.I)
+        for brand, token in provider_tokens.items():
+            raw = raw.replace(token, brand)
         return raw
 
     def rect_w(rect: Rect) -> int:
@@ -374,6 +389,11 @@ def install() -> None:
                 out.append(f"{label}: {patched_tr(value, lang)}")
         for key in (f"{prefix}_snapshot", f"{prefix}_notes", f"{prefix}_team_notes"):
             out.extend(split_value(row.get(key)))
+        provider_items = getattr(m, "team_items", None)
+        if callable(provider_items):
+            for item in provider_items(row, prefix):
+                if item not in out:
+                    out.append(item)
         return [patched_tr(item, lang) for item in out[:4]]
 
     def draw_metric_cell(d, rect: Rect, label: str, value: str, value_color: tuple[int, int, int], language: str) -> None:

@@ -14,6 +14,7 @@ API_SOURCE_DEFS = (
     ("API-Football", ("api_football_live", "api_football_enabled"), ("api_football_summary", "api_football_context", "api_football_team_summary", "api_football_lineup_summary"), (), False),
     ("Perplexity", ("perplexity_live", "perplexity_enabled"), ("perplexity_summary", "perplexity_context", "perplexity_news_context"), (), True),
     ("NewsAPI", ("newsapi_live", "newsapi_enabled"), ("newsapi_summary", "news_summary", "news_injury_summary", "breaking_news_summary"), (), False),
+    ("BALLDONTLIE", ("balldontlie_live", "balldontlie_enabled"), ("balldontlie_team_summary", "balldontlie_injury_summary", "balldontlie_game_summary", "balldontlie_props_summary"), ("player_prop_markets", "balldontlie_odds_summary"), False),
 )
 API_SECRET_DEFS = {
     "Odds API": ("ODDS_API_KEY", "THE_ODDS_API_KEY"),
@@ -22,6 +23,7 @@ API_SECRET_DEFS = {
     "API-Football": ("API_FOOTBALL_KEY", "APIFOOTBALL_KEY"),
     "Perplexity": ("PERPLEXITY_API_KEY", "PPLX_API_KEY"),
     "NewsAPI": ("NEWSAPI_KEY", "NEWS_API_KEY"),
+    "BALLDONTLIE": ("BALLDONTLIE_API_KEY", "BDL_API_KEY", "BALLDONTLIE_KEY"),
 }
 API_SHORT_LABELS = {
     "Odds API": "Odds",
@@ -30,6 +32,7 @@ API_SHORT_LABELS = {
     "API-Football": "API-FB",
     "Perplexity": "PPLX",
     "NewsAPI": "News",
+    "BALLDONTLIE": "BDL",
 }
 LOCATION_SHORT_LABELS = {
     "Pennsylvania": "PA",
@@ -43,7 +46,7 @@ LOCATION_SHORT_LABELS = {
     "Arizona": "AZ",
     "Nevada": "NV",
 }
-API_SUMMARY_KEY_FRAGMENTS = ("api", "sportsdataio", "weather", "news", "perplexity")
+API_SUMMARY_KEY_FRAGMENTS = ("api", "sportsdataio", "weather", "news", "perplexity", "balldontlie")
 _CURRENT_ROW: Mapping[str, Any] | None = None
 
 
@@ -168,19 +171,16 @@ def api_provenance(row: Any) -> dict[str, list[str]]:
         primary = _any_useful(row, data_keys)
         support = _any_useful(row, support_keys)
         configured = _configured(name)
-        if _name_matches(name, explicit_inactive) or live is False:
+        if _name_matches(name, explicit_inactive):
             inactive.append(name)
+        elif live is False:
+            (no_data if configured else inactive).append(name)
         elif _name_matches(name, explicit_active):
             active.append(name)
-        elif requires_live:
-            if primary or live is True:
-                active.append(name)
-            elif configured or support:
-                no_data.append(name)
-            else:
-                inactive.append(name)
-        elif primary or configured or live is True:
+        elif primary or live is True:
             active.append(name)
+        elif configured or support:
+            no_data.append(name)
         else:
             inactive.append(name)
     active = _dedupe(active)
@@ -417,17 +417,17 @@ def _items_from_keys(row: Any, keys: Iterable[str], fallback: list[str], limit: 
 
 
 def team_items(row: Any, side: str = "") -> list[str]:
-    keys = (f"{side}_team_form", f"{side}_team_record", f"{side}_recent_results", f"{side}_sportsdataio_team_summary", f"{side}_api_football_team_summary", "sportsdataio_team_summary", "sportsdataio_context", "api_football_team_summary", "api_football_context", "team_stats_summary", "home_team_form", "away_team_form", "recent_results", "news_summary", "newsapi_summary")
+    keys = (f"{side}_team_form", f"{side}_team_record", f"{side}_recent_results", f"{side}_sportsdataio_team_summary", f"{side}_api_football_team_summary", "sportsdataio_team_summary", "sportsdataio_context", "api_football_team_summary", "api_football_context", "balldontlie_team_summary", "team_stats_summary", "home_team_form", "away_team_form", "recent_results", "news_summary", "newsapi_summary")
     return _items_from_keys(row, keys, _team_fallback(row), 4, "team")
 
 
 def injury_items(row: Any, prefix: str) -> list[str]:
-    keys = (f"{prefix}_injuries", f"{prefix}_injury_report", f"{prefix}_lineup_status", f"{prefix}_player_notes", "injury_report", "injuries", "lineup_status", "key_players", "home_injuries", "away_injuries", "sportsdataio_injury_summary", "api_football_lineup_summary", "news_injury_summary")
+    keys = (f"{prefix}_injuries", f"{prefix}_injury_report", f"{prefix}_lineup_status", f"{prefix}_player_notes", "injury_report", "injuries", "lineup_status", "key_players", "home_injuries", "away_injuries", "sportsdataio_injury_summary", "api_football_lineup_summary", "news_injury_summary", "balldontlie_injury_summary")
     return _items_from_keys(row, keys, _injury_fallback(row), 3, "injury")
 
 
 def matchup_items(row: Any) -> list[str]:
-    keys = ("weather_summary", "api_football_summary", "api_football_context", "newsapi_summary", "news_summary", "sportsdataio_game_summary", "sportsdataio_context", "perplexity_context", "perplexity_summary")
+    keys = ("weather_summary", "api_football_summary", "api_football_context", "newsapi_summary", "news_summary", "sportsdataio_game_summary", "sportsdataio_context", "perplexity_context", "perplexity_summary", "balldontlie_game_summary", "balldontlie_odds_summary", "balldontlie_props_summary")
     return _items_from_keys(row, keys, _matchup_fallback(row), 3, "matchup")
 
 

@@ -6,6 +6,8 @@ from PIL import Image
 
 from autonomous_betting_agent import magazine_book_export
 from autonomous_betting_agent.magazine_sale_ready_patch import (
+    _page_one_provider_rows,
+    _page_one_trace_pairs,
     _decimal_text,
     _force_truthful_gate,
     apply_magazine_sale_ready_patch,
@@ -53,6 +55,95 @@ def _provider_terms():
         "News checked; no injury/lineup headline",
         "API-FB lookup checked; no match returned",
     )
+
+
+def _live_provider_row(**overrides):
+    row = _row(
+        odds_api_live=True,
+        odds_status="LIVE",
+        odds_source="The Odds API",
+        bookmaker="Book One",
+        provider_event_id="evt-123",
+        price_timestamp="2026-09-01T18:30:00Z",
+        sportsdataio_live=True,
+        sportsdataio_team_summary="SportsDataIO matched away and home team metadata; model statistic 61%.",
+        sportsdataio_injury_summary="SportsDataIO returned 1 matched-team injury row.",
+        weatherapi_live=True,
+        weather_summary="Weather: Clear, 22.0°C, wind 8.0 kph. Location: Paris, France.",
+        api_football_live=True,
+        api_football_fixture_id="77",
+        api_football_team_summary="API-Football matched teams: Iraq / France.",
+        api_football_context="API-Football fixture 77 matched; Stade de France; Not Started.",
+        api_football_lineup_summary="API-Football returned 2 injury/absence rows for fixture 77.",
+        newsapi_live=True,
+        newsapi_summary="NewsAPI returned 2 relevant articles.",
+        news_injury_summary="France confirms its final squad before the match.",
+        perplexity_live=True,
+        perplexity_status="LIVE_UNVERIFIED_RESEARCH",
+        perplexity_context="Unverified research context (not a verification source): schedule note with citations.",
+        perplexity_summary="Perplexity returned research context with 2 citations; verify against primary sources.",
+        balldontlie_live=True,
+        balldontlie_team_summary="BALLDONTLIE matched Iraq / France team records.",
+        balldontlie_injury_summary="BALLDONTLIE returned 1 active injury row.",
+        balldontlie_game_summary="BALLDONTLIE matched game 99.",
+        balldontlie_odds_summary="BALLDONTLIE returned Book Two moneyline odds.",
+        balldontlie_props_summary="BALLDONTLIE returned 2 player prop rows; model probability required.",
+        api_sources_active="Odds API|SportsDataIO|WeatherAPI|API-Football|NewsAPI|Perplexity|BALLDONTLIE",
+    )
+    row.update(overrides)
+    return row
+
+
+def test_page_one_live_provider_contract_preserves_all_seven_api_outputs():
+    row = _live_provider_row()
+    rendered_information = "\n".join(
+        sale_ready_team_items(row, "away")
+        + sale_ready_team_items(row, "home")
+        + sale_ready_injury_items(row, "away")
+        + sale_ready_injury_items(row, "home")
+        + _page_one_provider_rows(row)
+        + [f"{label}: {value}" for label, value in _page_one_trace_pairs(row, "en")]
+    )
+
+    for required in (
+        "The Odds API",
+        "Book One",
+        "evt-123",
+        "2026-09-01T18:30:00Z",
+        "SportsDataIO",
+        "Weather",
+        "API-Football",
+        "NewsAPI",
+        "Perplexity UNVERIFIED",
+        "citations",
+        "BALLDONTLIE",
+    ):
+        assert required in rendered_information
+    assert "not a verification source" in rendered_information
+
+
+def test_page_one_provider_rows_do_not_promote_configured_or_failed_sources():
+    row = _live_provider_row(
+        newsapi_live=False,
+        newsapi_summary="NewsAPI checked; provider response was unavailable.",
+        news_injury_summary="News checked; no injury/lineup headline.",
+        perplexity_live=False,
+        perplexity_context="",
+        perplexity_summary="Perplexity checked; provider response was unavailable.",
+    )
+
+    text = "\n".join(_page_one_provider_rows(row))
+
+    assert "provider response was unavailable" not in text
+    assert "no injury/lineup headline" not in text
+
+
+def test_spanish_page_one_preserves_provider_brand_and_unverified_label():
+    text = "\n".join(_page_one_provider_rows(_live_provider_row(report_language="es-MX"), "es"))
+
+    assert "API-Football" in text
+    assert "API-FÚTBOL AMERICANO" not in text
+    assert "NO VERIFICADO" in text
 
 
 def test_negative_edge_or_ev_cannot_play_small():
