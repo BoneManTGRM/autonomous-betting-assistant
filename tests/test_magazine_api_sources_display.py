@@ -55,7 +55,7 @@ def test_compact_pairs_use_active_no_live_inactive_labels():
         ("BOOK", "consensus average"),
         ("ACTIVE", "SDIO · Weather · API-FB · News"),
         ("NO LIVE", "Odds"),
-        ("INACTIVE", "PPLX"),
+        ("INACTIVE", "PPLX · BDL"),
     ]
 
 

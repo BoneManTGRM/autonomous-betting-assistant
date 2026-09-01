@@ -47,11 +47,12 @@ def _row() -> dict[str, str]:
     }
 
 
-def test_renderer_detects_four_active_apis(monkeypatch):
+def test_configured_keys_without_payload_are_no_live_data(monkeypatch):
     _clear_api_env(monkeypatch)
     _set_four(monkeypatch)
     provenance = magazine.api_provenance(_row())
-    assert provenance["active_sources"] == ["SportsDataIO", "WeatherAPI", "API-Football", "NewsAPI"]
+    assert provenance["active_sources"] == []
+    assert provenance["available_no_data_sources"] == [ODDS_API_NAME, "SportsDataIO", "WeatherAPI", "API-Football", "NewsAPI"]
     assert ODDS_API_NAME not in provenance["active_sources"]
     assert api_sources.odds_row_label(_row()) == "uploaded/cached row"
 
@@ -61,32 +62,33 @@ def test_cached_odds_key_does_not_make_odds_active(monkeypatch):
     monkeypatch.setenv("ODDS_API_KEY", "x")
     _set_four(monkeypatch)
     provenance = magazine.api_provenance(_row())
-    assert provenance["active_sources"] == ["SportsDataIO", "WeatherAPI", "API-Football", "NewsAPI"]
+    assert provenance["active_sources"] == []
+    assert provenance["available_no_data_sources"] == [ODDS_API_NAME, "SportsDataIO", "WeatherAPI", "API-Football", "NewsAPI"]
     assert ODDS_API_NAME not in provenance["active_sources"]
     assert api_sources.odds_row_label(_row()) == "uploaded/cached row"
 
 
-def test_pairs_show_four_active_apis(monkeypatch):
+def test_pairs_show_configured_providers_as_no_live_until_payload_returns(monkeypatch):
     _clear_api_env(monkeypatch)
     monkeypatch.setenv("ODDS_API_KEY", "x")
     _set_four(monkeypatch)
     pairs = magazine._pairs(_row(), "en")
     pair_text = "\n".join(f"{k}: {v}" for k, v in pairs)
     assert "ODDS ROW: uploaded/cached row" in pair_text
-    assert "ACTIVE: SDIO · Weather · API-FB · News" in pair_text
-    assert "NO LIVE: Odds" in pair_text
-    assert "INACTIVE: PPLX" in pair_text
+    assert not any(line.startswith("ACTIVE:") for line in pair_text.splitlines())
+    assert "NO LIVE: Odds · SDIO · Weather · API-FB · News" in pair_text
+    assert "INACTIVE: PPLX · BDL" in pair_text
     assert "ACTIVE APIS" not in pair_text
     assert "ODDS ROW: " + THE_ODDS_API not in pair_text
 
 
-def test_fallbacks_mention_four_active_apis(monkeypatch):
+def test_fallbacks_do_not_claim_configured_keys_are_active(monkeypatch):
     _clear_api_env(monkeypatch)
     monkeypatch.setenv("ODDS_API_KEY", "x")
     _set_four(monkeypatch)
     row = _row()
-    expected_sources = "SDIO · Weather · API-FB · News"
     for section_items in (api_sources.team_items(row, "away"), api_sources.injury_items(row, "home"), api_sources.matchup_items(row)):
         text = "\n".join(section_items)
-        assert expected_sources in text or any("checked" in item.lower() for item in section_items)
+        assert "No active API source" in text
+        assert "checked" not in text.lower()
         assert "SportsDataIO · WeatherAPI · API-Football · NewsAPI" not in text
