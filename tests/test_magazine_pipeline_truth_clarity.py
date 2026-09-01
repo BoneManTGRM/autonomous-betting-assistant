@@ -1,4 +1,4 @@
-from autonomous_betting_agent.magazine_pipeline_runtime import build_final_enriched_picks_df, beginner_explanation
+from autonomous_betting_agent.magazine_pipeline_runtime import build_final_enriched_picks_df, beginner_explanation, prepare_report_rows
 
 
 def _base_row(**extra):
@@ -64,3 +64,24 @@ def test_uploaded_row_stays_verify_price_and_shadow_observing():
     assert row["shadow_mode"] == "OBSERVING_ONLY"
     assert row["shadow_recommendation"] == "BLOCK STALE PRICE"
     assert row["live_verified_stake_units"] == "0.0"
+
+
+def test_demonstration_fixture_bypasses_live_enrichment_without_becoming_saved_handoff():
+    row = _base_row(
+        demonstration_mode=True,
+        source_mode="synthetic_test_fixture",
+        report_source_label="Synthetic validation fixture",
+        report_data_scope="Demonstration only - not current betting advice",
+        report_truth_warning="SYNTHETIC TEST DATA - NOT LIVE SPORTS INFORMATION",
+    )
+
+    prepared = prepare_report_rows([row])[0]
+
+    assert prepared["report_source"] == "demonstration_fixture"
+    assert prepared["report_source_mode"] == "synthetic_test_fixture"
+    assert prepared["report_source_label"] == "Synthetic validation fixture"
+    assert prepared["report_truth_severity"] == "DEMONSTRATION ONLY"
+    assert prepared["risk"] == "DEMONSTRATION DATA"
+    assert prepared["target_stake_units"] == "0.0"
+    assert prepared["model_probability"] == 0.62
+    assert "saved handoff" not in str(prepared).lower()

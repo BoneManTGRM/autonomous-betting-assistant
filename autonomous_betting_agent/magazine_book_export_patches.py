@@ -86,6 +86,26 @@ def install() -> None:
             return text
         raw = str(text)
         if lang == "es":
+            phrase_map = {
+                "ABA SIGNAL PRO - BILINGUAL VALIDATION": "ABA SIGNAL PRO - VALIDACIÓN BILINGÜE",
+                "SYNTHETIC TEST DATA - NOT LIVE SPORTS INFORMATION": "DATOS DE PRUEBA SINTÉTICOS - NO ES INFORMACIÓN DEPORTIVA EN VIVO",
+                "Synthetic validation fixture": "Fixture sintético de validación",
+                "No live sports data; test only.": "Sin datos deportivos en vivo; solo prueba.",
+                "Team stats were not returned by active APIs.": "Las APIs activas no devolvieron estadísticas del equipo.",
+                "Confirm form, injuries, and market movement before publishing.": "Confirmar forma, lesiones y movimiento del mercado antes de publicar.",
+                "Synthetic fixture used only to validate report completeness and Page 2 calculations.": "Fixture sintético usado solo para validar la integridad del reporte y los cálculos de la página 2.",
+                "Unavailable - no live market feed used.": "No disponible; no se usó una fuente de mercado en vivo.",
+                "ABA test harness": "Banco de pruebas ABA",
+                "TEST FIXTURE": "FIXTURE DE PRUEBA",
+                "FALLBACK MODE": "MODO DE RESPALDO",
+                "NO LIVE FEEDS USED": "NO SE USARON FUENTES EN VIVO",
+            }
+            for src, dst in phrase_map.items():
+                raw = re.sub(re.escape(src), dst, raw, flags=re.I)
+            raw = re.sub(r"Model projects\s+([^ ]+)\s+probability for\s+(.+?)\.?$", r"El modelo proyecta \1 de probabilidad para \2.", raw, flags=re.I)
+            raw = re.sub(r"Market-implied probability checks at\s+(.+?)\.?$", r"La probabilidad implícita del mercado es \1.", raw, flags=re.I)
+            raw = re.sub(r"Measured edge:\s*", "Ventaja medida: ", raw, flags=re.I)
+            raw = re.sub(r"Expected value:\s*", "Valor esperado: ", raw, flags=re.I)
             raw = re.sub(r"\bCUOTA\b", "MOMIO", raw, flags=re.I)
             raw = re.sub(r"\bcuota\b", "momio", raw, flags=re.I)
             raw = re.sub(r"\bcuotas\b", "momios", raw, flags=re.I)
@@ -141,12 +161,14 @@ def install() -> None:
     def fit_text_single_line(d, text: str, rect: Rect, max_font: int, min_font: int, bold: bool = True):
         for size in range(max_font, max(4, min_font) - 1, -1):
             font = m._font(size, bold)
-            if d.textbbox((0, 0), str(text), font=font)[2] <= rect_w(rect):
+            if d.textbbox((0, 0), str(text), font=font)[2] <= rect_w(rect) and m._line_height(font) <= rect_h(rect):
                 return font
         return m._font(max(4, min_font), bold)
 
     def fit_text_wrapped(d, text: str, rect: Rect, max_font: int, min_font: int, bold: bool = False, max_lines: int | None = None):
         floor = max(4, min_font)
+        if max_lines == 1:
+            return fit_text_single_line(d, str(text), rect, max_font, min_font, bold), [str(text)]
         for size in range(max_font, floor - 1, -1):
             font = m._font(size, bold)
             lines = safe_wrap(d, str(text), font, rect_w(rect), max_lines)
@@ -399,7 +421,10 @@ def install() -> None:
             draw_text_in_rect(d, label.upper(), (x + 66, 682, x + snap_w, 724), 24, 7, True, color, max_lines=1)
             items = team_items(row, prefix, lang)
             if not items:
-                items = [row.get("team_context_unavailable_reason") or m.TEAM_DATA_FALLBACK, "Confirm form, injuries, and market movement before publishing."]
+                items = [
+                    row.get("team_context_unavailable_reason") or m.TEAM_DATA_FALLBACK,
+                    "Confirmar forma, lesiones y movimiento del mercado antes de publicar." if lang == "es" else "Confirm form, injuries, and market movement before publishing.",
+                ]
             safe_bullets_auto(d, x, 751, items, snap_w - 10, 170, color, 18, 6, 4, lang)
 
     def repaint_risk_market(img, pick: Any, lang: str, sy: int = 456) -> None:

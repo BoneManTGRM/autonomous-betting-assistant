@@ -502,8 +502,40 @@ def validate_report_pipeline(df: Any) -> list[str]:
     return errors
 
 
+def _demonstration_row(row: Mapping[str, Any]) -> bool:
+    if row.get('demonstration_mode') is True:
+        return True
+    text = ' '.join(_txt(row.get(key)).lower() for key in ('report_title', 'report_data_scope', 'report_truth_warning', 'league'))
+    return any(token in text for token in ('demonstration', 'demo only', 'validation fixture', 'synthetic test'))
+
+
+def _prepare_demonstration_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    data = dict(row)
+    data.update({
+        'demonstration_mode': True,
+        'report_source': 'demonstration_fixture',
+        'report_source_mode': _txt(data.get('source_mode') or data.get('report_source_mode')) or 'synthetic_test_fixture',
+        'report_source_label': _txt(data.get('report_source_label')) or 'Synthetic validation fixture',
+        'report_data_scope': _txt(data.get('report_data_scope')) or 'Demonstration only - not current betting advice',
+        'report_truth_severity': 'DEMONSTRATION ONLY',
+        'verification_status': 'DEMONSTRATION ONLY',
+        'risk': 'DEMONSTRATION DATA',
+        'risk_level': 'DEMONSTRATION DATA',
+        'risk_label': 'DEMONSTRATION DATA',
+        'target_stake_units': '0.0',
+        'live_verified_stake_units': '0.0',
+        'odds_api_live': 'false',
+        'the_odds_api_live': 'false',
+        'odds_verified': 'false',
+    })
+    return data
+
+
 def prepare_report_rows(rows: Any, force_refresh: bool = False) -> list[dict[str, Any]]:
     frame = _frame(rows)
+    raw_rows = frame.to_dict('records')
+    if raw_rows and all(_demonstration_row(row) for row in raw_rows):
+        return [_prepare_demonstration_row(row) for row in raw_rows]
     if force_refresh or frame.empty or 'report_source' not in frame.columns or not frame['report_source'].astype(str).eq('final_enriched_picks_df').all():
         frame = build_final_enriched_picks_df(frame, force_refresh=force_refresh)
     errors = validate_report_pipeline(frame)

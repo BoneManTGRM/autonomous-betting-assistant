@@ -75,6 +75,17 @@ ES = {
     "ODDS ROW": "FILA DE MOMIO", "ACTIVE APIS": "APIS ACTIVAS", "INACTIVE": "INACTIVAS",
     "VOLUME OK": "VOLUMEN OK", "VOLUME_OK": "VOLUMEN OK", "PLAY SMALL": "JUGAR PEQUEÑO",
     "PLAY STANDARD": "JUGAR NORMAL", "NO PLAY": "NO JUGAR",
+    "DEMONSTRATION DATA": "DATOS DE DEMOSTRACIÓN",
+    "DEMONSTRATION ONLY": "SOLO DEMOSTRACIÓN",
+    "DEMO PRICE - NOT LIVE API": "CUOTA DE DEMOSTRACIÓN - NO ES API EN VIVO",
+    "SOCCER REGULAR SEASON": "FÚTBOL - TEMPORADA REGULAR",
+    "MONEYLINE": "GANADOR",
+    "Demonstration only": "Solo demostración",
+    "Not current betting advice": "No es consejo de apuesta actual",
+    "Replace all prices first": "Reemplazar primero todas las cuotas",
+    "Not used for this validation fixture": "No se usó para este caso de validación",
+    "No live: Odds": "Sin datos en vivo: Cuotas",
+    "Context": "Contexto",
     'Negative edge at current price.': 'Ventaja negativa con la cuota actual.',
     'Do not play unless price improves.': 'No jugar salvo que la cuota mejore.',
     'Recheck odds and key news.': 'Revisar cuotas y noticias clave.',
@@ -156,6 +167,12 @@ def _tr(value: Any, lang: str) -> str:
     if low in COUNTRY_ES:
         return COUNTRY_ES[low]
     phrase_replacements = (
+        ("SOCCER REGULAR SEASON", "FÚTBOL - TEMPORADA REGULAR"),
+        ("Line movement: Verify current market before entry", "Movimiento de línea: verificar el mercado actual antes de entrar"),
+        ("Demonstration only - not current betting advice", "Solo demostración; no es consejo de apuesta actual"),
+        ("DEMO PRICE - NOT LIVE API", "CUOTA DE DEMOSTRACIÓN - NO ES API EN VIVO"),
+        ("DEMONSTRATION DATA", "DATOS DE DEMOSTRACIÓN"),
+        ("DEMONSTRATION ONLY", "SOLO DEMOSTRACIÓN"),
         ("Negative edge at current " + "price", "Ventaja negativa con la cuota actual"),
         ("Do not play unless price " + "improves", "No jugar salvo que la cuota mejore"),
         ("Recheck odds and key " + "news", "Revisar cuotas y noticias clave"),
@@ -167,12 +184,19 @@ def _tr(value: Any, lang: str) -> str:
     )
     for old, new in phrase_replacements:
         text = re.sub(re.escape(old) + r"\.?", new + ".", text, flags=re.I)
+    text = re.sub(r"\bMONEYLINE\b", "GANADOR", text, flags=re.I)
+    text = re.sub(r"\bSOCCER\b", "FÚTBOL", text, flags=re.I)
+    text = re.sub(r"\bCONTEXT\s*:", "CONTEXTO:", text, flags=re.I)
     text = re.sub(r"\bFIFA WORLD CUP\b", "COPA MUNDIAL FIFA", text, flags=re.I)
     text = re.sub(r"\bREGULAR SEASON\b", "TEMPORADA REGULAR", text, flags=re.I)
     text = re.sub(r"\bGAME TOTAL\b", "TOTAL DEL PARTIDO", text, flags=re.I)
     text = re.sub(r"\bOVER\b", "MÁS DE", text, flags=re.I)
     text = re.sub(r"\bUNDER\b", "MENOS DE", text, flags=re.I)
     return text
+
+
+def _page_label(page_number: int, total_pages: int, lang: str) -> str:
+    return f"PÁGINA {page_number} DE {total_pages}" if lang == "es" else f"PAGE {page_number} OF {total_pages}"
 
 
 def _clean(value: Any, upper: bool = False) -> str:
@@ -866,9 +890,10 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     draw.rectangle((28, 24, 308, 74), fill=RED)
     draw.text((43, 29), "ABA SIGNAL PRO", font=_fit("ABA SIGNAL PRO", 250, 38, 25, True), fill="white")
     daily = _tr(_get(pick, "report_title", default="DAILY SPORTS ANALYSIS"), lang).upper()
-    draw.text((330, 28), daily, font=_fit(daily, 470, 38, 20, True), fill="white")
+    daily_font = _fit(daily, 470, 38, 10, True)
+    draw.text((330, 28), _ellipsize_to_width(draw, daily, daily_font, 470), font=daily_font, fill="white")
     draw.rounded_rectangle((840, 24, 1050, 74), radius=5, fill=CREAM, outline=BLACK)
-    page_text = _tr(f"PAGE {page_number} OF {total_pages}", lang)
+    page_text = _page_label(page_number, total_pages, lang)
     draw.text((862, 32), page_text, font=_fit(page_text, 174, 28, 16, True), fill=BLACK)
 
     _draw_matchup_headlines(draw, away_label, home_label, sport, pick, lang)
@@ -897,6 +922,8 @@ def render_full_pick_magazine_page(pick: Any, background_image: Any = None, repo
     _section(draw, left_x, 905, left_w, 225, "PRO BETTOR EVIDENCE", BLUE, lang)
     y = 974
     for label, value in (_pairs(pick, lang) or [(_tr("ODDS ROW", lang), "uploaded/cached row")])[:5]:
+        label = _tr(label, lang)
+        value = _tr(value, lang)
         draw.text((left_x + 24, y), f"{label}:", font=_fit(f"{label}:", 92, 16, 7, True), fill=BLACK)
         _txt_auto(draw, left_x + 122, y, value, left_w - 138, 22, 16, 7, BLACK, True, 1)
         y += 29

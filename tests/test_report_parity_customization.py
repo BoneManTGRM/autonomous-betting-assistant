@@ -175,3 +175,83 @@ def test_demonstration_fixture_never_renders_as_current_play() -> None:
         "Not current betting advice",
         "Replace all prices first",
     ]
+
+
+def test_spanish_page_labels_and_demonstration_statuses_are_localized() -> None:
+    assert magazine._page_label(1, 2, "es") == "PÁGINA 1 DE 2"
+    assert magazine._tr("MONEYLINE: NORTH STARS", "es") == "GANADOR: NORTH STARS"
+    assert magazine._tr("DEMONSTRATION DATA", "es") == "DATOS DE DEMOSTRACIÓN"
+    assert magazine._tr("DEMONSTRATION ONLY", "es") == "SOLO DEMOSTRACIÓN"
+    assert magazine._tr("DEMO PRICE - NOT LIVE API", "es") == "MOMIO DE DEMOSTRACIÓN - NO ES API EN VIVO"
+
+
+def test_spanish_page_two_generated_copy_has_no_mixed_english_phrases() -> None:
+    row = _report_row()
+    row.update({"demonstration_mode": True, "report_language": "es-MX"})
+    parlays, diagnostics = page2.generate_parlay_candidates(row)
+    sections = page2._page_two_sections(row, "es", parlays=parlays, diagnostics=diagnostics)
+    title, detail, _color = page2._final_status(row, "es", parlays=parlays, diagnostics=diagnostics)
+    rendered = "\n".join(
+        [page2._tr(section_title, "es") for section_title, _rows, _section_color in sections]
+        + [item for _section_title, rows, _section_color in sections for item in rows]
+        + [title, detail]
+    )
+
+    for phrase in (
+        "DEMONSTRATION PARLAY CALCULATION",
+        "Primary anchor",
+        "Model P",
+        "implied",
+        "Page 1 remains",
+        "PLAYABLE",
+        "Best 3-Leg Parlays",
+        "Leg 1",
+        "Combined",
+        "bankroll",
+        "profit",
+        "Correlation",
+        "Cross-game chains",
+        "Same-game parlays",
+        "Avoid any market",
+        "Markets discovered",
+        "eligible legs",
+        "Cancel if",
+    ):
+        assert phrase not in rendered
+    assert "Mercados descubiertos" in rendered
+    assert "discMás" not in rendered
+    assert "3-Selección" not in rendered
+    assert "3 selecciones" in rendered
+    assert "CÁLCULO DE PARLAY DE DEMOSTRACIÓN" in rendered
+    assert "Selección 1" in rendered
+
+
+def test_synthetic_demo_fixture_is_truthfully_labeled_without_operator_attestation() -> None:
+    row = _report_row()
+    fixture_fields = {
+        "demonstration_mode": True,
+        "source_mode": "synthetic_test_fixture",
+        "verification_method": "test_fixture",
+        "manual_attestation": False,
+        "provider": "Synthetic validation fixture",
+        "sportsbook": "TEST FIXTURE - NOT A SPORTSBOOK",
+    }
+    row.update(fixture_fields)
+    for market in row["advanced_market_rows"]:
+        market.update(fixture_fields)
+    for quote in row["parlay_price_quotes"]:
+        quote.update(fixture_fields)
+
+    parlays, diagnostics = page2.generate_parlay_candidates(row)
+    playable = [candidate for candidate in parlays if candidate.status == page2.PARLAY_PLAYABLE]
+    assert diagnostics["eligible_legs"] == 3
+    assert playable
+    assert all(leg.verification_method == "synthetic_fixture" for leg in playable[0].legs)
+    assert playable[0].quote_verification_method == "synthetic_fixture"
+
+    sections = page2._page_two_sections(row, "en", parlays=parlays, diagnostics=diagnostics)
+    rendered = "\n".join(item for _title, rows, _color in sections for item in rows)
+    assert "DEMONSTRATION CALCULATION" in rendered
+    assert " PLAYABLE " not in rendered
+    assert "operator" not in rendered.lower()
+    assert "manual" not in rendered.lower()
