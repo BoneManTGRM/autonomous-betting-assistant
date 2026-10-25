@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import csv
 import io
+import json
+from datetime import datetime, timedelta
 import unittest
 
-from autonomous_betting_agent.learning import fit_probability_calibrator
+from autonomous_betting_agent.learning import ProbabilityCalibrator
 from autonomous_betting_agent.learning_memory_tools import (
     build_memory_bank,
     build_segments,
@@ -18,50 +20,55 @@ from autonomous_betting_agent.learning_memory_tools import (
 
 
 def _csv_bytes(rows: list[dict[str, object]]) -> bytes:
-    fields = [
-        "event",
-        "event_start_utc",
-        "sport",
-        "market_type",
-        "prediction",
-        "model_probability_clean",
-        "result_status",
-        "decimal_price",
-        "closing_price",
-        "stake_units",
-        "bookmaker_count",
-        "api_coverage_score",
-    ]
+    # These are explicit synthetic evidence fixtures, not reconstructed history.
+    supplied = []
+    for index, row in enumerate(rows):
+        start = datetime.fromisoformat(str(row['event_start_utc']).replace('Z', '+00:00'))
+        before = (start - timedelta(hours=1)).isoformat()
+        supplied.append({**row, 'event_id': f'synthetic-{index}', 'market_id': 'synthetic-market',
+                         'selection_id': 'home', 'event_start': row['event_start_utc'],
+                         'decision_time': before, 'prediction_recorded_at': before,
+                         'result_available_at': (start + timedelta(hours=4)).isoformat(),
+                         'verified_at': (start + timedelta(hours=5)).isoformat(), 'outcome_verified': 'true',
+                         'raw_model_probability': row['model_probability_clean'],
+                         'baseline_probability': row['model_probability_clean'],
+                         'raw_probability_available_at': before, 'baseline_probability_available_at': before,
+                         'raw_model_version': 'synthetic-v1', 'baseline_model_version': 'synthetic-v1',
+                         'event_source': 'synthetic', 'prediction_source': 'synthetic', 'result_source': 'synthetic',
+                         'features': json.dumps({})})
+    fields = list(supplied[0])
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=fields, lineterminator="\n")
     writer.writeheader()
-    writer.writerows(rows)
+    writer.writerows(supplied)
     return buffer.getvalue().encode("utf-8")
 
 
 class LearningMemoryToolsTests(unittest.TestCase):
-    def test_high_confidence_result_only_file_uses_fallback_probability(self) -> None:
+    def test_high_confidence_result_only_file_is_rejected_without_fabricated_probability(self) -> None:
         csv_text = "event,sport,prediction,result\nA at B,Soccer,B,won\nC at D,Soccer,C,lost\nE at F,Soccer,E,unknown\n"
         rows, stats = read_compact_csv_bytes(csv_text.encode("utf-8"), "High confidence.csv")
         self.assertEqual(stats["input_rows"], 3)
-        self.assertEqual(stats["usable_rows"], 2)
-        self.assertEqual(stats["wins"], 1)
-        self.assertEqual(stats["losses"], 1)
+        self.assertEqual(stats["usable_rows"], 0)
+        self.assertEqual(stats["wins"], 0)
+        self.assertEqual(stats["losses"], 0)
         self.assertEqual(stats["missing_result"], 1)
-        self.assertEqual(stats["fallback_probability_rows"], 2)
-        self.assertTrue(all(row["probability_source"] == "fallback_high_confidence" for row in rows))
+        self.assertEqual(stats["fallback_probability_rows"], 0)
+        self.assertEqual(rows, [])
+        self.assertEqual(stats['admission_report']['rejected_rows'], 3)
+        self.assertEqual(len(stats['admission_report']['records']), 3)
         metrics = memory_metrics(rows)
-        self.assertEqual(metrics["resolved"], 2)
-        self.assertEqual(metrics["wins"], 1)
-        self.assertEqual(metrics["losses"], 1)
+        self.assertEqual(metrics["resolved"], 0)
+        self.assertEqual(metrics["wins"], 0)
+        self.assertEqual(metrics["losses"], 0)
 
-    def test_explicit_probability_does_not_need_fallback(self) -> None:
+    def test_explicit_probability_without_provenance_is_not_training_evidence(self) -> None:
         csv_text = "event,prediction,model_probability,result\nA at B,B,62%,won\n"
         rows, stats = read_compact_csv_bytes(csv_text.encode("utf-8"), "regular.csv")
-        self.assertEqual(stats["usable_rows"], 1)
+        self.assertEqual(stats["usable_rows"], 0)
         self.assertEqual(stats["fallback_probability_rows"], 0)
-        self.assertEqual(rows[0]["probability_source"], "model_probability")
-        self.assertAlmostEqual(rows[0]["probability"], 0.62)
+        self.assertEqual(rows, [])
+        self.assertEqual(stats['admission_report']['records'][0]['record']['model_probability'], '62%')
 
     def test_learning_memory_parses_roi_clv_and_segments(self) -> None:
         data = _csv_bytes(
@@ -150,7 +157,8 @@ class LearningMemoryToolsTests(unittest.TestCase):
                 }
             )
         segments = build_segments(rows, min_records=3, max_segments=200)
-        calibrator = fit_probability_calibrator(rows_to_graded(rows), min_events=5, source="unit-test")
+        # This test covers bank serialization, not a fitting operation.
+        calibrator = ProbabilityCalibrator(events_trained=len(rows), source="synthetic serialization fixture")
         bank = build_memory_bank(
             compact_rows=rows,
             calibrator=calibrator,

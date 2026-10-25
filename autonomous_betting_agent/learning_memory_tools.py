@@ -6,11 +6,13 @@ import json
 import math
 import re
 import unicodedata
+from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
 
 from .learning import GradedPrediction, ProbabilityCalibrator
 from .learning_strength import learning_memory_health
+from .learning_evidence_admission import COMPACT_SCHEMA, admission_reasons, evidence_view, review_learning_records, strict_learning_grade
 
 PROBABILITY_COLUMNS = (
     'final_probability_value', 'valor_probabilidad_final', 'prob_final', 'probabilidad_final',
@@ -71,21 +73,8 @@ def parse_probability(value: Any) -> float | None:
 
 
 def parse_result(value: Any) -> int | None:
-    text = clean_key(value)
-    win_words = {'won', 'win', 'w', 'correct', 'hit', 'true', 'yes', '1', 'gano', 'ganada', 'acierto', 'acertado', 'victoria'}
-    loss_words = {'lost', 'loss', 'l', 'incorrect', 'miss', 'false', 'no', '0', 'perdio', 'perdida', 'fallo', 'fallado', 'derrota'}
-    push_words = {'push', 'void', 'cancelled', 'canceled', 'empate', 'anulada'}
-    if text in push_words:
-        return None
-    if text in win_words:
-        return 1
-    if text in loss_words:
-        return 0
-    if any(token in text for token in ('win', 'won', 'correct', 'ganad', 'acert')):
-        return 1
-    if any(token in text for token in ('loss', 'lost', 'incorrect', 'perdid', 'fall')):
-        return 0
-    return None
+    grade = strict_learning_grade({'result_status': value})
+    return None if grade is None else int(grade == 'win')
 
 
 def first_text(row: dict[str, Any], names: tuple[str, ...]) -> str:
@@ -105,39 +94,20 @@ def first_float(row: dict[str, Any], names: tuple[str, ...]) -> float | None:
 
 
 def fallback_probability(row: dict[str, Any], source: str = '') -> tuple[float | None, str]:
-    text = ' '.join([source, first_text(row, CONFIDENCE_COLUMNS), first_text(row, ('source', 'note', 'result_note', 'decision_reasons', 'decision_signals'))]).lower()
-    if any(token in text for token in ('play_strong', 'jugar_fuerte', 'a+ high', 'high confidence', 'strong_candidate', 'strong candidate')):
-        return 0.70, 'fallback_high_confidence'
-    if any(token in text for token in ('play_small', 'high', 'alta', 'a strong')):
-        return 0.67, 'fallback_high_confidence'
-    if any(token in text for token in ('medium', 'media', 'lean', 'b lean', 'watch_only', 'solo_vigilar')):
-        return 0.60, 'fallback_medium_confidence'
-    if any(token in text for token in ('low', 'baja', 'no_action', 'sin_accion')):
-        return 0.52, 'fallback_low_confidence'
+    # Kept as a compatibility seam, never as a source of historical predictions.
     return None, 'missing'
 
 
 def extract_probability(row: dict[str, Any], source: str = '') -> tuple[float | None, str]:
-    for name in PROBABILITY_COLUMNS:
-        value = parse_probability(row.get(clean_key(name)))
-        if value is not None:
-            return value, clean_key(name)
-    price = first_float(row, PRICE_COLUMNS)
-    if price is not None and price > 1.0:
-        return max(0.000001, min(0.999999, 1.0 / price)), 'price_implied'
-    return fallback_probability(row, source)
+    value = parse_float(row.get('raw_model_probability'))
+    if isinstance(row.get('raw_model_probability'), bool) or value is None or not 0 <= value <= 1:
+        return None, 'missing_original_probability'
+    return value, 'raw_model_probability'
 
 
 def extract_result(row: dict[str, Any]) -> int | None:
-    for name in RESULT_COLUMNS:
-        value = parse_result(row.get(clean_key(name)))
-        if value is not None:
-            return value
-    pick = first_text(row, PICK_COLUMNS)
-    winner = first_text(row, WINNER_COLUMNS)
-    if pick and winner:
-        return 1 if clean_key(pick) == clean_key(winner) else 0
-    return None
+    grade = strict_learning_grade(row)
+    return None if grade is None else int(grade == 'win')
 
 
 def inferred_profit_units(*, outcome: int, price: float | None, stake: float | None, explicit_profit: float | None) -> float | None:
@@ -161,15 +131,23 @@ def clv_metrics(price: float | None, close_price: float | None) -> dict[str, Any
 
 
 def compact_row(row: dict[str, Any], row_number: int, source: str) -> dict[str, Any] | None:
-    probability, probability_source = extract_probability(row, source)
-    result = extract_result(row)
-    if probability is None or result is None:
+    reasons, observation = admission_reasons(row)
+    if reasons or observation is None:
         return None
-    event = first_text(row, EVENT_COLUMNS) or f'row {row_number}'
-    prediction = first_text(row, PICK_COLUMNS)
-    start = first_text(row, START_COLUMNS)
-    sport = first_text(row, SPORT_COLUMNS)
-    market_type = first_text(row, MARKET_COLUMNS)
+    return _compact_row_from_observation(row.get('raw_evidence', row), observation)
+
+
+def _compact_row_from_observation(row: dict[str, Any], observation: Any) -> dict[str, Any]:
+    """Canonical pure preview renderer; never a fitting or persistence function."""
+    original = deepcopy(row.get('raw_evidence', row))
+    row = evidence_view(row)
+    probability, probability_source = observation.raw_probability, 'raw_model_probability'
+    result = observation.outcome
+    event = first_text(row, EVENT_COLUMNS) or observation.event_id
+    prediction = first_text(row, PICK_COLUMNS) or observation.selection_id
+    start = row['event_start']
+    sport = observation.sport
+    market_type = observation.market_type
     bookmaker = first_text(row, BOOKMAKER_COLUMNS)
     price = first_float(row, PRICE_COLUMNS)
     close_price = first_float(row, CLOSING_PRICE_COLUMNS)
@@ -189,7 +167,7 @@ def compact_row(row: dict[str, Any], row_number: int, source: str) -> dict[str, 
         'market_type': market_type[:80],
         'bookmaker': bookmaker[:80],
         'prediction': prediction[:100],
-        'probability': round(probability, 6),
+        'probability': probability,
         'probability_source': probability_source,
         'outcome': int(result),
         'best_price': None if price is None else round(float(price), 4),
@@ -199,45 +177,47 @@ def compact_row(row: dict[str, Any], row_number: int, source: str) -> dict[str, 
         'books': None if books is None else int(max(0, round(float(books)))),
         'api_coverage_score': None if api_coverage is None else round(max(0.0, min(1.0, float(api_coverage))), 6),
         'confidence': first_text(row, CONFIDENCE_COLUMNS)[:60],
-        'model_version': first_text(row, MODEL_VERSION_COLUMNS)[:100],
-        'source': source[:120],
-        'last_seen_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+        'model_version': observation.raw_model_version,
+        # The intake filename is not provenance or a verification receipt.
+        'source': 'supplied_evidence_review',
+        'compact_schema': COMPACT_SCHEMA,
+        'event_id': observation.event_id,
+        'market_id': observation.market_id,
+        'selection_id': observation.selection_id,
+        'raw_evidence': original,
+        'evidence_authentication': 'UNVERIFIED_SUPPLIED_CLAIMS',
+        'observation_only': True,
+        'live_mutation_allowed': False,
     }
     item.update(clv)
     item['error_abs'] = round(abs(item['probability'] - item['outcome']), 6)
-    item['dedupe_key'] = '|'.join(part for part in (clean_key(event), clean_key(start[:10]), clean_key(market_type), clean_key(prediction)) if part)
+    item['dedupe_key'] = '|'.join(observation.key)
     return item
 
 
-def read_compact_csv_bytes(data: bytes, source: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
+def read_compact_csv_bytes(data: bytes, source: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Review every supplied record; never silently train a selected subset."""
     stats = {'input_rows': 0, 'usable_rows': 0, 'missing_probability': 0, 'missing_result': 0, 'fallback_probability_rows': 0, 'price_implied_probability_rows': 0, 'direct_probability_rows': 0, 'wins': 0, 'losses': 0}
-    text = data.decode('utf-8-sig', errors='replace')
-    rows: list[dict[str, Any]] = []
-    for row_number, raw in enumerate(csv.DictReader(io.StringIO(text)), start=2):
-        stats['input_rows'] += 1
-        row = {clean_key(k): v for k, v in raw.items() if k is not None}
-        probability, probability_source = extract_probability(row, source)
-        result = extract_result(row)
-        if probability is None:
-            stats['missing_probability'] += 1
-        if result is None:
-            stats['missing_result'] += 1
-            continue
-        if probability is None:
-            continue
-        item = compact_row(row, row_number, source)
-        if item is None:
-            continue
-        if str(probability_source).startswith('fallback_'):
-            stats['fallback_probability_rows'] += 1
-        elif probability_source == 'price_implied':
-            stats['price_implied_probability_rows'] += 1
-        else:
-            stats['direct_probability_rows'] += 1
-        stats['usable_rows'] += 1
-        stats['wins'] += int(item['outcome'] == 1)
-        stats['losses'] += int(item['outcome'] == 0)
-        rows.append(item)
+    text = data.decode('utf-8-sig')
+    reader = csv.DictReader(io.StringIO(text))
+    headers = reader.fieldnames or []
+    if any(not clean_key(key) for key in headers) or len({clean_key(key) for key in headers}) != len(headers):
+        raise ValueError('Duplicate CSV headers are ambiguous; original upload is unchanged.')
+    originals = list(reader)
+    if any(None in row or any(value is None for value in row.values()) for row in originals):
+        raise ValueError('CSV row/header length mismatch; original upload is unchanged.')
+    report = review_learning_records(originals)
+    stats['admission_report'] = report
+    stats['input_rows'] = len(originals)
+    stats['missing_probability'] = sum(extract_probability(row)[0] is None for row in originals)
+    stats['missing_result'] = sum(extract_result(row) is None for row in originals)
+    rows = []
+    if report['batch_admitted']:
+        rows = [compact_row(row, index + 2, source) for index, row in enumerate(originals)]
+        stats['usable_rows'] = len(rows)
+        stats['direct_probability_rows'] = len(rows)
+        stats['wins'] = sum(item['outcome'] == 1 for item in rows)
+        stats['losses'] = sum(item['outcome'] == 0 for item in rows)
     return rows, stats
 
 

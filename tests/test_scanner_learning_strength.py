@@ -55,12 +55,29 @@ class ScannerAndLearningStrengthTests(unittest.TestCase):
         self.assertGreater(health['sport_count'], 1)
         self.assertGreater(health['market_count'], 1)
 
-    def test_learning_parser_accepts_result_status_and_market_type(self):
+    def test_learning_parser_rejects_missing_evidence_without_losing_result_or_market_fields(self):
         csv_text = 'event,sport,market_type,prediction,model_probability,result_status,bookmaker\nA at B,Tennis,h2h,B,0.64,win,BookA\nC at D,Soccer,totals,Over,58,loss,BookB\n'
         rows, stats = read_compact_csv_bytes(csv_text.encode('utf-8'), 'unit_test.csv')
-        self.assertEqual(stats['usable_rows'], 2)
-        self.assertEqual(stats['direct_probability_rows'], 2)
-        self.assertEqual(rows[0]['market_type'], 'h2h')
+        self.assertEqual(rows, [])
+        self.assertEqual(stats['usable_rows'], 0)
+        self.assertEqual(stats['direct_probability_rows'], 0)
+        report = stats['admission_report']
+        self.assertEqual(report['rejected_rows'], 2)
+        self.assertFalse(report['trained'])
+        self.assertFalse(report['artifacts_written'])
+        originals = [entry['record'] for entry in report['records']]
+        self.assertEqual([row['result_status'] for row in originals], ['win', 'loss'])
+        self.assertEqual([row['market_type'] for row in originals], ['h2h', 'totals'])
+        self.assertEqual([row['model_probability'] for row in originals], ['0.64', '58'])
+        self.assertTrue(all(entry['reasons'] for entry in report['records']))
+
+    def test_segment_builder_retains_sport_and_market_dimensions(self):
+        # Preserve this independent aggregation check without treating a legacy
+        # provenance-free upload as admissible learning evidence.
+        rows = [
+            {'sport': 'synthetic-tennis', 'market_type': 'h2h', 'probability': .64, 'outcome': 1},
+            {'sport': 'synthetic-soccer', 'market_type': 'totals', 'probability': .58, 'outcome': 0},
+        ]
         segments = build_segments(rows, min_records=1, max_segments=20)
         area_types = {row['area_type'] for row in segments}
         self.assertIn('market_type', area_types)
