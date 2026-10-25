@@ -1,6 +1,7 @@
 import copy
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -131,6 +132,61 @@ def test_complete_report_state_with_real_runtime_hooks_no_conftest_or_io(tmp_pat
     assert receipt['normal_hooks'] and not receipt['conftest']
     assert receipt['cases_passed'] == 64
     assert receipt['input_unchanged']
+    assert receipt['fixture']['isolated_temporary_workspace']
+    assert receipt['fixture']['created_before_runtime_guard']
+    assert receipt['fixture']['source_files_unchanged']
+    assert receipt['fixture']['runtime_files_unchanged']
+    assert receipt['fixture']['source_data_access_attempts'] == []
+    assert not receipt['fixture']['source_data_or_secrets_copied']
+
+
+@pytest.mark.parametrize('existing_profile', [False, True])
+def test_runtime_fixture_never_uses_or_changes_source_profile_or_history(tmp_path, existing_profile):
+    source = Path(__file__).resolve().parents[1]
+    checkout = tmp_path / 'checkout'
+    checkout.mkdir()
+    paths = list(source.glob('*.py'))
+    for folder in ('autonomous_betting_agent', 'pages', 'src'):
+        paths.extend((source / folder).rglob('*.py'))
+    paths.append(source / 'scripts' / 'report_accounting_runtime_regression.py')
+    for path in paths:
+        if path.is_symlink() or '__pycache__' in path.parts:
+            continue
+        target = checkout / path.relative_to(source)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+
+    # Match a clean CI checkout after other tests prepared local-user folders,
+    # then repeat with a preexisting source profile. Neither is runtime input.
+    profile = checkout / 'data/local_users/owner/profile.json'
+    profile.parent.mkdir(parents=True)
+    for name in ('exports', 'ledgers', 'uploads'):
+        (profile.parent / name).mkdir()
+    source_profile = b'{"user_id":"owner","display_name":"SOURCE PROFILE MUST NOT BE READ"}'
+    if existing_profile:
+        profile.write_bytes(source_profile)
+    canaries = [checkout / 'data/history-canary.json', checkout / '.aba_state/history-canary.json']
+    for path in canaries:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'SYNTHETIC SOURCE HISTORY: MUST NOT BE READ OR COPIED')
+    outside_cwd = tmp_path / 'unrelated-cwd'
+    outside_cwd.mkdir()
+    result = subprocess.run([sys.executable, '-I', '-B', str(checkout / 'scripts/report_accounting_runtime_regression.py')],
+                            cwd=outside_cwd, capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    receipt = json.loads(result.stdout)
+    assert receipt['normal_hooks'] and not receipt['conftest']
+    assert receipt['cases_passed'] == 64 and receipt['input_unchanged']
+    assert receipt['fixture']['source_data_access_attempts'] == []
+    assert receipt['fixture']['runtime_files_unchanged']
+    assert receipt['fixture']['source_files_unchanged']
+    assert not receipt['fixture']['source_data_or_secrets_copied']
+    assert all(item['event'] != 'open' for item in receipt['blocked_operations'])
+    assert profile.exists() is existing_profile
+    if existing_profile:
+        assert profile.read_bytes() == source_profile
+    for path in canaries:
+        assert path.read_bytes() == b'SYNTHETIC SOURCE HISTORY: MUST NOT BE READ OR COPIED'
 
 
 def test_sparse_dataframe_nan_net_receipt_cannot_be_inferred_as_missing():
