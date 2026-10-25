@@ -20,6 +20,7 @@ PROVIDER_BRANDS = {
     "API-Football",
     "NewsAPI",
     "Perplexity",
+    "BALLDONTLIE",
     "Playdoit",
 }
 
@@ -44,6 +45,8 @@ BAD_CONTEXT_TOKENS = (
     "news checked",
     "no injury/lineup headline",
     "no lineup/injury headline",
+    "no match returned",
+    "no fixture match",
     "odds are not live.",
 )
 POSTGAME_TOKENS = (
@@ -158,6 +161,25 @@ TEXT_ES = {
 _impl.TEXT_ES.update(TEXT_ES)
 
 SPANISH_REPLACEMENTS = (
+    ("SYNTHETIC", "SINTÉTICO"),
+    ("response", "respuesta"),
+    ("both teams matched", "ambos equipos encontrados"),
+    ("model statistic", "estadística del modelo"),
+    ("test injury row", "registro de lesión de prueba"),
+    ("test absence rows", "registros de ausencia de prueba"),
+    ("relevant test articles", "artículos de prueba relevantes"),
+    ("headline", "titular"),
+    ("test lineup", "alineación de prueba"),
+    ("research response with", "respuesta de investigación con"),
+    ("test citations", "citas de prueba"),
+    ("verify primary sources", "verificar fuentes primarias"),
+    ("test game", "partido de prueba"),
+    ("test moneyline odds returned", "momios moneyline de prueba devueltos"),
+    ("test player-prop rows", "registros de props de jugador de prueba"),
+    ("model probability required", "se requiere probabilidad del modelo"),
+    ("Not Started", "No iniciado"),
+    ("Test Venue", "Sede de prueba"),
+    ("Clear", "despejado"),
     ("Weather", "Clima"),
     ("Light rain", "lluvia ligera"),
     ("Partly cloudy", "parcialmente nublado"),
@@ -246,7 +268,10 @@ def _source_items(row: Any, keys: Iterable[str], limit: int, max_chars: int) -> 
     out: list[str] = []
     seen: set[str] = set()
     for key in keys:
-        for part in _split(data.get(key)):
+        raw = data.get(key)
+        if _bad_context(raw, row):
+            continue
+        for part in _split(raw):
             if _bad_context(part, row):
                 continue
             item = _clean_text(part)
@@ -269,6 +294,12 @@ def _es(value: Any, lang: str = "es") -> str:
         return text
     if text in TEXT_ES:
         return TEXT_ES[text]
+    provider_tokens = {
+        brand: f"__ABA_PROVIDER_{index}__"
+        for index, brand in enumerate(sorted(PROVIDER_BRANDS, key=len, reverse=True))
+    }
+    for brand, token in provider_tokens.items():
+        text = text.replace(brand, token)
     text = _impl._es(text, lang)
     if text in PROVIDER_BRANDS:
         return text
@@ -276,6 +307,8 @@ def _es(value: Any, lang: str = "es") -> str:
         return TEXT_ES[text]
     for source, target in SPANISH_REPLACEMENTS:
         text = re.sub(r"(?<![\w])" + re.escape(source) + r"(?![\w])", target, text, flags=re.I)
+    for brand, token in provider_tokens.items():
+        text = text.replace(token, brand)
     return text
 
 
@@ -366,11 +399,15 @@ def sale_ready_team_items(row: Any, side: str = "") -> list[str]:
         f"{side}_team_form",
         f"{side}_team_record",
         f"{side}_recent_results",
+        f"{side}_sportsdataio_team_summary",
+        f"{side}_api_football_team_summary",
         "team_snapshot_home",
         "team_snapshot_away",
+        "sportsdataio_team_summary",
+        "api_football_team_summary",
+        "balldontlie_team_summary",
         "team_stats_summary",
         "recent_results",
-        "perplexity_context",
     )
     items = _source_items(row, keys, 3, 62)
     return _wrap(items or ["No live team snapshot returned.", "Team data not matched to a live provider.", "Verify before entry."], lang)
@@ -378,7 +415,7 @@ def sale_ready_team_items(row: Any, side: str = "") -> list[str]:
 
 def sale_ready_injury_items(row: Any, prefix: str = "") -> list[str]:
     lang = _impl._lang(row)
-    keys = (
+    side_keys = (
         f"{prefix}_injuries",
         f"{prefix}_injury_report",
         f"{prefix}_lineup_status",
@@ -387,8 +424,13 @@ def sale_ready_injury_items(row: Any, prefix: str = "") -> list[str]:
         "injuries",
         "lineup_status",
         "key_players",
-        "perplexity_context",
     )
+    provider_keys = (
+        ("sportsdataio_injury_summary", "balldontlie_injury_summary", "news_injury_summary", "api_football_lineup_summary")
+        if prefix == "away"
+        else ("api_football_lineup_summary", "news_injury_summary", "sportsdataio_injury_summary", "balldontlie_injury_summary")
+    )
+    keys = side_keys + provider_keys
     items = _source_items(row, keys, 2, 66)
     return _wrap(items or ["No verified lineup/injury update returned.", "Verify lineup/news before entry."], lang)
 
@@ -428,9 +470,11 @@ def _compact_weather(raw: str, lang: str) -> list[str]:
 
 def _compact_api_fb(row: Any, lang: str) -> str | None:
     data = _row(row)
-    raw = _clean_text(data.get("api_football_summary") or data.get("api_football_team_summary") or "")
-    if raw and ("api-fb" in raw.lower() or "api football" in raw.lower()) and not _bad_context(raw, row):
+    raw = _clean_text(data.get("api_football_context") or data.get("api_football_summary") or data.get("api_football_team_summary") or "")
+    if raw and "no match" in raw.lower():
         return _es("API-FB lookup checked; no fixture match.", lang)
+    if raw and ("api-fb" in raw.lower() or "api-football" in raw.lower() or "api football" in raw.lower()) and not _bad_context(raw, row):
+        return _es(raw, lang)
     return None
 
 
@@ -439,14 +483,17 @@ def sale_ready_matchup_items(row: Any) -> list[str]:
     items: list[str] = []
     if _explicit_fallback_odds(row):
         items.append("Odds are not live; verify current price before entry.")
-    items.extend(_source_items(row, ("perplexity_context", "perplexity_summary", "sports_context_summary", "preview_summary", "game_summary", "short_reason", "matchup_note"), 1, 82))
+    items.extend(_source_items(row, ("sports_context_summary", "preview_summary", "game_summary", "short_reason", "matchup_note"), 1, 82))
     items.extend(_compact_weather(str(_row(row).get("weather_summary", "") or ""), lang))
     api_fb = _compact_api_fb(row, lang)
     if api_fb:
         items.append(api_fb)
+    items.extend(_source_items(row, ("newsapi_summary", "news_summary", "news_injury_summary"), 1, 82))
+    items.extend(_source_items(row, ("perplexity_context", "perplexity_summary"), 1, 82))
+    items.extend(_source_items(row, ("balldontlie_game_summary", "balldontlie_odds_summary", "balldontlie_props_summary"), 1, 82))
     if not items:
         items.append("Pregame context was not returned; verify odds and news before entry.")
-    return _wrap(_dedupe(items)[:4], lang)
+    return _wrap(_dedupe(items)[:6], lang)
 
 
 def sale_ready_risk_items(row: Any) -> list[str]:

@@ -177,6 +177,11 @@ def _tr(value: Any, lang: str) -> str:
         ("ABA test harness", "Banco de pruebas ABA"),
         ("TEST FIXTURE", "FIXTURE DE PRUEBA"),
         ("Provider not matched", "Proveedor no vinculado"),
+        ("API data: active", "Datos API: activos"),
+        ("Datos API: activos none", "Datos API: activos ninguno"),
+        ("no live data", "sin datos en vivo"),
+        ("sin datos en vivo none", "sin datos en vivo ninguno"),
+        ("status unavailable", "estado no disponible"),
         ("Parlay calculations", "Cálculos de parlay"),
         ("quoted demo calculations", "cálculos demo con cuota"),
         ("estimated watchlist", "seguimiento estimado"),
@@ -928,6 +933,15 @@ def _page_two_sections(
         parlays, generated_diagnostics = generate_parlay_candidates(data)
         diagnostics = generated_diagnostics
     diag = dict(diagnostics)
+    try:
+        from autonomous_betting_agent.magazine_api_sources import api_provenance, short_api_list
+
+        api_state = api_provenance(data)
+        active_apis = short_api_list(api_state.get("active_sources", [])) or "none"
+        no_live_apis = short_api_list(api_state.get("available_no_data_sources", [])) or "none"
+        api_diag_row = f"API data: active {active_apis} · no live data {no_live_apis}."
+    except Exception:
+        api_diag_row = "API data: status unavailable."
     playable = [p for p in parlays if p.status == PARLAY_PLAYABLE]
     watch = [p for p in parlays if p.status == PARLAY_WATCHLIST]
     blocked = [p for p in parlays if p.status in {PARLAY_BLOCKED, PARLAY_AVOID}]
@@ -967,6 +981,7 @@ def _page_two_sections(
             f"Markets discovered: {diag.get('markets_discovered', 0)} · eligible legs: {diag.get('eligible_legs', 0)}.",
             f"Parlay calculations: {diag.get('parlay_candidates', 0)} · quoted demo calculations {diag.get('playable_parlays', 0)} · estimated watchlist {diag.get('watchlist_parlays', 0)}.",
             f"Timestamp: {diag.get('timestamp', 'missing')} · repair status {diag.get('repair_status', 'stable')}.",
+            api_diag_row,
         ]
     else:
         diag_rows = [
@@ -974,6 +989,7 @@ def _page_two_sections(
             f"Markets discovered: {diag.get('markets_discovered', 0)} · eligible legs: {diag.get('eligible_legs', 0)}.",
             f"Parlay candidates: {diag.get('parlay_candidates', 0)} · playable {diag.get('playable_parlays', 0)} · watchlist {diag.get('watchlist_parlays', 0)}.",
             f"Timestamp: {diag.get('timestamp', 'missing')} · repair status {diag.get('repair_status', 'stable')}.",
+            api_diag_row,
         ]
     cancel = [
         "Cancel if Page 1 line changes or sportsbook line differs from the report line.",

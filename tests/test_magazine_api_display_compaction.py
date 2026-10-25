@@ -113,5 +113,5 @@ def test_pro_bettor_pairs_use_short_api_labels() -> None:
     patched = api.apply_magazine_api_patch(Module)
     pairs = patched._pairs(_row(), "en")
     assert ("ACTIVE", "SDIO · Weather · API-FB · News") in pairs
-    assert ("INACTIVE", "PPLX") in pairs
+    assert ("INACTIVE", "PPLX · BDL") in pairs
     assert not any(label == "ACTIVE APIS" for label, _ in pairs)

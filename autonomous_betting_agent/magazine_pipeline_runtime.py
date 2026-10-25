@@ -320,12 +320,12 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
         perplexity_context = _clean(_first(row, 'perplexity_context', 'perplexity_summary', 'perplexity_news_context'))
         uploaded_context = _clean(_first(row, 'context', 'sports_context_summary', 'game_summary', 'preview_summary', 'analysis_summary'))
 
-        if perplexity_context:
-            context, context_source, context_status, context_reason = perplexity_context, 'Perplexity', perplexity_status, '' if perplexity_status == 'LIVE' else perplexity_failure
-        elif news_summary:
+        if news_summary:
             context, context_source, context_status, context_reason = news_summary, 'NewsAPI', news_status, '' if news_status == 'LIVE' else news_failure
         elif uploaded_context:
             context, context_source, context_status, context_reason = uploaded_context, 'UPLOADED_ROW', 'FALLBACK_USED', 'Context came from the uploaded/generated row.'
+        elif perplexity_context:
+            context, context_source, context_status, context_reason = perplexity_context, 'Perplexity', 'UNVERIFIED_RESEARCH', 'Perplexity content is research context, not a primary-source verification.'
         else:
             context, context_source, context_status, context_reason = '', 'EMPTY_WITH_REASON', 'FAILED', 'No real context source reached final_enriched_picks_df.'
 
@@ -335,7 +335,7 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
         loose_verify_line = line_info.get('risk_override') == 'VERIFY LINE'
         ev_status = 'LIVE_RECALCULATED' if odds_status == 'LIVE' and ev is not None else ('UNVERIFIED_MODEL_ONLY' if decimal_odds and ev is not None else 'UNVERIFIED')
         ev_source = 'calculated_from_live_odds_and_model_probability' if ev_status == 'LIVE_RECALCULATED' else ('model_edge_pending_price_verification' if ev_status == 'UNVERIFIED_MODEL_ONLY' else 'EMPTY_WITH_REASON')
-        fallback_used = odds_status != 'LIVE' or context_source != 'Perplexity' or news_status != 'LIVE' or perplexity_status != 'LIVE'
+        fallback_used = odds_status != 'LIVE' or news_status != 'LIVE'
         fallback_reason = '; '.join(part for part in [odds_failure if odds_status != 'LIVE' else '', context_reason, news_failure if news_status != 'LIVE' else '', perplexity_failure if perplexity_status != 'LIVE' else ''] if part)
         recommendation = _recommendation(model_probability, ev, edge)
         if line_blocked:
@@ -419,8 +419,8 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
             'what_this_means': beginner,
             'glossary_note': 'Moneyline: team must win. Spread: cover the listed margin. Over/Under: combined score versus the total. Parlay: every leg must win.',
             'sportsdataio_event_id': _txt(_first(row, 'sportsdataio_event_id', 'sportsdataio_game_id', 'sdio_event_id')),
-            'sportsdataio_match_status': 'MATCHED' if _txt(_first(row, 'sportsdataio_event_id', 'sportsdataio_game_id', 'sdio_event_id')) else 'NO_MATCH_TEAM_NAME',
-            'sportsdataio_failure_reason': '' if _txt(_first(row, 'sportsdataio_event_id', 'sportsdataio_game_id', 'sdio_event_id')) else 'No SportsDataIO event id reached final_enriched_picks_df.',
+            'sportsdataio_match_status': 'MATCHED' if _txt(_first(row, 'sportsdataio_event_id', 'sportsdataio_game_id', 'sdio_event_id')) else ('MATCHED_TEAM_DATA' if str(row.get('sportsdataio_live') or '').lower() in {'true', '1', 'yes', 'live'} else 'NO_MATCH_TEAM_NAME'),
+            'sportsdataio_failure_reason': '' if _txt(_first(row, 'sportsdataio_event_id', 'sportsdataio_game_id', 'sdio_event_id')) or str(row.get('sportsdataio_live') or '').lower() in {'true', '1', 'yes', 'live'} else 'No SportsDataIO event or team match reached final_enriched_picks_df.',
             'api_football_fixture_id': _txt(_first(row, 'api_football_fixture_id', 'api_football_match_id', 'fixture_id')),
             'api_football_match_status': 'MATCHED' if _txt(_first(row, 'api_football_fixture_id', 'api_football_match_id', 'fixture_id')) else 'NO_MATCH_TEAM_NAME',
             'api_football_failure_reason': '' if _txt(_first(row, 'api_football_fixture_id', 'api_football_match_id', 'fixture_id')) else 'No API-Football fixture id reached final_enriched_picks_df.',

@@ -40,7 +40,7 @@ def test_dynamic_api_provenance_six_active():
     }
     provenance = api_provenance(row)
     assert provenance["active_sources"] == [ODDS_API_NAME, "SportsDataIO", "WeatherAPI", "API-Football", "Perplexity", "NewsAPI"]
-    assert provenance["inactive_sources"] == []
+    assert provenance["inactive_sources"] == ["BALLDONTLIE"]
 
 
 def test_metric_cell_labels_exclude_removed_terms():
