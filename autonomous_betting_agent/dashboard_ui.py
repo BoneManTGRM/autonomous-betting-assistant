@@ -1,4 +1,5 @@
 import json
+import math
 from typing import Any, Mapping, Sequence
 
 import pandas as pd
@@ -242,6 +243,39 @@ def api_status_label(api_usage: Mapping[str, Any] | None) -> str:
     if fraction >= 0.75:
         return API_WARNING
     return API_OK
+
+
+def api_usage_indicator(api_usage: Mapping[str, Any] | None, language: str = "en") -> dict[str, str]:
+    """Display usage guardrails, never provider connectivity or credential health.
+
+    Keep api_status_label and its raw compatibility contract unchanged. A zero or
+    absent call limit cannot establish a meaningful usage assessment.
+    """
+    usage = api_usage or {}
+    assessed = False
+    try:
+        limit = float(usage.get("call_limit"))
+        fraction = float(usage.get("usage_fraction"))
+        used = float(usage.get("used_calls"))
+        assessed = (math.isfinite(limit) and limit > 0 and math.isfinite(fraction)
+                    and fraction >= 0 and math.isfinite(used) and used >= 0)
+    except (TypeError, ValueError, OverflowError):
+        pass
+    spanish = str(language).lower().startswith("es")
+    labels = {
+        API_OK: "Dentro del umbral de uso" if spanish else "Within usage thresholds",
+        API_WARNING: "Aviso de uso" if spanish else "Usage warning",
+        API_HIGH_USAGE: "Uso elevado" if spanish else "High usage",
+    }
+    return {
+        "label": "Uso de API" if spanish else "API usage",
+        "value": labels[api_status_label(usage)] if assessed else ("Sin evaluar" if spanish else "Not assessed"),
+        "help": (
+            "Basado solo en el uso informado o manual y un límite válido. Aquí no se verifican las credenciales ni la conectividad de los proveedores."
+            if spanish else
+            "Based only on reported or manual usage and a valid call limit. Provider credentials and connectivity are not checked here."
+        ),
+    }
 
 
 def proof_status_label(selected_source: str, dashboard_ready: bool, ledger_health: Mapping[str, Any] | None) -> str:

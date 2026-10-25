@@ -9,6 +9,7 @@ from autonomous_betting_agent.commercial_platform_tools import normalize_workspa
 from autonomous_betting_agent.dashboard_data_service import build_dashboard_data
 from autonomous_betting_agent.dashboard_ledger_bridge import build_dashboard_from_ledger, dashboard_source_summary
 from autonomous_betting_agent.dashboard_ui import (
+    api_usage_indicator,
     dashboard_json_text,
     dashboard_tables,
     operator_status_cards,
@@ -377,9 +378,13 @@ st.caption(f"{t('selected_source')}: {sync_summary.get('selected_source', 'empty
 _render_card_rows(operator_status_cards(dashboard, proof_status, ledger_health, dashboard_readiness, sync_summary), columns_per_row=4)
 
 st.subheader(t("traffic_lights"))
+api_usage_display = api_usage_indicator(dashboard.get("api_usage"), LANG)
 traffic_columns = st.columns(5)
 for column, key in zip(traffic_columns, ["proof_status", "ledger_status", "dashboard_source_status", "risk_status", "api_status"]):
-    column.metric(key.replace("_", " ").title(), traffic.get(key, ""))
+    if key == "api_status":
+        column.metric(api_usage_display["label"], api_usage_display["value"], help=api_usage_display["help"])
+    else:
+        column.metric(key.replace("_", " ").title(), traffic.get(key, ""))
 
 for message in _warning_messages(sync_summary, ledger_health, dashboard, traffic):
     st.warning(message)
@@ -405,7 +410,8 @@ with risk_col:
     st.metric("Bankroll Risk Status", traffic.get("risk_status", ""))
 with health_col:
     st.subheader(t("system_health"))
-    st.metric("API Status", traffic.get("api_status", ""))
+    st.metric(api_usage_display["label"], api_usage_display["value"], help=api_usage_display["help"])
+    st.caption(api_usage_display["help"])
     st.metric("Learning Rows Scanned", dashboard.get("learning_rows_scanned", 0))
     _render_summary_table(t("odds_lock"), tables["odds_lock_summary"])
 

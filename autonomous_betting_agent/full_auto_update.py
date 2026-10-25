@@ -10,8 +10,8 @@ import requests
 from .commercial_platform_tools import filter_locked_proof_rows, latest_active_list, load_persistent_ledger
 from .dashboard_sync import sync_dashboard_state
 from .live_odds import _get_json, validate_api_key
-from .result_grading_v2 import apply_fuzzy_updates, odds_scores_to_result_frame_v2
-from .row_normalizer import safe_text
+from .result_grading_v2 import apply_fuzzy_updates, odds_scores_to_result_frame_v2, restore_result_receipt, result_receipts_survive_normalization
+from .row_normalizer import first_text, result_status, safe_text
 
 ESPN_SCOREBOARD_MAP = {
     'baseball_mlb': ('baseball', 'mlb'),
@@ -217,21 +217,45 @@ def _row_key(row: dict[str, Any]) -> str:
     return '|'.join([safe_text(row.get('event')).lower(), safe_text(row.get('prediction')).lower(), safe_text(row.get('event_start_utc'))[:10]])
 
 
+def _fallback_row_key(row: dict[str, Any]) -> tuple[str, ...]:
+    return tuple(first_text(row, field).lower() for field in
+                 ('event', 'prediction', 'event_start_utc', 'market_type')) + (safe_text(row.get('line_point')),)
+
+
+def _original_row_lookup(frame: pd.DataFrame):
+    by_key = {}
+    without_id = {}
+    ambiguous = set()
+    for row in frame.to_dict(orient='records'):
+        if safe_text(row.get('proof_id')):
+            key = _row_key(row)
+            if key in by_key:
+                ambiguous.add(('proof', key))
+            by_key[key] = row
+        else:
+            key = _fallback_row_key(row)
+            if key in without_id:
+                ambiguous.add(('fallback', key))
+            without_id[key] = row
+    for kind, key in ambiguous:
+        (by_key if kind == 'proof' else without_id).pop(key, None)
+    return by_key, without_id, ambiguous
+
+
 def _protect_existing_wins(original: pd.DataFrame, proposed: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     if original.empty or proposed.empty:
         return proposed, 0
-    original_by_key = {_row_key(row): row for row in original.to_dict(orient='records')}
+    original_by_key, originals_without_id, ambiguous = _original_row_lookup(original)
+    if ambiguous:
+        # A batch with colliding raw identities cannot safely transfer any receipt.
+        return original.copy(), sum(result_status(row) == 'win' for row in original.to_dict(orient='records'))
     rows = []
     protected = 0
     for row in proposed.to_dict(orient='records'):
         item = dict(row)
-        old = original_by_key.get(_row_key(item))
-        if old and safe_text(old.get('result_status')).lower() == 'win' and safe_text(item.get('result_status')).lower() != 'win':
-            for field in PROTECTED_RESULT_FIELDS:
-                if field in old:
-                    item[field] = old.get(field)
-            item['grading_match_status'] = 'protected_existing_win'
-            item['protected_auto_downgrade'] = True
+        old = original_by_key.get(_row_key(item)) or originals_without_id.get(_fallback_row_key(item))
+        if old and result_status(old) == 'win' and result_status(item) != 'win':
+            item = restore_result_receipt(item, old)
             protected += 1
         rows.append(item)
     return pd.DataFrame(rows), protected
@@ -240,10 +264,12 @@ def _protect_existing_wins(original: pd.DataFrame, proposed: pd.DataFrame) -> tu
 def _changed_rows(before: pd.DataFrame, after: pd.DataFrame) -> int:
     if before.empty or after.empty:
         return 0
-    before_by_key = {_row_key(row): row for row in before.to_dict(orient='records')}
+    before_by_key, before_without_id, ambiguous = _original_row_lookup(before)
+    if ambiguous:
+        return 0
     changed = 0
     for row in after.to_dict(orient='records'):
-        old = before_by_key.get(_row_key(row))
+        old = before_by_key.get(_row_key(row)) or before_without_id.get(_fallback_row_key(row))
         if old is None:
             continue
         for field in RESULT_COMPARE_FIELDS:
@@ -290,17 +316,29 @@ def full_update_and_sync(*, workspace_id: Any = '', api_key_override: str = '', 
     locked = latest_active_list(ledger_all)
     if locked.empty:
         return pd.DataFrame(), {'updated_rows': 0, 'actual_changed_rows': 0, 'reason': 'empty_ledger', 'locked_rows': 0}
+    _, _, ambiguous = _original_row_lookup(ledger_all)
+    if ambiguous:
+        return ledger_all.copy(), {
+            'updated_rows': 0, 'actual_changed_rows': 0, 'dashboard_synced': False,
+            'reason': 'ambiguous_original_identity_needs_review', 'locked_rows': int(len(locked)),
+        }
     before_counts = _status_counts(locked)
     results, sport_stats = fetch_completed_scores_for_ledger(locked, api_key=get_api_key(api_key_override), days_from=days_from, sport_key=sport_key)
-    updated, stats = apply_fuzzy_updates(locked, results, regrade_resolved=True)
+    updated, stats = apply_fuzzy_updates(ledger_all, results, regrade_resolved=True)
     protected_wins = 0
     actual_changed = 0
     if not updated.empty:
-        updated, protected_wins = _protect_existing_wins(locked, updated)
-        actual_changed = _changed_rows(locked, updated)
+        updated, protected_wins = _protect_existing_wins(ledger_all, updated)
+        actual_changed = _changed_rows(ledger_all, updated)
     after_counts = _status_counts(updated if not updated.empty else locked)
     dashboard_synced = False
     if not updated.empty and _should_sync_dashboard(actual_changed=actual_changed, stats=stats, before_counts=before_counts, after_counts=after_counts):
+        if not result_receipts_survive_normalization(updated):
+            return ledger_all.copy(), {
+                **stats, 'proposed_updated_rows': stats.get('updated_rows', 0),
+                'updated_rows': 0, 'actual_changed_rows': 0, 'dashboard_synced': False,
+                'persisted': False, 'reason': 'retained_receipt_normalization_needs_review',
+            }
         updated = sync_dashboard_state(updated, workspace_id=workspace_id)
         dashboard_synced = True
         after_counts = _status_counts(updated)
