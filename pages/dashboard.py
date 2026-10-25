@@ -18,7 +18,7 @@ from autonomous_betting_agent.dashboard_ui import (
     proof_performance_cards,
     status_cards,
 )
-from autonomous_betting_agent.pick_hold_store import load_first_available
+from autonomous_betting_agent.pick_hold_store import load_first_available, remote_read_budget
 from autonomous_betting_agent.proof_center_control_service import get_dashboard_readiness, get_ledger_health, get_proof_center_status
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
@@ -306,51 +306,68 @@ def _warning_messages(sync_summary: Mapping[str, Any], ledger_health: Mapping[st
 st.title(t("title"))
 st.caption(t("caption"))
 
-with st.expander(t("input"), expanded=True):
-    workspace_input = st.text_input(t("workspace"), value=st.session_state.get("aba_test_window_id", "test_01"))
-    workspace_id = normalize_workspace_id(workspace_input)
-    st.session_state["aba_test_window_id"] = workspace_id
-    dashboard_uploads = st.file_uploader(t("upload"), type=["csv"], accept_multiple_files=True, key="dashboard_rows_upload")
-    uploaded_rows = _read_uploads(dashboard_uploads)
-    saved_fallback_rows = _load_saved_fallback_rows(workspace_id)
-    if not saved_fallback_rows.empty:
-        st.session_state["dashboard_saved_handoff_rows"] = saved_fallback_rows.to_dict(orient="records")
-    elif "dashboard_saved_handoff_rows" in st.session_state:
-        del st.session_state["dashboard_saved_handoff_rows"]
-    uploaded_frames = [frame for frame in (uploaded_rows,) if frame is not None and not frame.empty]
-    learning_uploads = st.file_uploader(t("learning_upload"), type=["csv"], accept_multiple_files=True, key="dashboard_learning_upload")
-    uploaded_learning_rows = _read_uploads(learning_uploads)
-    learning_rows = _load_learning_rows(uploaded_learning_rows)
+_previous_handoff = st.session_state.get("dashboard_saved_handoff_rows")
+with remote_read_budget() as remote_reads:
+    with st.expander(t("input"), expanded=True):
+        workspace_input = st.text_input(t("workspace"), value=st.session_state.get("aba_test_window_id", "test_01"))
+        workspace_id = normalize_workspace_id(workspace_input)
+        st.session_state["aba_test_window_id"] = workspace_id
+        dashboard_uploads = st.file_uploader(t("upload"), type=["csv"], accept_multiple_files=True, key="dashboard_rows_upload")
+        uploaded_rows = _read_uploads(dashboard_uploads)
+        saved_fallback_rows = _load_saved_fallback_rows(workspace_id)
+        if not remote_reads.unavailable:
+            if not saved_fallback_rows.empty:
+                st.session_state["dashboard_saved_handoff_rows"] = saved_fallback_rows.to_dict(orient="records")
+            elif "dashboard_saved_handoff_rows" in st.session_state:
+                del st.session_state["dashboard_saved_handoff_rows"]
+        uploaded_frames = [frame for frame in (uploaded_rows,) if frame is not None and not frame.empty]
+        learning_uploads = st.file_uploader(t("learning_upload"), type=["csv"], accept_multiple_files=True, key="dashboard_learning_upload")
+        uploaded_learning_rows = _read_uploads(learning_uploads)
+        learning_rows = _load_learning_rows(uploaded_learning_rows)
 
-with st.expander(t("settings"), expanded=False):
-    bankroll = st.number_input(t("bankroll"), min_value=0.0, value=float(st.session_state.get("dashboard_bankroll", 1000.0)), step=50.0)
-    unit_size = st.number_input(t("unit_size"), min_value=0.0, value=float(st.session_state.get("dashboard_unit_size", 10.0)), step=1.0)
-    max_daily_fraction = st.number_input(t("max_daily_fraction"), min_value=0.0, max_value=1.0, value=float(st.session_state.get("dashboard_max_daily_fraction", 0.05)), step=0.01)
-    api_used = st.number_input(t("api_used"), min_value=0, value=int(st.session_state.get("dashboard_api_used", 0)), step=100)
-    api_limit = st.number_input(t("api_limit"), min_value=0, value=int(st.session_state.get("dashboard_api_limit", 0)), step=100)
+    with st.expander(t("settings"), expanded=False):
+        bankroll = st.number_input(t("bankroll"), min_value=0.0, value=float(st.session_state.get("dashboard_bankroll", 1000.0)), step=50.0)
+        unit_size = st.number_input(t("unit_size"), min_value=0.0, value=float(st.session_state.get("dashboard_unit_size", 10.0)), step=1.0)
+        max_daily_fraction = st.number_input(t("max_daily_fraction"), min_value=0.0, max_value=1.0, value=float(st.session_state.get("dashboard_max_daily_fraction", 0.05)), step=0.01)
+        api_used = st.number_input(t("api_used"), min_value=0, value=int(st.session_state.get("dashboard_api_used", 0)), step=100)
+        api_limit = st.number_input(t("api_limit"), min_value=0, value=int(st.session_state.get("dashboard_api_limit", 0)), step=100)
 
-api_usage = _api_usage_from_state(int(api_used), int(api_limit))
-source_summary = dashboard_source_summary(workspace_id, session_state=st.session_state, uploaded_frames=uploaded_frames)
-dashboard = build_dashboard_from_ledger(
-    workspace_id,
-    session_state=st.session_state,
-    uploaded_frames=uploaded_frames,
-    learning_rows=learning_rows,
-    api_usage=api_usage,
-    bankroll=float(bankroll),
-    unit_size=float(unit_size),
-    max_daily_fraction=float(max_daily_fraction),
-)
-if source_summary.get("selected_source") == "empty":
-    dashboard = _compat_dashboard_data(pd.DataFrame(), learning_rows, api_usage, float(bankroll), float(unit_size), float(max_daily_fraction))
-    dashboard["sync_summary"] = source_summary
-else:
-    dashboard.setdefault("sync_summary", source_summary)
+    api_usage = _api_usage_from_state(int(api_used), int(api_limit))
+    source_summary = dashboard_source_summary(workspace_id, session_state=st.session_state, uploaded_frames=uploaded_frames)
+    dashboard = build_dashboard_from_ledger(
+        workspace_id,
+        session_state=st.session_state,
+        uploaded_frames=uploaded_frames,
+        learning_rows=learning_rows,
+        api_usage=api_usage,
+        bankroll=float(bankroll),
+        unit_size=float(unit_size),
+        max_daily_fraction=float(max_daily_fraction),
+    )
+    if source_summary.get("selected_source") == "empty":
+        dashboard = _compat_dashboard_data(pd.DataFrame(), learning_rows, api_usage, float(bankroll), float(unit_size), float(max_daily_fraction))
+        dashboard["sync_summary"] = source_summary
+    else:
+        dashboard.setdefault("sync_summary", source_summary)
 
-raw_proof_status = get_proof_center_status(workspace_id)
-proof_status = _proof_status_for_display(raw_proof_status, dashboard)
-ledger_health = get_ledger_health(workspace_id)
-dashboard_readiness = get_dashboard_readiness(workspace_id)
+    raw_proof_status = get_proof_center_status(workspace_id)
+    proof_status = _proof_status_for_display(raw_proof_status, dashboard)
+    ledger_health = get_ledger_health(workspace_id)
+    dashboard_readiness = get_dashboard_readiness(workspace_id)
+
+if remote_reads.unavailable:
+    if _previous_handoff is not None:
+        st.session_state["dashboard_saved_handoff_rows"] = _previous_handoff
+    else:
+        st.session_state.pop("dashboard_saved_handoff_rows", None)
+    st.warning(
+        "Remote saved rows could not be fully checked. This is not a confirmed empty ledger. "
+        "Local data is preserved; proof metrics are withheld until storage can be checked."
+    )
+    if st.button("Retry saved-row loading", key="dashboard_retry_saved_rows"):
+        st.rerun()
+    st.stop()
+
 sync_summary = dashboard.get("sync_summary") or source_summary
 traffic = operator_traffic_light_statuses(dashboard, proof_status, ledger_health, dashboard_readiness, sync_summary)
 tables = dashboard_tables(dashboard)
