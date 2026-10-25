@@ -31,7 +31,10 @@ def test_shell_brand_and_workflow_text_are_current() -> None:
     assert 'Powered by Reparodynamics' in app
     assert 'Pro Predictor' in app
     assert 'Odds Lock Pro' in app
-    assert 'Public Proof Dashboard' in app
+    assert 'Proof Center' in app
+    assert 'Dashboard' in app
+    assert 'Public Proof Dashboard' not in app
+    assert 'Proof Control Center' not in app
     assert 'Learning Memory' in app
 
 

@@ -5,6 +5,8 @@ import html
 import builtins
 from typing import Any
 
+from .ui_theme import APP_THEME_CSS
+
 APP_TAGLINE = 'Powered by Reparodynamics'
 APP_TAGLINE_ES = 'Impulsado por Reparodynamics'
 GLOBAL_LANGUAGE_KEY = 'aba_global_language'
@@ -43,13 +45,15 @@ REPARODYNAMICS_PAGE = ('Reparodynamics', 'Reparodynamics', 'pages/reparodynamics
 PRO_PREDICTOR_LARGE_LIST_70_DEFAULTS = {'baseline_accuracy_min_books': 1,'baseline_accuracy_min_model_prob': 0.58,'baseline_accuracy_min_edge': -0.03,'baseline_accuracy_strong_edge': 0.04,'baseline_accuracy_min_strength': 38.0,'baseline_accuracy_use_high_conf': True,'baseline_accuracy_max_high_conf': 700,'baseline_accuracy_min_high_prob': 0.58,'baseline_accuracy_min_high_edge': -0.03,'baseline_accuracy_min_high_strength': 38.0,'baseline_accuracy_min_high_agent': 35.0}
 SIDEBAR_CSS = '''<style>
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"] { padding-top: 1.4rem; }
-section[data-testid="stSidebar"] a[href*="pages/"] { display: block; padding: .62rem .82rem; border-radius: .75rem; margin: .18rem 0; text-decoration: none !important; font-weight: 650; }
-section[data-testid="stSidebar"] a[href*="pages/"]:hover { background: rgba(255,255,255,.10); }
+section[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] { min-height: 44px; height: auto; padding: .62rem .82rem; border-radius: 7px; margin: .18rem 0; text-decoration: none !important; font-weight: 650; white-space: normal; }
+section[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] p { white-space: normal; overflow-wrap: anywhere; }
+section[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover { background: rgba(185,239,201,.12); }
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 { margin-top: .65rem; }
-.aba-sidebar-title { font-size: 1.45rem; line-height: 1.2; font-weight: 850; margin: .35rem 0 .25rem 0; background: linear-gradient(90deg, #f6d365 0%, #fda085 40%, #70e1f5 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.aba-sidebar-tagline { color: rgba(255,255,255,.62); margin-bottom: 1rem; }
-.aba-sidebar-section { color: rgba(255,255,255,.56); font-size: .78rem; font-weight: 800; letter-spacing: .08rem; text-transform: uppercase; margin: .85rem 0 .25rem 0; }
-.aba-safe-download { display:inline-block; padding:.65rem 1rem; border-radius:.7rem; background:#ef5350; color:#fff!important; text-decoration:none!important; font-weight:700; margin:.35rem 0; }
+.aba-sidebar-brand { background: #102018; background: linear-gradient(155deg, #142c23, #102018); border: 1px solid #557b6e; border-radius: 12px; padding: .7rem; margin-bottom: .75rem; }
+.aba-sidebar-title { color: #eef7f4; font-size: 1.45rem; line-height: 1.2; font-weight: 800; margin: .1rem 0 .3rem 0; }
+.aba-sidebar-tagline { color: #bad1c6; font-size: .85rem; line-height: 1.5; }
+.aba-sidebar-section { color: #bad1c6; background: #102018; border-radius: 7px; padding: .3rem .5rem; font-size: .78rem; font-weight: 800; letter-spacing: .08rem; text-transform: uppercase; margin: .85rem 0 .25rem 0; }
+.aba-safe-download { display:inline-block; padding:.65rem 1rem; border-radius:7px; background:#b9efc9; color:#082017!important; text-decoration:none!important; font-weight:650; margin:.35rem 0; }
 </style>
 '''
 GLOBAL_UPLOAD_ES_CSS = '''<style>
@@ -141,8 +145,20 @@ def _bdl_ready() -> bool:
         return False
 
 
+def _bdl_status(language: str, configured: bool) -> str:
+    """Describe key presence, not untested provider availability or access."""
+    if normalize_language(language) == 'es':
+        if configured:
+            return 'BallDontLie (BDL): clave configurada; la conexión y el acceso a datos no se han comprobado.'
+        return 'BallDontLie (BDL): clave no configurada. Puedes usar datos guardados, archivos CSV y entradas manuales.'
+    if configured:
+        return 'BallDontLie (BDL): key configured; connection and data access have not been checked.'
+    return 'BallDontLie (BDL): key not configured. You can still use saved data and manual/CSV workflows.'
+
+
 def render_app_sidebar(current_page: str, *, language_key: str = 'global_language', selector: str = 'radio') -> str:
     import streamlit as st
+    st.markdown(APP_THEME_CSS, unsafe_allow_html=True)
     language = _language_label(_current_language(st))
     widget_key = f'aba_radio_{language_key}'
     if widget_key not in st.session_state:
@@ -151,10 +167,9 @@ def render_app_sidebar(current_page: str, *, language_key: str = 'global_languag
         st.markdown(GLOBAL_UPLOAD_ES_CSS, unsafe_allow_html=True)
     with st.sidebar:
         st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
-        st.markdown('<div class="aba-sidebar-title">ABA Signal Pro</div>', unsafe_allow_html=True)
         tagline = APP_TAGLINE if language == 'English' else APP_TAGLINE_ES
-        st.markdown(f'<div class="aba-sidebar-tagline">{html.escape(tagline)}</div>', unsafe_allow_html=True)
-        st.caption('BDL: Enabled' if _bdl_ready() else 'BDL: Missing')
+        st.markdown(f'<div class="aba-sidebar-brand"><div class="aba-sidebar-title">ABA Signal Pro</div><div class="aba-sidebar-tagline">{html.escape(tagline)}</div></div>', unsafe_allow_html=True)
+        st.caption(_bdl_status(language, _bdl_ready()))
         language = st.radio(
             _sidebar_language_label(language),
             ['English', 'Español'],
