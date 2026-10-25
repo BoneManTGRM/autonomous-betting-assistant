@@ -1,56 +1,35 @@
+"""Review supplied learning evidence; intentionally does not train or save state."""
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
 
-from autonomous_betting_agent.learning import GradedPrediction, fit_probability_calibrator, parse_graded_csv
+from autonomous_betting_agent.learning_evidence_admission import review_learning_records
+from autonomous_betting_agent.learning_memory_tools import read_compact_csv_bytes
 
 
-def dedupe_rows(rows: list[GradedPrediction]) -> list[GradedPrediction]:
-    seen: set[tuple[str, str, str, int]] = set()
-    unique: list[GradedPrediction] = []
-    for row in rows:
-        key = (row.event_name.strip().lower(), row.predicted_side.strip().lower(), row.actual_side.strip().lower(), row.outcome)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(row)
-    return unique
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description='Observation-only evidence readiness review. Never trains or writes learned state.')
+    parser.add_argument('results_csv', type=Path, help='Original evidence CSV; deficient legacy records are reported, not reconstructed')
+    parser.add_argument('--output', type=Path, default=Path('learned_state.json'), help='Legacy option: reported only; NO file will be written')
+    parser.add_argument('--epochs', type=int, default=2500, help='Legacy option ignored; no fitting occurs')
+    parser.add_argument('--learning-rate', type=float, default=0.05, help='Legacy option ignored')
+    parser.add_argument('--l2', type=float, default=0.01, help='Legacy option ignored')
+    parser.add_argument('--min-events', type=int, default=50, help='Readiness event minimum; cannot lower the existing 50-event minimum')
+    parser.add_argument('--keep-duplicates', action='store_true', help='Legacy option: all original records are always preserved in the review')
+    args = parser.parse_args(argv)
+    try:
+        _compact_preview, stats = read_compact_csv_bytes(args.results_csv.read_bytes(), str(args.results_csv))
+        report = review_learning_records([entry['record'] for entry in stats['admission_report']['records']], minimum_events=args.min_events)
+    except (OSError, ValueError, TypeError) as exc:
+        parser.error(str(exc))
+    report.update({'requested_output': str(args.output), 'output_written': False,
+                   'command_outcome': 'REVIEW_ONLY_NOT_TRAINED',
+                   'legacy_training_options_ignored': True})
+    print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+    return 0 if report['status'] == 'READY_FOR_OBSERVATION_ONLY' else 2
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Train probability calibration from a graded prediction CSV.")
-    parser.add_argument("results_csv", type=Path, help="CSV containing past predictions and final results")
-    parser.add_argument("--output", type=Path, default=Path("learned_state.json"), help="Where to save the learned calibration state")
-    parser.add_argument("--epochs", type=int, default=2500)
-    parser.add_argument("--learning-rate", type=float, default=0.05)
-    parser.add_argument("--l2", type=float, default=0.01)
-    parser.add_argument("--min-events", type=int, default=5)
-    parser.add_argument("--keep-duplicates", action="store_true", help="Keep duplicate graded rows instead of training on unique events")
-    args = parser.parse_args()
-
-    parsed_rows = parse_graded_csv(args.results_csv)
-    rows = parsed_rows if args.keep_duplicates else dedupe_rows(parsed_rows)
-    if len(rows) < args.min_events:
-        parser.error(f"Found {len(rows)} usable graded rows; need at least {args.min_events}.")
-        return 2
-
-    calibrator = fit_probability_calibrator(
-        rows,
-        epochs=args.epochs,
-        learning_rate=args.learning_rate,
-        l2=args.l2,
-        min_events=args.min_events,
-        source=str(args.results_csv),
-    )
-    calibrator.notes.append(f"Parsed {len(parsed_rows)} usable graded rows; trained on {len(rows)} rows.")
-    calibrator.save(args.output)
-
-    print(json.dumps(calibrator.to_dict(), indent=2, sort_keys=True))
-    print(f"Saved learned state to {args.output}")
-    return 0
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())
