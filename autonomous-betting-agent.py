@@ -1,1 +1,3 @@
-from streamlit_app import *  # noqa: F401,F403
+from app_streamlit import render_home
+
+render_home()

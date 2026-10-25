@@ -4,9 +4,6 @@ import streamlit as st
 
 from autonomous_betting_agent.sidebar_nav import render_app_sidebar
 
-st.set_page_config(page_title='ABA Signal Pro', layout='wide', initial_sidebar_state='expanded')
-LANG = render_app_sidebar('home', language_key='global_language', selector='radio')
-
 TEXT = {
     'en': {
         'title': 'ABA Signal Pro',
@@ -28,10 +25,18 @@ TEXT = {
     },
 }
 
-st.title(TEXT[LANG]['title'])
-st.caption(TEXT[LANG]['caption'])
-st.info(TEXT[LANG]['body'])
-st.success(TEXT[LANG]['steps'])
-st.page_link('pages/pro_predictor_volume.py', label=TEXT[LANG]['predictor'])
-st.page_link('pages/proof_control_center.py', label=TEXT[LANG]['proof_control'])
-st.page_link('pages/reset_storage.py', label=TEXT[LANG]['reset_storage'])
+def render_home() -> None:
+    """Render each Streamlit execution, independently of Python's module cache."""
+    st.set_page_config(page_title='ABA Signal Pro', layout='wide', initial_sidebar_state='expanded')
+    LANG = render_app_sidebar('home', language_key='global_language', selector='radio')
+    st.title(TEXT[LANG]['title'])
+    st.caption(TEXT[LANG]['caption'])
+    st.info(TEXT[LANG]['body'])
+    st.success(TEXT[LANG]['steps'])
+    st.page_link('pages/pro_predictor_volume.py', label=TEXT[LANG]['predictor'])
+    st.page_link('pages/proof_control_center.py', label=TEXT[LANG]['proof_control'])
+    st.page_link('pages/reset_storage.py', label=TEXT[LANG]['reset_storage'])
+
+
+if __name__ == '__main__':
+    render_home()
