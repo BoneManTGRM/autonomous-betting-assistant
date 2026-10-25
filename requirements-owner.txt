@@ -1,0 +1,3 @@
+-r requirements.txt
+# Reviewed ASGI middleware boundary; do not float this deployment's server API.
+streamlit==1.66.1
