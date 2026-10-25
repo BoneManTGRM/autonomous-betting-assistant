@@ -282,8 +282,8 @@ def _install_final_enriched_report_rows() -> None:
         return
     original = live.enrich_rows_with_live_api_data
 
-    def final_enriched_rows(rows):
-        enriched = original(rows)
+    def final_enriched_rows(rows, **kwargs):
+        enriched = original(rows, **kwargs)
         try:
             from .magazine_pipeline_runtime import build_final_enriched_picks_df
             return build_final_enriched_picks_df(enriched, force_refresh=True).to_dict('records')

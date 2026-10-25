@@ -13,13 +13,15 @@ def _source() -> str:
 def test_report_studio_imports_api_enrichment_helpers() -> None:
     text = _source()
     assert "ENRICHMENT_VERSION" in text
-    assert "enrich_rows_with_live_api_data" in text
+    assert "prepare_report_snapshot_rows" in text
+    assert "enrich_rows_with_live_api_data(" not in text
+    assert "allow_provider_refresh=True" not in text
     assert "from autonomous_betting_agent.magazine_live_api_enrichment import" in text
 
 
 def test_cards_as_rows_are_enriched_before_book_rendering() -> None:
     text = _source()
-    enrich_pos = text.index("cards_as_rows = enrich_rows_with_live_api_data")
+    enrich_pos = text.index("cards_as_rows = prepare_report_snapshot_rows")
     tab_pdf_pos = text.index("magazine_pdf_bytes = magazine_book_export.render_full_magazine_book_pdf")
     book_cache_pos = text.index("st.session_state[book_cache_key] = {")
     book_png_pos = text.index("render_full_magazine_book_png(cards_as_rows", book_cache_pos)
@@ -35,7 +37,7 @@ def test_selected_page_uses_enriched_rows_and_cache_version() -> None:
     assert "cached_render_full_pick_magazine_page_png" in text
     assert "NO_MARKET_EXPORT_VERSION, ENRICHMENT_VERSION" in text
     assert "TRUTH_CONTRACT_VERSION" in text
-    assert "rowd = enrich_rows_with_live_api_data([rowd])[0]" in text
+    assert "rowd = prepare_report_snapshot_rows([rowd])[0]" in text
 
 
 def test_full_book_cache_key_includes_enrichment_and_truth_versions() -> None:

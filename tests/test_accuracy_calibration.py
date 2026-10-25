@@ -11,12 +11,47 @@ from autonomous_betting_agent.accuracy_calibration import (
     expected_calibration_error,
     fit_calibration_model,
     parse_probability,
+    parse_result,
+    result_from_row,
     read_csv_rows,
     write_csv_rows,
 )
 
 
 class AccuracyCalibrationTests(unittest.TestCase):
+    def test_zero_and_false_grades_are_not_missing(self) -> None:
+        for value in (0, 0.0, "0", "0.0", False, "false"):
+            self.assertEqual(parse_result(value), "loss")
+        self.assertEqual(parse_probability(0), 0.0)
+
+    def test_final_grades_are_exact_and_conflicts_fail_closed(self) -> None:
+        self.assertEqual(result_from_row({"result_status": "WIN", "status": "settled"}), "win")
+        self.assertIsNone(result_from_row({"result_status": "win", "result": "loss"}))
+        for alias in ("Result Status", "Result-Status"):
+            self.assertIsNone(result_from_row({"result_status": "loss", alias: "win"}))
+        self.assertIsNone(result_from_row({"result_status": "win", "status": "pending win verification"}))
+        for value in ("would have won", "incorrect prediction", "win if home", "pending win verification"):
+            self.assertIsNone(parse_result(value))
+        model = fit_calibration_model([{"model_probability": 0.7, "result_status": "win"}])
+        self.assertEqual(model.global_samples, 1)
+
+    def test_calibration_is_idempotent_and_preserves_raw_input(self) -> None:
+        history = [{"model_probability": 0.8, "result_status": "win"}] * 20 + [{"model_probability": 0.8, "result_status": "loss"}] * 10
+        original = [{"model_probability": 0.8}]
+        first, first_report = apply_calibration(original, history, min_bucket_samples=5, shrinkage_strength=0)
+        second, second_report = apply_calibration(first, history, min_bucket_samples=5, shrinkage_strength=0)
+        self.assertEqual(first, second)
+        self.assertEqual(first[0]["raw_model_probability"], "0.8")
+        self.assertEqual(original, [{"model_probability": 0.8}])
+        self.assertEqual(first_report, second_report)
+
+    def test_repeated_calibration_preserves_boundary_precision(self) -> None:
+        history = [{"model_probability": 0.6999996, "result": "win"}] * 20 + [{"model_probability": 0.70, "result": "loss"}] * 20
+        first, _ = apply_calibration([{"model_probability": 0.6999996}], history, min_bucket_samples=1, shrinkage_strength=0)
+        second, _ = apply_calibration(first, history, min_bucket_samples=1, shrinkage_strength=0)
+        self.assertEqual(first, second)
+        self.assertEqual(first[0]["raw_model_probability"], "0.6999996")
+
     def test_parse_probability_accepts_percent_and_decimal(self) -> None:
         self.assertEqual(parse_probability("70"), 0.7)
         self.assertEqual(parse_probability("0.65"), 0.65)

@@ -51,13 +51,17 @@ def install() -> None:
             except Exception:
                 pass
         export_state_guard.install(renderer)
+        from .report_display_contract import install_source_note_pages
+        install_source_note_pages(renderer)
         renderer._ABA_REPORT_STUDIO_BOOTSTRAP = VERSION
     except Exception:
         pass
     try:
         from . import magazine_sale_ready_patch as sale_module
         from . import active_magazine_export_guard as guard
-        setattr(sale_module, "_force_truthful_gate", guard.normalize_row)
+        # Keep the sale gate's display/export compatibility fields. The active
+        # renderer guard and effective display decision remain authoritative;
+        # replacing this function made runtime ON disagree with runtime OFF.
         setattr(sale_module, "_truth_pairs", guard.public_truth_pairs)
     except Exception:
         pass

@@ -124,7 +124,7 @@ def _clear_leg_reason(page2: Any, market: Any, reason: str) -> str:
     if not line_required:
         line_status = "Line not required for this market type."
     elif getattr(market, "line", ""):
-        line_status = f"Line verified: {market.line}."
+        line_status = f"Line supplied, not independently verified: {market.line}."
     else:
         line_status = "Line missing: provider did not return exact spread/total/prop point."
     if "line" in low:
@@ -172,7 +172,7 @@ def _market_scan(page2: Any, data: Mapping[str, Any]) -> dict[str, Any]:
         if not requires_line:
             line_status["line not required"] += 1
         elif getattr(market, "line", ""):
-            line_status["line verified"] += 1
+            line_status["line supplied; provider verification separate"] += 1
         else:
             line_status["line missing"] += 1
         if ok:
@@ -212,88 +212,11 @@ def _install_page2_patch() -> None:
     if not callable(original_sections):
         return
 
-    def enhanced_sections(
-        data: dict[str, Any],
-        lang: str,
-        *,
-        parlays=None,
-        diagnostics=None,
-    ):
-        scan = _market_scan(page2, data)
-        if parlays is None or diagnostics is None:
-            parlays, diagnostics = page2.generate_parlay_candidates(data)
-        diag = dict(diagnostics)
-        playable = [p for p in parlays if p.status == page2.PARLAY_PLAYABLE]
-        blocked_parlays = [p for p in parlays if p.status in {page2.PARLAY_BLOCKED, page2.PARLAY_AVOID}]
-        reason_rows = [f"{name}: {count}" for name, count in scan["reason_counts"].most_common(5)] or ["No rejected market rows were returned by the scan."]
-        line_rows = [f"{name}: {count}" for name, count in scan["line_counts"].most_common()] or ["No line data returned."]
-        scan_rows = [
-            f"Markets scanned: {len(scan['markets'])} · events: {len(scan['events']) or 1} · books: {len(scan['books']) or 0}.",
-            f"Positive-EV legs: {scan['positive_ev']} · eligible legs: {len(scan['eligible'])} · watchlist legs: {len(scan['watchlist'])}.",
-            f"Parlay candidates: {len(parlays)} · playable: {len(playable)} · blocked/avoid: {len(blocked_parlays)}.",
-        ] + line_rows[:2]
-        if playable:
-            top_rows = [page2._parlay_line(p, lang) for p in playable[:5]]
-        else:
-            top_rows = [
-                f"{page2.STRAIGHT_ANCHOR_ONLY}: no fully verified parlay qualified from the current market pool.",
-                "This is not a failure: ABA needs two or more independently verified positive-EV legs before publishing a parlay.",
-            ]
-        two_leg = [page2._parlay_line(p, lang) for p in playable if "2-leg" in p.parlay_type][:5] or ["No verified 2-leg parlay. Need another independent priced positive-EV leg from a current sportsbook row."]
-        watch_rows = [f"WATCHLIST: {_leg_label(page2, m)} · {reason}" for m, reason in scan["watchlist"][:5]] or ["No watchlist legs with positive EV were returned. Increase event/market/book scan coverage."]
-        blocked_rows = [f"BLOCKED: {_leg_label(page2, m)} · {reason}" for m, reason in scan["blocked"][:5]] or ["No blocked leg details returned."]
-        if blocked_parlays:
-            blocked_rows += [f"PARLAY BLOCKED: {p.parlay_type} · {p.reason}" for p in blocked_parlays[:2]]
-        unlock_rows = [
-            "Scan moneyline, spreads/run lines/puck lines, totals, team totals, and priced props before report selection.",
-            "Each leg needs event ID, sportsbook, exact line when required, odds, timestamp, model probability, edge, and EV.",
-            "Use cross-game 2-leg parlays first; block same-game parlays unless sportsbook SGP price or correlation model exists.",
-        ] + reason_rows[:2]
-        source_rows = [
-            f"Provider: {diag.get('provider_called', 'unknown')} · state {diag.get('provider_state', 'unknown')}.",
-            f"Timestamp: {diag.get('timestamp', 'missing')} · repair status {diag.get('repair_status', 'stable')}.",
-            f"Rejection mix: {', '.join(reason_rows[:3])}.",
-        ]
-        cancel_rows = [
-            "Cancel if any leg loses current sportsbook price, exact line, timestamp, or positive EV.",
-            "Cancel if same-game correlation is unpriced or a prop lacks prop-specific model probability.",
-            "Cancel if live/flash market lacks live clock, score, odds, and provider timestamp.",
-        ]
-        return [
-            ("Market Scan Summary", sanitize_public_items([page2._tr(x, lang) for x in scan_rows]), page2.BLUE),
-            ("Top Parlay Recommendations", sanitize_public_items([page2._tr(x, lang) for x in top_rows[:5]]), page2.BLUE),
-            ("Best 2-Leg Parlays", sanitize_public_items([page2._tr(x, lang) for x in two_leg[:5]]), page2.BLUE),
-            ("Watchlist Legs", sanitize_public_items([page2._tr(x, lang) for x in watch_rows[:5]]), page2.GOLD),
-            ("Blocked / Why", sanitize_public_items([page2._tr(x, lang) for x in blocked_rows[:5]]), page2.RED),
-            ("Data Needed to Unlock", sanitize_public_items([page2._tr(x, lang) for x in unlock_rows[:5]]), page2.GOLD),
-            ("Source Diagnostics", sanitize_public_items([page2._tr(x, lang) for x in source_rows]), page2.BLUE),
-            ("Cancel Conditions", sanitize_public_items([page2._tr(x, lang) for x in cancel_rows]), page2.RED),
-        ]
+    def enhanced_sections(data, lang, *, parlays=None, diagnostics=None):
+        return original_sections(data, lang, parlays=parlays, diagnostics=diagnostics)
 
-    def enhanced_final_status(
-        data: dict[str, Any],
-        lang: str,
-        *,
-        parlays=None,
-        diagnostics=None,
-    ):
-        if callable(original_final_status):
-            title, detail, color = original_final_status(
-                data,
-                lang,
-                parlays=parlays,
-                diagnostics=diagnostics,
-            )
-        else:
-            title, detail, color = page2.NO_VERIFIED_PARLAY_AVAILABLE, "No verified parlay available.", page2.GOLD
-        scan = _market_scan(page2, data)
-        if title == page2.STRAIGHT_ANCHOR_ONLY or "No verified" in detail:
-            detail = (
-                f"{detail} Market pool: {len(scan['markets'])} scanned, {len(scan['eligible'])} eligible, "
-                f"{len(scan['watchlist'])} watchlist, top gap: "
-                f"{next(iter(scan['reason_counts']), 'need more current provider markets')}."
-            )
-        return title, page2._tr(detail, lang), color
+    def enhanced_final_status(data, lang, *, parlays=None, diagnostics=None):
+        return original_final_status(data, lang, parlays=parlays, diagnostics=diagnostics)
 
     def enhanced_advanced_market_diagnostics(pick: Any) -> dict[str, Any]:
         base = original_advanced(pick) if callable(original_advanced) else {}

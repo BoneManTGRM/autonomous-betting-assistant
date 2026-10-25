@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 import hashlib
 import importlib
+import json
 
 import pandas as pd
 import streamlit as st
@@ -11,7 +12,7 @@ from autonomous_betting_agent.app_feed_delivery import save_app_feed
 from autonomous_betting_agent.commercial_platform_tools import load_persistent_ledger, normalize_workspace_id
 import autonomous_betting_agent.magazine_book_export as magazine_book_export
 from autonomous_betting_agent.magazine_api_sources import api_provenance
-from autonomous_betting_agent.magazine_live_api_enrichment import ENRICHMENT_VERSION, enrich_rows_with_live_api_data, install as install_magazine_live_api_enrichment
+from autonomous_betting_agent.magazine_live_api_enrichment import ENRICHMENT_VERSION, prepare_report_snapshot_rows, install as install_magazine_live_api_enrichment
 from autonomous_betting_agent.magazine_report_polish_patch import install as install_magazine_report_polish
 from autonomous_betting_agent.magazine_sale_ready_patch import apply_magazine_sale_ready_patch
 from autonomous_betting_agent.pick_hold_store import load_first_available
@@ -437,14 +438,25 @@ def api_enrichment_diagnostics(rows: list[dict], source: str = "", source_mode_v
 
 @st.cache_data(show_spinner=False)
 def cached_render_full_pick_magazine_page_png(row_items: tuple[tuple[str, str], ...], background_bytes: bytes | None, report_name: str, page_number: int, total_pages: int, language: str, style_version: str, no_market_version: str, enrichment_version: str, truth_contract_version: str) -> bytes:
-    rowd = with_report_language(dict(row_items), language)
+    rowd = with_report_language(deserialize_row(row_items), language)
     rowd["_magazine_style_version"] = f"{style_version}:{no_market_version}:{enrichment_version}:{truth_contract_version}"
-    rowd = enrich_rows_with_live_api_data([rowd])[0]
+    rowd = prepare_report_snapshot_rows([rowd])[0]
     return magazine_book_export.render_full_pick_magazine_page_png(rowd, background_image=background_bytes, report_name=report_name, page_number=page_number, total_pages=total_pages, language=language)
 
 
 def serializable_row(rowd: dict) -> tuple[tuple[str, str], ...]:
-    return tuple(sorted((str(key), "" if value is None else str(value)) for key, value in rowd.items()))
+    return tuple(sorted((str(key), json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)) for key, value in rowd.items()))
+
+
+def deserialize_row(row_items: tuple[tuple[str, str], ...]) -> dict:
+    # Cache values are generated locally; never evaluate Python repr or code.
+    result = {}
+    for key, value in row_items:
+        try:
+            result[key] = json.loads(value)
+        except (ValueError, TypeError):
+            result[key] = value
+    return result
 
 
 st.title(t("title"))
@@ -537,7 +549,7 @@ feed = {"unified_v2": unified_feed, "legacy_v1": legacy_feed}
 summary = report_studio_summary(state)
 magazine_report_name = safe_text(brand_name) or "ABA Signal Pro"
 magazine_title = safe_text(report_title) or ("Analisis Deportivo Diario" if LANG == "es" else "Daily Sports Analysis")
-cards_as_rows = enrich_rows_with_live_api_data([with_report_branding(row.to_dict(), magazine_report_name, magazine_title, LANG) for _, row in cards.iterrows()])
+cards_as_rows = prepare_report_snapshot_rows([with_report_branding(row.to_dict(), magazine_report_name, magazine_title, LANG) for _, row in cards.iterrows()])
 api_diagnostics = api_enrichment_diagnostics(cards_as_rows, source_note, source_mode_value)
 
 st.markdown(render_status_dashboard(cards, language=LANG), unsafe_allow_html=True)

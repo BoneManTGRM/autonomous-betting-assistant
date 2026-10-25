@@ -24,7 +24,7 @@ RAW_PROBABILITY_COLUMNS = (
     "prop_model_probability",
 )
 CALIBRATED_PROBABILITY_COLUMNS = ("calibrated_probability",)
-RESULT_COLUMNS = ("result", "outcome", "win_loss", "graded_result", "status")
+RESULT_COLUMNS = ("result_status", "verified_grade", "result", "outcome", "win_loss", "graded_result", "status")
 SPORT_COLUMNS = ("sport", "league", "competition")
 MARKET_COLUMNS = ("market", "market_key", "prop_type", "bet_type")
 
@@ -89,7 +89,7 @@ def _first(row: Mapping[str, Any], keys: tuple[str, ...]) -> Any:
 
 
 def _float(value: Any) -> float | None:
-    text = str(value or "").strip().replace(",", "").replace("%", "")
+    text = ("" if value is None else str(value)).strip().replace(",", "").replace("%", "")
     if not text or text.lower() in {"none", "null", "nan", "unknown"}:
         return None
     try:
@@ -113,10 +113,12 @@ def parse_probability(value: Any) -> float | None:
 
 
 def parse_result(value: Any) -> str | None:
-    text = str(value or "").strip().lower()
-    if text in {"won", "win", "w", "1", "true", "correct"}:
+    if isinstance(value, (int, float)) and value in (0, 1):
+        return "win" if value == 1 else "loss"
+    text = ("" if value is None else str(value)).strip().lower()
+    if text in {"won", "win", "w", "1", "1.0", "true", "correct"}:
         return "win"
-    if text in {"lost", "loss", "l", "0", "false", "incorrect"}:
+    if text in {"lost", "loss", "l", "0", "0.0", "false", "incorrect"}:
         return "loss"
     if text in {"push", "void", "tie", "draw", "cancelled", "canceled"}:
         return "push"
@@ -124,7 +126,31 @@ def parse_result(value: Any) -> str | None:
 
 
 def raw_probability(row: Mapping[str, Any]) -> float | None:
-    return parse_probability(_first(row, PROBABILITY_COLUMNS))
+    # A calibrated output is never a replacement for the original prediction.
+    return parse_probability(_first(row, RAW_PROBABILITY_COLUMNS))
+
+
+def result_from_row(row: Mapping[str, Any]) -> str | None:
+    """Read exact final grades; contradictory or ambiguous labels fail closed.
+
+    ``status`` can also describe a completed operational state. Only explicit
+    completed-state words are ignored; pending or conditional text fails closed.
+    Inspect original keys so normalized aliases cannot hide contradictory grades.
+    """
+    grades: set[str] = set()
+    for key, value in row.items():
+        column = _clean_key(str(key))
+        if column not in RESULT_COLUMNS:
+            continue
+        if value is None or value == "":
+            continue
+        grade = parse_result(value)
+        if grade is None:
+            if column == "status" and str(value).strip().lower() in {"settled", "final", "completed", "closed", "graded"}:
+                continue
+            return None
+        grades.add(grade)
+    return next(iter(grades)) if len(grades) == 1 else None
 
 
 def probability_from_columns(row: Mapping[str, Any], columns: tuple[str, ...]) -> float | None:
@@ -132,7 +158,7 @@ def probability_from_columns(row: Mapping[str, Any], columns: tuple[str, ...]) -
 
 
 def _binary_result(row: Mapping[str, Any]) -> int | None:
-    result = parse_result(_first(row, RESULT_COLUMNS))
+    result = result_from_row(row)
     if result == "win":
         return 1
     if result == "loss":
@@ -213,7 +239,7 @@ def fit_calibration_model(
     global_losses = 0
     for row in rows:
         probability = raw_probability(row)
-        result = parse_result(_first(row, RESULT_COLUMNS))
+        result = result_from_row(row)
         if probability is None or result not in {"win", "loss"}:
             continue
         key = _bucket_key(probability, bucket_size)
@@ -280,7 +306,7 @@ def fit_scoped_calibration_models(
         grouped.setdefault(_scope_key(row), []).append(row)
     models = {"__global__": fit_calibration_model(rows, bucket_size=bucket_size, min_bucket_samples=min_bucket_samples, shrinkage_strength=shrinkage_strength)}
     for key, group_rows in grouped.items():
-        usable = [row for row in group_rows if raw_probability(row) is not None and parse_result(_first(row, RESULT_COLUMNS)) in {"win", "loss"}]
+        usable = [row for row in group_rows if raw_probability(row) is not None and result_from_row(row) in {"win", "loss"}]
         if len(usable) >= min_scope_samples:
             models[key] = fit_calibration_model(group_rows, bucket_size=bucket_size, min_bucket_samples=min_bucket_samples, shrinkage_strength=shrinkage_strength)
     return models
@@ -311,7 +337,8 @@ def apply_calibration(rows: list[Mapping[str, Any]], history_rows: list[Mapping[
             raw_values.append(probability)
         model = models.get(_scope_key(row), global_model)
         calibrated, reason, bucket = calibrate_probability(probability, model)
-        out["raw_model_probability"] = "" if probability is None else str(round(probability, 6))
+        # Full float round-trip precision is necessary at calibration boundaries.
+        out["raw_model_probability"] = "" if probability is None else str(probability)
         out["calibrated_probability"] = "" if calibrated is None else str(calibrated)
         out["calibration_reason"] = reason
         out["calibration_bucket"] = bucket
@@ -327,7 +354,7 @@ def apply_calibration(rows: list[Mapping[str, Any]], history_rows: list[Mapping[
     calibrated_ece = expected_calibration_error(output, CALIBRATED_PROBABILITY_COLUMNS, bucket_size=bucket_size)
     report = CalibrationReport(
         raw_rows=len(rows),
-        usable_rows=sum(1 for row in history_rows if raw_probability(row) is not None and parse_result(_first(row, RESULT_COLUMNS)) in {"win", "loss"}),
+        usable_rows=sum(1 for row in history_rows if raw_probability(row) is not None and result_from_row(row) in {"win", "loss"}),
         calibrated_rows=sum(1 for row in output if row.get("calibrated_probability") not in (None, "")),
         global_win_rate=global_model.global_win_rate,
         average_raw_probability=None if not raw_values else round(sum(raw_values) / len(raw_values), 6),

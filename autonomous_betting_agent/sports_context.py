@@ -421,10 +421,10 @@ def build_context(row: Mapping[str, Any], *, language: str = 'en', providers: li
     return merged
 
 
-def context_summary(row: Mapping[str, Any], *, language: str = 'en') -> str:
+def context_summary(row: Mapping[str, Any], *, language: str = 'en', providers: list[ContextProvider] | None = None) -> str:
     code = lang_code(language)
     family = sport_family(row.get('sport'))
-    context = build_context(row, language=language)
+    context = build_context(row, language=language, providers=providers)
     if context.get('sports_context_summary'):
         return context['sports_context_summary']
     fields = SPORT_CONTEXT_FIELDS.get(family, ())
@@ -460,23 +460,32 @@ def context_summary(row: Mapping[str, Any], *, language: str = 'en') -> str:
     return ' · '.join(parts[:4]) if parts else CONTEXT_UNAVAILABLE[code]
 
 
-def enrich_sports_context(frame: pd.DataFrame, *, language: str = 'en') -> pd.DataFrame:
+def enrich_sports_context(frame: pd.DataFrame, *, language: str = 'en', allow_provider_refresh: bool = False) -> pd.DataFrame:
     if frame is None or frame.empty:
         return pd.DataFrame() if frame is None else frame
     out = frame.copy()
     summaries: list[str] = []
     contexts = []
     for row in out.to_dict('records'):
-        context = build_context(row, language=language)
+        providers = None if allow_provider_refresh else [ColumnContextProvider(language=language), JsonContextProvider(language=language)]
+        context = build_context(row, language=language, providers=providers)
         contexts.append(context)
         enriched_row = {**row, **context}
-        summaries.append(context_summary(enriched_row, language=language))
+        summaries.append(context_summary(enriched_row, language=language, providers=providers))
     for context in contexts:
         for key, value in context.items():
             if key not in out.columns:
                 out[key] = ''
             mask = out[key].map(lambda x: not safe_text(x))
             out.loc[mask, key] = value
-    out['sports_context_summary'] = summaries
+    out['report_sports_context_summary'] = summaries
+    out['report_sports_context_summary_language'] = lang_code(language)
+    if 'sports_context_summary' not in out.columns:
+        out['sports_context_summary'] = ''
+    if 'sports_context_summary_language' not in out.columns:
+        out['sports_context_summary_language'] = ''
+    missing = out['sports_context_summary'].map(lambda value: not safe_text(value))
+    out.loc[missing, 'sports_context_summary'] = pd.Series(summaries, index=out.index)[missing]
+    out.loc[missing, 'sports_context_summary_language'] = lang_code(language)
     out['sports_context_available'] = out['sports_context_summary'].ne(CONTEXT_UNAVAILABLE[lang_code(language)])
     return out

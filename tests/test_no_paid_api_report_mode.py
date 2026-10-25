@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import pytest
 
 from autonomous_betting_agent.magazine_live_api_enrichment import (
     enrich_row_with_live_api_data,
@@ -14,6 +15,15 @@ from autonomous_betting_agent.report_verification_gate import (
 
 
 CAPTURED = "2026-08-31T16:00:00Z"
+
+
+@pytest.fixture(autouse=True)
+def frozen_parlay_observation_clock(monkeypatch):
+    class ObservationTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 8, 31, 16, 5, tzinfo=timezone.utc)
+    monkeypatch.setattr(page2, "datetime", ObservationTime)
 
 
 def _manual_leg(event: str, event_id: str, selection: str, odds: float, probability: float) -> dict:

@@ -139,6 +139,10 @@ def _injury_items(row_like: Any, prefix: str) -> list[str]:
 
 def sanitize_row(row_like: Any) -> dict[str, Any]:
     row = _row(row_like)
+    if row.get("report_provider_calls_allowed") is False:
+        # Snapshot diagnostics are not evidence; do not invent generic matchup
+        # prose or replace the saved observation's provider fields.
+        return row
     for key, value in list(row.items()):
         if isinstance(value, str):
             row[key] = _text(value)
@@ -170,8 +174,8 @@ def install_live_cleanup() -> None:
     def enrich_one(row_like: Any, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return sanitize_row(original_one(row_like, *args, **kwargs))
 
-    def enrich_many(rows: list[Any] | tuple[Any, ...]) -> list[dict[str, Any]]:
-        return [sanitize_row(row) for row in original_many(rows)]
+    def enrich_many(rows: list[Any] | tuple[Any, ...], **kwargs: Any) -> list[dict[str, Any]]:
+        return [sanitize_row(row) for row in original_many(rows, **kwargs)]
 
     live.enrich_row_with_live_api_data = enrich_one
     live.enrich_rows_with_live_api_data = enrich_many

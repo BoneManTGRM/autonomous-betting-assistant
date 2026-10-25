@@ -4,7 +4,9 @@ import autonomous_betting_agent.magazine_book_export as magazine_book_export
 from autonomous_betting_agent.magazine_live_api_enrichment import enrich_row_with_live_api_data, enrich_rows_with_live_api_data
 
 
-def test_spanish_report_enrichment_translates_dynamic_text_fields():
+def test_explicit_legacy_enrichment_translates_dynamic_text_fields(monkeypatch):
+    # Explicit enrichment compatibility is separate from the offline report path.
+    monkeypatch.setattr("autonomous_betting_agent.magazine_live_api_enrichment._secret", lambda names: "")
     row = {
         "report_language": "es",
         "event": "Iraq at France",
@@ -24,7 +26,7 @@ def test_spanish_report_enrichment_translates_dynamic_text_fields():
         "chain_notes": "Do not chain negative-EV picks.\nAvoid parlays unless edge turns positive.\nRecheck price before including.",
     }
 
-    enriched = enrich_row_with_live_api_data(row)
+    enriched = enrich_row_with_live_api_data(row, allow_provider_refresh=True)
     combined = "\n".join(str(enriched.get(key, "")) for key in ("why_bullets", "why_lose", "risk_reason", "chain_notes", "parlay_notes", "final_explanation"))
 
     assert enriched["final_decision"] == "LISTA DE SEGUIMIENTO"

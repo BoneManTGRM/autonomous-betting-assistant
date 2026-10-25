@@ -13,6 +13,7 @@ from typing import Any, Iterable, Mapping
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
+from autonomous_betting_agent.report_display_contract import tr as display_tr, localized_content
 
 PAGE_WIDTH = 1080
 PAGE_HEIGHT = 1620
@@ -158,7 +159,9 @@ def _team_label(team: str, lang: str) -> str:
 def _tr(value: Any, lang: str) -> str:
     if _bad(value):
         return NO_VERIFIED if lang == "en" else "Dato no disponible"
-    text = str(value)
+    text = display_tr(value, lang)
+    if text != str(value) and lang == "es":
+        return text
     if lang != "es":
         return text.replace("TENDENCIA", "TREND")
     if text in ES:
@@ -551,7 +554,7 @@ def _fit_lines_to_box(draw: ImageDraw.ImageDraw, text: str, box: tuple[int, int,
     for size in range(int(max_font), int(min_font) - 1, -1):
         font = _font(size, bold)
         line_sets = [[label]] if _text_width(draw, label, font) <= _rect_w(box) else []
-        line_sets.append(_wrap_text_to_box(draw, label, font, _rect_w(box), max_lines))
+        line_sets.append(_wrap_text_to_box(draw, label, font, _rect_w(box), max(1, len(label) + 1)))
         for lines in line_sets:
             if lines and len(lines) <= max_lines and len(lines) * _line_height(font) <= _rect_h(box) and all(_text_width(draw, line, font) <= _rect_w(box) for line in lines):
                 return font, lines
@@ -620,8 +623,8 @@ def _txt_auto(draw: ImageDraw.ImageDraw, x: int, y: int, text: str, width: int, 
         return y + _line_height(font)
     for size in range(start, minimum - 1, -1):
         font = _font(size, bold)
-        lines = _wrap(draw, str(text), font, width, max_lines)
-        if lines and len(lines) * _line_height(font) <= height:
+        lines = _wrap(draw, str(text), font, width, max(1, len(str(text)) + 1))
+        if lines and (max_lines is None or len(lines) <= max_lines) and len(lines) * _line_height(font) <= height:
             for line in lines:
                 draw.text((x, y), _ellipsize_to_width(draw, line, font, width), font=font, fill=fill)
                 y += _line_height(font)
@@ -787,19 +790,27 @@ def _items(row: Any, keys: Iterable[str], fallback: list[str], limit: int, lang:
 
 
 def _why(row: Any, lang: str) -> list[str]:
-    out: list[str] = []
-    for key in ("why_bullets", "why_pick", "analysis_summary", "reason", "explanation"):
-        out += _split(_row(row).get(key))
-    if out:
-        return out[:4]
-    pick = _tr(_pick(row), lang)
-    vals = [
-        f"Model projects {_pct(_num(row, 'learned_model_probability', 'model_probability_clean', 'model_probability', 'final_probability'))} probability for {pick}.",
-        f"Market-implied probability checks at {_pct(_num(row, 'market_probability', 'market_implied_probability'))}.",
-        f"Measured edge: {_edge(_num(row, 'model_market_edge', 'edge'))}.",
-        f"Expected value: {_fmt(_get(row, 'expected_value_per_unit', 'profit_expected_value', 'expected_value', 'ev'), 'ev')}.",
-    ]
-    return [value for value in vals if NO_VERIFIED not in value] or ["Use only while the line remains playable."]
+    from autonomous_betting_agent.report_public_quality import is_saved_source
+    data = _row(row)
+    supplied, _reason = localized_content(data, ("why_bullets", "why_pick", "analysis_summary", "reason", "explanation"), lang)
+    if supplied:
+        return [supplied]
+    p = _pct(_num(row, 'learned_model_probability', 'model_probability_clean', 'model_probability', 'final_probability'))
+    source = _get(row, "model_probability_source", "confidence_source")
+    pick_label = _tr(_pick(row), lang)
+    source_supplied = bool(source and source not in {'model_probability', 'EMPTY_WITH_REASON'})
+    if lang == 'es':
+        rows = [f'P del modelo: {p} · {pick_label}.'] if p != NO_VERIFIED else ['Falta la probabilidad del modelo.']
+        rows.append(f'Fuente: {source}.' if source_supplied else 'No se proporcionó la fuente del modelo.')
+        rows.append('Estimación; no es precisión validada.')
+        rows.append('VE con cuota guardada; verificar cuota actual.' if is_saved_source(data) else 'Confirmar cuota antes de apostar.')
+    else:
+        rows = [f'Model P: {p} · {pick_label}.'] if p != NO_VERIFIED else ['Model probability not supplied.']
+        rows.append(f'Source: {source}.' if source_supplied else 'Model source not supplied.')
+        rows.append('Estimate, not validated accuracy.')
+        rows.append('Stored-price EV; verify current price.' if is_saved_source(data) else 'Confirm current price before entry.')
+
+    return rows
 
 
 def _pairs(row: Any, lang: str) -> list[tuple[str, str]]:
@@ -1032,6 +1043,7 @@ def render_full_magazine_zip(picks: Iterable[Any], background_image: Any = None,
         zip_file.writestr(f"full_magazine_book_{NO_MARKET_EXPORT_VERSION}.png", render_full_magazine_book_png(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
         zip_file.writestr(f"full_magazine_book_{NO_MARKET_EXPORT_VERSION}.pdf", render_full_magazine_book_pdf(rows, background_image, report_name, logo_image, background_mode, logo_mode, background_opacity, logo_opacity, use_team_logo, language))
         for index, page in enumerate(pages):
-            row = rows[index] if index < len(rows) else {"event": "No Picks"}
+            row_index = page.info.get("report_row_index", index // 2)
+            row = rows[row_index] if row_index < len(rows) else {"event": "No Picks"}
             zip_file.writestr(_versioned_page_filename(row, index), _png(page))
     return out.getvalue()

@@ -3,6 +3,8 @@ from __future__ import annotations
 from io import BytesIO
 from typing import Any, Iterable
 import re
+from .report_display_contract import context_items, tr as display_tr, language as display_language, canonical_market_row, accounting_quarantined, team_items, display_decision
+from .report_public_quality import build_full_market_label
 
 # Regression markers kept for overlay plumbing tests:
 # repaint_vs_badge repaint_evidence_body repaint_masthead report_brand_name
@@ -202,7 +204,7 @@ def _rich_pick_text(data: dict[str, Any]) -> str:
 
 def _pick_for_display(row: Any) -> str:
     data = dict(_contract._row(row))
-    return _rich_pick_text(data)
+    return build_full_market_label(data)
 
 
 def _pick_subject(row: dict[str, Any]) -> str:
@@ -244,7 +246,7 @@ def _normalize_display_fields(data: dict[str, Any]) -> dict[str, Any]:
     data["target_stake_units"] = _stake_text(target)
     data.setdefault("source_freshness", _first(data, "last_refreshed", "updated_at", "locked_at_utc", default="Verify before entry"))
     data.setdefault("verification_status", data.get("report_truth_severity") or ("LIVE VERIFIED" if _live_verified(data) else "VERIFY SOURCE"))
-    display_pick = _rich_pick_text(data)
+    display_pick = build_full_market_label(data)
     data["aba_display_pick"] = display_pick
     data["display_pick"] = display_pick
     data["prediction"] = display_pick
@@ -253,7 +255,17 @@ def _normalize_display_fields(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _force_truthful_gate(row: Any) -> dict[str, Any]:
-    data = _normalize_display_fields(dict(_contract._row(row)))
+    data = _normalize_display_fields(canonical_market_row(dict(_contract._row(row))))
+    if accounting_quarantined(data):
+        for key in ("final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action"):
+            data[key] = "RESEARCH ONLY"
+        data.update(risk="ACCOUNTING REVIEW", risk_level="ACCOUNTING REVIEW", risk_label="ACCOUNTING REVIEW", report_truth_severity="ACCOUNTING REVIEW", verification_status="ACCOUNTING REVIEW", final_explanation="Accounting review required before report publication.")
+        return data
+    if data.get('report_market_issue'):
+        for key in ("final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action"):
+            data[key] = "RESEARCH ONLY"
+        data.update(risk="MARKET REVIEW", risk_level="MARKET REVIEW", risk_label="MARKET REVIEW", report_truth_severity="MARKET REVIEW", final_explanation="Conflicting market values")
+        return data
     if _demonstration_mode(data):
         data.update({
             "final_decision": "DEMONSTRATION ONLY",
@@ -320,31 +332,8 @@ def _force_truthful_gate(row: Any) -> dict[str, Any]:
 
 
 def _truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
-    data = _force_truthful_gate(row)
-    report_source = _clean(data.get("report_source"))
-    source_mode = _clean(data.get("report_source_mode")).lower()
-    odds_status = _clean(data.get("odds_status") or data.get("odds_source") or "MISSING").upper()
-    context_status = _clean(data.get("context_status") or data.get("context_source") or data.get("report_live_context_detected") or "VERIFY")
-    if _demonstration_mode(data):
-        source_label = _clean(data.get("report_source_label") or "Demonstration fixture")
-        scope = _clean(data.get("report_data_scope") or "Demonstration only - not current betting advice")
-        truth = "DEMONSTRATION ONLY"
-        odds_status = "DEMO PRICE - NOT LIVE API"
-    elif is_manual_verified_input(data):
-        source_label, scope, truth = "Operator-attested manual input", "Manual sportsbook observation", "MANUALLY VERIFIED INPUT"
-        odds_status = "MANUAL - NOT LIVE API"
-    elif report_source == "final_enriched_picks_df" and _live_verified(data):
-        source_label, scope, truth = "Live API refreshed report", "Current API-refreshed slate", "LIVE VERIFIED"
-    elif report_source == "final_enriched_picks_df" or _fallback_odds(data):
-        source_label, scope, truth = "API refreshed / no live odds match", "Verification-only report", "NO LIVE ODDS MATCH"
-    elif source_mode == "ledger-history":
-        source_label, scope, truth = "Proof ledger history", "Historical proof ledger", "HISTORY ONLY"
-    else:
-        source_label = _clean(data.get("report_source_label") or data.get("report_source_mode") or "Report source unknown")
-        scope = _clean(data.get("report_data_scope") or "Current/fallback status unknown")
-        truth = _clean(data.get("report_truth_severity") or "VERIFY")
-    pairs = [("REPORT SOURCE", source_label), ("DATA SCOPE", scope), ("TRUTH", truth), ("ODDS STATUS", odds_status), ("CONTEXT STATUS", context_status)]
-    return [(_contract._es(label, lang), _contract._es(value, lang)) for label, value in pairs]
+    from .active_magazine_export_guard import public_truth_pairs
+    return [(display_tr(label, lang), display_tr(value, lang)) for label, value in public_truth_pairs(row, lang)]
 
 
 def _png(image: Any) -> bytes:
@@ -354,23 +343,7 @@ def _png(image: Any) -> bytes:
 
 
 def _compact_context_rows(data: dict[str, Any]) -> list[str]:
-    rows: list[str] = []
-    weather = _first(data, "weather_summary_short", "weather_summary", "venue_weather", "weather_risk", default="")
-    matchup = _first(data, "expanded_matchup_context", "sports_context_summary", "preview_summary", "game_summary", "matchup_note", "matchup_notes", default="")
-    news = _first(data, "news_summary", "newsapi_summary", "perplexity_summary", "perplexity_context", "sportsdataio_context", "api_football_summary", default="")
-    line = _first(data, "line_movement_summary", "line_movement", "price_movement", default="Line movement: verify current market before entry.")
-    status = _first(data, "verification_status", "report_truth_severity", default="VERIFY SOURCE")
-    target = _stake_text(_first(data, "target_stake_units", default="0.0"))
-    live = _stake_text(_first(data, "live_verified_stake_units", default="0.0"))
-    if weather:
-        rows.append("Weather: " + _short(weather, 98))
-    if matchup:
-        rows.append("Context: " + _short(matchup, 108))
-    elif news:
-        rows.append("News: " + _short(news, 108))
-    rows.append(_short(line, 104))
-    rows.append(f"Verify: {status} · Target {target}u · Live {live}u.")
-    return rows[:4]
+    return context_items(data, display_language(data.get("report_language") or data.get("language")))
 
 
 def _expanded_context_rows(data: dict[str, Any]) -> list[str]:
@@ -395,33 +368,29 @@ def _selected_badge(patched: Any, row: dict[str, Any], pick_text: str, lang: str
     return "PICK", gold
 
 
-def _draw_readable_bullets(patched: Any, draw: Any, x: int, y: int, rows: list[str], width: int, height: int, color: tuple[int, int, int], lang: str) -> None:
-    tr = getattr(patched, "_tr", lambda value, _lang="en": str(value))
-    font_fn = getattr(patched, "_font", None)
-    wrap_fn = getattr(patched, "_wrap_text_to_box", None)
-    line_height_fn = getattr(patched, "_line_height", None)
-    ellipsize_fn = getattr(patched, "_ellipsize_to_width", None)
-    if not callable(font_fn):
-        return
-    font = font_fn(18)
-    small = font_fn(16)
-    line_height = line_height_fn(font) if callable(line_height_fn) else 22
-    bottom = y + height
-    current_y = y
-    for row in rows[:4]:
-        if current_y + line_height > bottom:
+def _draw_readable_bullets(patched: Any, draw: Any, x: int, y: int, rows: list[str], width: int, height: int, color: tuple[int, int, int], lang: str, *, overflow: list | None = None, title: str = '') -> None:
+    """Measure complete blocks; overflow is preserved, never silently clipped."""
+    rendered = [patched._tr(value, lang) for value in rows if str(value).strip()]
+    def layout(values, size):
+        font = patched._font(size)
+        step = max(size + 3, patched._line_height(font))
+        blocks = [patched._wrap_text_to_box(draw, value, font, width - 30, max(1, len(value) + 1)) for value in values]
+        return font, step, blocks, sum(len(lines) * step + 6 for lines in blocks)
+    for size in (18, 17, 16):
+        font, step, blocks, needed = layout(rendered, size)
+        if needed <= height:
             break
-        text = tr(row, lang)
-        draw.ellipse((x, current_y + 7, x + 12, current_y + 19), fill=color)
-        lines = wrap_fn(draw, text, font, width - 34, 2) if callable(wrap_fn) else [text]
-        for line in lines[:2]:
-            if current_y + line_height > bottom:
-                break
-            use_font = font if len(line) < 110 else small
-            if callable(ellipsize_fn):
-                line = ellipsize_fn(draw, line, use_font, width - 34)
-            draw.text((x + 25, current_y), line, font=use_font, fill=(14, 17, 21))
-            current_y += line_height
+    if needed > height:
+        if overflow is not None:
+            overflow.append((title, '\n'.join(rendered)))
+        rendered = [display_tr('Full source note continues on the source-notes pages.', lang)]
+        font, step, blocks, needed = layout(rendered, 16)
+    current_y = y
+    for lines in blocks:
+        draw.ellipse((x, current_y + 5, x + 8, current_y + 13), fill=color)
+        for line in lines:
+            draw.text((x + 24, current_y), line, font=font, fill=(14, 17, 21))
+            current_y += step
         current_y += 6
 
 
@@ -469,9 +438,17 @@ def _overlay_metric_strip(patched: Any, draw: Any, row: dict[str, Any], lang: st
     else:
         normalizer = getattr(patched, "normalize_public_risk_label", None)
         risk = normalizer(row, lang) if callable(normalizer) else _first(row, "risk", "risk_level", "risk_label", default="REVIEW")
+    classified = display_decision(row)
+    actionable = classified["report_display_actionable"] and not _demonstration_mode(row)
+    if not actionable:
+        risk = display_tr("ACCOUNTING REVIEW" if accounting_quarantined(row) else "VERIFY", lang)
+        units = display_tr("NO ACTION", lang)
     draw.rectangle((344, 462, 1060, 556), fill=black)
     for label, value, color, x, width in cells(odds, confidence, edge, ev, units, risk):
-        metric(draw, x, 462, width, label, value, color or green, lang)
+        label = {"CONFIDENCE": "MODEL P", "TARGET": "STAKE (u)", "UNITS": "STAKE (u)", "EV": "STORED EV" if not actionable else "MODEL EV"}.get(label, label)
+        if not actionable and label in {"MODEL P", "EDGE", "STORED EV", "RISK", "STAKE (u)"}:
+            color = (241, 184, 45)
+        metric(draw, x, 462, width, display_tr(label, lang), value, color or green, lang)
     draw.line((1060, 463, 1060, 555), fill=cream, width=1)
 
 
@@ -486,14 +463,17 @@ def _overlay_evidence_panel(patched: Any, draw: Any, row: dict[str, Any], lang: 
     if not callable(txt_auto) or not callable(font) or not callable(fit):
         return
     draw.rectangle((23, 961, 337, 1127), fill=cream)
-    y = 976
-    for label, value in _truth_pairs(row, lang)[:4]:
-        label_text = f"{tr(label, lang)}:"
-        draw.text((44, y), label_text, font=fit(label_text, 92, 14, 6, True), fill=black)
-        txt_auto(draw, 142, y, tr(value, lang), 178, 22, 14, 6, black, True, 1)
+    pairs = _truth_pairs(row, lang)[:4]
+    if accounting_quarantined(row):
+        pairs = [('TRUTH', 'ACCOUNTING REVIEW'), ('PRICE STATUS', 'RESEARCH ONLY'), ('SAVED PRICE', _first(row, 'decimal_price', 'decimal_odds', 'odds', default='Missing')), ('TIMESTAMP', _first(row, 'source_observed_at', 'provider_timestamp', 'price_timestamp', 'captured_at_utc', default='Missing'))]
+    y = 969
+    for label, value in pairs:
+        label_text, value_text = tr(label, lang).upper(), tr(value, lang)
+        draw.text((44, y), label_text, font=fit(label_text, 276, 10, 10, True), fill=blue)
+        draw.text((44, y + 11), value_text, font=fit(value_text, 276, 15, 11, True), fill=black)
         y += 29
     draw.rectangle((28, 1088, 332, 1120), fill=blue)
-    status = tr("NO LIVE FEEDS USED", lang)
+    status = display_tr("NO LIVE FEEDS USED", lang)
     draw.text((43, 1095), status, font=fit(status, 270, 15, 8, True), fill=cream)
     draw.rectangle((337, 1084, 351, 1124), fill=getattr(patched, "PAPER", (244, 235, 211)))
 
@@ -550,6 +530,38 @@ def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], lan
     _overlay_metric_strip(patched, draw, row, lang)
     _overlay_why_panel(patched, draw, row, lang)
     _overlay_evidence_panel(patched, draw, row, lang)
+    overflow = list(image.info.get('_aba_overflow_notes', []))
+    red = getattr(patched, 'RED', (190, 30, 28))
+    if not _demonstration_mode(row):
+        draw.rectangle((23, 641, 337, 882), fill=cream)
+        _draw_readable_bullets(patched, draw, 44, 655, patched._why(row, lang), 272, 210, red, lang, overflow=overflow, title='Fundamento' if lang == 'es' else 'Rationale')
+    for side, x, accent in (('away', 376, red), ('home', 730, blue)):
+        team = _first(row, f'{side}_team', 'team_a' if side == 'away' else 'team_b', default=side)
+        draw.rectangle((x - 2, 746, x + 300, 924), fill=cream)
+        _draw_readable_bullets(patched, draw, x, 751, team_items(row, side, lang), 292, 165, accent, lang, overflow=overflow, title=('Equipo: ' if lang == 'es' else 'Team: ') + team)
+        draw.rectangle((x - 2, 1055, x + 300, 1147), fill=cream)
+        _draw_readable_bullets(patched, draw, x, 1058, team_items(row, side, lang, injury=True), 302, 88, accent, lang, overflow=overflow, title=('Lesiones: ' if lang == 'es' else 'Injuries: ') + team)
+    # One complete fitted season label; no one-line wrapper truncation.
+    sport = _first(row, 'sport', 'league', default='Sport')
+    season = tr(_first(row, 'season_label', 'event_stage', 'competition_round', default=f'{sport} regular season'), lang).upper()
+    draw.rectangle((36, 330, 506, 378), fill=black)
+    draw.text((54, 341), season, font=patched._fit(season, 438, 25, 12, True), fill=cream)
+    classified = display_decision(row)
+    actionable = classified['report_display_actionable'] and not _demonstration_mode(row)
+    action = 'DEMONSTRATION ONLY' if _demonstration_mode(row) else classified['report_display_status']
+    accent = getattr(patched, 'GREEN', (61, 205, 84)) if actionable else (241, 184, 45)
+    draw.rounded_rectangle((20, 1374, 1060, 1532), radius=14, fill=black, outline=accent, width=3)
+    draw.rectangle((20, 1374, 250, 1532), fill=blue if not actionable else accent)
+    draw.text((40, 1404), tr('FINAL', lang), font=patched._font(30, True), fill=cream)
+    rec = tr('RECOMMENDATION', lang)
+    draw.text((40, 1450), rec, font=patched._fit(rec, 190, 24, 12, True), fill=cream)
+    action_text = tr(action, lang).upper()
+    draw.text((284, 1400), action_text, font=patched._fit(action_text, 720, 42, 16, True), fill=accent)
+    _overlay_pick_display(patched, img, draw, row, lang)
+    if not _demonstration_mode(row):
+        draw.rectangle((23, 1241, 337, 1350), fill=cream)
+        risk_rows = [display_tr('Accounting review required before report publication.' if accounting_quarantined(row) else 'Conflicting market values' if row.get('report_market_issue') else 'Verify lineup/news before entry.', lang), display_tr('Confirm current price before entry.' if actionable else 'No actionable stake; price verification is required.', lang)]
+        _draw_readable_bullets(patched, draw, 44, 1246, risk_rows, 272, 98, red, lang, overflow=overflow, title='Riesgos' if lang == 'es' else 'Risk checks')
     draw.rounded_rectangle((350, 1174, 1064, 1358), radius=16, fill=paper + (255,), outline=paper + (255,), width=4)
     if callable(getattr(patched, "_section", None)):
         patched._section(draw, 354, 1178, 706, 175, "MATCHUP NOTES", blue, lang)
@@ -557,8 +569,15 @@ def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], lan
         draw.rounded_rectangle((354, 1178, 1060, 1353), radius=14, fill=cream + (255,), outline=black + (238,), width=3)
         draw.rounded_rectangle((354, 1178, 1060, 1234), radius=10, fill=blue)
         draw.text((372, 1189), tr("MATCHUP NOTES", lang).upper(), fill=cream)
-    rows = _expanded_context_rows(row)
-    _draw_readable_bullets(patched, draw, 378, 1246, rows, 650, 94, blue, lang)
+    # Header context is an explicit status, independent of provider prose locale.
+    from .report_public_quality import is_saved_source
+    header = display_tr("Saved-source report. Verify current provider price before publishing." if is_saved_source(row) else "Current provider verification is incomplete." if not display_decision(row)["report_display_actionable"] else "Source verification is distinct from model accuracy.", lang)
+    if accounting_quarantined(row):
+        header = display_tr("Accounting review required before report publication.", lang)
+    draw.rectangle((36, 388, 610, 451), fill=paper)
+    patched._txt_auto(draw, 42, 394, header, 558, 54, 18, 14, getattr(patched, "TEXT", (14, 17, 21)), False, 3)
+    rows = context_items(row, lang)
+    _draw_readable_bullets(patched, draw, 378, 1246, rows, 650, 94, blue, lang, overflow=overflow, title='Contexto del partido' if lang == 'es' else 'Matchup context')
     if _demonstration_mode(row):
         if callable(getattr(patched, "_section", None)):
             patched._section(draw, 20, 1178, 320, 175, "RISK DESK", getattr(patched, "RED", (190, 30, 28)), lang)
@@ -568,7 +587,11 @@ def _overlay_page_one_context(patched: Any, image: Any, row: dict[str, Any], lan
             else ["Demonstration only", "Not current betting advice", "Replace all prices first"]
         )
         _draw_readable_bullets(patched, draw, 44, 1248, demo_rows, 272, 92, getattr(patched, "RED", (190, 30, 28)), lang)
-    return img.convert("RGB")
+    result = img.convert("RGB")
+    result.info["_aba_overflow_notes"] = overflow
+    result.info["report_display_actionable"] = actionable
+    result.info["report_display_status"] = action_text
+    return result
 
 
 def _install_display_patches(patched: Any) -> None:
@@ -687,14 +710,17 @@ def apply_magazine_sale_ready_patch(module):
 
     def truthful_render(pick: Any, *args: Any, **kwargs: Any):
         row = _force_truthful_gate(pick)
-        image = original_render(row, *args, **kwargs)
         language = kwargs.get("language") if kwargs else None
         if len(args) >= 11 and language is None:
             language = args[10]
+        row["report_language"] = display_language(language or row.get("report_language"))
+        image = original_render(row, *args, **kwargs)
         return _overlay_page_one_context(patched, image, row, language)
 
     patched.render_full_pick_magazine_page = truthful_render
     patched._pairs = _truth_pairs
     _install_forced_two_page_renderer(patched)
-    patched._ABA_SALE_READY_TRUTH_CONTRACT_VERSION = "truth_contract_v12_matchup_readable_pick_market_labels"
+    from .report_display_contract import install_source_note_pages
+    install_source_note_pages(patched)
+    patched._ABA_SALE_READY_TRUTH_CONTRACT_VERSION = "truth_contract_v14_locale_evidence_provenance"
     return patched

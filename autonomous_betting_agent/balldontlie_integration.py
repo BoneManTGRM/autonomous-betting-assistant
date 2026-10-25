@@ -319,6 +319,10 @@ def _append_unique(existing: Any, addition: str) -> str:
 
 def enrich_row_with_balldontlie(row_like: Any) -> dict[str, Any]:
     row = _row(row_like)
+    from .ledger_types import is_demonstration_row
+    if row.get("report_provider_calls_allowed") is False or is_demonstration_row(row):
+        row.setdefault("balldontlie_status", "REPORT_REFRESH_DISABLED")
+        return row
     slug = _sport_slug(row)
     if not slug:
         row.setdefault("balldontlie_status", "SPORT_UNSUPPORTED")
@@ -397,8 +401,8 @@ def _patch_live_enrichment() -> None:
         row = original_row(row_like, *args, **kwargs) if callable(original_row) else _row(row_like)
         return enrich_row_with_balldontlie(row)
 
-    def rows_with_bdl(rows: list[Any] | tuple[Any, ...]):
-        enriched = original_rows(rows) if callable(original_rows) else [_row(row) for row in rows]
+    def rows_with_bdl(rows: list[Any] | tuple[Any, ...], **kwargs: Any):
+        enriched = original_rows(rows, **kwargs) if callable(original_rows) else [_row(row) for row in rows]
         return [enrich_row_with_balldontlie(row) for row in enriched]
 
     def health_with_bdl(mask_secrets: bool = True):

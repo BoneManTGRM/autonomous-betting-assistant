@@ -178,6 +178,12 @@ def _patched_weather(row: dict[str, Any]) -> None:
 def install() -> None:
     import autonomous_betting_agent.magazine_live_api_enrichment as live
     _patch_report_polish_install()
+    # The snapshot-capable implementation owns its explicit refresh signature.
+    # This legacy bridge assumes a different API and must not dispatch providers
+    # ahead of the report's provided-data-only boundary.
+    if callable(getattr(live, "prepare_report_snapshot_row", None)):
+        _install_display_guard()
+        return
     if getattr(live, "_PROVIDER_USAGE_PATCH", "") == PATCH_VERSION:
         _install_display_guard()
         return

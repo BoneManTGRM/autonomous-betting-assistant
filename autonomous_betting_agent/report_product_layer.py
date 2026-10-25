@@ -420,7 +420,8 @@ def enrich_rows(rows: pd.DataFrame | list[Mapping[str, Any]], *, language: str =
         enriched = dict(item)
         enriched.update({
             "model_probability": model_prob,
-            "model_probability_source": model_source,
+            "model_probability_source": safe_text(item.get("model_probability_source")) or model_source,
+            "report_probability_input_field": model_source,
             "decimal_price": price,
             "market_probability": market_prob,
             "model_market_edge": edge,

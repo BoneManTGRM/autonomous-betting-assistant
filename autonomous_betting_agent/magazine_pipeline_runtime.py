@@ -27,7 +27,7 @@ LINE_FIELDS = (
     'spread', 'total', 'threshold', 'market_line', 'bet_line', 'line_display', 'prop_line'
 )
 PROVIDER_LINE_FIELDS = ('provider_line', 'live_line', 'sportsbook_line', 'odds_api_line', 'current_line')
-TIMESTAMP_FIELDS = ('timestamp', 'price_timestamp', 'last_update', 'last_updated', 'updated_at', 'commence_time', 'locked_at_utc')
+TIMESTAMP_FIELDS = ('source_observed_at', 'provider_timestamp', 'price_timestamp', 'odds_timestamp', 'captured_at_utc', 'timestamp', 'last_update', 'last_updated', 'updated_at', 'locked_at_utc')
 SOURCE_FIELDS = ('provider', 'bookmaker', 'sportsbook', 'odds_source', 'data_source')
 ENDPOINT_FIELDS = ('provider_endpoint', 'endpoint_called', 'odds_endpoint')
 
@@ -295,6 +295,9 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
 
     for index, source_row in enumerate(records):
         row = dict(source_row)
+        source_observed_at = _txt(_first(row, 'source_observed_at', 'provider_timestamp', 'price_timestamp', 'odds_timestamp', 'captured_at_utc', 'timestamp', 'last_update', 'last_updated', 'updated_at'))
+        source_trace = row.get('source_trace_json')
+        source_provenance = row.get('field_provenance_json')
         away_team, home_team = _teams(row)
         event_key = _event_key(row, home_team, away_team, index)
         decimal_odds = _decimal_odds(row)
@@ -306,6 +309,13 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
         no_vig = _num(_first(row, 'no_vig_implied_probability', 'novig_implied_probability')) if full_sides else None
 
         odds_live, odds_reason = _live_status(row, ('odds_api_live', 'the_odds_api_live'), ('odds_api_summary', 'live_odds_summary', 'odds_api_context'))
+        if odds_live == 'LIVE':
+            from .report_public_quality import is_saved_source
+            from .report_verification_gate import _fresh
+            current_receipt, _, _ = _fresh({**row, 'provider_timestamp': source_observed_at})
+            if is_saved_source(row) or not current_receipt:
+                odds_live = 'FAILED'
+                odds_reason = 'A stored live flag is not a fresh provider observation; current timestamp and source verification are required.'
         if odds_live == 'LIVE':
             odds_status, odds_source, odds_failure = 'LIVE', 'LIVE_API', ''
         elif decimal_odds:
@@ -378,18 +388,20 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
             'sportsbook': _txt(_first(row, 'sportsbook', 'bookmaker')),
             'provider': _truth_provider(row) or odds_source,
             'provider_endpoint': _truth_endpoint(row),
-            'price_timestamp': _truth_timestamp(row) if odds_status == 'LIVE' else '',
+            'price_timestamp': source_observed_at,
+            'source_observed_at': source_observed_at,
+            'report_generated_at': now,
             'decimal_odds': decimal_odds,
             'decimal_price': decimal_odds,
             'american_odds': _num(_first(row, 'american_odds', 'moneyline')) or _american_from_decimal(decimal_odds),
             'odds_source': odds_source,
             'odds_status': odds_status,
-            'odds_last_refresh': now if odds_status == 'LIVE' else '',
+            'odds_last_refresh': _txt(row.get('odds_last_refresh')) or source_observed_at,
             'odds_failure_reason': odds_failure,
             'odds_market_sides_available': 'FULL' if full_sides else 'INCOMPLETE',
             'model_probability': model_probability,
-            'model_probability_source': 'model_probability' if model_probability is not None else 'EMPTY_WITH_REASON',
-            'confidence_source': 'model_probability' if model_probability is not None else 'EMPTY_WITH_REASON',
+            'model_probability_source': _txt(row.get('model_probability_source')) or ('model_probability' if model_probability is not None else 'EMPTY_WITH_REASON'),
+            'confidence_source': _txt(row.get('confidence_source')) or ('model_probability' if model_probability is not None else 'EMPTY_WITH_REASON'),
             'confidence_status': 'AVAILABLE' if model_probability is not None else 'MISSING',
             'raw_implied_probability': raw_implied,
             'no_vig_implied_probability': no_vig,
@@ -440,10 +452,10 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
             'context_failure_reason': context_reason,
             'fallback_used': bool(fallback_used),
             'fallback_reason': fallback_reason,
-            'cache_status': 'CACHE_CLEARED' if force_refresh else 'LIVE_REFRESH',
+            'cache_status': 'LIVE_RECEIPT_PRESENT' if odds_status == 'LIVE' else (_txt(row.get('cache_status')) or 'NO_PROVIDER_REFRESH'),
             'enrichment_status': 'FALLBACK_USED' if fallback_used else 'LIVE_ENRICHED',
-            'data_freshness_status': 'CURRENT_RUN',
-            'last_api_refresh_time': now,
+            'data_freshness_status': 'CURRENT_PROVIDER_OBSERVATION' if odds_status == 'LIVE' else 'STORED_UNVERIFIED',
+            'last_api_refresh_time': source_observed_at if odds_status == 'LIVE' else _txt(row.get('last_api_refresh_time')),
             'report_run_id': report_run_id,
             'report_source': 'final_enriched_picks_df',
             'report_source_mode': 'current-run' if odds_status == 'LIVE' else 'saved-handoff',
@@ -451,8 +463,10 @@ def build_final_enriched_picks_df(raw_picks_df: Any, force_refresh: bool = False
             'report_data_scope': 'Current API-refreshed slate' if odds_status == 'LIVE' else 'Price verification required',
             'report_truth_severity': 'LIVE VERIFIED' if odds_status == 'LIVE' and not line_blocked else 'VERIFY PRICE',
             'verification_status': 'LIVE VERIFIED' if odds_status == 'LIVE' and not line_blocked else 'VERIFY PRICE',
-            'field_provenance_json': json.dumps(provenance, sort_keys=True),
-            'source_trace_json': json.dumps({'raw_row_index': index, 'event_key': event_key}, sort_keys=True),
+            'field_provenance_json': source_provenance if source_provenance is not None else json.dumps(provenance, sort_keys=True),
+            'report_field_provenance_json': json.dumps(provenance, sort_keys=True),
+            'source_trace_json': source_trace if source_trace is not None else json.dumps({'raw_row_index': index, 'event_key': event_key}, sort_keys=True),
+            'report_generation_trace_json': json.dumps({'raw_row_index': index, 'event_key': event_key, 'generated_at': now}, sort_keys=True),
             'api_health_json': json.dumps(api_health, sort_keys=True),
             **shadow,
         })
@@ -488,7 +502,7 @@ def validate_report_pipeline(df: Any) -> list[str]:
     for column in REQUIRED_REPORT_COLUMNS:
         if column not in frame.columns:
             errors.append('Missing required column: ' + column)
-    for column in ('report_run_id', 'last_api_refresh_time', 'raw_input_hash', 'enrichment_input_hash'):
+    for column in ('report_run_id', 'report_generated_at', 'raw_input_hash', 'enrichment_input_hash'):
         if column not in frame or frame[column].map(_txt).eq('').any():
             errors.append(column + ' missing')
     if 'report_source' in frame and not frame['report_source'].astype(str).eq('final_enriched_picks_df').all():

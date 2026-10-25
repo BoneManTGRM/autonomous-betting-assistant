@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Any, Mapping
 
 import pandas as pd
 
 from .report_product_layer import decimal_price, has_verified_odds, pct, safe_float, safe_text, tennis_blocked
-
-GRADE_COLUMNS = (
-    "result", "final_result", "grade", "outcome", "bet_result", "status", "settled_status",
-    "win_loss", "final_grade", "pick_result", "settlement_status",
-)
-PNL_COLUMNS = ("profit_loss", "pnl", "profit", "net_profit", "roi", "return_units", "units")
+from .report_accounting import accounting_result, GRADE_FIELDS as GRADE_COLUMNS, NET_FIELDS as PNL_COLUMNS
 
 WIN_TOKENS = {"win", "won", "winner", "w", "graded_win", "cash", "cashed", "success"}
 LOSS_TOKENS = {"loss", "lost", "loser", "l", "graded_loss", "failed", "lose"}
@@ -28,37 +24,11 @@ class CalibrationRule:
 
 
 def normalize_grade(row: Mapping[str, Any]) -> str:
-    for name in GRADE_COLUMNS:
-        raw = safe_text(row.get(name)).lower().replace("_", " ").strip()
-        if not raw:
-            continue
-        if raw in WIN_TOKENS or raw.startswith("win"):
-            return "WIN"
-        if raw in LOSS_TOKENS or raw.startswith("loss") or raw.startswith("lost"):
-            return "LOSS"
-        if raw in PUSH_TOKENS or any(token in raw for token in ("push", "void", "refund")):
-            return "PUSH"
-        if raw in CANCEL_TOKENS or any(token in raw for token in ("cancel", "postpon", "abandon")):
-            return "CANCELLED"
-        if raw in PENDING_TOKENS or any(token in raw for token in ("pending", "open", "scheduled")):
-            return "PENDING"
-    return "UNKNOWN"
+    return accounting_result(row)['result_status']
 
 
 def profit_units(row: Mapping[str, Any]) -> float | None:
-    for name in PNL_COLUMNS:
-        value = safe_float(row.get(name))
-        if value is not None:
-            return value
-    grade = normalize_grade(row)
-    price = decimal_price(row)
-    if grade == "WIN" and price is not None:
-        return price - 1.0
-    if grade == "LOSS":
-        return -1.0
-    if grade in {"PUSH", "CANCELLED"}:
-        return 0.0
-    return None
+    return accounting_result(row)['profit_units']
 
 
 def model_lean(model_prob: float | None) -> str:
@@ -92,7 +62,7 @@ def data_issue_reason(row: Mapping[str, Any]) -> str:
 
 
 def official_status(row: Mapping[str, Any]) -> str:
-    if data_issue_reason(row):
+    if safe_text(row.get('data_issue_reason')) or data_issue_reason(row):
         return "Data Blocked"
     if bool(row.get("official_publish_ready") or row.get("publish_ready")):
         return "Official +EV"
@@ -154,14 +124,17 @@ def apply_learning_layer(cards: pd.DataFrame) -> pd.DataFrame:
     records: list[dict[str, Any]] = []
     for _, row in frame.iterrows():
         item = row.to_dict()
-        grade = normalize_grade(item)
+        accounting = accounting_result(item)
+        grade = accounting['result_status']
         blocked_reason = data_issue_reason(item)
+        quarantine = accounting['report_accounting_quarantined']
+        if quarantine and not blocked_reason:
+            blocked_reason = 'Accounting review required'
         edge = item.get("model_market_edge")
         ev = item.get("expected_value_per_unit")
         official_ready = bool(item.get("publish_ready")) and not blocked_reason
         enriched = dict(item)
-        enriched["result_status"] = grade
-        enriched["profit_units"] = profit_units(item)
+        enriched.update(accounting)
         enriched["model_lean_label"] = model_lean(item.get("model_probability"))
         enriched["price_value_label"] = price_value(edge, ev)
         enriched["data_issue_reason"] = blocked_reason
@@ -233,24 +206,38 @@ def summarize_group(frame: pd.DataFrame, group_col: str, *, rule: CalibrationRul
         return pd.DataFrame(columns=[group_col, "sample_size", "wins", "losses", "pushes", "win_rate", "roi", "suggestion"])
     rows = []
     for key, group in frame.groupby(group_col, dropna=False):
+        if 'report_accounting_quarantined' in group.columns:
+            group = group[~group['report_accounting_quarantined'].fillna(False).astype(bool)]
         graded = group[group["result_status"].isin(["WIN", "LOSS", "PUSH", "CANCELLED"])]
         wins = int(graded["result_status"].eq("WIN").sum())
         losses = int(graded["result_status"].eq("LOSS").sum())
         pushes = int(graded["result_status"].isin(["PUSH", "CANCELLED"]).sum())
         decisions = wins + losses
-        win_rate = wins / decisions if decisions else 0.0
-        pnl = pd.to_numeric(graded.get("profit_units", pd.Series(dtype=float)), errors="coerce").fillna(0.0)
-        roi = float(pnl.sum() / decisions) if decisions else 0.0
+        win_rate = wins / decisions if decisions else None
+        pnl = pd.to_numeric(graded.get("profit_units", pd.Series(index=graded.index, dtype=float)), errors="coerce")
+        stakes = pd.to_numeric(graded.get("report_stake_units", pd.Series(index=graded.index, dtype=float)), errors="coerce")
+        complete = bool(len(graded)) and pnl.map(math.isfinite).all() and stakes.map(math.isfinite).all() and stakes.gt(0).all()
+        net_total, stake_total = float(pnl.sum()), float(stakes.sum())
+        complete = complete and math.isfinite(net_total) and math.isfinite(stake_total)
+        roi = net_total / stake_total if complete else None
+        if roi is not None and not math.isfinite(roi):
+            roi = None
+        before_fees = graded.get('report_profit_basis', pd.Series('', index=graded.index)).eq('derived_before_unspecified_fees').any()
+        roi_basis = 'before_unspecified_fees' if before_fees else 'net_profit_per_stated_stake'
         breakeven = _break_even_roi(graded)
-        if decisions >= rule.min_sample and roi > rule.min_roi and win_rate > breakeven + rule.min_win_rate_over_breakeven:
+        if decisions and (roi is None or before_fees):
+            suggestion = "Incomplete accounting / no promotion"
+        elif decisions >= max(1, rule.min_sample) and roi > rule.min_roi and win_rate > breakeven + rule.min_win_rate_over_breakeven:
             suggestion = "Research upgrade candidate"
         elif decisions and roi > 0:
             suggestion = "Calibration opportunity / needs larger sample"
         elif decisions:
             suggestion = "Monitor / no promotion"
+        elif len(graded):
+            suggestion = "No decisive outcomes / no promotion"
         else:
             suggestion = "Needs grading"
-        rows.append({group_col: key, "sample_size": int(len(graded)), "wins": wins, "losses": losses, "pushes": pushes, "win_rate": win_rate, "roi": roi, "suggestion": suggestion})
+        rows.append({group_col: key, "sample_size": int(len(graded)), "wins": wins, "losses": losses, "pushes": pushes, "win_rate": win_rate, "roi": roi, "roi_basis": roi_basis if roi is not None else 'unavailable', "suggestion": suggestion})
     return pd.DataFrame(rows).sort_values(["roi", "win_rate", "sample_size"], ascending=[False, False, False])
 
 
@@ -258,6 +245,8 @@ def calibration_audit(cards: pd.DataFrame, *, min_sample: int = 25) -> dict[str,
     frame = apply_learning_layer(cards)
     if frame.empty:
         return {}
+    if 'report_accounting_quarantined' in frame.columns:
+        frame = frame[~frame['report_accounting_quarantined'].fillna(False).astype(bool)].copy()
     frame["edge_bucket"] = frame["model_market_edge"].map(edge_bucket) if "model_market_edge" in frame.columns else "unknown"
     frame["model_probability_bucket"] = frame["model_probability"].map(probability_bucket) if "model_probability" in frame.columns else "unknown"
     if "market_type" not in frame.columns:
