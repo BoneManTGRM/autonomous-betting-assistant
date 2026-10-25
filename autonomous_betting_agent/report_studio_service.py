@@ -10,6 +10,7 @@ from .magazine_row_ordering import order_magazine_rows
 from .report_export_service import ReportExportBundle, build_report_export_bundle
 from .report_feed_service import build_report_feed
 from .report_learning_layer import calibration_audit
+from .report_accounting import preserve_accounting_input
 from .report_learning_layer_compat import apply_learning_layer_compat
 from .report_product_layer import MagazineBrand, enrich_rows, grouped_report, lang_code, safe_text
 from .row_normalizer import normalize_frame
@@ -234,7 +235,10 @@ def _data_issues(frame: pd.DataFrame) -> int:
 
 def build_report_studio_cards(raw_rows: pd.DataFrame | Sequence[Mapping[str, Any]] | None, filters: ReportStudioFilters | None = None, source_note: str = "") -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     filters = filters or ReportStudioFilters()
-    raw = _to_frame(raw_rows)
+    # Preserve report-only evidence before the general normalizer's legacy aliases.
+    # In particular, ambiguous `units` must never become a net-profit receipt.
+    records = raw_rows.to_dict('records') if isinstance(raw_rows, pd.DataFrame) else list(raw_rows or [])
+    raw = _to_frame([preserve_accounting_input(row) for row in records])
     if raw.empty:
         empty = pd.DataFrame()
         return raw, empty, empty, empty

@@ -43,7 +43,7 @@ def test_weather_news_api_football_and_sportsdataio_checked_details(monkeypatch)
         return {}
 
     monkeypatch.setattr(enrich, "_request_json", fake_request)
-    row = enrich.enrich_row_with_live_api_data(_row())
+    row = enrich.enrich_row_with_live_api_data(_row(), allow_provider_refresh=True)
     row_text = "\n".join(str(value) for value in row.values())
 
     assert "Weather: Clear, 22.0°C, wind 8.0 kph." in row["weather_summary"]
@@ -67,7 +67,7 @@ def test_api_football_lookup_is_not_labeled_as_verified_fixture(monkeypatch) -> 
         return {"response": [{"team": {"name": team}}]}
 
     monkeypatch.setattr(enrich, "_request_json", fake_request)
-    row = enrich.enrich_row_with_live_api_data(_row())
+    row = enrich.enrich_row_with_live_api_data(_row(), allow_provider_refresh=True)
     assert row["api_football_summary"] == "API-FB team lookup matched Iraq / France; fixture not verified."
     assert "verified fixture" not in row["api_football_summary"].lower()
 
@@ -75,7 +75,7 @@ def test_api_football_lookup_is_not_labeled_as_verified_fixture(monkeypatch) -> 
 def test_weather_checked_message_when_location_is_missing(monkeypatch) -> None:
     _clear(monkeypatch)
     monkeypatch.setenv("WEATHERAPI_KEY", "weather-secret")
-    row = enrich.enrich_row_with_live_api_data({"event_name": "Iraq vs France", "sport": "FIFA WORLD CUP"})
+    row = enrich.enrich_row_with_live_api_data({"event_name": "Iraq vs France", "sport": "FIFA WORLD CUP"}, allow_provider_refresh=True)
     assert row["weather_summary"] == "Weather checked; no venue/location in row."
 
 

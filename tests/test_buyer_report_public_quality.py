@@ -64,7 +64,9 @@ def test_page_two_sections_are_buyer_facing_and_exact():
     }
     rendered = _flat(_page_two_sections(row, "en"))
     assert "Game Total: Over 171.5" in rendered
-    assert "STRAIGHT ANCHOR ONLY" in rendered
+    assert "NO VERIFIED SELECTION" in rendered
+    assert "STRAIGHT ANCHOR ONLY" not in rendered
+    assert "timestamp" in rendered.lower() and "stale" in rendered.lower()
     assert "No SGP/cross-game/prop/live parlay is playable" in rendered
     assert "Gate failed" not in rendered
     assert "endpoint" not in rendered.lower()

@@ -7,6 +7,7 @@ from typing import Any, Iterable, Mapping
 import hashlib
 import json
 import re
+from .report_display_contract import tr as display_tr, canonical_market_row, accounting_quarantined
 
 from autonomous_betting_agent.report_public_quality import (
     LIVE_TRIGGER_UNAVAILABLE,
@@ -167,6 +168,9 @@ def _tr(value: Any, lang: str) -> str:
     text = sanitize_public_text(_clean(value))
     if lang != "es":
         return text
+    translated = display_tr(text, lang)
+    if translated != text:
+        return translated
     if text in ES:
         return ES[text]
     phrases = (
@@ -225,7 +229,7 @@ def _tr(value: Any, lang: str) -> str:
         (" · watchlist ", " · seguimiento "),
     )
     for old, new in phrases:
-        text = re.sub(re.escape(old), new, text, flags=re.I)
+        text = re.sub(r"(?<!\w)" + re.escape(old) + r"(?!\w)", new, text, flags=re.I)
     text = re.sub(r"(?<!\w)(\d+)-leg(?!\w)", r"\1 selecciones", text, flags=re.I)
     words = (
         ("Moneyline", "Ganador"), ("Game Total", "Total del partido"),
@@ -455,11 +459,23 @@ def _line_required(market_name: str) -> bool:
 
 
 def _candidate(item: Mapping[str, Any], parent: dict[str, Any], sport: str) -> MarketCandidate:
-    merged = {**parent, **dict(item)}
-    raw = _get(item, "market_raw", "raw_market", "market", "market_name", "key", "name", default=_get(parent, "market", "market_type", "prediction", "pick", default="Primary market"))
-    selection = _get(item, "selection", "outcome", "side", "pick", "label", default=_get(parent, "prediction", "pick", "selection", default="Selection"))
-    line = _get(item, "line", "point", "handicap", "total", "threshold", default=_get(parent, "verified_line", "current_line", "provider_line", "line", "point", "handicap", "total_line", "spread_line", "run_line"))
-    dec = _decimal(_get(item, "decimal_odds", "decimal_price", "price", "odds", "best_price", "american_odds", default=_get(parent, "verified_price", "decimal_price", "odds", "best_price", "american_odds")))
+    from .report_display_contract import MARKET_FIELDS, SELECTION_FIELDS, LINE_FIELDS
+    anchor = bool(item.get('_report_anchor'))
+    context = dict(parent)
+    if not anchor:
+        for key in (*MARKET_FIELDS, *SELECTION_FIELDS, *LINE_FIELDS, 'report_market_issue', 'report_field_conflicts', 'report_line_origin'):
+            context.pop(key, None)
+        if item.get('provider_event_id'):
+            for key in ('verified_provider_event_id', 'current_provider_event_id'):
+                if key not in item:
+                    context.pop(key, None)
+    merged = canonical_market_row({**context, **{key: value for key, value in item.items() if key != '_report_anchor'}})
+    if accounting_quarantined(parent) or accounting_quarantined(item):
+        merged['report_accounting_quarantined'] = True
+    raw = _get(merged, 'selected_market', 'market_raw', 'raw_market', 'market_type', 'market', 'market_name', 'key', 'name', default='Primary market')
+    selection = _get(merged, 'selected_pick', 'selection', 'prediction', 'pick', 'outcome', 'side', 'label', default='Selection')
+    line = _get(merged, 'line', 'selected_line', 'point', 'handicap', 'total', 'threshold')
+    dec = _decimal(_get(item, "decimal_odds", "decimal_price", "price", "odds", "best_price", "american_odds", default=_get(parent, "verified_price", "decimal_price", "decimal_odds", "odds", "best_price", "american_odds")))
     normal = _normal_market(raw, sport)
     group = _market_group(normal)
     item_prob = next((_prob(item.get(key)) for key in PROP_MODEL_KEYS if _prob(item.get(key)) is not None), None)
@@ -502,10 +518,16 @@ def _candidate(item: Mapping[str, Any], parent: dict[str, Any], sport: str) -> M
     full_label = build_full_market_label(merged)
     badge = WATCHLIST
     reason = ""
-    if repair in {"drift detected in observation mode", "protected observation mode"} and "blocked" in _clean(parent.get("data_issue_reason")).lower():
+    if accounting_quarantined(merged):
+        badge, reason = BLOCKED, "Accounting review required before report publication."
+    elif repair in {"drift detected in observation mode", "protected observation mode"} and "blocked" in _clean(parent.get("data_issue_reason")).lower():
         badge, reason = BLOCKED, "Reparodynamics remains in protected observation mode"
     elif not source_ok:
         badge, reason = WATCHLIST, "Provider match required before verified status"
+    elif timestamp and not _quote_timestamp_is_fresh(timestamp):
+        badge, reason = WATCHLIST, "Provider timestamp is stale or invalid"
+    elif not has_exact_market_line(merged):
+        badge, reason = MENU_ONLY, "Exact market line or selection is missing or conflicting"
     elif missing:
         badge, reason = MENU_ONLY, "Missing " + ", ".join(missing)
     elif not value_ok:
@@ -542,18 +564,22 @@ def _candidate(item: Mapping[str, Any], parent: dict[str, Any], sport: str) -> M
     )
 
 
+def _market_identity(market: MarketCandidate) -> tuple[str, str, str, str, str]:
+    return (market.provider_event_id or market.event_name.casefold(), market.normalized_market, market.full_label.casefold(), market.line, _odds(market.decimal_odds))
+
+
 def discover_markets(pick: Any) -> tuple[list[MarketCandidate], dict[str, Any]]:
     data = _row(pick)
     sport = _sport_family(data)
     items: list[dict[str, Any]] = []
     for key in MARKET_KEYS:
         items.extend(_parse_markets(data.get(key)))
-    items.insert(0, {"market": _get(data, "market", "market_type", "prediction", "pick", default="Primary market"), "selection": _get(data, "prediction", "pick", "selection", default="Selection")})
+    items.insert(0, {'_report_anchor': True})
     candidates = [_candidate(item, data, sport) for item in items]
     seen = set()
     unique: list[MarketCandidate] = []
     for c in candidates:
-        key = (c.normalized_market, c.full_label.lower(), c.line.lower(), _odds(c.decimal_odds))
+        key = _market_identity(c)
         if key not in seen:
             unique.append(c)
             seen.add(key)
@@ -576,12 +602,7 @@ def discover_markets(pick: Any) -> tuple[list[MarketCandidate], dict[str, Any]]:
 
 def _anchor_market(data: dict[str, Any]) -> MarketCandidate:
     sport = _sport_family(data)
-    return _candidate({
-        "market": _get(data, "market", "market_type", "prediction", "pick", default="Primary anchor"),
-        "selection": _get(data, "prediction", "pick", "selection", default="Selection"),
-        "line": _get(data, "verified_line", "current_line", "provider_line", "spread_line", "run_line", "line", "point", "handicap"),
-        "decimal_odds": _get(data, "verified_price", "decimal_price", "decimal_odds", "odds", "best_price", "odds_at_pick", "american_odds", "odds_american"),
-    }, data, sport)
+    return _candidate({'_report_anchor': True}, data, sport)
 
 
 def _is_same_event(a: MarketCandidate, b: MarketCandidate) -> bool:
@@ -795,11 +816,11 @@ def generate_parlay_candidates(pick: Any) -> tuple[list[ParlayCandidate], dict[s
     data = _row(pick)
     markets, diag = discover_markets(data)
     anchor = _anchor_market(data)
-    all_markets = [anchor] + [m for m in markets if m.full_label.lower() != anchor.full_label.lower()]
+    all_markets = [anchor] + [m for m in markets if _market_identity(m) != _market_identity(anchor)]
     eligible = [m for m in all_markets if _leg_is_eligible(m)[0]]
     out: list[ParlayCandidate] = []
     for size, label, limit in ((2, "2-leg", 80), (3, "3-leg", 80)):
-        others = [m for m in eligible if m.full_label != anchor.full_label]
+        others = [m for m in eligible if _market_identity(m) != _market_identity(anchor)]
         combos: list[list[MarketCandidate]] = []
         if _leg_is_eligible(anchor)[0]:
             def build(start: int, current: list[MarketCandidate]) -> None:
@@ -825,7 +846,7 @@ def generate_parlay_candidates(pick: Any) -> tuple[list[ParlayCandidate], dict[s
         # candidates above. Do not duplicate them under a second label.
     unique: dict[tuple[str, tuple[str, ...]], ParlayCandidate] = {}
     for p in out:
-        key = (p.parlay_type, tuple(sorted(leg.full_label for leg in p.legs)))
+        key = (p.parlay_type, tuple(sorted(_market_identity(leg) for leg in p.legs)))
         if key not in unique or ((p.combined_ev or -99) > (unique[key].combined_ev or -99)):
             unique[key] = p
     ranked = sorted(unique.values(), key=lambda p: ({PARLAY_PLAYABLE: 0, PARLAY_WATCHLIST: 1, PARLAY_AVOID: 2, PARLAY_BLOCKED: 3}.get(p.status, 9), -(p.combined_ev or -99), -(p.combined_probability or 0), -(p.combined_decimal_odds or 0)))
@@ -917,6 +938,106 @@ def _top_by_type(parlays: list[ParlayCandidate], kind: str, n: int) -> list[Parl
     return [p for p in parlays if kind in p.parlay_type and p.status in {PARLAY_PLAYABLE, PARLAY_WATCHLIST}][:n]
 
 
+def _display_reason(reason: str, lang: str) -> str:
+    """Translate a gate result without exposing implementation tokens as prose."""
+    if '; ' in reason:
+        return '; '.join(dict.fromkeys(_display_reason(part, lang) for part in reason.split('; ')))
+    if reason == "Accounting review required before report publication.":
+        return display_tr(reason, lang)
+    if lang != "es":
+        return reason.replace("event_id", "event identity").replace("model_probability", "model probability").replace("implied_probability", "implied probability")
+    if reason.startswith('Missing '):
+        fields = {'event_id': 'identidad del evento', 'provider': 'proveedor', 'provider match': 'coincidencia del proveedor', 'sportsbook': 'casa de apuestas', 'timestamp': 'fecha y hora', 'fresh timestamp': 'fecha y hora vigente', 'odds': 'cuota', 'current provider price': 'cuota actual del proveedor', 'model_probability': 'probabilidad del modelo', 'prop-specific model probability': 'probabilidad del modelo específica del jugador', 'implied_probability': 'probabilidad implícita', 'EV': 'valor esperado', 'line': 'línea', 'exact market line': 'línea exacta del mercado'}
+        parts = reason[8:].split(', ')
+        if all(part in fields for part in parts):
+            return 'Falta: ' + ', '.join(fields[part] for part in parts) + '.'
+    low = reason.lower()
+    checks = (
+        (("saved", "provider", "source"), "Falta verificar la fuente y la cuota actual con el proveedor."),
+        (("timestamp", "fresh", "stale", "expired"), "Falta una observación de cuota vigente con fecha y hora."),
+        (("event_id", "event id"), "Falta la identidad del evento vinculada al proveedor."),
+        (("model_probability", "probability", "model"), "Falta una probabilidad del modelo específica de este mercado."),
+        (("line", "point"), "Falta verificar la línea exacta del mercado."),
+        (("odds", "price", "book"), "Falta una cuota verificable de una casa identificada."),
+        (("edge", "ev", "positive"), "La ventaja y el valor esperado deben ser positivos."),
+        (("correlation", "joint", "same-game"), "Falta verificar la cuota conjunta y la correlación entre selecciones."),
+        (("live", "clock", "score"), "Falta confirmar el reloj, el marcador y la cuota en vivo."),
+    )
+    return next((message for tokens, message in checks if any(token in low for token in tokens)), "La selección no cumple todos los controles de verificación.")
+
+
+def _verification_blockers(data: Mapping[str, Any], lang: str) -> list[str]:
+    from .report_verification_gate import verify_current_provider_match
+    if accounting_quarantined(data):
+        return [display_tr("Accounting review required before report publication.", lang)]
+    checks = verify_current_provider_match(canonical_market_row(data))["checks"]
+    rows = []
+    if not checks["event_id"]:
+        rows.append("Falta el identificador del evento vinculado al proveedor." if lang == "es" else "Provider-matched event identity is missing.")
+    if not checks["selection"] or not has_exact_market_line(data):
+        rows.append("Falta una selección y una línea exactas sin contradicciones." if lang == "es" else "An exact, unambiguous selection and market line are required.")
+    if not checks["source_current"] or not _get(data, *BOOK_KEYS):
+        rows.append("Verificar la fuente actual y la casa que ofrece la cuota." if lang == "es" else "Verify the current source and the sportsbook offering this price.")
+    if not checks["timestamp"]:
+        rows.append("La fecha de la cuota falta o está vencida; solicitar una observación vigente." if lang == "es" else "The price timestamp is missing or stale; obtain a current observation.")
+    if not checks["price"]:
+        rows.append("Falta una cuota válida del mercado seleccionado." if lang == "es" else "A valid price for the selected market is missing.")
+    if not checks["model_probability"] or not checks["edge_positive"] or not checks["ev_positive"]:
+        rows.append("Se requieren probabilidad del modelo, ventaja positiva y VE positivo." if lang == "es" else "Model probability, positive edge, and positive EV are required.")
+    if not checks["not_blocked"]:
+        rows.append("El estado del evento o mercado bloquea la publicación." if lang == "es" else "The event or market state blocks publication.")
+    return rows
+
+
+def _market_scan_report(data: Mapping[str, Any], lang: str) -> tuple[str, list[str]]:
+    from collections import Counter
+    markets, _ = discover_markets(dict(data))
+    anchor = _anchor_market(dict(data))
+    identity = _market_identity
+    anchor_key = identity(anchor)
+    lines = Counter()
+    reasons = Counter()
+    details = []
+    eligible = watchlist = positive = 0
+    for market in markets:
+        ok, reason = _leg_is_eligible(market)
+        eligible += int(ok)
+        positive += int(market.model_probability is not None and market.ev is not None and market.edge is not None and market.ev > 0 and market.edge > 0)
+        watch = bool(not ok and market.model_probability is not None and market.ev is not None and market.edge is not None and market.ev > 0 and market.edge > 0 and market.decimal_odds)
+        watchlist += int(watch)
+        lines['not_required' if not _line_required(market.normalized_market) else 'supplied' if market.line else 'missing'] += 1
+        if ok:
+            continue
+        missing = []
+        for absent, en, es in (
+            (not market.provider_event_id, 'event identity', 'identidad del evento'),
+            (not market.provider, 'provider', 'proveedor'),
+            (not market.sportsbook, 'sportsbook', 'casa de apuestas'),
+            (not market.timestamp or not _quote_timestamp_is_fresh(market.timestamp), 'current observation timestamp', 'fecha y hora de observación vigente'),
+            (not market.decimal_odds, 'price', 'cuota'),
+            (market.model_probability is None, 'market-specific model probability', 'probabilidad del modelo específica del mercado'),
+            (_line_required(market.normalized_market) and not market.line, 'exact line', 'línea exacta'),
+        ):
+            if absent:
+                missing.append(es if lang == 'es' else en)
+        localized_reason = _display_reason(reason, lang)
+        reasons[localized_reason] += 1
+        if identity(market) == anchor_key:
+            continue  # The anchor already has its own complete verification panel.
+        event = market.event_name or market.provider_event_id or ('Evento no identificado' if lang == 'es' else 'Event not identified')
+        status = ('Seguimiento' if watch else 'Bloqueado') if lang == 'es' else ('Watchlist' if watch else 'Blocked')
+        detail = f'{status}: {event} · {_tr(market.full_label, lang)} · {localized_reason}'
+        if missing:
+            detail += (' Faltan: ' if lang == 'es' else ' Missing: ') + ', '.join(missing) + '.'
+        details.append(detail)
+    rejected = len(markets) - eligible
+    summary = (f'Mercados: {len(markets)} · elegibles: {eligible} · seguimiento: {watchlist} · bloqueados: {rejected - watchlist} · VE positivo: {positive}. Líneas: {lines["supplied"]} proporcionadas / {lines["missing"]} ausentes / {lines["not_required"]} no requeridas.' if lang == 'es' else
+               f'Markets: {len(markets)} · eligible: {eligible} · watchlist: {watchlist} · blocked: {rejected - watchlist} · positive EV: {positive}. Lines: {lines["supplied"]} supplied / {lines["missing"]} missing / {lines["not_required"]} not required.')
+    if details:
+        details.append(('Motivos de rechazo: ' if lang == 'es' else 'Rejection reasons: ') + ' · '.join(f'{reason} ({count})' for reason, count in reasons.items()))
+    return summary, details
+
+
 def _page_two_sections(
     data: dict[str, Any],
     lang: str,
@@ -924,73 +1045,79 @@ def _page_two_sections(
     parlays: list[ParlayCandidate] | None = None,
     diagnostics: Mapping[str, Any] | None = None,
 ) -> list[tuple[str, list[str], tuple[int, int, int]]]:
+    data = canonical_market_row(data)
     if parlays is None or diagnostics is None:
-        parlays, generated_diagnostics = generate_parlay_candidates(data)
-        diagnostics = generated_diagnostics
+        parlays, diagnostics = generate_parlay_candidates(data)
     diag = dict(diagnostics)
+    anchor = _anchor_market(data)
+    anchor_ok, anchor_reason = _leg_is_eligible(anchor)
+    demonstration = _demonstration_mode(data)
     playable = [p for p in parlays if p.status == PARLAY_PLAYABLE]
     watch = [p for p in parlays if p.status == PARLAY_WATCHLIST]
     blocked = [p for p in parlays if p.status in {PARLAY_BLOCKED, PARLAY_AVOID}]
-    anchor = _anchor_market(data)
-    anchor_rows = [
-        f"Primary anchor: {anchor.full_label} at {_odds(anchor.decimal_odds)}.",
-        f"Model P {_pct(anchor.model_probability)} · implied {_pct(anchor.implied_probability)} · edge {_spct(anchor.edge)} · EV {_ev(anchor.ev)}.",
-        f"Provider: {anchor.provider or 'missing'} · book {anchor.sportsbook or 'missing'} · timestamp {anchor.timestamp or 'missing'}.",
-        "Page 1 remains the straight-bet anchor; Page 2 shows demonstration calculations only." if _demonstration_mode(data) else "Page 1 remains the straight-bet anchor; Page 2 only adds verified parlays.",
-    ]
-    ranked_unique = _unique_by_legs(playable + watch)
-    demonstration = _demonstration_mode(data)
-    if ranked_unique:
-        top = [_parlay_summary(p, lang, demonstration) for p in ranked_unique[:4]]
+    eligible = int(diag.get("eligible_legs", 0))
+    label = _tr(anchor.full_label, lang)
+    anchor_rows = ([f"Selección principal: {label} a cuota {_odds(anchor.decimal_odds)}.",
+                    f"P del modelo {_pct(anchor.model_probability)} · implícita {_pct(anchor.implied_probability)} · ventaja {_spct(anchor.edge)} · VE {_ev(anchor.ev)}."] if lang == "es" else
+                   [f"Primary anchor: {label} at {_odds(anchor.decimal_odds)}.",
+                    f"Model P {_pct(anchor.model_probability)} · implied {_pct(anchor.implied_probability)} · edge {_spct(anchor.edge)} · EV {_ev(anchor.ev)}."])
+    if not anchor_ok:
+        anchor_rows += [display_tr("No actionable stake; price verification is required.", lang), _display_reason(anchor_reason, lang)]
+    elif demonstration:
+        anchor_rows.append(_tr("Page 1 remains the straight-bet anchor; Page 2 shows demonstration calculations only.", lang))
     else:
-        top = ["No verified parlay or chain bet qualifies.", f"Eligible legs found: {diag.get('eligible_legs', 0)}. Need at least two source-traceable priced positive-EV legs."]
-    best_two = next(iter(_top_by_type(parlays, "2-leg", 1)), None)
-    best_three = next(iter(_top_by_type(parlays, "3-leg", 1)), None)
-    two = _parlay_card_rows(best_two, lang, demonstration) if best_two else ["No verified 2-leg parlay found. Reason: only one priced positive-EV leg available or correlation/pricing blocked."]
-    three = _parlay_card_rows(best_three, lang, demonstration) if best_three else ["No verified 3-leg parlay found. Three independently eligible legs were not available."]
-    if ranked_unique:
-        specialty = [
-            "Cross-game chains: independent probability and price products are labeled estimates.",
-            "Same-game parlays: require a sportsbook SGP quote plus a validated joint-probability method.",
-            "Props: each leg requires its own market-specific model probability and current price.",
-            "Live / flash: cancel when the market starts, suspends, expires, or changes price.",
-        ]
+        anchor_rows.append(_tr("Page 1 remains the straight-bet anchor; Page 2 only adds verified parlays.", lang))
+    ranked = _unique_by_legs(playable + watch)
+    if ranked:
+        top = [_parlay_summary(p, lang, demonstration) for p in ranked[:4]]
     else:
-        specialty = [
-            "STRAIGHT ANCHOR ONLY",
-            "No SGP/cross-game/prop/live parlay is playable until provider returns priced eligible legs and correlation is handled.",
-        ]
-    avoid = [f"Avoid: {p.parlay_type} · {p.reason}" for p in blocked[:5]] or ["Avoid any market with stale odds, line movement against the anchor, missing prop model, unsupported SGP pricing, or expired live window."]
+        top = [_tr(STRAIGHT_ANCHOR_ONLY, lang) if anchor_ok else display_tr("NO VERIFIED SELECTION", lang), display_tr("No verified parlay or chain bet qualifies.", lang),
+               f"Selecciones elegibles: {eligible}. Se necesitan al menos 2." if lang == "es" else f"Eligible legs: {eligible}. At least 2 are required."]
+        if not anchor_ok:
+            top.append(display_tr("Verify the anchor before considering a straight bet or a parlay.", lang))
+    def candidates(kind: str, required: int) -> list[str]:
+        best = next(iter(_top_by_type(parlays, kind, 1)), None)
+        if best:
+            return _parlay_card_rows(best, lang, demonstration)
+        if lang == "es":
+            return [f"Sin parlay verificado de {required} selecciones. Elegibles: {eligible}; necesarias: {required}.",
+                    "Revisar los bloqueos de fuente, vigencia, cuota y correlación."]
+        return [f"No verified {required}-leg parlay. Eligible: {eligible}; required: {required}.",
+                "Review source, freshness, price, and correlation blockers."]
+    specialty = [_tr(message, lang) for message in (
+        "Cross-game chains: independent probability and price products are labeled estimates.",
+        "Same-game parlays: require a sportsbook SGP quote plus a validated joint-probability method.",
+        "Props: each leg requires its own market-specific model probability and current price.",
+        "Live / flash: cancel when the market starts, suspends, expires, or changes price.",
+    )] if ranked else [_tr("No SGP/cross-game/prop/live parlay is playable until provider returns priced eligible legs and correlation is handled.", lang)]
+    from collections import Counter
+    blocked_counts = Counter(_display_reason(p.reason, lang) for p in blocked)
+    avoid = _verification_blockers(data, lang) + [f'{reason} ({count})' for reason, count in blocked_counts.items()]
+    _scan_summary, child_diagnostics = _market_scan_report(data, lang)
+    avoid.extend(child_diagnostics)
+    if not anchor_ok and not avoid:
+        avoid.insert(0, _display_reason(anchor_reason, lang))
+    avoid = list(dict.fromkeys(avoid)) or [_tr("Avoid any market with stale odds, line movement against the anchor, missing prop model, unsupported SGP pricing, or expired live window.", lang)]
+    provider = anchor.provider or ("no proporcionado" if lang == "es" else "not supplied")
+    captured = anchor.timestamp or ("no proporcionada" if lang == "es" else "not supplied")
+    source_rows = ([f"Proveedor: {provider}.", f"Fecha de observación: {captured}.",
+                    f"Mercados descubiertos: {diag.get('markets_discovered', 0)} · selecciones elegibles: {eligible}.",
+                    f"Candidatos: {len(parlays)} · jugables: {len(playable)} · seguimiento: {len(watch)}."] if lang == "es" else
+                   [f"Provider: {provider}.", f"Observation time: {captured}.",
+                    f"Markets discovered: {diag.get('markets_discovered', 0)} · eligible legs: {eligible}.",
+                    f"Candidates: {len(parlays)} · playable: {len(playable)} · watchlist: {len(watch)}."])
     if demonstration:
-        diag_rows = [
-            f"Provider: {diag.get('provider_called', 'unknown')} · state Synthetic fixture validation only.",
-            f"Markets discovered: {diag.get('markets_discovered', 0)} · eligible legs: {diag.get('eligible_legs', 0)}.",
-            f"Parlay calculations: {diag.get('parlay_candidates', 0)} · quoted demo calculations {diag.get('playable_parlays', 0)} · estimated watchlist {diag.get('watchlist_parlays', 0)}.",
-            f"Timestamp: {diag.get('timestamp', 'missing')} · repair status {diag.get('repair_status', 'stable')}.",
-        ]
-    else:
-        diag_rows = [
-            f"Provider: {diag.get('provider_called', 'unknown')} · state {diag.get('provider_state', 'unknown')}.",
-            f"Markets discovered: {diag.get('markets_discovered', 0)} · eligible legs: {diag.get('eligible_legs', 0)}.",
-            f"Parlay candidates: {diag.get('parlay_candidates', 0)} · playable {diag.get('playable_parlays', 0)} · watchlist {diag.get('watchlist_parlays', 0)}.",
-            f"Timestamp: {diag.get('timestamp', 'missing')} · repair status {diag.get('repair_status', 'stable')}.",
-        ]
-    cancel = [
+        source_rows.append(_tr("DEMONSTRATION CALCULATION", lang))
+    cancel = [_tr(message, lang) for message in (
         "Cancel if Page 1 line changes or sportsbook line differs from the report line.",
         "Cancel if any leg loses odds, timestamp, provider match, market status, or positive EV.",
         "Cancel if SGP correlation cannot be priced by sportsbook or model.",
         "Cancel if a live/flash window is started, suspended, or expired.",
-    ]
-    return [
-        ("Primary Anchor", sanitize_public_items([_tr(x, lang) for x in anchor_rows]), RED),
-        ("Top Parlay Recommendations", sanitize_public_items(top[:5]), BLUE),
-        ("Best 2-Leg Parlays", sanitize_public_items([_tr(x, lang) for x in two[:5]]), BLUE),
-        ("Best 3-Leg Parlays", sanitize_public_items([_tr(x, lang) for x in three[:5]]), GOLD),
-        ("SGP / Cross / Prop / Live", sanitize_public_items([_tr(x, lang) for x in specialty[:5]]), BLUE),
-        ("Parlay Avoid List", sanitize_public_items([_tr(x, lang) for x in avoid[:5]]), RED),
-        ("Source Diagnostics", sanitize_public_items([_tr(x, lang) for x in diag_rows]), BLUE),
-        ("Cancel Conditions", sanitize_public_items([_tr(x, lang) for x in cancel]), RED),
-    ]
+    )]
+    return [("Primary Anchor" if anchor_ok else "Selection Review", anchor_rows, RED), ("Top Parlay Recommendations", top, BLUE),
+            ("Best 2-Leg Parlays", candidates("2-leg", 2), BLUE), ("Best 3-Leg Parlays", candidates("3-leg", 3), GOLD),
+            ("SGP / Cross / Prop / Live", specialty, BLUE), ("Parlay Avoid List", avoid, RED),
+            ("Source Diagnostics", source_rows, BLUE), ("Cancel Conditions", cancel, RED)]
 
 
 def _final_detail(parlay: ParlayCandidate, lang: str) -> str:
@@ -1006,6 +1133,8 @@ def _final_status(
     parlays: list[ParlayCandidate] | None = None,
     diagnostics: Mapping[str, Any] | None = None,
 ) -> tuple[str, str, tuple[int, int, int]]:
+    if accounting_quarantined(data):
+        return display_tr("ACCOUNTING REVIEW", lang), display_tr("Accounting review required before report publication.", lang), RED
     if parlays is None or diagnostics is None:
         parlays, generated_diagnostics = generate_parlay_candidates(data)
         diagnostics = generated_diagnostics
@@ -1018,6 +1147,10 @@ def _final_status(
         return _tr(BEST_PARLAY_FOUND, lang), _final_detail(playable, lang), GREEN
     if watch:
         return _tr("WATCHLIST PARLAY ONLY", lang), _final_detail(watch, lang), GOLD
+    anchor_ok, anchor_reason = _leg_is_eligible(_anchor_market(canonical_market_row(data)))
+    if not anchor_ok:
+        detail = display_tr("No current-provider selection is verified; this report is a watchlist only.", lang)
+        return display_tr("NO VERIFIED SELECTION", lang), detail + " " + _display_reason(anchor_reason, lang), GOLD
     if diag.get("eligible_legs", 0) <= 1:
         return _tr(STRAIGHT_ANCHOR_ONLY, lang), _tr("No verified parlay available. Straight anchor only until another priced, positive-EV, source-traceable leg exists.", lang), GOLD
     return _tr(NO_VERIFIED_PARLAY_AVAILABLE, lang), _tr("Parlay candidates were blocked by pricing, correlation, EV, stale data, or missing model probability.", lang), GOLD
@@ -1087,6 +1220,19 @@ def _paint_header_identity(
     draw.text((43, 29), brand, font=module._fit(brand, 250, 38, 18, True), fill="white")
 
 
+def _status_bullet_color(message: str, default: tuple[int, int, int]) -> tuple[int, int, int]:
+    upper = message.upper()
+    if any(token in upper for token in ('AVOID', 'BLOCK', 'BLOQUEADO', 'NO VERIFIED', 'NOT PLAYABLE', 'NO JUGABLE', 'REJECTED', 'SIN PARLAY', 'FALTA', 'NO HAY')):
+        return RED
+    if re.search(r'\b(?:PLAYABLE|JUGABLES?)\s*:\s*0\b', upper):
+        return default
+    if any(token in upper for token in ('PLAYABLE', 'BEST PARLAY', 'JUGABLE')):
+        return GREEN
+    if any(token in upper for token in ('WATCH', 'STRAIGHT', 'ONLY', 'MISSING', 'SEGUIMIENTO', 'SIN APUESTA')):
+        return GOLD
+    return default
+
+
 def _draw_second_page(
     module: Any,
     pick: Any,
@@ -1138,7 +1284,7 @@ def _draw_second_page(
     )
     best_parlay = next((candidate for candidate in page_parlays if candidate.status == PARLAY_PLAYABLE), None) or next((candidate for candidate in page_parlays if candidate.status == PARLAY_WATCHLIST), None)
     price = best_parlay.combined_decimal_odds if best_parlay else _decimal(_get(data, "display_decimal_odds", "verified_price", "decimal_price", "decimal_odds", "odds", "best_price", "odds_at_pick", "american_odds", "odds_american"))
-    price_label = "DEMO PRICE" if _demonstration_mode(data) else ("EST. PRICE" if best_parlay and best_parlay.pricing_source == SYNTHETIC_PRODUCT_PRICE else "PRICE")
+    price_label = "DEMO PRICE" if _demonstration_mode(data) else ("EST. PRICE" if best_parlay and best_parlay.pricing_source == SYNTHETIC_PRODUCT_PRICE else "PRICE" if _leg_is_eligible(_anchor_market(canonical_market_row(data)))[0] else "STORED PRICE")
     price_text = f"{_tr(price_label, lang)} {_odds(price)}"
     draw.rounded_rectangle((720, 104, 1042, 214), radius=14, fill=black, outline=final_color, width=3)
     draw.text((740, 122), final_title, font=module._fit(final_title, 282, 24, 10, True), fill=final_color)
@@ -1155,14 +1301,23 @@ def _draw_second_page(
         title2 = _tr(label, lang).upper()
         draw.text((x + 14, y + 8), title2, font=module._fit(title2, w - 28, 23, 9, True), fill=cream)
         cy = y + 55
-        for item in rows[:5]:
-            if cy > y + h - 20:
-                break
-            up = item.upper()
-            bcolor = GREEN if any(t in up for t in ("PLAYABLE", "BEST PARLAY", "VERIFIED")) else RED if any(t in up for t in ("AVOID", "BLOCK", "NO VERIFIED", "REJECTED")) else GOLD if any(t in up for t in ("WATCH", "STRAIGHT", "ONLY", "MISSING")) else color
+        if len(rows) * 20 > h - 60:
+            img.info.setdefault('_aba_overflow_notes', []).append((title2, '\n'.join(str(item) for item in rows)))
+            rows = [display_tr('See full source notes.', lang)]
+        row_height = max(20, (h - 60) // max(1, len(rows)))
+        for item in rows:
+            # Section rows already have an explicit output locale. Do not run
+            # fragment translation again (it corrupts provider/player names).
+            message = str(item)
+            minimum_font = module._font(12)
+            wrapped = module._wrap_text_to_box(draw, message, minimum_font, w - 48, max(1, len(message) + 1))
+            if len(wrapped) * module._line_height(minimum_font) > row_height:
+                img.info.setdefault("_aba_overflow_notes", []).append((title2, message))
+                message = display_tr("See full source notes.", lang)
+            bcolor = _status_bullet_color(message, color)
             draw.ellipse((x + 14, cy + 5, x + 25, cy + 16), fill=bcolor)
-            module._txt_auto(draw, x + 34, cy, _tr(item, lang), w - 48, 32, 11 if h <= 220 else 12, 7, black, False, 2)
-            cy += 34
+            module._txt_auto(draw, x + 34, cy, message, w - 48, row_height, 18 if w > 700 else 15, 12, black, False, None)
+            cy += row_height
 
     coords = [(42, 318, 488, 210), (552, 318, 488, 210), (42, 548, 488, 224), (552, 548, 488, 224), (42, 792, 488, 224), (552, 792, 488, 224), (42, 1036, 488, 224), (552, 1036, 488, 224)]
     sections = _page_two_sections(
@@ -1171,11 +1326,33 @@ def _draw_second_page(
         parlays=page_parlays,
         diagnostics=page_diagnostics,
     )
-    for (title2, rows, color), coord in zip(sections, coords):
-        box(*coord, title2, rows, color)
+    if not page_parlays and page_diagnostics.get("eligible_legs", 0) == 0:
+        # Empty recommendation grids are not useful. Keep the same paired-page
+        # contract, but show a readable verification checklist with every blocker.
+        box(42, 320, 488, 244, sections[0][0], sections[0][1], red)
+        box(552, 320, 488, 244, "Source Diagnostics", sections[6][1], blue)
+        eligibility = sections[1][1][:3] + [sections[2][1][0], sections[3][1][0]]
+        box(42, 584, 1000, 212, "Eligibility Summary", eligibility, blue)
+        pending = sections[5][1]
+        # All blocker rows are retained; these messages are deliberately short.
+        box(42, 816, 1000, 220, "Required Checks", pending, red)
+        box(42, 1056, 1000, 204, "Cancel Conditions", sections[7][1], red)
+    else:
+        for (title2, rows, color), coord in zip(sections, coords):
+            box(*coord, title2, rows, color)
     draw.rounded_rectangle((42, 1288, 1042, 1518), radius=16, fill=black, outline=final_color, width=4)
     draw.text((68, 1310), final_title, font=module._fit(final_title, 914, 36, 14, True), fill=final_color)
-    module._txt_auto(draw, 68, 1364, final_detail, 914, 104, 20, 8, cream, False, 3)
+    detail_lines = module._wrap_text_to_box(draw, final_detail, module._font(16), 914, max(1, len(final_detail) + 1))
+    if len(detail_lines) * module._line_height(module._font(16)) > 104:
+        img.info.setdefault("_aba_overflow_notes", []).append((final_title, final_detail))
+        final_detail = display_tr("Full source note continues on the source-notes pages.", lang)
+    module._txt_auto(draw, 68, 1364, final_detail, 914, 104, 20, 16, cream, False, None)
+    scan_summary, _ = _market_scan_report(data, lang)
+    summary_lines = module._wrap_text_to_box(draw, scan_summary, module._font(12), 914, max(1, len(scan_summary) + 1))
+    if len(summary_lines) * module._line_height(module._font(12)) > 36:
+        img.info.setdefault('_aba_overflow_notes', []).append((_tr('Market Scan Summary', lang), scan_summary))
+        scan_summary = display_tr('Full source note continues on the source-notes pages.', lang)
+    module._txt_auto(draw, 68, 1476, scan_summary, 914, 36, 14, 12, cream, False, None)
     draw.rectangle((20, 1542, 1060, 1581), fill=black)
     footer = _tr(getattr(module, "SAFETY_FOOTER", "Informational only."), lang)
     module._txt_auto(draw, 42, 1550, footer, 890, 20, 15, 8, cream, False, 1)

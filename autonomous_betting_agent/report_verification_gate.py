@@ -6,7 +6,7 @@ import re
 
 from .report_public_quality import build_full_market_label, is_manual_verified_input, is_saved_source, market_type, provider_state, public_text, to_float
 
-VERSION = "verification_gate_v2_no_verified_truth"
+VERSION = "verification_gate_v3_accounting_quarantine"
 VERIFIED_BUYER_PICK = "VERIFIED_BUYER_PICK"
 WATCHLIST_VERIFY_PRICE = "WATCHLIST_VERIFY_PRICE"
 NO_PRICE_REJECTED = "NO_B" + "ET_PRICE_REJECTED"
@@ -190,6 +190,8 @@ def _source_current(data: Mapping[str, Any]) -> tuple[bool, str]:
 
 
 def _blocked(data: Mapping[str, Any]) -> tuple[bool, str]:
+    if _truthy(data.get('report_accounting_quarantined')) is True:
+        return True, 'Accounting review required before report publication.'
     blob = _blob(data, ("event_status", "game_status", "market_status", "status", "price_status", "odds_freshness_status", "cancel_condition", "cancel_reason", "blocked_reason"))
     live = _is_live(data)
     if any(token in blob for token in BAD_STATUS) and not live:

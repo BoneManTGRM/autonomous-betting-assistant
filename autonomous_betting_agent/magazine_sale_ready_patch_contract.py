@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import re
+from .report_display_contract import team_items as display_team_items
 from typing import Any, Iterable
 
 from autonomous_betting_agent import magazine_api_sources as api_sources
@@ -361,36 +362,11 @@ def sale_ready_recommendation(row: Any) -> tuple[str, str, bool]:
 
 
 def sale_ready_team_items(row: Any, side: str = "") -> list[str]:
-    lang = _impl._lang(row)
-    keys = (
-        f"{side}_team_form",
-        f"{side}_team_record",
-        f"{side}_recent_results",
-        "team_snapshot_home",
-        "team_snapshot_away",
-        "team_stats_summary",
-        "recent_results",
-        "perplexity_context",
-    )
-    items = _source_items(row, keys, 3, 62)
-    return _wrap(items or ["No live team snapshot returned.", "Team data not matched to a live provider.", "Verify before entry."], lang)
+    return display_team_items(dict(_row(row)), side, _impl._lang(row))
 
 
 def sale_ready_injury_items(row: Any, prefix: str = "") -> list[str]:
-    lang = _impl._lang(row)
-    keys = (
-        f"{prefix}_injuries",
-        f"{prefix}_injury_report",
-        f"{prefix}_lineup_status",
-        f"{prefix}_player_notes",
-        "injury_report",
-        "injuries",
-        "lineup_status",
-        "key_players",
-        "perplexity_context",
-    )
-    items = _source_items(row, keys, 2, 66)
-    return _wrap(items or ["No verified lineup/injury update returned.", "Verify lineup/news before entry."], lang)
+    return display_team_items(dict(_row(row)), prefix, _impl._lang(row), injury=True)
 
 
 def _compact_location(raw: str, lang: str) -> str | None:

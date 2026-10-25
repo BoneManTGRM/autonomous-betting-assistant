@@ -83,7 +83,7 @@ def _has_pick_identity(row: Mapping[str, Any]) -> bool:
     event = _safe(row.get("public_event") or row.get("event") or row.get("event_name") or row.get("matchup") or row.get("game"))
     away = _safe(row.get("away_team") or row.get("team_a"))
     home = _safe(row.get("home_team") or row.get("team_b"))
-    pick = _safe(row.get("public_pick") or row.get("prediction") or row.get("pick") or row.get("selection") or row.get("consumer_action") or row.get("recommended_action"))
+    pick = _safe(row.get("selected_pick") or row.get("public_pick") or row.get("prediction") or row.get("pick") or row.get("selection") or row.get("consumer_action") or row.get("recommended_action"))
     if _bad_text(event) and not (away and home):
         return False
     if _bad_text(pick):
@@ -96,6 +96,7 @@ def _has_market_values(row: Mapping[str, Any]) -> bool:
         not _bad_text(row.get(key))
         for key in (
             "decimal_price",
+            "decimal_odds",
             "odds",
             "best_price",
             "odds_at_pick",
@@ -161,7 +162,7 @@ def _signature(rows: Iterable[Mapping[str, Any]], *, report_name: str | None = N
     payload = {
         "report_name": _safe(report_name),
         "language": _safe(language),
-        "rows": [{key: _safe(row.get(key)) for key in key_fields if not _bad_text(row.get(key))} for row in rows],
+        "rows": [{key: _safe(value) for key, value in sorted(row.items()) if not _bad_text(value)} for row in rows],
     }
     return sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
@@ -351,3 +352,8 @@ def install(module: Any | None = None) -> Any | None:
     module._ABA_MAGAZINE_EXPORT_STATE_GUARD_V2 = True
     module._ABA_MAGAZINE_EXPORT_STATE_GUARD_V3 = True
     return module
+
+
+def remember_display_pages(rows, pages, *, report_name=None, language=None):
+    sig = _remember(rows, report_name=report_name, language=language, page_count=len(pages), source="complete-display-pages")
+    _remember_pages(pages, sig=sig, row_count=len(rows), source="complete-display-pages")

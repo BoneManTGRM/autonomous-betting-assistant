@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 import re
+from .report_display_contract import canonical_market_row, tr as display_tr, accounting_quarantined
 
 from autonomous_betting_agent.report_public_quality import (
     build_full_market_label,
@@ -56,6 +57,10 @@ def _num(data: dict[str, Any], *keys: str) -> float | None:
 
 
 def _family(data: dict[str, Any]) -> str:
+    from .report_public_quality import market_type
+    explicit_family = market_type(data)
+    if explicit_family in {'team_total', 'player_prop'}:
+        return explicit_family
     text = " ".join(_clean(data.get(k)).lower().replace("_", " ") for k in ("market_type", "market", "market_name", "wager_type", "prediction", "pick", "selection"))
     sport = " ".join(_clean(data.get(k)).lower() for k in ("sport", "league", "event", "matchup"))
     line_text = " ".join(_clean(data.get(k)) for k in ("line", "point", "points", "spread_line", "run_line", "handicap", "line_point"))
@@ -74,19 +79,10 @@ def _family(data: dict[str, Any]) -> str:
 
 
 def _line(data: dict[str, Any]) -> str:
-    raw = _first(data, "total_line", "game_total_line", "spread_line", "run_line", "line_point", "line", "point", "points", "handicap", "threshold", "line_value", "market_line", "line_display", default="")
-    if raw:
-        try:
-            num = float(raw.replace("+", "").replace(",", ""))
-            return f"+{num:g}" if num > 0 and _family(data) != "total" else f"{num:g}"
-        except Exception:
-            return raw
-    blob = " | ".join(_clean(data.get(k)) for k in ("prediction", "pick", "display_pick", "exact_bet", "matchup_note", "matchup_notes", "sports_context_summary") if _clean(data.get(k)))
-    if _family(data) == "total":
-        match = re.search(r"\b(?:over|under|total|set at)\D{0,36}(\d+(?:\.\d+)?)\b", blob, flags=re.I)
-        return match.group(1) if match else ""
-    match = re.search(r"(?<![A-Za-z0-9])([+-]\d+(?:\.\d+)?)(?![A-Za-z0-9])", blob)
-    return match.group(1) if match else ""
+    resolved = canonical_market_row(data)
+    if resolved.get("report_market_issue"):
+        return ""
+    return _first(resolved, "line", default="")
 
 
 def _negative_value(data: dict[str, Any]) -> bool:
@@ -144,7 +140,7 @@ def _price_source(data: dict[str, Any]) -> str:
 
 
 def _timestamp(data: dict[str, Any]) -> str:
-    return _first(data, "odds_timestamp", "price_timestamp", "odds_updated_at", "line_timestamp", "locked_at_utc", "commence_time", "event_start_utc", default="")
+    return _first(data, "source_observed_at", "odds_timestamp", "price_timestamp", "provider_timestamp", "captured_at_utc", "odds_updated_at", "line_timestamp", "locked_at_utc", "timestamp", default="")
 
 
 def _price_line(data: dict[str, Any]) -> str:
@@ -166,7 +162,12 @@ def _demonstration_mode(data: dict[str, Any]) -> bool:
 
 
 def normalize_row(value: Any) -> dict[str, Any]:
-    data = _row(value)
+    data = canonical_market_row(_row(value))
+    if accounting_quarantined(data):
+        for key in ("final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action"):
+            data[key] = "RESEARCH ONLY"
+        data.update(risk="ACCOUNTING REVIEW", risk_level="ACCOUNTING REVIEW", risk_label="ACCOUNTING REVIEW", report_truth_severity="ACCOUNTING REVIEW", verification_status="ACCOUNTING REVIEW", final_explanation="Accounting review required before report publication.")
+        return data
     for key in ("weather_summary", "venue_weather", "weather_risk", "weather_location", "expanded_matchup_context", "sports_context_summary", "preview_summary", "game_summary", "matchup_note", "matchup_notes", "news_summary", "newsapi_summary", "perplexity_summary", "perplexity_context", "sportsdataio_context", "api_football_summary", "line_movement_summary", "line_movement", "price_movement"):
         if key in data:
             cleaned = _note(data.get(key))
@@ -225,10 +226,10 @@ def normalize_row(value: Any) -> dict[str, Any]:
     manual_verified = is_manual_verified_input(data)
     saved = is_saved_source(data)
     demo = _demonstration_mode(data)
-    action = "DEMONSTRATION ONLY" if demo else ("NO " + "BET / PRICE REJECTED" if negative else (WATCH_VERIFY if saved else public_action_label(data)))
+    action = "DEMONSTRATION ONLY" if demo else ("NO " + "BET / PRICE REJECTED" if negative else (WATCH_VERIFY if saved and public_action_label(data) == "WATCHLIST" else public_action_label(data)))
     for key in ("final_decision", "agent_decision", "recommendation", "consumer_action", "recommended_action"):
         data[key] = action
-    data["risk"] = "DEMONSTRATION DATA" if demo else ("PRICE REJECTED" if negative else ("VERIFY CURRENT PRICE" if saved else "MANUALLY VERIFIED PRICE" if manual_verified else "VERIFIED PRICE"))
+    data["risk"] = "DEMONSTRATION DATA" if demo else ("PRICE REJECTED" if negative else ("VERIFY CURRENT PRICE" if saved else "MANUALLY VERIFIED PRICE" if manual_verified else "VERIFIED PRICE" if public_action_label(data) == "VERIFIED CANDIDATE" else "VERIFY CURRENT PRICE"))
     data["risk_level"] = data["risk_label"] = data["profit_guard_status"] = data["risk"]
     data["final_explanation"] = "Demonstration only - not current betting advice." if demo else ("Negative edge or EV at current price." if negative else ("Saved row uses stored price/context. Recheck current provider price before publishing." if saved else public_recommendation_status(data)))
     data["action_reason"] = data["recommendation_reason"] = data["final_explanation"]
@@ -278,6 +279,8 @@ def normalize_row(value: Any) -> dict[str, Any]:
 
 def public_truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
     data = normalize_row(row)
+    if accounting_quarantined(data):
+        return [(display_tr("TRUTH", lang), display_tr("ACCOUNTING REVIEW", lang)), (display_tr("PRICE STATUS", lang), display_tr("Accounting review required before report publication.", lang))]
     if _no_verified_row(data):
         return [("REPORT SOURCE", "No verified current-provider picks"), ("DATA SCOPE", "No verified buyer picks"), ("TRUTH", "RESEARCH ONLY"), ("ODDS STATUS", "NO_VERIFIED_BUYER_PICKS"), ("MATCHED", "Provider not matched")]
     odds_status = _clean(data.get("odds_status") or data.get("odds_source") or "VERIFY").upper()
@@ -297,14 +300,18 @@ def public_truth_pairs(row: Any, lang: str = "en") -> list[tuple[str, str]]:
         pairs.append(("MATCHED", "Current provider recheck required"))
         return pairs[:5]
     if is_manual_verified_input(data):
+        from .report_display_contract import display_decision
         return [
             ("REPORT SOURCE", "Operator-attested manual input"),
-            ("PRICE STATUS", "Manually verified"),
+            ("PRICE STATUS", "Manually verified" if display_decision(data)["report_display_actionable"] else "Provider verification required"),
             ("BOOK / PRICE", _price_line(data)),
             ("TIMESTAMP", _timestamp(data) or "Missing"),
             ("LIVE API", "Not used for this price"),
         ]
-    return [("REPORT SOURCE", "Current provider row"), ("DATA SCOPE", "Current provider matched"), ("TRUTH", "VERIFIED PRICE"), ("ODDS STATUS", odds_status), ("MATCHED", "Provider matched")]
+    from .report_verification_gate import classify_report_row, VERIFIED_BUYER_PICK
+    from .report_display_contract import display_decision
+    verified = display_decision(data)['report_display_actionable']
+    return [("REPORT SOURCE", "Current provider row"), ("PRICE STATUS", "VERIFIED PRICE" if verified else "Provider verification required"), ("TRUTH", "VERIFIED PRICE" if verified else "RESEARCH ONLY"), ("TIMESTAMP", _timestamp(data) or "Missing")]
 
 
 def _draw_overlay(module: Any, image: Any, row: dict[str, Any], language: str | None = None) -> Any:
@@ -401,7 +408,7 @@ def install(module: Any) -> Any:
                     elif str(getattr(market, "badge", "")).upper() == "WATCHLIST":
                         market.badge = WATCH_VERIFY
                     if is_saved_source(row) and str(getattr(market, "rejection_reason", "")).strip():
-                        market.rejection_reason = "Saved price only - current provider recheck required"
+                        market.rejection_reason = str(market.rejection_reason) + "; Saved price only - current provider recheck required" if "Saved price only" not in str(market.rejection_reason) else market.rejection_reason
                 if is_saved_source(row):
                     diag["provider_state"] = "Saved price only"
                     diag["provider_called"] = _price_source(row) or "saved-row"
@@ -432,7 +439,7 @@ def install(module: Any) -> Any:
                         rows = _source_diagnostics(row)
                     else:
                         rows = [_clean_saved_page2_row(item) for item in rows]
-                    cleaned.append((title, rows, color))
+                    cleaned.append((title, [display_tr(item, lang) for item in rows], color))
                 return cleaned
             guarded_sections._ABA_ACTIVE_EXPORT_SECTIONS = True  # type: ignore[attr-defined]
             page2._page_two_sections = guarded_sections

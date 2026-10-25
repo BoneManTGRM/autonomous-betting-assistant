@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import math
+from .report_display_contract import canonical_market_row, _market_family, _selection_tokens
 from typing import Any, Iterable, Mapping
 
 MISSING_EXACT_MARKET_LINE = "Missing exact market line"
@@ -11,7 +13,7 @@ DANGLING_ENDINGS = ("where", "where the", "with", "with the", "who are", "becaus
 SAVED_SOURCE_TOKENS = ("saved", "uploaded", "cached", "handoff", "fallback", "manual", "uploaded_row")
 PROVIDER_TOKENS = ("odds api", "the odds api", "sportsdataio", "sportradar", "api-football", "bookmaker", "draftkings", "fanduel", "betmgm", "caesars", "pinnacle", "consensus")
 RAW_PUBLIC_DIAGNOSTIC_PATTERNS = (r"\bendpoint unknown\b", r"\bstatus code unknown\b", r"\brows returned\b\s*:?\s*\d*", r"\braw session key\b", r"\braw source key\b", r"\bUPLOADED_ROW\b")
-TEXT_LINE_KEYS = ("verified_market_label", "full_market_label", "public_market_label", "market_label", "final_recommendation_label", "final_label", "trend_label", "display_pick", "exact_bet", "prediction", "pick", "selection", "recommended_action", "consumer_action", "why_pick", "analysis_summary", "reason", "explanation")
+TEXT_LINE_KEYS = ("verified_market_label", "full_market_label", "public_market_label", "market_label", "final_recommendation_label", "final_label", "trend_label", "display_pick", "exact_bet", "prediction", "pick", "selection", "recommended_action", "consumer_action", "selected_pick")
 
 
 def public_text(value: Any) -> str:
@@ -32,11 +34,12 @@ def first_value(row: Mapping[str, Any], *keys: str) -> str:
 
 
 def to_float(value: Any) -> float | None:
-    text = public_text(value).replace(",", "").replace("%", "")
+    text = public_text(value).replace(",", "").replace("%", "").replace("−", "-").replace("–", "-").replace("—", "-")
     if not text:
         return None
     try:
-        return float(text)
+        parsed = float(text)
+        return parsed if math.isfinite(parsed) else None
     except (TypeError, ValueError):
         return None
 
@@ -64,10 +67,10 @@ def format_total_line(value: Any) -> str:
 
 def normalize_side(value: Any) -> str:
     text = public_text(value)
-    lowered = text.lower()
-    if re.search(r"\bover\b|^o\s*\d|\bo\d", lowered):
+    lowered = _selection_tokens(text)
+    if re.search(r"\bover\b|\bmás de\b|\bmas de\b|^o\s*\d|\bo\d", lowered):
         return "Over"
-    if re.search(r"\bunder\b|^u\s*\d|\bu\d", lowered):
+    if re.search(r"\bunder\b|\bmenos de\b|^u\s*\d|\bu\d", lowered):
         return "Under"
     return text
 
@@ -100,7 +103,11 @@ def _extract_line_from_text(row: Mapping[str, Any], kind: str) -> str:
 
 
 def market_type(row: Mapping[str, Any]) -> str:
-    text = " ".join(public_text(row.get(key)).lower() for key in ("market_type", "market", "market_name", "bet_type", "selection", "pick", "prediction", "side", "outcome", "exact_bet", "final_recommendation_label", "trend_label"))
+    for key in ('selected_market', 'market_type', 'market', 'market_name', 'bet_type'):
+        family = _market_family(row.get(key))
+        if family:
+            return family
+    text = " ".join(public_text(row.get(key)).lower() for key in ("selected_market", "market_type", "market", "market_name", "bet_type", "selection", "pick", "prediction", "side", "outcome", "exact_bet", "final_recommendation_label", "trend_label"))
     if any(token in text for token in ("team total", "team_total", "team goals", "team points")):
         return "team_total"
     if any(token in text for token in ("run line", "run_line")):
@@ -117,15 +124,18 @@ def market_type(row: Mapping[str, Any]) -> str:
 
 
 def _selection_text(row: Mapping[str, Any]) -> str:
-    return first_value(row, "public_pick", "selection", "pick", "prediction", "side", "outcome", "team", "participant", "exact_bet", "final_recommendation_label")
+    return first_value(row, "selected_pick", "public_pick", "selection", "pick", "prediction", "side", "outcome", "team", "participant", "exact_bet", "final_recommendation_label")
 
 
 def _team_text(row: Mapping[str, Any]) -> str:
-    selection = _selection_text(row)
+    selection = _selection_text(row).replace("−", "-").replace("–", "-").replace("—", "-")
+    for original, canonical in (('Total del partido', 'Game Total'), ('Total del equipo', 'Team Total'), ('Más de', 'Over'), ('Mas de', 'Over'), ('Menos de', 'Under'), ('Hándicap', 'Spread'), ('Ganador', 'Moneyline')):
+        selection = re.sub(re.escape(original), canonical, selection, flags=re.I)
     if normalize_side(selection) in {"Over", "Under"}:
-        return first_value(row, "team", "selection_team", "participant", "home_team", "away_team")
+        named = re.sub(r"\b(?:over|under)\s*[+-]?\d+(?:\.\d+)?|\b(?:game total|team total|total|over|under)\b", "", selection, flags=re.I).strip(" -:|/")
+        return named or first_value(row, "team", "selection_team", "participant")
     cleaned = re.sub(r"\b(?:moneyline|ml|spread|point spread|run line|over|under|game total|total)\b", "", selection, flags=re.I)
-    cleaned = re.sub(r"[+\-]?\d+(?:\.\d+)?", "", cleaned).strip(" -:|/")
+    cleaned = re.sub(r"(?<![\w.])[+\-]\d+(?:\.\d+)?(?![\w.])", "", cleaned).strip(" -:|/")
     return cleaned or first_value(row, "team", "selection_team", "participant", "home_team", "away_team")
 
 
@@ -140,16 +150,20 @@ def _line_value(row: Mapping[str, Any], kind: str) -> str:
         value = first_value(row, "spread_line", "handicap", "point", "points", "line")
     else:
         value = first_value(row, "line", "point", "points", "handicap")
-    return value or _extract_line_from_text(row, kind)
+    return value if to_float(value) is not None else _extract_line_from_text(row, kind)
 
 
 def build_full_market_label(row: Mapping[str, Any]) -> str:
+    row = canonical_market_row(row)
     kind = market_type(row)
+    if row.get("report_market_issue"):
+        label = {"total": "Game Total", "team_total": "Team Total", "player_prop": "Player Prop"}.get(kind, kind.replace("_", " ").title())
+        return f"{label}: {row['report_market_issue']}"
     side = normalize_side(_selection_text(row))
     team = _team_text(row)
     if kind == "total":
         line = _line_value(row, "total")
-        return f"Game Total: {side} {format_total_line(line)}" if side in {"Over", "Under"} and line else f"Game Total: {side} - {MISSING_EXACT_MARKET_LINE}" if side in {"Over", "Under"} else f"Game Total: {MISSING_EXACT_MARKET_LINE}"
+        return f"Game Total: {side} {format_total_line(line)}" if side in {"Over", "Under"} and line else f"Game Total: {side} - {MISSING_EXACT_MARKET_LINE}" if side in {"Over", "Under"} else "Game Total: Missing selection side" if line else f"Game Total: {MISSING_EXACT_MARKET_LINE}"
     if kind == "team_total":
         line = _line_value(row, "team_total")
         prefix = f"Team Total: {team}".strip()
@@ -171,7 +185,12 @@ def build_full_market_label(row: Mapping[str, Any]) -> str:
 
 
 def has_exact_market_line(row: Mapping[str, Any]) -> bool:
+    row = canonical_market_row(row)
+    if row.get("report_market_issue"):
+        return False
     kind = market_type(row)
+    if kind in {"total", "team_total", "player_prop"} and normalize_side(_selection_text(row)) not in {"Over", "Under"}:
+        return False
     return bool(_line_value(row, kind if kind != "player_prop" else "prop")) if kind in {"total", "team_total", "run_line", "spread", "player_prop"} else True
 
 
@@ -271,7 +290,7 @@ def sanitize_public_text(value: Any) -> str:
     text = public_text(value)
     if not text:
         return ""
-    replacements = ((r"\bGate failed\b", "Verification pending"), (r"\bsource mode saved-handoff\b", "Saved-source verification pending"), (r"\bsaved/uploaded rows cannot become VERIFIED\b", "Provider match required before verified status"), (r"\bReparodynamics blocked\b", "Reparodynamics remains in protected observation mode"), (r"\bno verified parlay\b(?! or chain bet qualifies)", "No verified parlay or chain bet qualifies"), (r"\bData unavailable\b", "Verification pending"), (r"\bUPLOADED_ROW\b", "Saved-source verification pending"))
+    replacements = ((r"\bGate failed\b", "Verification pending"), (r"\bsource mode saved-handoff\b", "Saved-source verification pending"), (r"\bsaved/uploaded rows cannot become VERIFIED\b", "Provider match required before verified status"), (r"\bReparodynamics blocked\b", "Reparodynamics remains in protected observation mode"), (r"\bData unavailable\b", "Verification pending"), (r"\bUPLOADED_ROW\b", "Saved-source verification pending"))
     for pattern, replacement in replacements:
         text = re.sub(pattern, replacement, text, flags=re.I)
     for pattern in RAW_PUBLIC_DIAGNOSTIC_PATTERNS:

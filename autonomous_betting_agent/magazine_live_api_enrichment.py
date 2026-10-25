@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 
 from .ledger_types import is_demonstration_row
 
-ENRICHMENT_VERSION = "v17_truthful_optional_enrichment"
+ENRICHMENT_VERSION = "v18_offline_report_snapshot"
 _CACHE: dict[tuple[Any, ...], Any] = {}
 
 API_SECRET_DEFS = {
@@ -232,13 +232,40 @@ def _enrich_sportsdataio(row: dict[str, Any]) -> None:
         row.setdefault("sportsdataio_context", "SDIO checked; no provider event ID in row.")
 
 
-def enrich_row_with_live_api_data(row_like: Any, **_: Any) -> dict[str, Any]:
+def prepare_report_snapshot_row(row_like: Any) -> dict[str, Any]:
+    """Report-only boundary: supplied observations, no provider dispatch or refresh.
+
+    Kept separate from legacy live-enrichment names, which runtime bridges wrap.
+    """
+    row = _row(row_like)
+    row['_live_api_enriched'] = ENRICHMENT_VERSION
+    row['report_enrichment_mode'] = 'provided_data_only'
+    row['report_provider_calls_allowed'] = False
+    row['report_enrichment_reason'] = 'Report uses supplied source observations only; no provider refresh was requested.'
+    row['live_api_enrichment_status'] = 'DEMONSTRATION_ONLY' if is_demonstration_row(row) else 'PROVIDED_DATA_ONLY'
+    return row
+
+
+def prepare_report_snapshot_rows(rows: list[Any] | tuple[Any, ...]) -> list[dict[str, Any]]:
+    return [prepare_report_snapshot_row(row) for row in rows]
+
+
+def enrich_row_with_live_api_data(row_like: Any, *, allow_provider_refresh: bool = False, **_: Any) -> dict[str, Any]:
     """Add only evidence returned by configured providers.
 
     Missing keys and empty payloads remain explicit statuses. This function never
     manufactures injury, lineup, team, matchup, price, or verification claims.
     """
     row = _row(row_like)
+    if not allow_provider_refresh:
+        row = prepare_report_snapshot_row(row)
+        # Legacy callers retain key-availability diagnostics, but never dispatch
+        # a provider. The pure report snapshot boundary does not inspect keys.
+        if not is_demonstration_row(row):
+            for field, provider in (("weather_status", "WeatherAPI"), ("news_status", "NewsAPI"),
+                                    ("api_football_status", "API-Football"), ("sportsdataio_status", "SportsDataIO")):
+                row.setdefault(field, "REPORT_REFRESH_DISABLED" if _secret(API_SECRET_DEFS[provider]) else "API_KEY_MISSING")
+        return row
     if is_demonstration_row(row):
         row["live_api_enrichment_status"] = "DEMONSTRATION_ONLY"
         return row
@@ -275,7 +302,7 @@ def install(module: Any | None = None) -> Any:
     original = getattr(module, "render_full_pick_magazine_page", None)
 
     def wrapped(row: Any, *args: Any, **kwargs: Any) -> Any:
-        enriched = enrich_row_with_live_api_data(row)
+        enriched = prepare_report_snapshot_row(row)
         return original(enriched, *args, **kwargs) if callable(original) else enriched
 
     module.render_full_pick_magazine_page = wrapped
