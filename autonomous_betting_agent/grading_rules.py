@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import math
 from typing import Any, Iterable, Mapping
 
 WINS = {"win", "won", "w", "winner", "winning", "graded_win", "graded winner", "success", "hit", "cash", "cashed", "✅", "✅ win"}
@@ -102,6 +103,8 @@ def _profit_grade(row: Mapping[str, Any]) -> str:
         try:
             value = float(raw.replace("%", "").replace(",", ""))
         except ValueError:
+            continue
+        if not math.isfinite(value):
             continue
         # Only use profit as a fallback when the row appears settled or no explicit
         # result field exists. This prevents expected-value fields from being graded.

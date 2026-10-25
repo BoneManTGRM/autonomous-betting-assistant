@@ -3,20 +3,23 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import math
 from typing import Any, Iterable, Mapping
 
+from .grading_rules import grade_from_row
 
 def _float(value: Any) -> float | None:
     if value is None or value == "":
         return None
     try:
-        return float(value)
-    except (TypeError, ValueError):
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
         return None
+    return number if math.isfinite(number) else None
 
 
 def _result_value(row: Mapping[str, Any]) -> float | None:
-    grade = str(row.get("grade") or row.get("result") or "").strip().lower()
+    grade = grade_from_row(row)
     if grade in {"win", "won", "w"}:
         return 1.0
     if grade in {"loss", "lost", "l"}:
@@ -25,7 +28,11 @@ def _result_value(row: Mapping[str, Any]) -> float | None:
 
 
 def row_probability(row: Mapping[str, Any]) -> float | None:
-    return _float(row.get("learned_model_probability") or row.get("model_probability") or row.get("probability"))
+    for key in ("learned_model_probability", "model_probability", "probability"):
+        probability = _float(row.get(key))
+        if probability is not None:
+            return probability
+    return None
 
 
 def normalize_probability(value: float | None) -> float | None:
@@ -55,6 +62,8 @@ def _bucket_index(probability: float, bucket_size: float) -> int:
 
 
 def calibration_buckets(rows: Iterable[Mapping[str, Any]], bucket_size: float = 0.10) -> list[dict[str, Any]]:
+    if not math.isfinite(bucket_size) or not 0 < bucket_size <= 1:
+        raise ValueError("bucket_size must be finite and greater than zero, up to one")
     buckets: dict[int, list[tuple[float, float]]] = defaultdict(list)
     for row in rows:
         probability = normalize_probability(row_probability(row))
@@ -92,7 +101,7 @@ def odds_band_summary(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]
     for row in rows:
         price = _float(row.get("decimal_price") or row.get("odds_at_pick"))
         result = _result_value(row)
-        if price is None or result is None:
+        if price is None or price <= 1 or result is None:
             continue
         if price < 1.30:
             key = "<1.30"

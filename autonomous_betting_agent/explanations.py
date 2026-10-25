@@ -6,6 +6,7 @@ reasons without promising wins, ROI, or certainty.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Mapping
 
 from .ledger_types import classify_ledger_type
@@ -17,9 +18,11 @@ def _float(row: Mapping[str, Any], *keys: str) -> float | None:
         if value is None or value == "":
             continue
         try:
-            return float(value)
-        except (TypeError, ValueError):
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
             continue
+        if math.isfinite(number):
+            return number
     return None
 
 

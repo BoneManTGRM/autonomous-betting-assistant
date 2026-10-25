@@ -7,6 +7,7 @@ from typing import Any
 from urllib.parse import quote_plus, urlencode
 from urllib.request import Request, urlopen
 
+from .ledger_types import is_demonstration_row
 
 ENRICHMENT_VERSION = "v17_truthful_optional_enrichment"
 _CACHE: dict[tuple[Any, ...], Any] = {}
@@ -238,6 +239,9 @@ def enrich_row_with_live_api_data(row_like: Any, **_: Any) -> dict[str, Any]:
     manufactures injury, lineup, team, matchup, price, or verification claims.
     """
     row = _row(row_like)
+    if is_demonstration_row(row):
+        row["live_api_enrichment_status"] = "DEMONSTRATION_ONLY"
+        return row
     if row.get("_live_api_enriched") == ENRICHMENT_VERSION:
         return row
     away, home = _teams(row)
