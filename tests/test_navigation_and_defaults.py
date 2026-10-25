@@ -11,7 +11,8 @@ def test_main_shell_uses_shared_sidebar_and_current_entrypoint() -> None:
     app = (repo_root() / 'app_streamlit.py').read_text(encoding='utf-8')
     shell = (repo_root() / 'streamlit_app.py').read_text(encoding='utf-8')
     assert "render_app_sidebar('home'" in app
-    assert "from app_streamlit import *" in shell
+    assert "from app_streamlit import render_home" in shell
+    assert "render_home()" in shell
     assert 'Streamlit Cloud entrypoint' in shell
     assert 'pages/ultra80_profit_mode.py' not in app
     assert 'pages/ultra80_profit_mode.py' not in shell

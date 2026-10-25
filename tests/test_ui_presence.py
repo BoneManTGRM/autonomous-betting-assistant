@@ -7,7 +7,8 @@ from pathlib import Path
 class UiPresenceTests(unittest.TestCase):
     def test_streamlit_app_uses_current_app_shell(self) -> None:
         text = Path('streamlit_app.py').read_text(encoding='utf-8')
-        self.assertIn('from app_streamlit import *', text)
+        self.assertIn('from app_streamlit import render_home', text)
+        self.assertIn('render_home()', text)
         self.assertIn('Streamlit Cloud entrypoint', text)
         self.assertNotIn('runpy.run_path', text)
         self.assertNotIn('PRO_PREDICTOR_PAGE', text)
