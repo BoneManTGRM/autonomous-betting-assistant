@@ -57,6 +57,8 @@ class LocalStorage:
             return self._read_csv(self._csv_path(ledger_type))
         rows: list[dict[str, Any]] = []
         for path in self.csv_dir.glob("*.csv"):
+            if path.name == "audit_log.csv":
+                continue
             rows.extend(self._read_csv(path))
         return rows
 

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from .ledger_types import classify_ledger_type, event_start_value
+from .grading_rules import PENDING, normalize_grade
 
 DEFAULT_DB_PATH = Path("data/aba_signal_pro.sqlite")
 
@@ -205,7 +206,14 @@ class SQLiteStore:
             if not item:
                 return False
             old_grade = item["grade"]
-            if old_grade and old_grade != grade and not overwrite:
+            old_normalized = normalize_grade(old_grade)
+            new_normalized = normalize_grade(grade)
+            # normalize_grade also returns pending for unknown provider labels.
+            # Only explicit pending states may settle without overriding history.
+            old_token = " ".join(str(old_grade or "").strip().lower().replace("_", " ").replace("-", " ").split())
+            pending_tokens = {value.replace("_", " ").replace("-", " ") for value in PENDING}
+            same_grade = old_grade == grade or (old_normalized != "pending" and old_normalized == new_normalized)
+            if old_token not in pending_tokens and not same_grade and not overwrite:
                 self.add_audit_event(
                     action="grade_conflict",
                     row={"proof_id": proof_key_or_id},

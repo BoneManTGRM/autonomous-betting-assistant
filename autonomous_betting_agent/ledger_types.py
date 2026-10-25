@@ -119,6 +119,8 @@ def has_clean_audit(row: Mapping[str, Any]) -> bool:
 
 
 def is_research_or_learning(row: Mapping[str, Any]) -> bool:
+    if is_demonstration_row(row):
+        return True
     values = {
         _lower(row.get("ledger_type")),
         _lower(row.get("proof_type")),
@@ -128,6 +130,19 @@ def is_research_or_learning(row: Mapping[str, Any]) -> bool:
     if values & _RESEARCH_FLAGS:
         return True
     return _truthy(row.get("research_only")) or _truthy(row.get("learning_only")) or _truthy(row.get("backfill"))
+
+
+def is_demonstration_row(row: Mapping[str, Any]) -> bool:
+    """Recognize explicit fixture metadata, never guess from team/event names."""
+    if _truthy(row.get("demonstration_mode")):
+        return True
+    if any(_lower(row.get(key)) == "demo_ledger" for key in ("source_file", "active_list_id", "ledger_batch_id")):
+        return True
+    if any(_lower(row.get(key)) in {"synthetic_fixture", "synthetic_test_fixture", "validation_fixture", "demonstration_fixture"}
+           for key in ("source_mode", "report_source_mode", "report_source")):
+        return True
+    text = " ".join(_lower(row.get(key)) for key in ("report_title", "report_data_scope", "report_truth_warning", "league"))
+    return any(token in text for token in ("demonstration", "demo only", "validation fixture", "synthetic test"))
 
 
 def has_high_confidence_hint(row: Mapping[str, Any]) -> bool:
@@ -156,7 +171,7 @@ def can_be_official(row: Mapping[str, Any]) -> bool:
 
 
 def can_be_public_high_confidence(row: Mapping[str, Any]) -> bool:
-    return has_required_proof_fields(row) and is_future_locked(row) and has_clean_audit(row) and has_high_confidence_hint(row)
+    return has_required_proof_fields(row) and is_future_locked(row) and has_clean_audit(row) and has_high_confidence_hint(row) and not is_research_or_learning(row)
 
 
 def classify_ledger_type(row: Mapping[str, Any]) -> str:
@@ -171,6 +186,8 @@ def classify_ledger_type(row: Mapping[str, Any]) -> str:
 
     if explicit in {QUARANTINE_LEDGER, "review", "review_only"} or audit_status in _BAD_STATUS:
         return QUARANTINE_LEDGER
+    if is_demonstration_row(row):
+        return RESEARCH_LEDGER
     if explicit in {LEARNING_ONLY_LEDGER, "learning", "backfill"} or _truthy(row.get("learning_only")):
         return LEARNING_ONLY_LEDGER
     if explicit in {ALL_HIGH_CONFIDENCE_LEDGER, "all_high_confidence", "high_confidence_test", "b_high_confidence_test"} or has_high_confidence_hint(row):

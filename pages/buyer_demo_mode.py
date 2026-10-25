@@ -50,8 +50,7 @@ metrics = dashboard_metrics(demo)
 st.title(t('title'))
 st.caption(t('caption'))
 if st.button(t('load'), type='primary', use_container_width=True):
-    st.session_state['odds_lock_pro_locked_rows'] = demo.to_dict('records')
-    st.session_state['ara_latest_predictions'] = demo.to_dict('records')
+    st.session_state['buyer_demo_mode_rows'] = demo.to_dict('records')
     st.success('Demo rows loaded.' if LANG == 'en' else 'Filas demo cargadas.')
 
 cols = st.columns(6)

@@ -652,4 +652,7 @@ def demo_ledger():
         locked['source_file'] = 'demo_ledger'
         locked['active_list_id'] = 'demo_ledger'
         locked['ledger_batch_id'] = 'demo_ledger'
+        locked['demonstration_mode'] = True
+        locked['research_only'] = True
+        locked['ledger_type'] = 'research'
     return locked
