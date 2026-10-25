@@ -3,6 +3,10 @@ from __future__ import annotations
 import base64
 import json
 import os
+import time
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +29,36 @@ _FALLBACK_MEMORY: dict[str, list[dict[str, Any]]] = {}
 GITHUB_API = 'https://api.github.com'
 GITHUB_STATE_DIR = '.aba_state'
 GITHUB_CHUNK_SIZE = 50
+
+
+
+@dataclass
+class RemoteReadBudget:
+    """Ephemeral render state; unavailable must not be presented as an empty ledger."""
+
+    deadline: float
+    unavailable: bool = False
+    requests: int = 0
+    responses: dict = field(default_factory=dict)
+
+
+_REMOTE_READ_BUDGET: ContextVar[RemoteReadBudget | None] = ContextVar('held_remote_read_budget', default=None)
+
+
+@contextmanager
+def remote_read_budget():
+    """Bound automatic reads for one render, never writes or other callers.
+
+    Five seconds is an elapsed admission budget, not a hard wall-clock guarantee:
+    Requests connect/read timeouts cannot interrupt every DNS or slow-trickle case.
+    Each new context retries afresh; no unavailable result is cached globally.
+    """
+    state = RemoteReadBudget(deadline=time.monotonic() + 5.0)
+    token = _REMOTE_READ_BUDGET.set(state)
+    try:
+        yield state
+    finally:
+        _REMOTE_READ_BUDGET.reset(token)
 
 
 def _memory_store() -> dict[str, list[dict[str, Any]]]:
@@ -186,24 +220,45 @@ def _empty_payload(key: str, workspace_id: Any = 'test_01') -> dict[str, Any]:
     return {'version': 'held-picks-v8-deduped', 'workspace_id': normalize_workspace_id(workspace_id), 'key': key, 'rows': []}
 
 
-def _github_get_json(path: str) -> tuple[dict[str, Any], str, int]:
+def _github_get_json(path: str, *, use_read_budget: bool = True) -> tuple[dict[str, Any], str, int]:
     token = _github_token()
     repo = _github_repo()
     branch = _github_branch()
     if not token or not repo:
         return {}, '', 0
+    state = _REMOTE_READ_BUDGET.get() if use_read_budget else None
+    cache_key = (repo, branch, token, path)
+    timeout: Any = 20
+    if state is not None:
+        if cache_key in state.responses:
+            return state.responses[cache_key]
+        remaining = state.deadline - time.monotonic()
+        if state.unavailable or remaining <= 0 or state.requests >= 64:
+            state.unavailable = True
+            return {}, '', 0
+        timeout = (min(2.5, remaining / 2), min(2.5, remaining / 2))
+        state.requests += 1
     url = f'{GITHUB_API}/repos/{repo}/contents/{path}'
     try:
-        response = requests.get(url, headers=_github_headers(token), params={'ref': branch}, timeout=20)
+        response = requests.get(url, headers=_github_headers(token), params={'ref': branch}, timeout=timeout)
         if response.status_code == 404:
-            return {}, '', 404
-        status = response.status_code
-        response.raise_for_status()
-        payload = response.json()
-        encoded = str(payload.get('content', '')).replace('\n', '')
-        decoded = base64.b64decode(encoded).decode('utf-8')
-        return json.loads(decoded), str(payload.get('sha', '')), status
+            result = ({}, '', 404)
+        else:
+            status = response.status_code
+            response.raise_for_status()
+            payload = response.json()
+            encoded = str(payload.get('content', '')).replace('\n', '')
+            decoded = base64.b64decode(encoded).decode('utf-8')
+            decoded_payload = json.loads(decoded)
+            if state is not None and not isinstance(decoded_payload, dict):
+                raise ValueError('Remote saved-row payload must be an object')
+            result = (decoded_payload, str(payload.get('sha', '')), status)
+        if state is not None:
+            state.responses[cache_key] = result
+        return result
     except Exception:
+        if state is not None:
+            state.unavailable = True
         return {}, '', 0
 
 
@@ -213,7 +268,7 @@ def _github_put_json(path: str, payload: dict[str, Any], message: str) -> bool:
     branch = _github_branch()
     if not token or not repo:
         return False
-    _existing, sha, _status = _github_get_json(path)
+    _existing, sha, _status = _github_get_json(path, use_read_budget=False)
     content = base64.b64encode((json.dumps(payload, ensure_ascii=False, indent=2, default=str) + '\n').encode('utf-8')).decode('ascii')
     body: dict[str, Any] = {'message': message, 'content': content, 'branch': branch}
     if sha:
@@ -229,15 +284,31 @@ def _github_put_json(path: str, payload: dict[str, Any], message: str) -> bool:
 
 def _github_get_payload(key: str, workspace_id: Any = 'test_01') -> tuple[list[dict[str, Any]], str]:
     index_payload, index_sha, _ = _github_get_json(_github_index_path(key, workspace_id))
+    state = _REMOTE_READ_BUDGET.get()
     if index_payload.get('format') == 'chunked':
+        if state is not None:
+            parts = index_payload.get('parts')
+            if type(parts) is not int or not 1 <= parts <= 64:
+                state.unavailable = True
+                return [], ''
         rows: list[dict[str, Any]] = []
         part_count = int(index_payload.get('parts') or 0)
         for part in range(part_count):
-            part_payload, _part_sha, _ = _github_get_json(_github_part_path(key, workspace_id, part))
+            part_payload, _part_sha, part_status = _github_get_json(_github_part_path(key, workspace_id, part))
+            state = _REMOTE_READ_BUDGET.get()
+            if state is not None and (state.unavailable or part_status != 200):
+                state.unavailable = True
+                return [], ''
+            if state is not None and (not isinstance(part_payload.get('rows'), list) or not all(isinstance(row, dict) for row in part_payload['rows'])):
+                state.unavailable = True
+                return [], ''
             part_rows = part_payload.get('rows', [])
             rows.extend([dict(row) for row in part_rows if isinstance(row, dict)])
         return dedupe_rows(rows), index_sha
-    payload, sha, _ = _github_get_json(_github_path(key, workspace_id))
+    payload, sha, status = _github_get_json(_github_path(key, workspace_id))
+    if state is not None and status == 200 and (not isinstance(payload.get('rows'), list) or not all(isinstance(row, dict) for row in payload['rows'])):
+        state.unavailable = True
+        return [], ''
     rows = payload.get('rows', [])
     return dedupe_rows([dict(row) for row in rows if isinstance(row, dict)]), sha
 
@@ -247,7 +318,7 @@ def _github_save_payload(key: str, rows: list[dict[str, Any]], workspace_id: Any
         return False
     workspace = normalize_workspace_id(workspace_id)
     cleaned = dedupe_rows(rows)
-    old_index, _old_sha, _ = _github_get_json(_github_index_path(key, workspace))
+    old_index, _old_sha, _ = _github_get_json(_github_index_path(key, workspace), use_read_budget=False)
     old_parts = int(old_index.get('parts') or 0) if old_index.get('format') == 'chunked' else 0
     parts = [cleaned[index:index + GITHUB_CHUNK_SIZE] for index in range(0, len(cleaned), GITHUB_CHUNK_SIZE)] or [[]]
     ok = True
