@@ -9,18 +9,21 @@ ENTRYPOINTS=['streamlit_app.py','app.py','app_streamlit.py','main.py','run.py','
 def assert_home(app, language='en'):
  assert not app.exception
  assert [x.value for x in app.title]==['ABA Signal Pro']
- expected='Use the Tools menu' if language=='en' else 'Usa el menú Tools'
+ expected='Core section in the sidebar' if language=='en' else 'sección Principal de la barra lateral'
  assert any(expected in str(x.value) for x in app.info)
  assert any(x.key=='aba_radio_global_language' for x in app.radio)
 
 @pytest.mark.parametrize('entry',ENTRYPOINTS)
 @pytest.mark.parametrize('scenario',['rerun','language','return','second_session'])
-def test_home_rendered_on_every_execution(entry,scenario):
+@pytest.mark.parametrize('language',['en','es'])
+def test_home_rendered_on_every_execution(entry,scenario,language):
  app=AppTest.from_file(str(ROOT/entry)).run(timeout=60)
- assert_home(app)
+ if language=='es':
+  app.radio(key='aba_radio_global_language').set_value('Español').run(timeout=60)
+ assert_home(app,language)
  app.session_state['SYNTHETIC_HOME_SENTINEL']={'unchanged':True}
  if scenario=='rerun':
-  app.run(timeout=60);assert_home(app)
+  app.run(timeout=60);assert_home(app,language)
  elif scenario=='language':
   app.radio(key='aba_radio_global_language').set_value('Español').run(timeout=60)
   assert_home(app,'es')
@@ -30,7 +33,7 @@ def test_home_rendered_on_every_execution(entry,scenario):
   app.switch_page('pages/pro_predictor_volume.py').run(timeout=60)
   assert not app.exception
   app.switch_page(entry).run(timeout=60)
-  assert_home(app)
+  assert_home(app,language)
  else:
   second=AppTest.from_file(str(ROOT/entry)).run(timeout=60)
   assert_home(second)

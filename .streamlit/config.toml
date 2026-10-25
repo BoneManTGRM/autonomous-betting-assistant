@@ -8,3 +8,13 @@ gatherUsageStats = false
 [client]
 showSidebarNavigation = false
 toolbarMode = "developer"
+
+[theme]
+base = "dark"
+# Native primary buttons use white text, including on legacy pages.
+# Shared branded buttons set both mint background and dark text explicitly.
+primaryColor = "#397653"
+backgroundColor = "#07120f"
+secondaryBackgroundColor = "#102018"
+textColor = "#eef7f4"
+font = "sans serif"

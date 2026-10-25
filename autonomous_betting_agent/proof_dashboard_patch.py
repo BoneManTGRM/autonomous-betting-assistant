@@ -102,6 +102,12 @@ def install_proof_dashboard_patch() -> None:
     st._proof_roi_patch_v1 = True
     old_json = st.json
     old_dg_json = DeltaGenerator.json
+    old_summary = tools.summarize_locked_picks
+
+    def summarize_locked_picks(frame: pd.DataFrame | list[dict[str, Any]]) -> dict[str, Any]:
+        # Keep the locked-pick API (including its status-based validity count).
+        # The ROI extension remains authoritative for grades, stakes and profit.
+        return {**old_summary(frame), **summarize(frame)}
 
     def patched_json(body: Any, *args: Any, **kwargs: Any) -> Any:
         out = old_json(body, *args, **kwargs)
@@ -118,6 +124,6 @@ def install_proof_dashboard_patch() -> None:
     st.json = patched_json
     DeltaGenerator.json = patched_dg_json
     tools.update_profit_columns = enhance
-    tools.summarize_locked_picks = summarize
+    tools.summarize_locked_picks = summarize_locked_picks
     tools.performance_by_group = group
     tools.cumulative_profit_frame = curve
