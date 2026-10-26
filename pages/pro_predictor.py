@@ -422,3 +422,7 @@ if st.button(t('run'), type='primary', use_container_width=True):
                 st.write(f'- {item}')
         else:
             st.caption(t('no_skipped'))
+
+# Session-only paper capture works on reruns without launching another scan.
+from autonomous_betting_agent.prediction_capture_ui import render_prediction_capture
+render_prediction_capture(st.session_state.get('pro_predictor_all_rows'), LANG)
