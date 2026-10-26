@@ -36,6 +36,7 @@ ADVANCED_TOOLS: tuple[tuple[str, str, str], ...] = (
     ('Public Proof Share', 'Compartir Prueba Pública', 'pages/public_proof_share.py'),
     ('Client Proof Viewer', 'Visor de Prueba para Cliente', 'pages/client_proof_viewer.py'),
     ('Local Control Center', 'Centro de Control Local', 'pages/local_control_center.py'),
+    ('Forward Test Tracker', 'Seguimiento prospectivo', 'pages/forward_test_tracker.py'),
     ('Learning Memory', 'Memoria de Aprendizaje', 'pages/learn_memory_safe.py'),
     ('Storage Diagnostics', 'Diagnóstico de Almacenamiento', 'pages/storage_diagnostics.py'),
     ('Reset Storage', 'Reiniciar almacenamiento', 'pages/reset_storage.py'),
