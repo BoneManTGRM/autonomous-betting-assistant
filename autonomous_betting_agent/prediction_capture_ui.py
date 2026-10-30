@@ -54,3 +54,37 @@ def render_prediction_capture(rows, language='en'):
             {key: row[key] for key in ('source_row_index', 'missing_fields', 'structural_error', 'omitted_field_names', 'possible_aliases_not_applied')}
             for row in snapshot['rows']]})
     st.page_link('pages/forward_test_tracker.py', label=t['next'])
+
+
+def render_stage_evidence(snapshot_json, language='en', *, status=None):
+    """Display already-captured session bytes; no new clock, scan or history load."""
+    import streamlit as st
+    es = language == 'es'
+    st.subheader('Evidencia anterior al ranking' if es else 'Pre-ranking stage evidence')
+    st.caption(
+        'Instantánea local de todas las filas construidas antes del ranking, después de los filtros de origen. Puede incluir calibración previa. No es toda la población escaneada ni una predicción original autenticada. No cambia el modelo ni el historial.' if es else
+        'Local snapshot of all built rows before ranking, after source/build filters. Values may already include calibration. Not the full scanned population or authenticated original predictions. No model or history changes.')
+    if not snapshot_json:
+        if status == 'capture_failed':
+            st.warning('La captura completa no fue posible; no hay descarga parcial.' if es else 'Whole-stage capture failed; no partial download is available.')
+        else:
+            st.info('No hay evidencia de etapa en esta sesión. Este panel no inicia escaneos.' if es else 'No stage evidence in this session. This panel does not start scans.')
+        return
+    try:
+        snapshot = json.loads(snapshot_json)
+        if snapshot.get('schema') != 'aba-pre-ranking-stage-evidence-v1':
+            raise ValueError('Unknown stage schema')
+        route = snapshot['origin_route']
+        stamp = snapshot['stage_captured_at']
+        count = snapshot['row_count']
+        digest = snapshot['content_sha256']
+    except (TypeError, ValueError, KeyError, AttributeError):
+        st.warning('Evidencia de etapa no disponible.' if es else 'Stage evidence unavailable.')
+        return
+    st.caption(f'{route} · {stamp} · {count}')
+    st.warning(
+        'La hora de captura no es la hora de predicción ni de observación de cuotas. Faltan procedencia original, versiones congeladas y reglas/identidades de liquidación. No permite entrenamiento, promoción ni afirmar mejoras.' if es else
+        'Capture time is not prediction time or odds-observation time. Original provenance, frozen versions and settlement rules/identities remain missing. No training, promotion or improvement claim is enabled.')
+    st.download_button('Descargar evidencia anterior al ranking' if es else 'Download pre-ranking stage evidence',
+                       snapshot_json, file_name=f'pre_ranking_evidence_{digest[:16]}.json',
+                       mime='application/json', key='aba_stage_evidence_download')

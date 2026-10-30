@@ -19,6 +19,7 @@ from autonomous_betting_agent.live_odds import list_sports, scan_market
 from autonomous_betting_agent.multi_source_fusion import fuse_row
 from autonomous_betting_agent.pick_hold_store import save_held_rows
 from autonomous_betting_agent.scanner_strength import score_scanner_frame, scanner_strength_summary
+from autonomous_betting_agent.prediction_stage_evidence import SESSION_KEY, capture_stage_evidence
 
 APP_VERSION = 'pro-predictor-v24-balldontlie-api-registry'
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -339,6 +340,9 @@ with st.expander(t('large_setup'), expanded=True):
     min_agent = h3.number_input(t('min_agent'), min_value=0.0, max_value=100.0, value=DEFAULTS['min_agent'], step=1.0)
 
 if st.button(t('run'), type='primary', use_container_width=True):
+    # A new requested run invalidates old stage evidence, even if it stops early.
+    st.session_state.pop(SESSION_KEY, None)
+    st.session_state['aba_pre_ranking_evidence_status'] = 'not_captured'
     if not odds_key:
         st.error('Odds API key is required.' if LANG == 'en' else 'La clave de Odds API es obligatoria.')
         st.stop()
@@ -370,6 +374,15 @@ if st.button(t('run'), type='primary', use_container_width=True):
         progress.progress((index + 1) / max(1, len(selected_sports)))
     progress.empty()
     raw = pd.DataFrame(rows)
+    # Separate immutable session evidence only: never add columns to persistence.
+    if rows:
+        try:
+            st.session_state[SESSION_KEY] = capture_stage_evidence(rows, origin_route=Path(__file__).stem)
+            st.session_state['aba_pre_ranking_evidence_status'] = 'captured'
+        except (ValueError, TypeError, OverflowError, RecursionError):
+            st.session_state['aba_pre_ranking_evidence_status'] = 'capture_failed'
+    else:
+        st.session_state['aba_pre_ranking_evidence_status'] = 'no_built_rows'
     if raw.empty:
         st.info(t('no_rows'))
         st.stop()
@@ -426,3 +439,6 @@ if st.button(t('run'), type='primary', use_container_width=True):
 # Session-only paper capture works on reruns without launching another scan.
 from autonomous_betting_agent.prediction_capture_ui import render_prediction_capture
 render_prediction_capture(st.session_state.get('pro_predictor_all_rows'), LANG)
+from autonomous_betting_agent.prediction_capture_ui import render_stage_evidence
+render_stage_evidence(st.session_state.get(SESSION_KEY), LANG,
+                      status=st.session_state.get('aba_pre_ranking_evidence_status'))
